@@ -1,0 +1,464 @@
+import pkg from 'pg'
+const { Pool } = pkg
+
+// Create PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // Ensure password is treated as string
+  ...(process.env.DATABASE_URL ? {} : {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'costra',
+    user: process.env.DB_USER || 'postgres',
+    password: String(process.env.DB_PASSWORD || 'postgres'),
+  }),
+})
+
+// Test connection
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database')
+})
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err)
+  process.exit(-1)
+})
+
+// Initialize database schema
+export const initDatabase = async () => {
+  try {
+    const client = await pool.connect()
+    
+    try {
+      // Users table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      // User preferences table (currency, etc.)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_preferences (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL UNIQUE,
+          currency TEXT DEFAULT 'USD',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+
+      // Cloud providers table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cloud_providers (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          provider_id TEXT NOT NULL,
+          provider_name TEXT NOT NULL,
+          icon TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id)
+        )
+      `)
+
+      // Cost data table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cost_data (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          provider_id TEXT NOT NULL,
+          month INTEGER NOT NULL,
+          year INTEGER NOT NULL,
+          current_month_cost DECIMAL(15, 2) DEFAULT 0,
+          last_month_cost DECIMAL(15, 2) DEFAULT 0,
+          forecast_cost DECIMAL(15, 2) DEFAULT 0,
+          credits DECIMAL(15, 2) DEFAULT 0,
+          savings DECIMAL(15, 2) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, month, year)
+        )
+      `)
+
+      // Service costs table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS service_costs (
+          id SERIAL PRIMARY KEY,
+          cost_data_id INTEGER NOT NULL,
+          service_name TEXT NOT NULL,
+          cost DECIMAL(15, 2) NOT NULL,
+          change_percent DECIMAL(10, 2) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (cost_data_id) REFERENCES cost_data(id) ON DELETE CASCADE
+        )
+      `)
+
+      // Savings plans table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS savings_plans (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          discount_percent DECIMAL(5, 2) NOT NULL,
+          status TEXT DEFAULT 'pending',
+          expires_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+
+      // Cloud provider credentials table (encrypted)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cloud_provider_credentials (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          provider_id TEXT NOT NULL,
+          provider_name TEXT NOT NULL,
+          credentials_encrypted TEXT NOT NULL,
+          is_active BOOLEAN DEFAULT true,
+          last_sync_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id)
+        )
+      `)
+
+      // Create indexes for better performance
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cost_data_user_month_year 
+        ON cost_data(user_id, month, year)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_service_costs_cost_data_id 
+        ON service_costs(cost_data_id)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_savings_plans_user_id 
+        ON savings_plans(user_id)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cloud_provider_credentials_user_id 
+        ON cloud_provider_credentials(user_id)
+      `)
+
+      console.log('Database schema initialized successfully')
+    } finally {
+      client.release()
+    }
+  } catch (error) {
+    console.error('Error initializing database:', error)
+    throw error
+  }
+}
+
+// User operations
+export const createUser = async (name, email, passwordHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+      [name, email, passwordHash]
+    )
+    const userId = result.rows[0].id
+    
+    // Create default preferences
+    await client.query(
+      'INSERT INTO user_preferences (user_id, currency) VALUES ($1, $2)',
+      [userId, 'USD']
+    )
+    
+    return userId
+  } finally {
+    client.release()
+  }
+}
+
+export const getUserByEmail = async (email) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query('SELECT * FROM users WHERE email = $1', [email])
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+export const getUserById = async (id) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT id, name, email, created_at FROM users WHERE id = $1',
+      [id]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+// User preferences operations
+export const getUserPreferences = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT * FROM user_preferences WHERE user_id = $1',
+      [userId]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+export const updateUserCurrency = async (userId, currency) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'UPDATE user_preferences SET currency = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+      [currency, userId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Cost data operations
+export const getCostDataForUser = async (userId, month, year) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT cd.*, cp.provider_name, cp.icon, cp.provider_id as provider_code
+       FROM cost_data cd
+       JOIN cloud_providers cp ON cd.provider_id = cp.provider_id AND cd.user_id = cp.user_id
+       WHERE cd.user_id = $1 AND cd.month = $2 AND cd.year = $3
+       ORDER BY cd.current_month_cost DESC`,
+      [userId, month, year]
+    )
+
+    const costData = result.rows
+
+    // Get service costs for each cost data entry
+    for (const cost of costData) {
+      const servicesResult = await client.query(
+        'SELECT * FROM service_costs WHERE cost_data_id = $1',
+        [cost.id]
+      )
+      cost.services = servicesResult.rows
+    }
+
+    return costData
+  } finally {
+    client.release()
+  }
+}
+
+export const saveCostData = async (userId, providerId, month, year, costData) => {
+  const client = await pool.connect()
+  try {
+    // Start transaction
+    await client.query('BEGIN')
+
+    try {
+      // Ensure provider exists
+      await client.query(
+        `INSERT INTO cloud_providers (user_id, provider_id, provider_name, icon)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, provider_id) DO NOTHING`,
+        [userId, providerId, costData.providerName, costData.icon]
+      )
+
+      // Save cost data
+      const costResult = await client.query(
+        `INSERT INTO cost_data 
+         (user_id, provider_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id, provider_id, month, year) 
+         DO UPDATE SET 
+           current_month_cost = EXCLUDED.current_month_cost,
+           last_month_cost = EXCLUDED.last_month_cost,
+           forecast_cost = EXCLUDED.forecast_cost,
+           credits = EXCLUDED.credits,
+           savings = EXCLUDED.savings,
+           updated_at = CURRENT_TIMESTAMP
+         RETURNING id`,
+        [
+          userId,
+          providerId,
+          month,
+          year,
+          costData.currentMonth,
+          costData.lastMonth,
+          costData.forecast,
+          costData.credits,
+          costData.savings
+        ]
+      )
+
+      const costDataId = costResult.rows[0].id
+
+      // Clear old service costs and insert new ones
+      await client.query('DELETE FROM service_costs WHERE cost_data_id = $1', [costDataId])
+
+      if (costData.services && costData.services.length > 0) {
+        for (const service of costData.services) {
+          await client.query(
+            'INSERT INTO service_costs (cost_data_id, service_name, cost, change_percent) VALUES ($1, $2, $3, $4)',
+            [costDataId, service.name, service.cost, service.change]
+          )
+        }
+      }
+
+      await client.query('COMMIT')
+      return costDataId
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    }
+  } finally {
+    client.release()
+  }
+}
+
+// Savings plans operations
+export const getSavingsPlansForUser = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT * FROM savings_plans WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    )
+    return result.rows
+  } finally {
+    client.release()
+  }
+}
+
+export const saveSavingsPlan = async (userId, plan) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO savings_plans (user_id, name, provider, discount_percent, status, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, plan.name, plan.provider, plan.discount, plan.status || 'pending', plan.expiresAt || null]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Cloud provider credentials operations
+export const addCloudProvider = async (userId, providerId, providerName, credentials) => {
+  const client = await pool.connect()
+  try {
+    const { encrypt } = await import('./services/encryption.js')
+    const credentialsJson = JSON.stringify(credentials)
+    const encryptedCredentials = encrypt(credentialsJson)
+
+    const result = await client.query(
+      `INSERT INTO cloud_provider_credentials 
+       (user_id, provider_id, provider_name, credentials_encrypted, is_active, updated_at)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id, provider_id) 
+       DO UPDATE SET 
+         provider_name = EXCLUDED.provider_name,
+         credentials_encrypted = EXCLUDED.credentials_encrypted,
+         is_active = EXCLUDED.is_active,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING id`,
+      [userId, providerId, providerName, encryptedCredentials, true]
+    )
+    return result.rows[0].id
+  } finally {
+    client.release()
+  }
+}
+
+export const getUserCloudProviders = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT id, provider_id, provider_name, is_active, last_sync_at, created_at, updated_at
+       FROM cloud_provider_credentials
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    )
+    return result.rows
+  } finally {
+    client.release()
+  }
+}
+
+export const getCloudProviderCredentials = async (userId, providerId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT credentials_encrypted
+       FROM cloud_provider_credentials
+       WHERE user_id = $1 AND provider_id = $2 AND is_active = true`,
+      [userId, providerId]
+    )
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    const { decrypt } = await import('./services/encryption.js')
+    const decrypted = decrypt(result.rows[0].credentials_encrypted)
+    return JSON.parse(decrypted)
+  } finally {
+    client.release()
+  }
+}
+
+export const deleteCloudProvider = async (userId, providerId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM cloud_provider_credentials
+       WHERE user_id = $1 AND provider_id = $2
+       RETURNING id`,
+      [userId, providerId]
+    )
+    return result.rows.length > 0
+  } finally {
+    client.release()
+  }
+}
+
+export const updateCloudProviderStatus = async (userId, providerId, isActive) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `UPDATE cloud_provider_credentials
+       SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2 AND provider_id = $3`,
+      [isActive, userId, providerId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Close database connection pool
+export const closeDatabase = async () => {
+  await pool.end()
+  console.log('Database connection pool closed')
+}
+
+export { pool }

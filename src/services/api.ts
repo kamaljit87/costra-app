@@ -1,0 +1,167 @@
+// Use relative URL to leverage Vite proxy in development, or absolute URL in production
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3001/api')
+
+// Get auth token from localStorage
+const getToken = (): string | null => {
+  return localStorage.getItem('authToken')
+}
+
+// API request helper
+const apiRequest = async (
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Response> => {
+  const token = getToken()
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    })
+
+    if (!response.ok) {
+      let error
+      try {
+        const errorData = await response.json()
+        error = errorData.error || errorData.message || `HTTP error! status: ${response.status}`
+      } catch (e) {
+        // If response is not JSON, get text
+        const text = await response.text().catch(() => 'Request failed')
+        error = text || `HTTP error! status: ${response.status}`
+      }
+      throw new Error(error)
+    }
+
+    return response
+  } catch (error: any) {
+    // Handle network errors (server not running, CORS, etc.)
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Unable to connect to server. Please make sure the backend server is running on http://localhost:3001')
+    }
+    // Re-throw other errors
+    throw error
+  }
+}
+
+// Auth API
+export const authAPI = {
+  signup: async (name: string, email: string, password: string) => {
+    const response = await apiRequest('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password }),
+    })
+    const data = await response.json()
+    if (data.token) {
+      localStorage.setItem('authToken', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+    }
+    return data
+  },
+
+  login: async (email: string, password: string) => {
+    const response = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await response.json()
+    if (data.token) {
+      localStorage.setItem('authToken', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+    }
+    return data
+  },
+
+  getCurrentUser: async () => {
+    const response = await apiRequest('/auth/me')
+    return response.json()
+  },
+
+  logout: () => {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('user')
+  },
+}
+
+// Cost Data API
+export const costDataAPI = {
+  getCostData: async () => {
+    const response = await apiRequest('/cost-data')
+    return response.json()
+  },
+
+  saveCostData: async (providerId: string, costData: any) => {
+    const response = await apiRequest('/cost-data', {
+      method: 'POST',
+      body: JSON.stringify({ providerId, costData }),
+    })
+    return response.json()
+  },
+
+  getPreferences: async () => {
+    const response = await apiRequest('/cost-data/preferences')
+    return response.json()
+  },
+
+  updateCurrency: async (currency: string) => {
+    const response = await apiRequest('/cost-data/preferences/currency', {
+      method: 'PUT',
+      body: JSON.stringify({ currency }),
+    })
+    return response.json()
+  },
+}
+
+// Savings Plans API
+export const savingsPlansAPI = {
+  getSavingsPlans: async () => {
+    const response = await apiRequest('/savings-plans')
+    return response.json()
+  },
+
+  saveSavingsPlan: async (plan: any) => {
+    const response = await apiRequest('/savings-plans', {
+      method: 'POST',
+      body: JSON.stringify(plan),
+    })
+    return response.json()
+  },
+}
+
+// Cloud Providers API
+export const cloudProvidersAPI = {
+  getCloudProviders: async () => {
+    const response = await apiRequest('/cloud-providers')
+    return response.json()
+  },
+
+  addCloudProvider: async (providerId: string, providerName: string, credentials: any) => {
+    const response = await apiRequest('/cloud-providers', {
+      method: 'POST',
+      body: JSON.stringify({ providerId, providerName, credentials }),
+    })
+    return response.json()
+  },
+
+  deleteCloudProvider: async (providerId: string) => {
+    const response = await apiRequest(`/cloud-providers/${providerId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+
+  updateProviderStatus: async (providerId: string, isActive: boolean) => {
+    const response = await apiRequest(`/cloud-providers/${providerId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    })
+    return response.json()
+  },
+}

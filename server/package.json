@@ -1,0 +1,30 @@
+{
+  "name": "costra-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "setup": "node setup.js",
+    "pm2:start": "pm2 start ../ecosystem.config.js --only costra-backend",
+    "pm2:stop": "pm2 stop costra-backend",
+    "pm2:restart": "pm2 restart costra-backend",
+    "pm2:logs": "pm2 logs costra-backend",
+    "pm2:delete": "pm2 delete costra-backend"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.5"
+  }
+}
