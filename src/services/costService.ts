@@ -1,14 +1,7 @@
-import { costDataAPI, savingsPlansAPI } from './api'
-
 export interface CloudProvider {
   id: string
   name: string
   icon: string
-}
-
-export interface CostDataPoint {
-  date: string
-  cost: number
 }
 
 export interface CostData {
@@ -31,7 +24,7 @@ export interface CostData {
 export interface ServiceCost {
   name: string
   cost: number
-  change: number
+  change: number // percentage change
 }
 
 export interface SavingsPlan {
@@ -43,6 +36,21 @@ export interface SavingsPlan {
   expiresAt?: string
 }
 
+export interface CostDataPoint {
+  date: string
+  cost: number
+}
+
+import { costDataAPI } from './api'
+
+// Helper function to slice daily data for different periods
+const sliceDailyData = (dailyData: CostDataPoint[], days: number): CostDataPoint[] => {
+  if (dailyData.length === 0) return []
+  const sorted = [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  return sorted.slice(-days)
+}
+
+// Generate mock historical data for charts (daily data)
 const generateHistoricalData = (
   baseCost: number,
   days: number,
@@ -56,38 +64,11 @@ const generateHistoricalData = (
     date.setDate(date.getDate() - i)
     date.setHours(0, 0, 0, 0)
     
-    const trendFactor = 1 + (Math.sin(i / 10) * 0.05)
-    const randomFactor = 1 + (Math.random() - 0.5) * variance * 2
-    const cost = baseCost * trendFactor * randomFactor
-    
-    data.push({
-      date: date.toISOString(),
-      cost: Math.max(0, cost),
-    })
-  }
-  
-  return data
-}
-
-const generateMonthlyData = (
-  baseCost: number,
-  months: number,
-  variance: number = 0.1
-): CostDataPoint[] => {
-  const data: CostDataPoint[] = []
-  const now = new Date()
-  
-  for (let i = months - 1; i >= 0; i--) {
-    const date = new Date(now)
-    date.setMonth(date.getMonth() - i)
-    date.setDate(1)
-    date.setHours(0, 0, 0, 0)
-    
     const randomFactor = 1 + (Math.random() - 0.5) * variance * 2
     const cost = baseCost * randomFactor
     
     data.push({
-      date: date.toISOString(),
+      date: date.toISOString().split('T')[0],
       cost: Math.max(0, cost),
     })
   }
@@ -95,19 +76,59 @@ const generateMonthlyData = (
   return data
 }
 
+// Get cost data from API or return mock data for demo mode
+export const getCostData = async (isDemoMode: boolean = false): Promise<CostData[]> => {
+  // If demo mode, return mock data
+  if (isDemoMode) {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    return getMockCostData()
+  }
+
+  try {
+    const response = await costDataAPI.getCostData()
+    const costData = response.costData || []
+    
+    // Add historical chart data to each provider (using mock data for now)
+    // In production, this would fetch from daily_cost_data table
+    return costData.map((data: any) => {
+      const allHistoricalData = generateHistoricalData(data.currentMonth, 365, 0.15)
+      return {
+        ...data,
+        chartData30Days: sliceDailyData(allHistoricalData, 30),
+        chartData60Days: sliceDailyData(allHistoricalData, 60),
+        chartData120Days: sliceDailyData(allHistoricalData, 120),
+        chartData180Days: sliceDailyData(allHistoricalData, 180),
+        chartData4Months: sliceDailyData(allHistoricalData, 120),
+        chartData6Months: sliceDailyData(allHistoricalData, 180),
+        allHistoricalData,
+      }
+    })
+  } catch (error) {
+    console.error('Failed to fetch cost data:', error)
+    // Fallback to mock data on error
+    return getMockCostData()
+  }
+}
+
+// Mock data for demo mode
 const getMockCostData = (): CostData[] => {
-  const awsBaseCost = 12450.75
-  const azureBaseCost = 8950.25
-  const gcpBaseCost = 6750.50
-  
-  const awsAllData = generateHistoricalData(awsBaseCost, 365, 0.15)
-  const azureAllData = generateHistoricalData(azureBaseCost, 365, 0.15)
-  const gcpAllData = generateHistoricalData(gcpBaseCost, 365, 0.15)
-  
+  const generateAllData = (baseCost: number) => {
+    const allHistoricalData = generateHistoricalData(baseCost, 365, 0.15)
+    return {
+      chartData30Days: sliceDailyData(allHistoricalData, 30),
+      chartData60Days: sliceDailyData(allHistoricalData, 60),
+      chartData120Days: sliceDailyData(allHistoricalData, 120),
+      chartData180Days: sliceDailyData(allHistoricalData, 180),
+      chartData4Months: sliceDailyData(allHistoricalData, 120),
+      chartData6Months: sliceDailyData(allHistoricalData, 180),
+      allHistoricalData,
+    }
+  }
+
   return [
     {
       provider: { id: 'aws', name: 'Amazon Web Services', icon: '☁️' },
-      currentMonth: awsBaseCost,
+      currentMonth: 12450.75,
       lastMonth: 11800.50,
       forecast: 13500.00,
       credits: 500.00,
@@ -119,17 +140,11 @@ const getMockCostData = (): CostData[] => {
         { name: 'Lambda Functions', cost: 850.00, change: 12.3 },
         { name: 'CloudFront CDN', cost: 1100.00, change: -1.5 },
       ],
-      chartData30Days: awsAllData.slice(-30),
-      chartData60Days: awsAllData.slice(-60),
-      chartData120Days: awsAllData.slice(-120),
-      chartData180Days: awsAllData.slice(-180),
-      chartData4Months: generateMonthlyData(awsBaseCost, 4, 0.2),
-      chartData6Months: generateMonthlyData(awsBaseCost, 6, 0.25),
-      allHistoricalData: awsAllData,
+      ...generateAllData(12450.75),
     },
     {
       provider: { id: 'azure', name: 'Microsoft Azure', icon: '🔷' },
-      currentMonth: azureBaseCost,
+      currentMonth: 8950.25,
       lastMonth: 9200.00,
       forecast: 9800.00,
       credits: 300.00,
@@ -141,17 +156,11 @@ const getMockCostData = (): CostData[] => {
         { name: 'Functions', cost: 650.00, change: 9.2 },
         { name: 'CDN', cost: 550.00, change: -2.1 },
       ],
-      chartData30Days: azureAllData.slice(-30),
-      chartData60Days: azureAllData.slice(-60),
-      chartData120Days: azureAllData.slice(-120),
-      chartData180Days: azureAllData.slice(-180),
-      chartData4Months: generateMonthlyData(azureBaseCost, 4, 0.2),
-      chartData6Months: generateMonthlyData(azureBaseCost, 6, 0.25),
-      allHistoricalData: azureAllData,
+      ...generateAllData(8950.25),
     },
     {
       provider: { id: 'gcp', name: 'Google Cloud Platform', icon: '🔵' },
-      currentMonth: gcpBaseCost,
+      currentMonth: 6750.50,
       lastMonth: 7100.00,
       forecast: 7200.00,
       credits: 200.00,
@@ -163,46 +172,31 @@ const getMockCostData = (): CostData[] => {
         { name: 'Cloud Functions', cost: 550.00, change: 11.5 },
         { name: 'Cloud CDN', cost: 350.00, change: -1.8 },
       ],
-      chartData30Days: gcpAllData.slice(-30),
-      chartData60Days: gcpAllData.slice(-60),
-      chartData120Days: gcpAllData.slice(-120),
-      chartData180Days: gcpAllData.slice(-180),
-      chartData4Months: generateMonthlyData(gcpBaseCost, 4, 0.2),
-      chartData6Months: generateMonthlyData(gcpBaseCost, 6, 0.25),
-      allHistoricalData: gcpAllData,
+      ...generateAllData(6750.50),
     },
   ]
 }
 
-export const getCostData = async (isDemoMode: boolean = false): Promise<CostData[]> => {
+import { savingsPlansAPI } from './api'
+
+export const getSavingsPlans = async (isDemoMode: boolean = false): Promise<SavingsPlan[]> => {
+  // If demo mode, return mock data
   if (isDemoMode) {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return getMockCostData()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return getMockSavingsPlans()
   }
 
   try {
-    const response = await costDataAPI.getCostData()
-    const costData = response.costData || []
-    
-    return costData.map((data: any) => {
-      const allData = generateHistoricalData(data.currentMonth, 365, 0.15)
-      return {
-        ...data,
-        chartData30Days: allData.slice(-30),
-        chartData60Days: allData.slice(-60),
-        chartData120Days: allData.slice(-120),
-        chartData180Days: allData.slice(-180),
-        chartData4Months: generateMonthlyData(data.currentMonth, 4, 0.2),
-        chartData6Months: generateMonthlyData(data.currentMonth, 6, 0.25),
-        allHistoricalData: allData,
-      }
-    })
+    const response = await savingsPlansAPI.getSavingsPlans()
+    return response.savingsPlans || []
   } catch (error) {
-    console.error('Failed to fetch cost data:', error)
-    return getMockCostData()
+    console.error('Failed to fetch savings plans:', error)
+    // Fallback to mock data on error
+    return getMockSavingsPlans()
   }
 }
 
+// Mock savings plans for demo mode
 const getMockSavingsPlans = (): SavingsPlan[] => {
   return [
     {
@@ -239,25 +233,76 @@ const getMockSavingsPlans = (): SavingsPlan[] => {
   ]
 }
 
-export const getSavingsPlans = async (isDemoMode: boolean = false): Promise<SavingsPlan[]> => {
-  if (isDemoMode) {
-    await new Promise(resolve => setTimeout(resolve, 300))
-    return getMockSavingsPlans()
-  }
-
-  try {
-    const response = await savingsPlansAPI.getSavingsPlans()
-    return response.savingsPlans || []
-  } catch (error) {
-    console.error('Failed to fetch savings plans:', error)
-    return getMockSavingsPlans()
-  }
-}
-
+// Get detailed cost data for a specific provider with historical data
 export const getProviderCostDetails = async (
   providerId: string,
   isDemoMode: boolean = false
 ): Promise<CostData | null> => {
-  const allData = await getCostData(isDemoMode)
-  return allData.find(data => data.provider.id === providerId) || null
+  if (isDemoMode) {
+    const allData = await getCostData(isDemoMode)
+    const data = allData.find(data => data.provider.id === providerId)
+    return data || null
+  }
+
+  try {
+    // Get monthly cost data
+    const response = await costDataAPI.getCostData()
+    const costData = response.costData || []
+    const providerData = costData.find((data: any) => data.provider.id === providerId)
+    
+    if (!providerData) {
+      return null
+    }
+
+    // Fetch daily cost data for last 180 days
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 180)
+    
+    try {
+      const dailyResponse = await costDataAPI.getDailyCostData(
+        providerId,
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0]
+      )
+      
+      const dailyData: CostDataPoint[] = dailyResponse.dailyData || []
+      
+      // Sort and slice for different periods
+      const sortedDaily = [...dailyData].sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      )
+
+      return {
+        ...providerData,
+        chartData30Days: sliceDailyData(sortedDaily, 30),
+        chartData60Days: sliceDailyData(sortedDaily, 60),
+        chartData120Days: sliceDailyData(sortedDaily, 120),
+        chartData180Days: sliceDailyData(sortedDaily, 180),
+        chartData4Months: sliceDailyData(sortedDaily, 120), // 4 months ≈ 120 days
+        chartData6Months: sliceDailyData(sortedDaily, 180), // 6 months ≈ 180 days
+        allHistoricalData: sortedDaily,
+      }
+    } catch (dailyError) {
+      console.warn('Failed to fetch daily cost data, using mock data:', dailyError)
+      // If daily data fetch fails, generate mock data
+      const allHistoricalData = generateHistoricalData(providerData.currentMonth, 365, 0.15)
+      return {
+        ...providerData,
+        chartData30Days: sliceDailyData(allHistoricalData, 30),
+        chartData60Days: sliceDailyData(allHistoricalData, 60),
+        chartData120Days: sliceDailyData(allHistoricalData, 120),
+        chartData180Days: sliceDailyData(allHistoricalData, 180),
+        chartData4Months: sliceDailyData(allHistoricalData, 120),
+        chartData6Months: sliceDailyData(allHistoricalData, 180),
+        allHistoricalData,
+      }
+    }
+  } catch (error) {
+    console.error('Failed to fetch provider cost details:', error)
+    // Fallback to mock data
+    const allData = await getCostData(true)
+    const data = allData.find(data => data.provider.id === providerId)
+    return data || null
+  }
 }

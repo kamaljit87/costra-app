@@ -117,6 +117,7 @@ router.post('/login',
       })
     } catch (error) {
       console.error('Login error:', error)
+      console.error('Login error stack:', error.stack)
       // Provide more specific error messages
       if (error.message && error.message.includes('database')) {
         return res.status(500).json({ error: 'Database error. Please check your database connection.' })
@@ -143,6 +144,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     })
   } catch (error) {
     console.error('Get user error:', error)
+    console.error('Get user error stack:', error.stack)
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })

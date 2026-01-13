@@ -1,7 +1,15 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
-import { getCloudProviderCredentials, getUserCloudProviders, saveCostData, pool } from '../database.js'
-import { fetchProviderCostData } from '../services/cloudProviderIntegrations.js'
+import { 
+  getCloudProviderCredentials, 
+  getUserCloudProviders, 
+  saveCostData, 
+  saveBulkDailyCostData,
+  getCachedCostData,
+  setCachedCostData,
+  pool 
+} from '../database.js'
+import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
 
 const router = express.Router()
 
@@ -25,15 +33,15 @@ router.post('/', async (req, res) => {
     const results = []
     const errors = []
 
-    // Calculate date range (current month and last month)
+    // Calculate date range - fetch last 180 days for historical data
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1
     const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
-    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-    const endDate = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0]
+    // Fetch 180 days of data for historical tracking
+    const { startDate, endDate } = getDateRange(180)
 
     for (const provider of providers) {
       try {
@@ -53,15 +61,24 @@ router.post('/', async (req, res) => {
           continue
         }
 
-        // Fetch cost data from provider API
-        const costData = await fetchProviderCostData(
-          provider.provider_id,
-          credentials,
-          startDate,
-          endDate
-        )
+        // Check cache first
+        const cacheKey = `${provider.provider_id}-${startDate}-${endDate}`
+        let costData = await getCachedCostData(userId, provider.provider_id, cacheKey)
+        
+        if (!costData) {
+          // Fetch cost data from provider API
+          costData = await fetchProviderCostData(
+            provider.provider_id,
+            credentials,
+            startDate,
+            endDate
+          )
+          
+          // Cache the result for 60 minutes
+          await setCachedCostData(userId, provider.provider_id, cacheKey, costData, 60)
+        }
 
-        // Save to database
+        // Save monthly cost data to database
         await saveCostData(
           userId,
           provider.provider_id,
@@ -78,6 +95,11 @@ router.post('/', async (req, res) => {
             services: costData.services || [],
           }
         )
+
+        // Save daily cost data for historical tracking
+        if (costData.dailyData && costData.dailyData.length > 0) {
+          await saveBulkDailyCostData(userId, provider.provider_id, costData.dailyData)
+        }
 
         // Update last sync time
         const client = await pool.connect()
@@ -139,17 +161,25 @@ router.post('/:providerId', async (req, res) => {
     const provider = providers.find(p => p.provider_id === providerId)
     const providerName = provider?.provider_name || providerId
 
-    // Calculate date range
+    // Calculate date range - fetch last 180 days for historical data
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
-    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-    const endDate = new Date(currentYear, currentMonth, 0).toISOString().split('T')[0]
+    const { startDate, endDate } = getDateRange(180)
 
-    // Fetch cost data
-    const costData = await fetchProviderCostData(providerId, credentials, startDate, endDate)
+    // Check cache first
+    const cacheKey = `${providerId}-${startDate}-${endDate}`
+    let costData = await getCachedCostData(userId, providerId, cacheKey)
+    
+    if (!costData) {
+      // Fetch cost data from provider API
+      costData = await fetchProviderCostData(providerId, credentials, startDate, endDate)
+      
+      // Cache the result for 60 minutes
+      await setCachedCostData(userId, providerId, cacheKey, costData, 60)
+    }
 
-    // Save to database
+    // Save monthly cost data to database
     await saveCostData(
       userId,
       providerId,
@@ -166,6 +196,11 @@ router.post('/:providerId', async (req, res) => {
         services: costData.services || [],
       }
     )
+
+    // Save daily cost data for historical tracking
+    if (costData.dailyData && costData.dailyData.length > 0) {
+      await saveBulkDailyCostData(userId, providerId, costData.dailyData)
+    }
 
         // Update last sync time
         const client = await pool.connect()

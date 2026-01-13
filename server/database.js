@@ -117,6 +117,36 @@ export const initDatabase = async () => {
         )
       `)
 
+      // Daily cost data table for historical tracking
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS daily_cost_data (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          provider_id TEXT NOT NULL,
+          date DATE NOT NULL,
+          cost DECIMAL(15, 2) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, date)
+        )
+      `)
+
+      // Cost data cache table for API response caching
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cost_data_cache (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          provider_id TEXT NOT NULL,
+          cache_key TEXT NOT NULL,
+          cache_data JSONB NOT NULL,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, cache_key)
+        )
+      `)
+
       // Savings plans table
       await client.query(`
         CREATE TABLE IF NOT EXISTS savings_plans (
@@ -169,6 +199,21 @@ export const initDatabase = async () => {
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_cloud_provider_credentials_user_id 
         ON cloud_provider_credentials(user_id)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_daily_cost_data_user_provider_date 
+        ON daily_cost_data(user_id, provider_id, date)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cost_data_cache_user_provider 
+        ON cost_data_cache(user_id, provider_id)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cost_data_cache_expires 
+        ON cost_data_cache(expires_at)
       `)
 
       console.log('Database schema initialized successfully')
@@ -566,6 +611,115 @@ export const updateCloudProviderStatus = async (userId, providerId, isActive) =>
        SET is_active = $1, updated_at = CURRENT_TIMESTAMP
        WHERE user_id = $2 AND provider_id = $3`,
       [isActive, userId, providerId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Daily cost data operations
+export const saveDailyCostData = async (userId, providerId, date, cost) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+       ON CONFLICT (user_id, provider_id, date)
+       DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
+      [userId, providerId, date, cost]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+export const saveBulkDailyCostData = async (userId, providerId, dailyData) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    
+    try {
+      for (const { date, cost } of dailyData) {
+        await client.query(
+          `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
+           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+           ON CONFLICT (user_id, provider_id, date)
+           DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
+          [userId, providerId, date, cost]
+        )
+      }
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK')
+      throw error
+    }
+  } finally {
+    client.release()
+  }
+}
+
+export const getDailyCostData = async (userId, providerId, startDate, endDate) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT date, cost
+       FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2 AND date >= $3 AND date <= $4
+       ORDER BY date ASC`,
+      [userId, providerId, startDate, endDate]
+    )
+    return result.rows.map(row => ({
+      date: row.date.toISOString().split('T')[0],
+      cost: parseFloat(row.cost)
+    }))
+  } finally {
+    client.release()
+  }
+}
+
+// Cache operations
+export const getCachedCostData = async (userId, providerId, cacheKey) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT cache_data, expires_at
+       FROM cost_data_cache
+       WHERE user_id = $1 AND provider_id = $2 AND cache_key = $3 AND expires_at > CURRENT_TIMESTAMP`,
+      [userId, providerId, cacheKey]
+    )
+    
+    if (result.rows.length > 0) {
+      return result.rows[0].cache_data
+    }
+    return null
+  } finally {
+    client.release()
+  }
+}
+
+export const setCachedCostData = async (userId, providerId, cacheKey, cacheData, ttlMinutes = 60) => {
+  const client = await pool.connect()
+  try {
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + ttlMinutes)
+    
+    await client.query(
+      `INSERT INTO cost_data_cache (user_id, provider_id, cache_key, cache_data, expires_at)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (user_id, provider_id, cache_key)
+       DO UPDATE SET cache_data = EXCLUDED.cache_data, expires_at = EXCLUDED.expires_at`,
+      [userId, providerId, cacheKey, JSON.stringify(cacheData), expiresAt]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+export const clearExpiredCache = async () => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'DELETE FROM cost_data_cache WHERE expires_at < CURRENT_TIMESTAMP'
     )
   } finally {
     client.release()

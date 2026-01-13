@@ -6,6 +6,7 @@ import {
   getUserPreferences,
   updateUserCurrency,
   updateProviderCredits,
+  getDailyCostData,
 } from '../database.js'
 
 const router = express.Router()
@@ -76,7 +77,8 @@ router.get('/preferences', async (req, res) => {
     res.json({ preferences })
   } catch (error) {
     console.error('Get preferences error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('Get preferences error stack:', error.stack)
+    res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
 
@@ -140,6 +142,25 @@ router.get('/:providerId/credits', async (req, res) => {
     res.json({ credits: parseFloat(providerData.credits) || 0 })
   } catch (error) {
     console.error('Get credits error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Get daily cost data for a provider within a date range
+router.get('/:providerId/daily', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId } = req.params
+    const { startDate, endDate } = req.query
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate query parameters are required' })
+    }
+
+    const dailyData = await getDailyCostData(userId, providerId, startDate, endDate)
+    res.json({ dailyData })
+  } catch (error) {
+    console.error('Get daily cost data error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

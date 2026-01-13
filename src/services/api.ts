@@ -130,6 +130,11 @@ export const costDataAPI = {
     })
     return response.json()
   },
+
+  getDailyCostData: async (providerId: string, startDate: string, endDate: string) => {
+    const response = await apiRequest(`/cost-data/${providerId}/daily?startDate=${startDate}&endDate=${endDate}`)
+    return response.json()
+  },
 }
 
 // Savings Plans API
