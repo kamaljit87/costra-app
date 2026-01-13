@@ -2,7 +2,7 @@ import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { body, validationResult } from 'express-validator'
-import { createUser, getUserByEmail } from '../database.js'
+import { createUser, getUserByEmail, getUserById } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
@@ -45,13 +45,16 @@ router.post('/signup',
         { expiresIn: '7d' }
       )
 
+      // Get the created user to return full user object
+      const user = await getUserByEmail(email)
       res.status(201).json({
         message: 'User created successfully',
         token,
         user: {
-          id: userId,
-          name,
-          email,
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatar_url,
         },
       })
     } catch (error) {
@@ -109,6 +112,7 @@ router.post('/login',
           id: user.id,
           name: user.name,
           email: user.email,
+          avatarUrl: user.avatar_url,
         },
       })
     } catch (error) {
@@ -125,15 +129,21 @@ router.post('/login',
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const { getUserById } = await import('../database.js')
     const user = await getUserById(req.user.userId)
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
-    res.json({ user })
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatar_url || null,
+      },
+    })
   } catch (error) {
     console.error('Get user error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
 

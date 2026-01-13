@@ -1,30 +1,51 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
+import { cloudProvidersAPI, syncAPI } from '../services/api'
 import Layout from '../components/Layout'
-import CostOverview from '../components/CostOverview'
-import CreditsSavingsCard from '../components/CreditsSavingsCard'
-import ProviderCostCard from '../components/ProviderCostCard'
+import TotalBillSummary from '../components/TotalBillSummary'
+import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
-import { Sparkles, RefreshCw } from 'lucide-react'
+import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
+
+interface ConfiguredProvider {
+  id: number
+  providerId: string
+  providerName: string
+  isActive: boolean
+}
+
+const PROVIDER_ICONS: { [key: string]: string } = {
+  aws: '☁️',
+  azure: '🔷',
+  gcp: '🔵',
+  digitalocean: '🌊',
+  linode: '🟢',
+  vultr: '⚡',
+}
 
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
-  const { formatCurrency, convertAmount } = useCurrency()
+  const { convertAmount } = useCurrency()
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
+  const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const loadData = async () => {
     try {
-      const [costs, plans] = await Promise.all([
+      const [costs, plans, providersResponse] = await Promise.all([
         getCostData(isDemoMode),
         getSavingsPlans(isDemoMode),
+        isDemoMode ? Promise.resolve({ providers: [] }) : cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
       ])
       setCostData(costs)
       setSavingsPlans(plans)
+      setConfiguredProviders(providersResponse.providers || [])
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
@@ -35,13 +56,41 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [isDemoMode])
 
   const handleRefresh = () => {
     setIsRefreshing(true)
     loadData()
   }
 
+  const handleSync = async () => {
+    if (isDemoMode) {
+      alert('Sync is not available in demo mode. Please sign up to sync your cloud providers.')
+      return
+    }
+
+    setIsSyncing(true)
+    try {
+      const result = await syncAPI.syncAll()
+      if (result.errors && result.errors.length > 0) {
+        alert(`Sync completed with some errors:\n${result.errors.map((e: any) => `${e.providerId}: ${e.error}`).join('\n')}`)
+      } else {
+        alert('Sync completed successfully!')
+      }
+      // Reload data after sync
+      await loadData()
+    } catch (error: any) {
+      console.error('Sync error:', error)
+      alert(`Sync failed: ${error.message || 'Unknown error'}`)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  // Calculate totals
+  const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
+  const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
+  const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
   const totalCredits = costData.reduce((sum, data) => sum + convertAmount(data.credits), 0)
   const totalSavings = costData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
 
@@ -59,23 +108,36 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Header with Refresh */}
-        <div className="flex items-center justify-between mb-8">
+        {/* Header with Refresh and Sync */}
+        <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Cost Dashboard</h1>
             <p className="text-gray-600">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Refresh data"
-          >
-            <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {!isDemoMode && (
+              <button
+                onClick={handleSync}
+                disabled={isSyncing}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Sync cost data from cloud providers"
+              >
+                <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+              </button>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              title="Refresh data"
+            >
+              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -87,23 +149,131 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {/* Cost Overview */}
-            <CostOverview costData={costData} />
+            {/* Total Bill Summary */}
+            <TotalBillSummary
+              totalCurrent={totalCurrent}
+              totalLastMonth={totalLastMonth}
+              totalForecast={totalForecast}
+              totalCredits={totalCredits}
+              totalSavings={totalSavings}
+            />
 
-            {/* Credits & Savings */}
-            <div className="mb-8">
-              <CreditsSavingsCard credits={totalCredits} savings={totalSavings} />
-            </div>
-
-            {/* Provider Costs */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">By Provider</h2>
-              <div className="grid md:grid-cols-3 gap-6">
-                {costData.map((data) => (
-                  <ProviderCostCard key={data.provider.id} data={data} />
-                ))}
-              </div>
-            </div>
+            {/* Provider Sections with Charts */}
+            {(() => {
+              // Merge configured providers with cost data
+              // Show all configured providers, even if they don't have cost data yet
+              const allProviders = new Map<string, CostData>()
+              
+              // Add providers with cost data
+              costData.forEach(data => {
+                allProviders.set(data.provider.id, data)
+              })
+              
+              // Add configured providers without cost data (show as empty/zero)
+              if (!isDemoMode) {
+                configuredProviders
+                  .filter(p => p.isActive)
+                  .forEach(provider => {
+                    if (!allProviders.has(provider.providerId)) {
+                      // Create empty cost data for configured providers without cost data
+                      allProviders.set(provider.providerId, {
+                        provider: {
+                          id: provider.providerId,
+                          name: provider.providerName,
+                          icon: PROVIDER_ICONS[provider.providerId] || '☁️',
+                        },
+                        currentMonth: 0,
+                        lastMonth: 0,
+                        forecast: 0,
+                        credits: 0,
+                        savings: 0,
+                        services: [],
+                        chartData30Days: [],
+                        chartData60Days: [],
+                        chartData120Days: [],
+                        chartData180Days: [],
+                        chartData4Months: [],
+                        chartData6Months: [],
+                        allHistoricalData: [],
+                      })
+                    }
+                  })
+              }
+              
+              const providersToShow = Array.from(allProviders.values())
+              
+              if (providersToShow.length > 0) {
+                return (
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">By Provider</h2>
+                    <div className="space-y-8">
+                      {providersToShow.map((data) => {
+                        const hasData = data.currentMonth > 0 || data.services.length > 0
+                        return (
+                          <div key={data.provider.id}>
+                            {hasData ? (
+                              <ProviderSection
+                                providerId={data.provider.id}
+                                providerName={data.provider.name}
+                                providerIcon={data.provider.icon}
+                                currentMonth={data.currentMonth}
+                                lastMonth={data.lastMonth}
+                                forecast={data.forecast}
+                                credits={data.credits}
+                                savings={data.savings}
+                                chartData30Days={data.chartData30Days}
+                                chartData60Days={data.chartData60Days}
+                                chartData120Days={data.chartData120Days}
+                                chartData180Days={data.chartData180Days}
+                                chartData4Months={data.chartData4Months}
+                                chartData6Months={data.chartData6Months}
+                              />
+                            ) : (
+                              <div className="card">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="text-3xl">{data.provider.icon}</span>
+                                    <div>
+                                      <h2 className="text-xl font-semibold text-gray-900">{data.provider.name}</h2>
+                                      <p className="text-sm text-gray-600">No cost data available yet</p>
+                                    </div>
+                                  </div>
+                                  <Link
+                                    to={`/provider/${data.provider.id}`}
+                                    className="flex items-center space-x-2 px-4 py-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                                  >
+                                    <span>View Details</span>
+                                  </Link>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-6 text-center">
+                                  <p className="text-gray-600 mb-2">Cost data will appear here once your provider is synced.</p>
+                                  <p className="text-sm text-gray-500">Cost data is typically synced every 24 hours.</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              } else {
+                return (
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-6">By Provider</h2>
+                    <div className="card text-center py-12">
+                      <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
+                      <Link
+                        to="/settings"
+                        className="text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        Add a cloud provider in Settings →
+                      </Link>
+                    </div>
+                  </div>
+                )
+              }
+            })()}
 
             {/* Savings Plans */}
             <div className="mb-8">

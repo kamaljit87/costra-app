@@ -5,6 +5,7 @@ import {
   saveCostData,
   getUserPreferences,
   updateUserCurrency,
+  updateProviderCredits,
 } from '../database.js'
 
 const router = express.Router()
@@ -93,6 +94,52 @@ router.put('/preferences/currency', async (req, res) => {
     res.json({ message: 'Currency preference updated' })
   } catch (error) {
     console.error('Update currency error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Update credits for a provider
+router.put('/:providerId/credits', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId } = req.params
+    const { credits, month, year } = req.body
+
+    if (credits === undefined || credits === null) {
+      return res.status(400).json({ error: 'Credits amount is required' })
+    }
+
+    if (typeof credits !== 'number' || credits < 0) {
+      return res.status(400).json({ error: 'Credits must be a non-negative number' })
+    }
+
+    await updateProviderCredits(userId, providerId, month, year, credits)
+    res.json({ message: 'Credits updated successfully', credits })
+  } catch (error) {
+    console.error('Update credits error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Get credits for a provider
+router.get('/:providerId/credits', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId } = req.params
+    const now = new Date()
+    const month = req.query.month ? parseInt(req.query.month) : now.getMonth() + 1
+    const year = req.query.year ? parseInt(req.query.year) : now.getFullYear()
+
+    const costData = await getCostDataForUser(userId, month, year)
+    const providerData = costData.find(cost => cost.provider_code === providerId)
+
+    if (!providerData) {
+      return res.json({ credits: 0 })
+    }
+
+    res.json({ credits: parseFloat(providerData.credits) || 0 })
+  } catch (error) {
+    console.error('Get credits error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

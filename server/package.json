@@ -19,7 +19,9 @@
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3",
     "dotenv": "^16.3.1",
-    "express-validator": "^7.0.1"
+    "express-validator": "^7.0.1",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

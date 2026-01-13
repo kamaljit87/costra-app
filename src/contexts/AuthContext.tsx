@@ -13,6 +13,7 @@ interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
   signup: (name: string, email: string, password: string) => Promise<boolean>
+  googleLogin: (googleId: string, name: string, email: string, avatarUrl?: string) => Promise<boolean>
   demoLogin: () => void
   logout: () => void
 }
@@ -68,6 +69,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
+  const googleLogin = async (googleId: string, name: string, email: string, avatarUrl?: string): Promise<boolean> => {
+    try {
+      const response = await authAPI.googleLogin(googleId, name, email, avatarUrl)
+      if (response.token && response.user) {
+        setUser(response.user)
+        setIsAuthenticated(true)
+        setIsDemoMode(false)
+        return true
+      }
+      return false
+    } catch (error: any) {
+      console.error('Google login error:', error)
+      throw new Error(error.message || 'Google sign-in failed. Please try again.')
+    }
+  }
+
   const signup = async (name: string, email: string, password: string): Promise<boolean> => {
     try {
       const response = await authAPI.signup(name, email, password)
@@ -105,8 +122,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         isAuthenticated,
         isDemoMode,
+        user,
         login,
         signup,
+        googleLogin,
         demoLogin,
         logout,
       }}

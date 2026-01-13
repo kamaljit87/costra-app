@@ -33,6 +33,18 @@ export default function SavingsPlansList({ plans }: SavingsPlansListProps) {
     }
   }
 
+  if (!plans || plans.length === 0) {
+    return (
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Savings Plans</h3>
+        <div className="text-center py-8">
+          <p className="text-gray-600 mb-2">No savings plans found</p>
+          <p className="text-sm text-gray-500">Savings plans will appear here when available</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="card">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Savings Plans</h3>

@@ -88,6 +88,19 @@ export const authAPI = {
     localStorage.removeItem('authToken')
     localStorage.removeItem('user')
   },
+
+  googleLogin: async (googleId: string, name: string, email: string, avatarUrl?: string) => {
+    const response = await apiRequest('/auth/google/callback', {
+      method: 'POST',
+      body: JSON.stringify({ googleId, name, email, avatarUrl }),
+    })
+    const data = await response.json()
+    if (data.token) {
+      localStorage.setItem('authToken', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+    }
+    return data
+  },
 }
 
 // Cost Data API
@@ -161,6 +174,23 @@ export const cloudProvidersAPI = {
     const response = await apiRequest(`/cloud-providers/${providerId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ isActive }),
+    })
+    return response.json()
+  },
+}
+
+// Sync API
+export const syncAPI = {
+  syncAll: async () => {
+    const response = await apiRequest('/sync', {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  syncProvider: async (providerId: string) => {
+    const response = await apiRequest(`/sync/${providerId}`, {
+      method: 'POST',
     })
     return response.json()
   },

@@ -6,6 +6,8 @@ import authRoutes from './routes/auth.js'
 import costDataRoutes from './routes/costData.js'
 import savingsPlansRoutes from './routes/savingsPlans.js'
 import cloudProvidersRoutes from './routes/cloudProviders.js'
+import googleAuthRoutes from './routes/googleAuth.js'
+import syncRoutes from './routes/sync.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -41,9 +43,11 @@ initDatabase().catch(console.error)
 
 // Routes
 app.use('/api/auth', authRoutes)
+app.use('/api/auth/google', googleAuthRoutes)
 app.use('/api/cost-data', costDataRoutes)
 app.use('/api/savings-plans', savingsPlansRoutes)
 app.use('/api/cloud-providers', cloudProvidersRoutes)
+app.use('/api/sync', syncRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

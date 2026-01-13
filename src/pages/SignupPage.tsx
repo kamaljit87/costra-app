@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import { UserPlus, Sparkles } from 'lucide-react'
 
 export default function SignupPage() {
@@ -160,6 +161,20 @@ export default function SignupPage() {
 
           <div className="mt-6">
             <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            {/* Google Sign Up */}
+            <div className="mt-6">
+              <GoogleSignInButton mode="signup" />
+            </div>
+
+            <div className="relative mt-6">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300"></div>
               </div>

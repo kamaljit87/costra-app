@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import SettingsPage from './pages/SettingsPage'
+import ProviderDetailPage from './pages/ProviderDetailPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -34,6 +35,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/provider/:providerId"
+              element={
+                <ProtectedRoute>
+                  <ProviderDetailPage />
                 </ProtectedRoute>
               }
             />

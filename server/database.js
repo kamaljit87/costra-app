@@ -37,10 +37,25 @@ export const initDatabase = async () => {
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL,
           email TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
+          password_hash TEXT,
+          google_id TEXT UNIQUE,
+          avatar_url TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+      `)
+
+      // Add avatar_url column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'avatar_url'
+          ) THEN
+            ALTER TABLE users ADD COLUMN avatar_url TEXT;
+          END IF;
+        END $$;
       `)
 
       // User preferences table (currency, etc.)
@@ -188,6 +203,69 @@ export const createUser = async (name, email, passwordHash) => {
   }
 }
 
+export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl) => {
+  const client = await pool.connect()
+  try {
+    // Check if user exists by Google ID
+    let result = await client.query(
+      'SELECT id FROM users WHERE google_id = $1',
+      [googleId]
+    )
+
+    let userId
+    if (result.rows.length > 0) {
+      // Update existing user
+      userId = result.rows[0].id
+      await client.query(
+        'UPDATE users SET name = $1, email = $2, avatar_url = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+        [name, email, avatarUrl, userId]
+      )
+    } else {
+      // Check if user exists by email
+      result = await client.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      )
+
+      if (result.rows.length > 0) {
+        // Link Google account to existing user
+        userId = result.rows[0].id
+        await client.query(
+          'UPDATE users SET google_id = $1, avatar_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [googleId, avatarUrl, userId]
+        )
+      } else {
+        // Create new user
+        result = await client.query(
+          'INSERT INTO users (name, email, google_id, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
+          [name, email, googleId, avatarUrl]
+        )
+        userId = result.rows[0].id
+
+        // Create default preferences
+        await client.query(
+          'INSERT INTO user_preferences (user_id, currency) VALUES ($1, $2)',
+          [userId, 'USD']
+        )
+      }
+    }
+
+    return userId
+  } finally {
+    client.release()
+  }
+}
+
+export const getUserByGoogleId = async (googleId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query('SELECT * FROM users WHERE google_id = $1', [googleId])
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
 export const getUserByEmail = async (email) => {
   const client = await pool.connect()
   try {
@@ -202,7 +280,7 @@ export const getUserById = async (id) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      'SELECT id, name, email, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, created_at FROM users WHERE id = $1',
       [id]
     )
     return result.rows[0] || null
@@ -329,6 +407,45 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
       await client.query('ROLLBACK')
       throw error
     }
+  } finally {
+    client.release()
+  }
+}
+
+// Update credits for a provider
+export const updateProviderCredits = async (userId, providerId, month, year, credits) => {
+  const client = await pool.connect()
+  try {
+    const now = new Date()
+    const currentMonth = month || (now.getMonth() + 1)
+    const currentYear = year || now.getFullYear()
+
+    // First, ensure the cost_data entry exists
+    const existingResult = await client.query(
+      `SELECT id FROM cost_data 
+       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4`,
+      [userId, providerId, currentMonth, currentYear]
+    )
+
+    if (existingResult.rows.length === 0) {
+      // Create a new entry with default values if it doesn't exist
+      await client.query(
+        `INSERT INTO cost_data 
+         (user_id, provider_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings)
+         VALUES ($1, $2, $3, $4, 0, 0, 0, $5, 0)`,
+        [userId, providerId, currentMonth, currentYear, credits]
+      )
+    } else {
+      // Update existing entry
+      await client.query(
+        `UPDATE cost_data 
+         SET credits = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE user_id = $2 AND provider_id = $3 AND month = $4 AND year = $5`,
+        [credits, userId, providerId, currentMonth, currentYear]
+      )
+    }
+
+    return true
   } finally {
     client.release()
   }
@@ -461,4 +578,5 @@ export const closeDatabase = async () => {
   console.log('Database connection pool closed')
 }
 
+// Export pool for use in other modules
 export { pool }
