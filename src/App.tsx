@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
 import ProviderDetailPage from './pages/ProviderDetailPage'
 import DebugPage from './pages/DebugPage'
 
@@ -38,6 +39,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
                 </ProtectedRoute>
               }
             />

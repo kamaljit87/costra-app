@@ -58,6 +58,32 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // Add google_id column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'google_id'
+          ) THEN
+            ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE;
+          END IF;
+        END $$;
+      `)
+
+      // Add updated_at column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'updated_at'
+          ) THEN
+            ALTER TABLE users ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+          END IF;
+        END $$;
+      `)
+
       // User preferences table (currency, etc.)
       await client.query(`
         CREATE TABLE IF NOT EXISTS user_preferences (
@@ -392,7 +418,7 @@ export const getUserById = async (id) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      'SELECT id, name, email, avatar_url, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at FROM users WHERE id = $1',
       [id]
     )
     return result.rows[0] || null
@@ -1008,6 +1034,72 @@ export const clearUserCache = async (userId) => {
     )
     console.log(`[clearUserCache] Cleared ${result.rowCount} cache entries for user ${userId}`)
     return result.rowCount
+  } finally {
+    client.release()
+  }
+}
+
+// Update user profile (name, email)
+export const updateUserProfile = async (userId, { name, email }) => {
+  const client = await pool.connect()
+  try {
+    const updates = []
+    const values = []
+    let paramIndex = 1
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`)
+      values.push(name)
+    }
+    if (email !== undefined) {
+      updates.push(`email = $${paramIndex++}`)
+      values.push(email)
+    }
+
+    if (updates.length === 0) {
+      // No updates, just return current user
+      const result = await client.query(
+        'SELECT id, name, email, avatar_url FROM users WHERE id = $1',
+        [userId]
+      )
+      return result.rows[0]
+    }
+
+    updates.push(`updated_at = CURRENT_TIMESTAMP`)
+    values.push(userId)
+
+    const result = await client.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, name, email, avatar_url`,
+      values
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+// Update user avatar
+export const updateUserAvatar = async (userId, avatarUrl) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'UPDATE users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name, email, avatar_url',
+      [avatarUrl, userId]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+// Update user password
+export const updateUserPassword = async (userId, passwordHash) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [passwordHash, userId]
+    )
   } finally {
     client.release()
   }

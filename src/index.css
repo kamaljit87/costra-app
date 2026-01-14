@@ -3,11 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-gray-200;
+  }
+  
   body {
     @apply bg-surface-50 text-gray-900 antialiased font-sans;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -25,8 +30,13 @@
     @apply bg-gray-400;
   }
 
+  /* Dark scrollbar for sidebar */
   .dark-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-sidebar-border;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
   }
 }
 
@@ -70,6 +80,10 @@
   .card-glass {
     @apply bg-white/80 backdrop-blur-xl rounded-2xl shadow-card border border-white/20 p-6;
   }
+
+  .card-gradient {
+    @apply bg-gradient-to-br from-white to-surface-100 rounded-2xl shadow-card border border-gray-100/50 p-6;
+  }
   
   .input-field {
     @apply w-full px-4 py-3 bg-surface-50 border border-gray-200 rounded-xl 
@@ -78,6 +92,14 @@
            placeholder:text-gray-400;
   }
 
+  .input-field-dark {
+    @apply w-full px-4 py-3 bg-sidebar-hover border border-sidebar-border rounded-xl text-white
+           focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 
+           transition-all duration-200
+           placeholder:text-sidebar-text;
+  }
+
+  /* Badge styles */
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
@@ -90,17 +112,86 @@
     @apply badge bg-success-100 text-success-700;
   }
 
+  .badge-warning {
+    @apply badge bg-amber-100 text-amber-700;
+  }
+
+  .badge-error {
+    @apply badge bg-red-100 text-red-700;
+  }
+
+  /* Stats card */
   .stat-card {
     @apply relative overflow-hidden rounded-2xl p-6 
            bg-gradient-to-br from-white via-white to-surface-100
            border border-gray-100/80 shadow-card;
   }
 
+  .stat-card::before {
+    content: '';
+    @apply absolute top-0 right-0 w-32 h-32 
+           bg-gradient-to-br from-primary-500/5 to-transparent
+           rounded-full -translate-y-1/2 translate-x-1/2;
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    @apply animate-shimmer bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%];
+  }
+
+  /* Glow effects */
+  .glow-primary {
+    @apply shadow-glow;
+  }
+
+  .glow-primary-lg {
+    @apply shadow-glow-lg;
+  }
+
+  /* Chart container */
   .chart-container {
     @apply bg-gradient-to-br from-white to-surface-50 rounded-2xl p-6 border border-gray-100/50;
   }
+
+  /* Table styles */
+  .table-modern {
+    @apply w-full;
+  }
+
+  .table-modern thead {
+    @apply bg-surface-50;
+  }
+
+  .table-modern th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider;
+  }
+
+  .table-modern td {
+    @apply px-4 py-4 text-sm;
+  }
+
+  .table-modern tbody tr {
+    @apply border-b border-gray-100 last:border-0 transition-colors hover:bg-surface-50;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    @apply absolute z-50 px-3 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg shadow-lg
+           opacity-0 invisible transition-all duration-200
+           group-hover:opacity-100 group-hover:visible;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-2 bg-gray-100 rounded-full overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-500;
+  }
 }
 
+/* Animation utilities */
 @layer utilities {
   .animate-delay-100 {
     animation-delay: 100ms;
@@ -111,6 +202,12 @@
   .animate-delay-300 {
     animation-delay: 300ms;
   }
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animate-delay-500 {
+    animation-delay: 500ms;
+  }
 
   .text-gradient {
     @apply bg-gradient-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent;
@@ -118,5 +215,11 @@
 
   .bg-gradient-primary {
     @apply bg-gradient-to-r from-primary-600 to-primary-500;
+  }
+
+  .bg-gradient-accent {
+    @apply bg-gradient-to-r from-accent-500 to-accent-400;
+  }  .border-gradient {
+    border-image: linear-gradient(to right, theme('colors.primary.500'), theme('colors.accent.500')) 1;
   }
 }

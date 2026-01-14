@@ -8,6 +8,7 @@ import savingsPlansRoutes from './routes/savingsPlans.js'
 import cloudProvidersRoutes from './routes/cloudProviders.js'
 import googleAuthRoutes from './routes/googleAuth.js'
 import syncRoutes from './routes/sync.js'
+import profileRoutes from './routes/profile.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -41,9 +42,13 @@ app.use(express.json())
 // Initialize database
 initDatabase().catch(console.error)
 
+// Serve static files for uploaded avatars
+app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')))
+
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/auth/google', googleAuthRoutes)
+app.use('/api/profile', profileRoutes)
 app.use('/api/cost-data', costDataRoutes)
 app.use('/api/savings-plans', savingsPlansRoutes)
 app.use('/api/cloud-providers', cloudProvidersRoutes)

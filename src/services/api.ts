@@ -229,3 +229,55 @@ export const syncAPI = {
     return response.json()
   },
 }
+
+// Profile API
+export const profileAPI = {
+  getProfile: async () => {
+    const response = await apiRequest('/profile')
+    return response.json()
+  },
+
+  updateProfile: async (data: { name?: string; email?: string }) => {
+    const response = await apiRequest('/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+
+  uploadAvatar: async (file: File) => {
+    const token = localStorage.getItem('authToken')
+    const formData = new FormData()
+    formData.append('avatar', file)
+
+    const response = await fetch(`${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3001/api')}/profile/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to upload avatar')
+    }
+
+    return response.json()
+  },
+
+  removeAvatar: async () => {
+    const response = await apiRequest('/profile/avatar', {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const response = await apiRequest('/profile/password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+    return response.json()
+  },
+}

@@ -17,6 +17,7 @@ interface AuthContextType {
   googleLogin: (googleId: string, name: string, email: string, avatarUrl?: string) => Promise<boolean>
   demoLogin: () => void
   logout: () => void
+  updateUser: (userData: Partial<User>) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -118,6 +119,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('demoMode')
   }
 
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...userData }
+      setUser(updatedUser)
+      localStorage.setItem('user', JSON.stringify(updatedUser))
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -129,6 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         googleLogin,
         demoLogin,
         logout,
+        updateUser,
       }}
     >
       {children}

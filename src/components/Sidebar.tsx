@@ -99,7 +99,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     }, {} as Record<string, CloudAccount[]>)
 
   const userMenuItems = [
-    { label: 'Profile', icon: User, path: '/settings#profile', tooltip: 'Manage your account profile' },
+    { label: 'Profile', icon: User, path: '/profile', tooltip: 'Manage your account profile' },
     { label: 'Billing', icon: CreditCard, path: '/settings#billing', tooltip: 'View billing and invoices' },
     { label: 'API Debug', icon: Bug, path: '/debug', tooltip: 'Test API endpoints' },
     { label: 'Settings', icon: Settings, path: '/settings', tooltip: 'Configure app preferences' },
