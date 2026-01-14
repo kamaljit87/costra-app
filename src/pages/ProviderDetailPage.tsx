@@ -2,21 +2,13 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
-import { getProviderCostDetails, CostData, CostDataPoint } from '../services/costService'
+import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly } from '../services/costService'
 import { cloudProvidersAPI } from '../services/api'
 import Layout from '../components/Layout'
 import ProviderCostChart from '../components/ProviderCostChart'
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-
-const PROVIDER_ICONS: { [key: string]: string } = {
-  aws: '☁️',
-  azure: '🔷',
-  gcp: '🔵',
-  digitalocean: '🌊',
-  linode: '🟢',
-  vultr: '⚡',
-}
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
 type PeriodType = '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | 'custom'
 
@@ -31,6 +23,8 @@ export default function ProviderDetailPage() {
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [filteredData, setFilteredData] = useState<CostDataPoint[]>([])
+  const [isLoadingChartData, setIsLoadingChartData] = useState(false)
+  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily')
 
   useEffect(() => {
     const loadData = async () => {
@@ -54,7 +48,6 @@ export default function ProviderDetailPage() {
                 provider: {
                   id: configuredProvider.providerId,
                   name: configuredProvider.providerName,
-                  icon: PROVIDER_ICONS[configuredProvider.providerId] || '☁️',
                 },
                 currentMonth: 0,
                 lastMonth: 0,
@@ -96,25 +89,106 @@ export default function ProviderDetailPage() {
     loadData()
   }, [providerId, isDemoMode])
 
+  // Fetch data when period changes (especially for custom, 4months, 6months)
   useEffect(() => {
-    if (!providerData) return
-
-    // Apply custom date filter if selected
-    if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
-      const start = new Date(customStartDate)
-      const end = new Date(customEndDate)
-      end.setHours(23, 59, 59, 999) // Include the entire end date
-
-      const filtered = providerData.allHistoricalData.filter(point => {
-        const pointDate = new Date(point.date)
-        return pointDate >= start && pointDate <= end
-      })
-
-      setFilteredData(filtered)
-    } else {
+    if (!providerData || !providerId) {
       setFilteredData([])
+      setIsLoadingChartData(false)
+      return
     }
-  }, [selectedPeriod, customStartDate, customEndDate, providerData])
+
+    // In demo mode, use preloaded data for all periods
+    if (isDemoMode) {
+      setFilteredData([])
+      setIsLoadingChartData(false)
+      return
+    }
+
+    const fetchDataForPeriod = async () => {
+      // For standard periods (30days, 60days, 120days, 180days), use preloaded data
+      if (['30days', '60days', '120days', '180days'].includes(selectedPeriod)) {
+        setFilteredData([])
+        setIsLoadingChartData(false)
+        return
+      }
+
+      // For 4months, 6months, or custom, always fetch fresh data from API
+      setIsLoadingChartData(true)
+      setFilteredData([]) // Clear previous data
+
+      try {
+        let startDate: Date
+        let endDate: Date
+
+        if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
+          const range = getDateRangeForPeriod('custom', customStartDate, customEndDate)
+          startDate = range.startDate
+          endDate = range.endDate
+        } else if (selectedPeriod === '4months' || selectedPeriod === '6months') {
+          const range = getDateRangeForPeriod(selectedPeriod)
+          startDate = range.startDate
+          endDate = range.endDate
+        } else {
+          setIsLoadingChartData(false)
+          return
+        }
+
+        console.log(`Fetching data for ${selectedPeriod}:`, {
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
+          providerId
+        })
+
+        const data = await fetchDailyCostDataForRange(providerId, startDate, endDate, isDemoMode)
+        
+        console.log(`Fetched ${data.length} data points for ${selectedPeriod}`)
+
+        if (data.length > 0) {
+          setFilteredData(data)
+        } else {
+          // If no data from API, try to filter from allHistoricalData as fallback
+          console.warn(`No data returned from API for ${selectedPeriod}, using preloaded data`)
+          const filtered = providerData.allHistoricalData.filter(point => {
+            const pointDate = new Date(point.date)
+            return pointDate >= startDate && pointDate <= endDate
+          })
+          
+          if (filtered.length > 0) {
+            setFilteredData(filtered)
+          } else {
+            // Last resort: use preloaded chart data
+            const fallbackData = selectedPeriod === '4months' 
+              ? providerData.chartData4Months 
+              : selectedPeriod === '6months'
+              ? providerData.chartData6Months
+              : []
+            setFilteredData(fallbackData)
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to fetch ${selectedPeriod} data:`, error)
+        // Fallback to filtering from allHistoricalData
+        try {
+          const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+            ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+            : getDateRangeForPeriod(selectedPeriod)
+          
+          const filtered = providerData.allHistoricalData.filter(point => {
+            const pointDate = new Date(point.date)
+            return pointDate >= range.startDate && pointDate <= range.endDate
+          })
+          setFilteredData(filtered.length > 0 ? filtered : [])
+        } catch (fallbackError) {
+          console.error('Fallback filtering also failed:', fallbackError)
+          setFilteredData([])
+        }
+      } finally {
+        setIsLoadingChartData(false)
+      }
+    }
+
+    fetchDataForPeriod()
+  }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId, isDemoMode])
 
   if (isLoading) {
     return (
@@ -159,11 +233,40 @@ export default function ProviderDetailPage() {
     ? ((providerData.currentMonth - providerData.lastMonth) / providerData.lastMonth) * 100
     : 0
 
-  const getChartData = (): CostDataPoint[] => {
-    if (selectedPeriod === 'custom' && filteredData.length > 0) {
-      return filteredData
+  const getDailyChartData = (): CostDataPoint[] => {
+    // For custom, 4months, or 6months, prioritize filteredData (freshly fetched)
+    if (selectedPeriod === 'custom' || selectedPeriod === '4months' || selectedPeriod === '6months') {
+      if (filteredData.length > 0) {
+        return filteredData
+      }
+      
+      // If filteredData is empty but we're loading, return empty array
+      if (isLoadingChartData) {
+        return []
+      }
+      
+      // Fallback: try to filter from allHistoricalData
+      if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
+        const { startDate, endDate } = getDateRangeForPeriod('custom', customStartDate, customEndDate)
+        const filtered = providerData.allHistoricalData.filter(point => {
+          const pointDate = new Date(point.date)
+          return pointDate >= startDate && pointDate <= endDate
+        })
+        return filtered.length > 0 ? filtered : []
+      }
+      
+      // For 4months or 6months, use preloaded data as fallback
+      if (selectedPeriod === '4months') {
+        return providerData.chartData4Months
+      }
+      if (selectedPeriod === '6months') {
+        return providerData.chartData6Months
+      }
+      
+      return []
     }
 
+    // For standard periods, use preloaded data
     switch (selectedPeriod) {
       case '30days':
         return providerData.chartData30Days
@@ -173,13 +276,20 @@ export default function ProviderDetailPage() {
         return providerData.chartData120Days
       case '180days':
         return providerData.chartData180Days
-      case '4months':
-        return providerData.chartData4Months
-      case '6months':
-        return providerData.chartData6Months
       default:
         return providerData.chartData30Days
     }
+  }
+
+  // Get chart data - daily or aggregated to monthly
+  const getChartData = (): CostDataPoint[] => {
+    const dailyData = getDailyChartData()
+    
+    if (viewMode === 'monthly') {
+      return aggregateToMonthly(dailyData)
+    }
+    
+    return dailyData
   }
 
   const getPeriodLabel = (period: PeriodType): string => {
@@ -195,7 +305,7 @@ export default function ProviderDetailPage() {
     }
   }
 
-  const handleCustomFilter = () => {
+  const handleCustomFilter = async () => {
     if (customStartDate && customEndDate) {
       const start = new Date(customStartDate)
       const end = new Date(customEndDate)
@@ -207,6 +317,7 @@ export default function ProviderDetailPage() {
       
       setSelectedPeriod('custom')
       setShowCustomFilter(false)
+      // The useEffect will handle fetching the data
     }
   }
 
@@ -220,7 +331,6 @@ export default function ProviderDetailPage() {
   const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7']
 
   const chartData = getChartData()
-  const isDailyData = selectedPeriod !== '4months' && selectedPeriod !== '6months' && selectedPeriod !== 'custom'
 
   return (
     <Layout>
@@ -237,7 +347,12 @@ export default function ProviderDetailPage() {
         {/* Provider Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-4 mb-4">
-            <span className="text-4xl">{providerData.provider.icon}</span>
+            <div 
+              className="w-16 h-16 flex items-center justify-center rounded-xl"
+              style={{ backgroundColor: `${getProviderColor(providerId || '')}15` }}
+            >
+              <ProviderIcon providerId={providerId || ''} size={40} />
+            </div>
             <div className="flex-1">
               <div className="flex items-center space-x-3">
                 <h1 className="text-3xl font-bold text-gray-900">{providerData.provider.name}</h1>
@@ -319,6 +434,36 @@ export default function ProviderDetailPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Cost Trends</h2>
+              
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('daily')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'daily'
+                      ? 'bg-white text-primary-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <LineChart className="h-4 w-4" />
+                  <span>Daily</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('monthly')}
+                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    viewMode === 'monthly'
+                      ? 'bg-white text-primary-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <BarChart2 className="h-4 w-4" />
+                  <span>Monthly</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Period Selector */}
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
                 {/* Period Buttons */}
                 <div className="flex flex-wrap gap-2">
@@ -326,8 +471,13 @@ export default function ProviderDetailPage() {
                     <button
                       key={period}
                       onClick={() => {
+                        console.log(`Period button clicked: ${period}`)
                         setSelectedPeriod(period)
                         setShowCustomFilter(false)
+                        // Clear filtered data to trigger fresh fetch for 4months/6months
+                        if (period === '4months' || period === '6months') {
+                          setFilteredData([])
+                        }
                       }}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         selectedPeriod === period
@@ -400,23 +550,39 @@ export default function ProviderDetailPage() {
                       </button>
                     </div>
                   </div>
-                  {selectedPeriod === 'custom' && filteredData.length > 0 && (
+                  {selectedPeriod === 'custom' && (
                     <div className="mt-3 text-sm text-gray-600">
-                      Showing {filteredData.length} data points from {new Date(customStartDate).toLocaleDateString()} to {new Date(customEndDate).toLocaleDateString()}
+                      {isLoadingChartData ? (
+                        <span>Loading data...</span>
+                      ) : filteredData.length > 0 ? (
+                        <span>Showing {filteredData.length} data points from {new Date(customStartDate).toLocaleDateString()} to {new Date(customEndDate).toLocaleDateString()}</span>
+                      ) : (
+                        <span className="text-yellow-600">No data available for the selected date range</span>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            <ProviderCostChart
-              providerName={providerData.provider.name}
-              providerIcon={providerData.provider.icon}
-              data={chartData}
-              currentMonth={providerData.currentMonth}
-              lastMonth={providerData.lastMonth}
-              period={isDailyData ? '30days' : selectedPeriod === '4months' ? '4months' : '6months'}
-            />
+            {isLoadingChartData ? (
+              <div className="card flex items-center justify-center h-64">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading chart data...</p>
+                </div>
+              </div>
+            ) : (
+              <ProviderCostChart
+                providerId={providerData.provider.id}
+                providerName={providerData.provider.name}
+                data={chartData}
+                currentMonth={providerData.currentMonth}
+                lastMonth={providerData.lastMonth}
+                period={viewMode === 'monthly' ? 'monthly' : selectedPeriod}
+                isMonthlyView={viewMode === 'monthly'}
+              />
+            )}
           </div>
         )}
 
@@ -438,7 +604,7 @@ export default function ProviderDetailPage() {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {serviceCostData.map((entry, index) => (
+                  {serviceCostData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

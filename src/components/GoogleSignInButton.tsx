@@ -9,7 +9,7 @@ interface GoogleSignInButtonProps {
   mode: 'signin' | 'signup'
 }
 
-export default function GoogleSignInButton({ mode }: GoogleSignInButtonProps) {
+export default function GoogleSignInButton({ mode: _mode }: GoogleSignInButtonProps) {
   const { googleLogin } = useAuth()
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
@@ -25,54 +25,6 @@ export default function GoogleSignInButton({ mode }: GoogleSignInButtonProps) {
       document.head.appendChild(script)
     }
   }, [])
-
-  const handleGoogleSignIn = async () => {
-    if (!GOOGLE_CLIENT_ID) {
-      setError('Google OAuth is not configured. Please use email/password authentication.')
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      setError('')
-
-      // Wait for Google script to load
-      let attempts = 0
-      while (typeof window.google === 'undefined' && attempts < 20) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-        attempts++
-      }
-
-      if (typeof window.google === 'undefined') {
-        throw new Error('Failed to load Google OAuth. Please refresh the page.')
-      }
-
-      // Initialize and render Google Sign In button
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCallback,
-      })
-
-      // Use one-tap sign-in
-      window.google.accounts.id.prompt((notification: any) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // Fallback: render button manually
-          const buttonContainer = document.getElementById('google-signin-button')
-          if (buttonContainer) {
-            window.google.accounts.id.renderButton(buttonContainer, {
-              theme: 'outline',
-              size: 'large',
-              width: '100%',
-            })
-          }
-        }
-      })
-    } catch (err: any) {
-      console.error('Google sign-in error:', err)
-      setError(err.message || 'Failed to initialize Google sign-in')
-      setIsLoading(false)
-    }
-  }
 
   const handleGoogleCallback = async (response: any) => {
     try {

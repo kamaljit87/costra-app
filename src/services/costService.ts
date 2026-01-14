@@ -1,7 +1,6 @@
 export interface CloudProvider {
   id: string
   name: string
-  icon: string
 }
 
 export interface CostData {
@@ -50,6 +49,34 @@ const sliceDailyData = (dailyData: CostDataPoint[], days: number): CostDataPoint
   return sorted.slice(-days)
 }
 
+// Helper function to aggregate daily data into monthly data
+export const aggregateToMonthly = (dailyData: CostDataPoint[]): CostDataPoint[] => {
+  if (dailyData.length === 0) return []
+  
+  const monthlyMap = new Map<string, number>()
+  
+  dailyData.forEach(point => {
+    const date = new Date(point.date)
+    // Use YYYY-MM format as key, but store as first day of month
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+    const existing = monthlyMap.get(monthKey) || 0
+    monthlyMap.set(monthKey, existing + point.cost)
+  })
+  
+  // Convert map to array and sort by date
+  const result = Array.from(monthlyMap.entries())
+    .map(([date, cost]) => ({ date, cost }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  
+  return result
+}
+
+// Get month name from date string
+export const getMonthName = (dateStr: string): string => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+}
+
 // Generate mock historical data for charts (daily data)
 const generateHistoricalData = (
   baseCost: number,
@@ -88,21 +115,62 @@ export const getCostData = async (isDemoMode: boolean = false): Promise<CostData
     const response = await costDataAPI.getCostData()
     const costData = response.costData || []
     
-    // Add historical chart data to each provider (using mock data for now)
-    // In production, this would fetch from daily_cost_data table
-    return costData.map((data: any) => {
-      const allHistoricalData = generateHistoricalData(data.currentMonth, 365, 0.15)
-      return {
-        ...data,
-        chartData30Days: sliceDailyData(allHistoricalData, 30),
-        chartData60Days: sliceDailyData(allHistoricalData, 60),
-        chartData120Days: sliceDailyData(allHistoricalData, 120),
-        chartData180Days: sliceDailyData(allHistoricalData, 180),
-        chartData4Months: sliceDailyData(allHistoricalData, 120),
-        chartData6Months: sliceDailyData(allHistoricalData, 180),
-        allHistoricalData,
-      }
-    })
+    // Calculate date range for fetching daily data (180 days back)
+    const fetchEndDate = new Date()
+    fetchEndDate.setHours(23, 59, 59, 999)
+    const fetchStartDate = new Date()
+    fetchStartDate.setDate(fetchStartDate.getDate() - 180)
+    fetchStartDate.setHours(0, 0, 0, 0)
+    
+    // Fetch daily data for each provider in parallel
+    const costDataWithHistory = await Promise.all(
+      costData.map(async (data: any) => {
+        try {
+          // Fetch daily cost data from the API
+          const dailyResponse = await costDataAPI.getDailyCostData(
+            data.provider.id,
+            fetchStartDate.toISOString().split('T')[0],
+            fetchEndDate.toISOString().split('T')[0]
+          )
+          
+          const dailyData: CostDataPoint[] = dailyResponse.dailyData || []
+          
+          // Sort by date
+          const sortedDaily = [...dailyData].sort((a, b) => 
+            new Date(a.date).getTime() - new Date(b.date).getTime()
+          )
+          
+          console.log(`Dashboard: Fetched ${sortedDaily.length} daily data points for ${data.provider.id}`)
+          
+          return {
+            ...data,
+            chartData30Days: sliceDailyData(sortedDaily, 30),
+            chartData60Days: sliceDailyData(sortedDaily, 60),
+            chartData120Days: sliceDailyData(sortedDaily, 120),
+            chartData180Days: sliceDailyData(sortedDaily, 180),
+            chartData4Months: sliceDailyData(sortedDaily, 120),
+            chartData6Months: sliceDailyData(sortedDaily, 180),
+            allHistoricalData: sortedDaily,
+          }
+        } catch (dailyError) {
+          console.warn(`Failed to fetch daily data for ${data.provider.id}, using mock data:`, dailyError)
+          // Fallback to mock data for this provider
+          const allHistoricalData = generateHistoricalData(data.currentMonth || 100, 365, 0.15)
+          return {
+            ...data,
+            chartData30Days: sliceDailyData(allHistoricalData, 30),
+            chartData60Days: sliceDailyData(allHistoricalData, 60),
+            chartData120Days: sliceDailyData(allHistoricalData, 120),
+            chartData180Days: sliceDailyData(allHistoricalData, 180),
+            chartData4Months: sliceDailyData(allHistoricalData, 120),
+            chartData6Months: sliceDailyData(allHistoricalData, 180),
+            allHistoricalData,
+          }
+        }
+      })
+    )
+    
+    return costDataWithHistory
   } catch (error) {
     console.error('Failed to fetch cost data:', error)
     // Fallback to mock data on error
@@ -127,7 +195,7 @@ const getMockCostData = (): CostData[] => {
 
   return [
     {
-      provider: { id: 'aws', name: 'Amazon Web Services', icon: '☁️' },
+      provider: { id: 'aws', name: 'Amazon Web Services' },
       currentMonth: 12450.75,
       lastMonth: 11800.50,
       forecast: 13500.00,
@@ -143,7 +211,7 @@ const getMockCostData = (): CostData[] => {
       ...generateAllData(12450.75),
     },
     {
-      provider: { id: 'azure', name: 'Microsoft Azure', icon: '🔷' },
+      provider: { id: 'azure', name: 'Microsoft Azure' },
       currentMonth: 8950.25,
       lastMonth: 9200.00,
       forecast: 9800.00,
@@ -159,7 +227,7 @@ const getMockCostData = (): CostData[] => {
       ...generateAllData(8950.25),
     },
     {
-      provider: { id: 'gcp', name: 'Google Cloud Platform', icon: '🔵' },
+      provider: { id: 'gcp', name: 'Google Cloud Platform' },
       currentMonth: 6750.50,
       lastMonth: 7100.00,
       forecast: 7200.00,
@@ -233,6 +301,83 @@ const getMockSavingsPlans = (): SavingsPlan[] => {
   ]
 }
 
+// Helper function to get date range for a period
+export const getDateRangeForPeriod = (period: '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | 'custom', customStartDate?: string, customEndDate?: string): { startDate: Date, endDate: Date } => {
+  const endDate = new Date()
+  endDate.setHours(23, 59, 59, 999)
+  const startDate = new Date()
+
+  if (period === 'custom' && customStartDate && customEndDate) {
+    startDate.setTime(new Date(customStartDate).getTime())
+    startDate.setHours(0, 0, 0, 0)
+    endDate.setTime(new Date(customEndDate).getTime())
+    endDate.setHours(23, 59, 59, 999)
+    return { startDate, endDate }
+  }
+
+  switch (period) {
+    case '30days':
+      startDate.setDate(startDate.getDate() - 30)
+      break
+    case '60days':
+      startDate.setDate(startDate.getDate() - 60)
+      break
+    case '120days':
+      startDate.setDate(startDate.getDate() - 120)
+      break
+    case '180days':
+      startDate.setDate(startDate.getDate() - 180)
+      break
+    case '4months':
+      // Use days instead of months to avoid date overflow issues
+      startDate.setDate(startDate.getDate() - 120) // ~4 months
+      break
+    case '6months':
+      // Use days instead of months to avoid date overflow issues
+      startDate.setDate(startDate.getDate() - 180) // ~6 months
+      break
+    default:
+      startDate.setDate(startDate.getDate() - 30)
+  }
+
+  startDate.setHours(0, 0, 0, 0)
+  return { startDate, endDate }
+}
+
+// Get daily cost data for a specific date range
+export const fetchDailyCostDataForRange = async (
+  providerId: string,
+  startDate: Date,
+  endDate: Date,
+  isDemoMode: boolean = false
+): Promise<CostDataPoint[]> => {
+  if (isDemoMode) {
+    // Generate mock data for the date range
+    const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    const baseCost = 1000 // Default base cost
+    return generateHistoricalData(baseCost, days, 0.15)
+  }
+
+  try {
+    const dailyResponse = await costDataAPI.getDailyCostData(
+      providerId,
+      startDate.toISOString().split('T')[0],
+      endDate.toISOString().split('T')[0]
+    )
+    
+    const dailyData: CostDataPoint[] = dailyResponse.dailyData || []
+    
+    // Sort by date
+    return [...dailyData].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
+  } catch (error) {
+    console.warn('Failed to fetch daily cost data for range:', error)
+    // Return empty array on error, let caller handle fallback
+    return []
+  }
+}
+
 // Get detailed cost data for a specific provider with historical data
 export const getProviderCostDetails = async (
   providerId: string,
@@ -254,16 +399,22 @@ export const getProviderCostDetails = async (
       return null
     }
 
-    // Fetch daily cost data for last 180 days
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - 180)
+    // Always fetch at least 180 days (6 months) of data for initial load
+    // This ensures we have enough data for all period options
+    const fetchStartDate = (() => {
+      const d = new Date()
+      d.setDate(d.getDate() - 180) // Fetch 6 months of data
+      d.setHours(0, 0, 0, 0)
+      return d
+    })()
+    const fetchEndDate = new Date()
+    fetchEndDate.setHours(23, 59, 59, 999)
     
     try {
       const dailyResponse = await costDataAPI.getDailyCostData(
         providerId,
-        startDate.toISOString().split('T')[0],
-        endDate.toISOString().split('T')[0]
+        fetchStartDate.toISOString().split('T')[0],
+        fetchEndDate.toISOString().split('T')[0]
       )
       
       const dailyData: CostDataPoint[] = dailyResponse.dailyData || []

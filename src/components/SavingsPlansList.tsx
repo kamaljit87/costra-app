@@ -1,4 +1,3 @@
-import { useCurrency } from '../contexts/CurrencyContext'
 import { SavingsPlan } from '../services/costService'
 import { CheckCircle, Clock, XCircle } from 'lucide-react'
 

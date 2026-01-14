@@ -1,6 +1,7 @@
 import { useCurrency } from '../contexts/CurrencyContext'
 import { CostData } from '../services/costService'
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 
 interface ProviderCostCardProps {
   data: CostData
@@ -18,7 +19,12 @@ export default function ProviderCostCard({ data }: ProviderCostCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center mb-2">
-            <span className="text-2xl mr-2">{data.provider.icon}</span>
+            <div 
+              className="w-8 h-8 flex items-center justify-center rounded-lg mr-2"
+              style={{ backgroundColor: `${getProviderColor(data.provider.id)}15` }}
+            >
+              <ProviderIcon providerId={data.provider.id} size={20} />
+            </div>
             <h3 className="text-lg font-semibold text-gray-900">{data.provider.name}</h3>
           </div>
           <p className="text-3xl font-bold text-gray-900">{formatCurrency(currentMonth)}</p>

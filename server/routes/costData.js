@@ -157,11 +157,17 @@ router.get('/:providerId/daily', async (req, res) => {
       return res.status(400).json({ error: 'startDate and endDate query parameters are required' })
     }
 
+    console.log(`[Daily Cost Data] Fetching data for user ${userId}, provider ${providerId}, range: ${startDate} to ${endDate}`)
+    
     const dailyData = await getDailyCostData(userId, providerId, startDate, endDate)
+    
+    console.log(`[Daily Cost Data] Found ${dailyData.length} data points`)
+    
     res.json({ dailyData })
   } catch (error) {
     console.error('Get daily cost data error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('Error stack:', error.stack)
+    res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
 

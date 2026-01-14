@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, Bug } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
@@ -28,6 +28,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       path: '/settings',
       label: 'Settings',
       icon: Settings,
+    },
+    {
+      path: '/debug',
+      label: 'API Debug',
+      icon: Bug,
     },
   ]
 

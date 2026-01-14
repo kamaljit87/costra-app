@@ -163,21 +163,88 @@ export const initDatabase = async () => {
         )
       `)
 
-      // Cloud provider credentials table (encrypted)
+      // Cloud provider credentials table (encrypted) - supports multiple accounts per provider
       await client.query(`
         CREATE TABLE IF NOT EXISTS cloud_provider_credentials (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL,
           provider_id TEXT NOT NULL,
           provider_name TEXT NOT NULL,
+          account_alias TEXT,
           credentials_encrypted TEXT NOT NULL,
           is_active BOOLEAN DEFAULT true,
           last_sync_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-          UNIQUE(user_id, provider_id)
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
+      `)
+
+      // Add account_alias column if it doesn't exist (for existing databases)
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'account_alias'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN account_alias TEXT;
+          END IF;
+        END $$;
+      `)
+
+      // Drop old unique constraint if it exists (to allow multiple accounts per provider)
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.table_constraints 
+            WHERE constraint_name = 'cloud_provider_credentials_user_id_provider_id_key' 
+            AND table_name = 'cloud_provider_credentials'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials 
+            DROP CONSTRAINT cloud_provider_credentials_user_id_provider_id_key;
+          END IF;
+        END $$;
+      `)
+
+      // Add account_id column to daily_cost_data for multi-account support
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'daily_cost_data' AND column_name = 'account_id'
+          ) THEN
+            ALTER TABLE daily_cost_data ADD COLUMN account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE;
+          END IF;
+        END $$;
+      `)
+
+      // Add account_id column to cost_data for multi-account support
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cost_data' AND column_name = 'account_id'
+          ) THEN
+            ALTER TABLE cost_data ADD COLUMN account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE;
+          END IF;
+        END $$;
+      `)
+
+      // Add account_id column to cost_data_cache for multi-account support
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cost_data_cache' AND column_name = 'account_id'
+          ) THEN
+            ALTER TABLE cost_data_cache ADD COLUMN account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE;
+          END IF;
+        END $$;
       `)
 
       // Create indexes for better performance
@@ -524,25 +591,22 @@ export const saveSavingsPlan = async (userId, plan) => {
 }
 
 // Cloud provider credentials operations
-export const addCloudProvider = async (userId, providerId, providerName, credentials) => {
+export const addCloudProvider = async (userId, providerId, providerName, credentials, accountAlias = null) => {
   const client = await pool.connect()
   try {
     const { encrypt } = await import('./services/encryption.js')
     const credentialsJson = JSON.stringify(credentials)
     const encryptedCredentials = encrypt(credentialsJson)
 
+    // Generate default alias if not provided
+    const alias = accountAlias || `${providerName} Account`
+
     const result = await client.query(
       `INSERT INTO cloud_provider_credentials 
-       (user_id, provider_id, provider_name, credentials_encrypted, is_active, updated_at)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-       ON CONFLICT (user_id, provider_id) 
-       DO UPDATE SET 
-         provider_name = EXCLUDED.provider_name,
-         credentials_encrypted = EXCLUDED.credentials_encrypted,
-         is_active = EXCLUDED.is_active,
-         updated_at = CURRENT_TIMESTAMP
+       (user_id, provider_id, provider_name, account_alias, credentials_encrypted, is_active, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
        RETURNING id`,
-      [userId, providerId, providerName, encryptedCredentials, true]
+      [userId, providerId, providerName, alias, encryptedCredentials, true]
     )
     return result.rows[0].id
   } finally {
@@ -554,10 +618,10 @@ export const getUserCloudProviders = async (userId) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      `SELECT id, provider_id, provider_name, is_active, last_sync_at, created_at, updated_at
+      `SELECT id, provider_id, provider_name, account_alias, is_active, last_sync_at, created_at, updated_at
        FROM cloud_provider_credentials
        WHERE user_id = $1
-       ORDER BY created_at DESC`,
+       ORDER BY provider_id, created_at DESC`,
       [userId]
     )
     return result.rows
@@ -566,13 +630,45 @@ export const getUserCloudProviders = async (userId) => {
   }
 }
 
+// Get credentials by account ID (for multi-account support)
+export const getCloudProviderCredentialsByAccountId = async (userId, accountId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT id, provider_id, provider_name, account_alias, credentials_encrypted
+       FROM cloud_provider_credentials
+       WHERE user_id = $1 AND id = $2 AND is_active = true`,
+      [userId, accountId]
+    )
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    const { decrypt } = await import('./services/encryption.js')
+    const decrypted = decrypt(result.rows[0].credentials_encrypted)
+    return {
+      accountId: result.rows[0].id,
+      providerId: result.rows[0].provider_id,
+      providerName: result.rows[0].provider_name,
+      accountAlias: result.rows[0].account_alias,
+      credentials: JSON.parse(decrypted)
+    }
+  } finally {
+    client.release()
+  }
+}
+
+// Get credentials by provider ID (legacy - returns first active account for backward compatibility)
 export const getCloudProviderCredentials = async (userId, providerId) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      `SELECT credentials_encrypted
+      `SELECT id, credentials_encrypted, account_alias
        FROM cloud_provider_credentials
-       WHERE user_id = $1 AND provider_id = $2 AND is_active = true`,
+       WHERE user_id = $1 AND provider_id = $2 AND is_active = true
+       ORDER BY created_at ASC
+       LIMIT 1`,
       [userId, providerId]
     )
     
@@ -588,6 +684,51 @@ export const getCloudProviderCredentials = async (userId, providerId) => {
   }
 }
 
+// Get all active accounts for a specific provider type
+export const getCloudProviderAccountsByType = async (userId, providerId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT id, provider_id, provider_name, account_alias, credentials_encrypted, is_active, last_sync_at
+       FROM cloud_provider_credentials
+       WHERE user_id = $1 AND provider_id = $2 AND is_active = true
+       ORDER BY created_at ASC`,
+      [userId, providerId]
+    )
+    
+    const { decrypt } = await import('./services/encryption.js')
+    
+    return result.rows.map(row => ({
+      accountId: row.id,
+      providerId: row.provider_id,
+      providerName: row.provider_name,
+      accountAlias: row.account_alias,
+      credentials: JSON.parse(decrypt(row.credentials_encrypted)),
+      isActive: row.is_active,
+      lastSyncAt: row.last_sync_at
+    }))
+  } finally {
+    client.release()
+  }
+}
+
+// Delete by account ID (for multi-account support)
+export const deleteCloudProviderByAccountId = async (userId, accountId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM cloud_provider_credentials
+       WHERE user_id = $1 AND id = $2
+       RETURNING id`,
+      [userId, accountId]
+    )
+    return result.rows.length > 0
+  } finally {
+    client.release()
+  }
+}
+
+// Legacy delete by provider ID (deletes all accounts of that provider type)
 export const deleteCloudProvider = async (userId, providerId) => {
   const client = await pool.connect()
   try {
@@ -603,6 +744,22 @@ export const deleteCloudProvider = async (userId, providerId) => {
   }
 }
 
+// Update status by account ID (for multi-account support)
+export const updateCloudProviderStatusByAccountId = async (userId, accountId, isActive) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `UPDATE cloud_provider_credentials
+       SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2 AND id = $3`,
+      [isActive, userId, accountId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Legacy update by provider ID
 export const updateCloudProviderStatus = async (userId, providerId, isActive) => {
   const client = await pool.connect()
   try {
@@ -617,40 +774,115 @@ export const updateCloudProviderStatus = async (userId, providerId, isActive) =>
   }
 }
 
-// Daily cost data operations
-export const saveDailyCostData = async (userId, providerId, date, cost) => {
+// Update account alias
+export const updateCloudProviderAlias = async (userId, accountId, accountAlias) => {
   const client = await pool.connect()
   try {
     await client.query(
-      `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
-       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-       ON CONFLICT (user_id, provider_id, date)
-       DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
-      [userId, providerId, date, cost]
+      `UPDATE cloud_provider_credentials
+       SET account_alias = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2 AND id = $3`,
+      [accountAlias, userId, accountId]
     )
   } finally {
     client.release()
   }
 }
 
-export const saveBulkDailyCostData = async (userId, providerId, dailyData) => {
+// Update last sync time for an account
+export const updateCloudProviderSyncTime = async (userId, accountId) => {
   const client = await pool.connect()
   try {
+    await client.query(
+      `UPDATE cloud_provider_credentials
+       SET last_sync_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND id = $2`,
+      [userId, accountId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Daily cost data operations
+export const saveDailyCostData = async (userId, providerId, date, cost, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    if (accountId) {
+      // New multi-account aware save
+      await client.query(
+        `INSERT INTO daily_cost_data (user_id, provider_id, account_id, date, cost, updated_at)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id, provider_id, date)
+         DO UPDATE SET cost = EXCLUDED.cost, account_id = EXCLUDED.account_id, updated_at = CURRENT_TIMESTAMP`,
+        [userId, providerId, accountId, date, cost]
+      )
+    } else {
+      // Legacy save without account_id
+      await client.query(
+        `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
+         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+         ON CONFLICT (user_id, provider_id, date)
+         DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
+        [userId, providerId, date, cost]
+      )
+    }
+  } finally {
+    client.release()
+  }
+}
+
+export const saveBulkDailyCostData = async (userId, providerId, dailyData, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    console.log(`[saveBulkDailyCostData] Saving ${dailyData.length} data points for user ${userId}, provider ${providerId}, account ${accountId}`)
+    
     await client.query('BEGIN')
     
     try {
+      let savedCount = 0
       for (const { date, cost } of dailyData) {
-        await client.query(
-          `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
-           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-           ON CONFLICT (user_id, provider_id, date)
-           DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
-          [userId, providerId, date, cost]
-        )
+        // Ensure date is in YYYY-MM-DD format
+        let dateStr
+        if (date instanceof Date) {
+          dateStr = date.toISOString().split('T')[0]
+        } else if (typeof date === 'string') {
+          // If it's already in YYYY-MM-DD format, use it; otherwise try to parse
+          if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            dateStr = date
+          } else {
+            dateStr = new Date(date).toISOString().split('T')[0]
+          }
+        } else {
+          dateStr = String(date).split('T')[0]
+        }
+        
+        const costValue = parseFloat(cost) || 0
+        
+        if (accountId) {
+          await client.query(
+            `INSERT INTO daily_cost_data (user_id, provider_id, account_id, date, cost, updated_at)
+             VALUES ($1, $2, $3, $4::date, $5, CURRENT_TIMESTAMP)
+             ON CONFLICT (user_id, provider_id, date)
+             DO UPDATE SET cost = EXCLUDED.cost, account_id = EXCLUDED.account_id, updated_at = CURRENT_TIMESTAMP`,
+            [userId, providerId, accountId, dateStr, costValue]
+          )
+        } else {
+          await client.query(
+            `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
+             VALUES ($1, $2, $3::date, $4, CURRENT_TIMESTAMP)
+             ON CONFLICT (user_id, provider_id, date)
+             DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
+            [userId, providerId, dateStr, costValue]
+          )
+        }
+        savedCount++
       }
       await client.query('COMMIT')
+      console.log(`[saveBulkDailyCostData] Successfully saved ${savedCount} data points`)
     } catch (error) {
       await client.query('ROLLBACK')
+      console.error('[saveBulkDailyCostData] Error saving data:', error)
       throw error
     }
   } finally {
@@ -658,20 +890,60 @@ export const saveBulkDailyCostData = async (userId, providerId, dailyData) => {
   }
 }
 
-export const getDailyCostData = async (userId, providerId, startDate, endDate) => {
+// Get daily cost data - supports both account_id (for multi-account) and legacy provider_id
+export const getDailyCostData = async (userId, providerId, startDate, endDate, accountId = null) => {
   const client = await pool.connect()
   try {
-    const result = await client.query(
-      `SELECT date, cost
-       FROM daily_cost_data
-       WHERE user_id = $1 AND provider_id = $2 AND date >= $3 AND date <= $4
-       ORDER BY date ASC`,
-      [userId, providerId, startDate, endDate]
-    )
-    return result.rows.map(row => ({
-      date: row.date.toISOString().split('T')[0],
-      cost: parseFloat(row.cost)
-    }))
+    // Ensure dates are in the correct format (YYYY-MM-DD)
+    const startDateStr = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0]
+    const endDateStr = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0]
+    
+    console.log(`[getDailyCostData] Querying: user_id=${userId}, provider_id=${providerId}, account_id=${accountId}, startDate=${startDateStr}, endDate=${endDateStr}`)
+    
+    let result
+    if (accountId) {
+      // Query by specific account
+      result = await client.query(
+        `SELECT date, cost
+         FROM daily_cost_data
+         WHERE user_id = $1 AND account_id = $2 AND date >= $3::date AND date <= $4::date
+         ORDER BY date ASC`,
+        [userId, accountId, startDateStr, endDateStr]
+      )
+    } else {
+      // Legacy query by provider_id
+      result = await client.query(
+        `SELECT date, cost
+         FROM daily_cost_data
+         WHERE user_id = $1 AND provider_id = $2 AND date >= $3::date AND date <= $4::date
+         ORDER BY date ASC`,
+        [userId, providerId, startDateStr, endDateStr]
+      )
+    }
+    
+    console.log(`[getDailyCostData] Found ${result.rows.length} rows`)
+    
+    const mappedData = result.rows.map(row => {
+      // Handle both Date objects and strings
+      let dateStr
+      if (row.date instanceof Date) {
+        dateStr = row.date.toISOString().split('T')[0]
+      } else if (typeof row.date === 'string') {
+        dateStr = row.date.split('T')[0]
+      } else {
+        dateStr = String(row.date).split('T')[0]
+      }
+      
+      return {
+        date: dateStr,
+        cost: parseFloat(row.cost) || 0
+      }
+    })
+    
+    return mappedData
+  } catch (error) {
+    console.error('[getDailyCostData] Error:', error)
+    throw error
   } finally {
     client.release()
   }

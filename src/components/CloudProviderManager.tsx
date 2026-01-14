@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { cloudProvidersAPI } from '../services/api'
-import { Plus, Trash2, CheckCircle, XCircle, Cloud, Settings } from 'lucide-react'
+import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check } from 'lucide-react'
+import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 
 interface CloudProvider {
   id: number
+  accountId: number
   providerId: string
   providerName: string
+  accountAlias: string
   isActive: boolean
   lastSyncAt: string | null
   createdAt: string
@@ -16,12 +19,13 @@ interface CloudProviderManagerProps {
 }
 
 const AVAILABLE_PROVIDERS = [
-  { id: 'aws', name: 'Amazon Web Services', icon: '☁️', color: 'orange' },
-  { id: 'azure', name: 'Microsoft Azure', icon: '🔷', color: 'blue' },
-  { id: 'gcp', name: 'Google Cloud Platform', icon: '🔵', color: 'blue' },
-  { id: 'digitalocean', name: 'DigitalOcean', icon: '🌊', color: 'blue' },
-  { id: 'linode', name: 'Linode', icon: '🟢', color: 'green' },
-  { id: 'vultr', name: 'Vultr', icon: '⚡', color: 'purple' },
+  { id: 'aws', name: 'Amazon Web Services' },
+  { id: 'azure', name: 'Microsoft Azure' },
+  { id: 'gcp', name: 'Google Cloud Platform' },
+  { id: 'digitalocean', name: 'DigitalOcean' },
+  { id: 'linode', name: 'Linode (Akamai)' },
+  { id: 'vultr', name: 'Vultr' },
+  { id: 'ibm', name: 'IBM Cloud' },
 ]
 
 export default function CloudProviderManager({ onProviderChange }: CloudProviderManagerProps) {
@@ -29,9 +33,12 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
   const [isLoading, setIsLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [accountAlias, setAccountAlias] = useState('')
   const [credentials, setCredentials] = useState<{ [key: string]: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [editingAliasId, setEditingAliasId] = useState<number | null>(null)
+  const [editingAliasValue, setEditingAliasValue] = useState('')
 
   useEffect(() => {
     loadProviders()
@@ -77,10 +84,12 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
       await cloudProvidersAPI.addCloudProvider(
         selectedProvider,
         provider.name,
-        credentials
+        credentials,
+        accountAlias || undefined
       )
       setShowAddModal(false)
       setSelectedProvider('')
+      setAccountAlias('')
       setCredentials({})
       await loadProviders()
       onProviderChange?.()
@@ -91,28 +100,53 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
     }
   }
 
-  const handleDeleteProvider = async (providerId: string) => {
-    if (!confirm(`Are you sure you want to remove ${providerId}? This will delete all associated credentials.`)) {
+  const handleDeleteProvider = async (accountId: number, accountAlias: string) => {
+    if (!confirm(`Are you sure you want to remove "${accountAlias}"? This will delete all associated credentials and data.`)) {
       return
     }
 
     try {
-      await cloudProvidersAPI.deleteCloudProvider(providerId)
+      await cloudProvidersAPI.deleteCloudProviderAccount(accountId)
       await loadProviders()
       onProviderChange?.()
     } catch (error: any) {
-      setError(error.message || 'Failed to delete cloud provider')
+      setError(error.message || 'Failed to delete cloud provider account')
     }
   }
 
-  const handleToggleStatus = async (providerId: string, currentStatus: boolean) => {
+  const handleToggleStatus = async (accountId: number, currentStatus: boolean) => {
     try {
-      await cloudProvidersAPI.updateProviderStatus(providerId, !currentStatus)
+      await cloudProvidersAPI.updateAccountStatus(accountId, !currentStatus)
       await loadProviders()
       onProviderChange?.()
     } catch (error: any) {
-      setError(error.message || 'Failed to update provider status')
+      setError(error.message || 'Failed to update account status')
     }
+  }
+
+  const handleStartEditAlias = (accountId: number, currentAlias: string) => {
+    setEditingAliasId(accountId)
+    setEditingAliasValue(currentAlias)
+  }
+
+  const handleSaveAlias = async (accountId: number) => {
+    if (!editingAliasValue.trim()) {
+      return
+    }
+
+    try {
+      await cloudProvidersAPI.updateAccountAlias(accountId, editingAliasValue.trim())
+      setEditingAliasId(null)
+      setEditingAliasValue('')
+      await loadProviders()
+    } catch (error: any) {
+      setError(error.message || 'Failed to update account alias')
+    }
+  }
+
+  const handleCancelEditAlias = () => {
+    setEditingAliasId(null)
+    setEditingAliasValue('')
   }
 
   const getRequiredFields = (providerId: string): string[] => {
@@ -123,19 +157,32 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
         return ['subscriptionId', 'clientId', 'clientSecret', 'tenantId']
       case 'gcp':
         return ['projectId', 'serviceAccountKey']
+      case 'digitalocean':
+        return ['apiToken']
+      case 'linode':
+        return ['apiToken']
+      case 'ibm':
+        return ['apiKey', 'accountId']
+      case 'vultr':
+        return ['apiKey']
       default:
         return ['apiKey']
     }
   }
 
-  const getProviderInfo = (providerId: string) => {
-    return AVAILABLE_PROVIDERS.find(p => p.id === providerId) || { name: providerId, icon: '☁️' }
+  // Count accounts per provider type
+  const getAccountCount = (providerId: string) => {
+    return providers.filter(p => p.providerId === providerId).length
   }
 
-  const getAvailableProviders = () => {
-    const connectedIds = providers.map(p => p.providerId)
-    return AVAILABLE_PROVIDERS.filter(p => !connectedIds.includes(p.id))
-  }
+  // Group providers by type for display
+  const groupedProviders = providers.reduce((acc, provider) => {
+    if (!acc[provider.providerId]) {
+      acc[provider.providerId] = []
+    }
+    acc[provider.providerId].push(provider)
+    return acc
+  }, {} as Record<string, CloudProvider[]>)
 
   if (isLoading) {
     return (
@@ -156,7 +203,7 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
             Cloud Providers
           </h3>
           <p className="text-sm text-gray-600 mt-1">
-            Manage your cloud provider integrations
+            Manage your cloud provider accounts (multiple accounts per provider supported)
           </p>
         </div>
         <button
@@ -164,84 +211,147 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
           className="btn-primary flex items-center"
         >
           <Plus className="h-4 w-4 mr-2" />
-          Add Provider
+          Add Account
         </button>
       </div>
 
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
           {error}
+          <button 
+            onClick={() => setError('')}
+            className="float-right text-red-500 hover:text-red-700"
+          >
+            ✕
+          </button>
         </div>
       )}
 
       {providers.length === 0 ? (
         <div className="text-center py-12">
           <Cloud className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">No cloud providers connected</p>
+          <p className="text-gray-600 mb-4">No cloud provider accounts connected</p>
           <button
             onClick={() => setShowAddModal(true)}
             className="btn-primary"
           >
-            Add Your First Provider
+            Add Your First Account
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {providers.map((provider) => {
-            const providerInfo = getProviderInfo(provider.providerId)
-            return (
-              <div
-                key={provider.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="text-2xl">{providerInfo.icon}</div>
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {provider.providerName}
+        <div className="space-y-6">
+          {Object.entries(groupedProviders).map(([providerId, accounts]) => (
+            <div key={providerId} className="space-y-3">
+              {/* Provider Header */}
+              <div className="flex items-center space-x-2">
+                <ProviderIcon providerId={providerId} size={20} />
+                <span className="font-medium text-gray-700">
+                  {AVAILABLE_PROVIDERS.find(p => p.id === providerId)?.name || providerId}
+                </span>
+                <span className="text-sm text-gray-500">
+                  ({accounts.length} account{accounts.length > 1 ? 's' : ''})
+                </span>
+              </div>
+
+              {/* Account Cards */}
+              <div className="space-y-2 pl-7">
+                {accounts.map((provider) => (
+                  <div
+                    key={provider.accountId}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div 
+                        className="w-10 h-10 flex items-center justify-center rounded-lg" 
+                        style={{ backgroundColor: `${getProviderColor(provider.providerId)}15` }}
+                      >
+                        <ProviderIcon providerId={provider.providerId} size={24} />
+                      </div>
+                      <div>
+                        {editingAliasId === provider.accountId ? (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={editingAliasValue}
+                              onChange={(e) => setEditingAliasValue(e.target.value)}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveAlias(provider.accountId)
+                                if (e.key === 'Escape') handleCancelEditAlias()
+                              }}
+                            />
+                            <button
+                              onClick={() => handleSaveAlias(provider.accountId)}
+                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={handleCancelEditAlias}
+                              className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-900">
+                              {provider.accountAlias}
+                            </span>
+                            <button
+                              onClick={() => handleStartEditAlias(provider.accountId, provider.accountAlias)}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                              title="Edit account name"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="text-sm text-gray-600">
+                          {provider.providerId.toUpperCase()}
+                          {provider.lastSyncAt && (
+                            <span className="ml-2">
+                              • Last sync: {new Date(provider.lastSyncAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      {provider.providerId.toUpperCase()}
-                      {provider.lastSyncAt && (
-                        <span className="ml-2">
-                          • Last sync: {new Date(provider.lastSyncAt).toLocaleDateString()}
-                        </span>
-                      )}
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => handleToggleStatus(provider.accountId, provider.isActive)}
+                        className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${
+                          provider.isActive
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {provider.isActive ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Active
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Inactive
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProvider(provider.accountId, provider.accountAlias)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete account"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => handleToggleStatus(provider.providerId, provider.isActive)}
-                    className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${
-                      provider.isActive
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {provider.isActive ? (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Active
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Inactive
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProvider(provider.providerId)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete provider"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
+                ))}
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -251,11 +361,12 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Add Cloud Provider</h3>
+                <h3 className="text-xl font-semibold text-gray-900">Add Cloud Provider Account</h3>
                 <button
                   onClick={() => {
                     setShowAddModal(false)
                     setSelectedProvider('')
+                    setAccountAlias('')
                     setCredentials({})
                     setError('')
                   }}
@@ -271,30 +382,59 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                     Select Provider
                   </label>
                   <div className="grid grid-cols-2 gap-3">
-                    {getAvailableProviders().map((provider) => (
-                      <button
-                        key={provider.id}
-                        onClick={() => {
-                          setSelectedProvider(provider.id)
-                          setCredentials({})
-                          setError('')
-                        }}
-                        className={`p-4 border-2 rounded-lg text-left transition-colors ${
-                          selectedProvider === provider.id
-                            ? 'border-primary-500 bg-primary-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="text-2xl mb-2">{provider.icon}</div>
-                        <div className="font-medium text-gray-900">{provider.name}</div>
-                      </button>
-                    ))}
+                    {AVAILABLE_PROVIDERS.map((provider) => {
+                      const count = getAccountCount(provider.id)
+                      return (
+                        <button
+                          key={provider.id}
+                          onClick={() => {
+                            setSelectedProvider(provider.id)
+                            setCredentials({})
+                            setError('')
+                            // Suggest a default alias
+                            setAccountAlias(count > 0 ? `${provider.name} Account ${count + 1}` : '')
+                          }}
+                          className={`p-4 border-2 rounded-lg text-left transition-colors ${
+                            selectedProvider === provider.id
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <ProviderIcon providerId={provider.id} size={32} />
+                            {count > 0 && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                {count} account{count > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <div className="font-medium text-gray-900">{provider.name}</div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
                 {selectedProvider && (
                   <div className="space-y-4 pt-4 border-t border-gray-200">
-                    <h4 className="font-medium text-gray-900">Credentials</h4>
+                    {/* Account Alias */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Account Name (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={accountAlias}
+                        onChange={(e) => setAccountAlias(e.target.value)}
+                        className="input-field"
+                        placeholder={`e.g., Production, Development, ${AVAILABLE_PROVIDERS.find(p => p.id === selectedProvider)?.name} Main`}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Give this account a recognizable name to differentiate it from other accounts
+                      </p>
+                    </div>
+
+                    <h4 className="font-medium text-gray-900 pt-2">Credentials</h4>
                     {getRequiredFields(selectedProvider).map((field) => (
                       <div key={field}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -325,6 +465,7 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                     onClick={() => {
                       setShowAddModal(false)
                       setSelectedProvider('')
+                      setAccountAlias('')
                       setCredentials({})
                       setError('')
                     }}
@@ -337,7 +478,7 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                     disabled={isSubmitting || !selectedProvider}
                     className="btn-primary"
                   >
-                    {isSubmitting ? 'Adding...' : 'Add Provider'}
+                    {isSubmitting ? 'Adding...' : 'Add Account'}
                   </button>
                 </div>
               </div>

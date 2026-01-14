@@ -1,12 +1,13 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
 import { 
-  getCloudProviderCredentials, 
+  getCloudProviderCredentialsByAccountId,
   getUserCloudProviders, 
   saveCostData, 
   saveBulkDailyCostData,
   getCachedCostData,
   setCachedCostData,
+  updateCloudProviderSyncTime,
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
@@ -17,18 +18,25 @@ const router = express.Router()
 router.use(authenticateToken)
 
 /**
- * Sync cost data from all active cloud providers
+ * Sync cost data from all active cloud provider accounts
  * POST /api/sync
  */
 router.post('/', async (req, res) => {
   try {
     const userId = req.user.userId
-    const { providerId } = req.body // Optional: sync specific provider
+    const { accountId } = req.body // Optional: sync specific account
 
-    // Get all active providers or specific provider
-    const providers = providerId
-      ? [{ provider_id: providerId }]
-      : await getUserCloudProviders(userId)
+    console.log(`[Sync] Starting sync for user ${userId}, account: ${accountId || 'ALL'}`)
+
+    // Get all active provider accounts or specific account
+    let accounts = await getUserCloudProviders(userId)
+    
+    // Filter by specific account if provided
+    if (accountId) {
+      accounts = accounts.filter(a => a.id === parseInt(accountId, 10))
+    }
+
+    console.log(`[Sync] Found ${accounts.length} account(s) to sync`)
 
     const results = []
     const errors = []
@@ -37,56 +45,80 @@ router.post('/', async (req, res) => {
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
-    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1
-    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear
 
     // Fetch 180 days of data for historical tracking
     const { startDate, endDate } = getDateRange(180)
+    console.log(`[Sync] Date range: ${startDate} to ${endDate}`)
 
-    for (const provider of providers) {
+    for (const account of accounts) {
+      const accountLabel = account.account_alias || `${account.provider_id} (${account.id})`
+      console.log(`[Sync] Processing account: ${accountLabel}`)
+      
       try {
-        // Skip if provider is not active
-        if (provider.is_active === false) {
+        // Skip if account is not active
+        if (account.is_active === false) {
+          console.log(`[Sync] Skipping inactive account: ${accountLabel}`)
           continue
         }
 
-        // Get decrypted credentials
-        const credentials = await getCloudProviderCredentials(userId, provider.provider_id)
+        // Get decrypted credentials using account ID
+        const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
         
-        if (!credentials) {
+        if (!accountData || !accountData.credentials) {
+          console.log(`[Sync] No credentials found for account: ${accountLabel}`)
           errors.push({
-            providerId: provider.provider_id,
+            accountId: account.id,
+            accountAlias: account.account_alias,
+            providerId: account.provider_id,
             error: 'Credentials not found',
           })
           continue
         }
+        console.log(`[Sync] Got credentials for account: ${accountLabel}`)
 
-        // Check cache first
-        const cacheKey = `${provider.provider_id}-${startDate}-${endDate}`
-        let costData = await getCachedCostData(userId, provider.provider_id, cacheKey)
+        // Check cache first (unless force refresh is requested)
+        // Use account ID in cache key to support multiple accounts
+        const cacheKey = `account-${account.id}-${startDate}-${endDate}`
+        const forceRefresh = req.query.force === 'true'
+        let costData = forceRefresh ? null : await getCachedCostData(userId, account.provider_id, cacheKey)
         
-        if (!costData) {
+        if (costData && !forceRefresh) {
+          console.log(`[Sync] Using cached data for account: ${accountLabel}`)
+        } else {
+          if (forceRefresh) {
+            console.log(`[Sync] Force refresh requested for account: ${accountLabel}`)
+          }
+          console.log(`[Sync] Fetching fresh data for account: ${accountLabel}`)
           // Fetch cost data from provider API
           costData = await fetchProviderCostData(
-            provider.provider_id,
-            credentials,
+            account.provider_id,
+            accountData.credentials,
             startDate,
             endDate
           )
           
+          console.log(`[Sync] Fetched data for ${accountLabel}:`)
+          console.log(`  - currentMonth: $${costData.currentMonth?.toFixed(2) || 0}`)
+          console.log(`  - lastMonth: $${costData.lastMonth?.toFixed(2) || 0}`)
+          console.log(`  - dailyData points: ${costData.dailyData?.length || 0}`)
+          console.log(`  - services: ${costData.services?.length || 0}`)
+          
           // Cache the result for 60 minutes
-          await setCachedCostData(userId, provider.provider_id, cacheKey, costData, 60)
+          await setCachedCostData(userId, account.provider_id, cacheKey, costData, 60)
         }
 
         // Save monthly cost data to database
+        console.log(`[Sync] Saving monthly cost data for account: ${accountLabel}`)
         await saveCostData(
           userId,
-          provider.provider_id,
+          account.provider_id,
           currentMonth,
           currentYear,
           {
-            providerName: provider.provider_name,
-            icon: getProviderIcon(provider.provider_id),
+            providerName: account.provider_name,
+            accountAlias: account.account_alias,
+            accountId: account.id,
+            icon: getProviderIcon(account.provider_id),
             currentMonth: costData.currentMonth,
             lastMonth: costData.lastMonth || costData.currentMonth * 0.95,
             forecast: costData.forecast || costData.currentMonth * 1.1,
@@ -96,24 +128,21 @@ router.post('/', async (req, res) => {
           }
         )
 
-        // Save daily cost data for historical tracking
+        // Save daily cost data for historical tracking (include account ID)
         if (costData.dailyData && costData.dailyData.length > 0) {
-          await saveBulkDailyCostData(userId, provider.provider_id, costData.dailyData)
+          console.log(`[Sync] Saving ${costData.dailyData.length} daily data points for account: ${accountLabel}`)
+          await saveBulkDailyCostData(userId, account.provider_id, costData.dailyData, account.id)
+        } else {
+          console.log(`[Sync] No daily data to save for account: ${accountLabel}`)
         }
 
-        // Update last sync time
-        const client = await pool.connect()
-        try {
-          await client.query(
-            'UPDATE cloud_provider_credentials SET last_sync_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND provider_id = $2',
-            [userId, provider.provider_id]
-          )
-        } finally {
-          client.release()
-        }
+        // Update last sync time for this account
+        await updateCloudProviderSyncTime(userId, account.id)
 
         results.push({
-          providerId: provider.provider_id,
+          accountId: account.id,
+          accountAlias: account.account_alias,
+          providerId: account.provider_id,
           status: 'success',
           costData: {
             currentMonth: costData.currentMonth,
@@ -121,9 +150,11 @@ router.post('/', async (req, res) => {
           },
         })
       } catch (error) {
-        console.error(`Error syncing ${provider.provider_id}:`, error)
+        console.error(`Error syncing account ${accountLabel}:`, error)
         errors.push({
-          providerId: provider.provider_id,
+          accountId: account.id,
+          accountAlias: account.account_alias,
+          providerId: account.provider_id,
           error: error.message,
         })
       }
@@ -141,25 +172,27 @@ router.post('/', async (req, res) => {
 })
 
 /**
- * Sync cost data for a specific provider
- * POST /api/sync/:providerId
+ * Sync cost data for a specific account
+ * POST /api/sync/account/:accountId
  */
-router.post('/:providerId', async (req, res) => {
+router.post('/account/:accountId', async (req, res) => {
   try {
     const userId = req.user.userId
-    const { providerId } = req.params
+    const accountId = parseInt(req.params.accountId, 10)
 
-    // Get provider credentials
-    const credentials = await getCloudProviderCredentials(userId, providerId)
-
-    if (!credentials) {
-      return res.status(404).json({ error: 'Provider credentials not found' })
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
     }
 
-    // Get provider name for saving
-    const providers = await getUserCloudProviders(userId)
-    const provider = providers.find(p => p.provider_id === providerId)
-    const providerName = provider?.provider_name || providerId
+    // Get account credentials
+    const accountData = await getCloudProviderCredentialsByAccountId(userId, accountId)
+
+    if (!accountData || !accountData.credentials) {
+      return res.status(404).json({ error: 'Account credentials not found' })
+    }
+
+    const { providerId, providerName, accountAlias, credentials } = accountData
+    const accountLabel = accountAlias || `${providerId} (${accountId})`
 
     // Calculate date range - fetch last 180 days for historical data
     const now = new Date()
@@ -168,7 +201,7 @@ router.post('/:providerId', async (req, res) => {
     const { startDate, endDate } = getDateRange(180)
 
     // Check cache first
-    const cacheKey = `${providerId}-${startDate}-${endDate}`
+    const cacheKey = `account-${accountId}-${startDate}-${endDate}`
     let costData = await getCachedCostData(userId, providerId, cacheKey)
     
     if (!costData) {
@@ -187,6 +220,8 @@ router.post('/:providerId', async (req, res) => {
       currentYear,
       {
         providerName: providerName,
+        accountAlias: accountAlias,
+        accountId: accountId,
         icon: getProviderIcon(providerId),
         currentMonth: costData.currentMonth,
         lastMonth: costData.lastMonth || costData.currentMonth * 0.95,
@@ -197,30 +232,110 @@ router.post('/:providerId', async (req, res) => {
       }
     )
 
-    // Save daily cost data for historical tracking
+    // Save daily cost data for historical tracking (with account ID)
     if (costData.dailyData && costData.dailyData.length > 0) {
-      await saveBulkDailyCostData(userId, providerId, costData.dailyData)
+      await saveBulkDailyCostData(userId, providerId, costData.dailyData, accountId)
     }
 
-        // Update last sync time
-        const client = await pool.connect()
-    try {
-      await client.query(
-        'UPDATE cloud_provider_credentials SET last_sync_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND provider_id = $2',
-        [userId, providerId]
-      )
-    } finally {
-      client.release()
-    }
+    // Update last sync time for this account
+    await updateCloudProviderSyncTime(userId, accountId)
 
     res.json({
       message: 'Sync completed successfully',
+      accountId,
+      accountAlias,
       providerId,
       costData: {
         currentMonth: costData.currentMonth,
         lastMonth: costData.lastMonth,
         forecast: costData.forecast,
       },
+    })
+  } catch (error) {
+    console.error('Sync account error:', error)
+    res.status(500).json({ error: error.message || 'Internal server error' })
+  }
+})
+
+/**
+ * Legacy: Sync cost data for all accounts of a specific provider type
+ * POST /api/sync/:providerId
+ */
+router.post('/:providerId', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId } = req.params
+
+    // Get all accounts for this provider type
+    const allAccounts = await getUserCloudProviders(userId)
+    const providerAccounts = allAccounts.filter(a => a.provider_id === providerId && a.is_active)
+
+    if (providerAccounts.length === 0) {
+      return res.status(404).json({ error: 'No active accounts found for this provider' })
+    }
+
+    const now = new Date()
+    const currentMonth = now.getMonth() + 1
+    const currentYear = now.getFullYear()
+    const { startDate, endDate } = getDateRange(180)
+
+    const results = []
+    const errors = []
+
+    for (const account of providerAccounts) {
+      try {
+        const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
+        
+        if (!accountData || !accountData.credentials) {
+          errors.push({ accountId: account.id, error: 'Credentials not found' })
+          continue
+        }
+
+        // Check cache first
+        const cacheKey = `account-${account.id}-${startDate}-${endDate}`
+        let costData = await getCachedCostData(userId, providerId, cacheKey)
+        
+        if (!costData) {
+          costData = await fetchProviderCostData(providerId, accountData.credentials, startDate, endDate)
+          await setCachedCostData(userId, providerId, cacheKey, costData, 60)
+        }
+
+        // Save data
+        await saveCostData(userId, providerId, currentMonth, currentYear, {
+          providerName: account.provider_name,
+          accountAlias: account.account_alias,
+          accountId: account.id,
+          icon: getProviderIcon(providerId),
+          currentMonth: costData.currentMonth,
+          lastMonth: costData.lastMonth || costData.currentMonth * 0.95,
+          forecast: costData.forecast || costData.currentMonth * 1.1,
+          credits: costData.credits || 0,
+          savings: costData.savings || 0,
+          services: costData.services || [],
+        })
+
+        if (costData.dailyData && costData.dailyData.length > 0) {
+          await saveBulkDailyCostData(userId, providerId, costData.dailyData, account.id)
+        }
+
+        await updateCloudProviderSyncTime(userId, account.id)
+
+        results.push({
+          accountId: account.id,
+          accountAlias: account.account_alias,
+          status: 'success',
+          costData: { currentMonth: costData.currentMonth, lastMonth: costData.lastMonth },
+        })
+      } catch (error) {
+        errors.push({ accountId: account.id, error: error.message })
+      }
+    }
+
+    res.json({
+      message: 'Sync completed',
+      providerId,
+      results,
+      errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error) {
     console.error('Sync provider error:', error)

@@ -9,6 +9,7 @@ import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
+import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
 interface ConfiguredProvider {
   id: number
@@ -17,14 +18,6 @@ interface ConfiguredProvider {
   isActive: boolean
 }
 
-const PROVIDER_ICONS: { [key: string]: string } = {
-  aws: '☁️',
-  azure: '🔷',
-  gcp: '🔵',
-  digitalocean: '🌊',
-  linode: '🟢',
-  vultr: '⚡',
-}
 
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
@@ -180,7 +173,6 @@ export default function Dashboard() {
                         provider: {
                           id: provider.providerId,
                           name: provider.providerName,
-                          icon: PROVIDER_ICONS[provider.providerId] || '☁️',
                         },
                         currentMonth: 0,
                         lastMonth: 0,
@@ -215,7 +207,6 @@ export default function Dashboard() {
                               <ProviderSection
                                 providerId={data.provider.id}
                                 providerName={data.provider.name}
-                                providerIcon={data.provider.icon}
                                 currentMonth={data.currentMonth}
                                 lastMonth={data.lastMonth}
                                 forecast={data.forecast}
@@ -232,7 +223,12 @@ export default function Dashboard() {
                               <div className="card">
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="flex items-center space-x-3">
-                                    <span className="text-3xl">{data.provider.icon}</span>
+                                    <div 
+                                      className="w-12 h-12 flex items-center justify-center rounded-xl"
+                                      style={{ backgroundColor: `${getProviderColor(data.provider.id)}15` }}
+                                    >
+                                      <ProviderIcon providerId={data.provider.id} size={32} />
+                                    </div>
                                     <div>
                                       <h2 className="text-xl font-semibold text-gray-900">{data.provider.name}</h2>
                                       <p className="text-sm text-gray-600">No cost data available yet</p>

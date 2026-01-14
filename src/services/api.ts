@@ -12,9 +12,9 @@ const apiRequest = async (
   options: RequestInit = {}
 ): Promise<Response> => {
   const token = getToken()
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string> || {}),
   }
 
   if (token) {
@@ -160,14 +160,24 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
-  addCloudProvider: async (providerId: string, providerName: string, credentials: any) => {
+  // Add new cloud provider account (supports multiple accounts per provider)
+  addCloudProvider: async (providerId: string, providerName: string, credentials: any, accountAlias?: string) => {
     const response = await apiRequest('/cloud-providers', {
       method: 'POST',
-      body: JSON.stringify({ providerId, providerName, credentials }),
+      body: JSON.stringify({ providerId, providerName, credentials, accountAlias }),
     })
     return response.json()
   },
 
+  // Delete specific account by account ID
+  deleteCloudProviderAccount: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/account/${accountId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+
+  // Legacy: Delete all accounts of a provider type
   deleteCloudProvider: async (providerId: string) => {
     const response = await apiRequest(`/cloud-providers/${providerId}`, {
       method: 'DELETE',
@@ -175,6 +185,25 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
+  // Update account status by account ID
+  updateAccountStatus: async (accountId: number, isActive: boolean) => {
+    const response = await apiRequest(`/cloud-providers/account/${accountId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    })
+    return response.json()
+  },
+
+  // Update account alias
+  updateAccountAlias: async (accountId: number, accountAlias: string) => {
+    const response = await apiRequest(`/cloud-providers/account/${accountId}/alias`, {
+      method: 'PATCH',
+      body: JSON.stringify({ accountAlias }),
+    })
+    return response.json()
+  },
+
+  // Legacy: Update provider status by provider ID
   updateProviderStatus: async (providerId: string, isActive: boolean) => {
     const response = await apiRequest(`/cloud-providers/${providerId}/status`, {
       method: 'PATCH',

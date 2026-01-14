@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useCurrency } from '../contexts/CurrencyContext'
 import ProviderCostChart from './ProviderCostChart'
 import { ArrowRight, TrendingUp, TrendingDown, Gift } from 'lucide-react'
+import { aggregateToMonthly } from '../services/costService'
+import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 
 interface CostDataPoint {
   date: string
@@ -12,7 +14,6 @@ interface CostDataPoint {
 interface ProviderSectionProps {
   providerId: string
   providerName: string
-  providerIcon: string
   currentMonth: number
   lastMonth: number
   forecast: number
@@ -29,43 +30,42 @@ interface ProviderSectionProps {
 export default function ProviderSection({
   providerId,
   providerName,
-  providerIcon,
   currentMonth,
   lastMonth,
   forecast,
   credits,
   savings,
-  chartData30Days,
-  chartData60Days,
-  chartData120Days,
+  chartData30Days: _chartData30Days,
+  chartData60Days: _chartData60Days,
+  chartData120Days: _chartData120Days,
   chartData180Days,
-  chartData4Months,
-  chartData6Months,
+  chartData4Months: _chartData4Months,
+  chartData6Months: _chartData6Months,
 }: ProviderSectionProps) {
+  // Suppress unused variable warnings - these props are passed but we only use 180 days for monthly aggregation
+  void _chartData30Days
+  void _chartData60Days
+  void _chartData120Days
+  void _chartData4Months
+  void _chartData6Months
   const { formatCurrency, convertAmount } = useCurrency()
-  const [selectedPeriod, setSelectedPeriod] = useState<'30days' | '60days' | '120days' | '180days' | '4months' | '6months'>('30days')
+  const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>('6months')
 
   const changePercent = lastMonth > 0
     ? ((currentMonth - lastMonth) / lastMonth) * 100
     : 0
 
+  // Aggregate daily data to monthly for dashboard view
+  const monthlyData = useMemo(() => {
+    // Combine all available daily data for monthly aggregation
+    const allData = [...chartData180Days]
+    return aggregateToMonthly(allData)
+  }, [chartData180Days])
+
+  // Get chart data based on selected period (monthly)
   const getChartData = () => {
-    switch (selectedPeriod) {
-      case '30days':
-        return chartData30Days
-      case '60days':
-        return chartData60Days
-      case '120days':
-        return chartData120Days
-      case '180days':
-        return chartData180Days
-      case '4months':
-        return chartData4Months
-      case '6months':
-        return chartData6Months
-      default:
-        return chartData30Days
-    }
+    const monthsToShow = selectedPeriod === '3months' ? 3 : selectedPeriod === '6months' ? 6 : 12
+    return monthlyData.slice(-monthsToShow)
   }
 
   return (
@@ -73,7 +73,12 @@ export default function ProviderSection({
       {/* Provider Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <span className="text-3xl">{providerIcon}</span>
+          <div 
+            className="w-12 h-12 flex items-center justify-center rounded-xl"
+            style={{ backgroundColor: `${getProviderColor(providerId)}15` }}
+          >
+            <ProviderIcon providerId={providerId} size={32} />
+          </div>
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-xl font-semibold text-gray-900">{providerName}</h2>
@@ -116,9 +121,9 @@ export default function ProviderSection({
         </Link>
       </div>
 
-      {/* Period Selector */}
+      {/* Period Selector - Monthly view */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {(['30days', '60days', '120days', '180days', '4months', '6months'] as const).map((period) => (
+        {(['3months', '6months', '12months'] as const).map((period) => (
           <button
             key={period}
             onClick={() => setSelectedPeriod(period)}
@@ -128,24 +133,22 @@ export default function ProviderSection({
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            {period === '30days' && '30 Days'}
-            {period === '60days' && '60 Days'}
-            {period === '120days' && '120 Days'}
-            {period === '180days' && '180 Days'}
-            {period === '4months' && '4 Months'}
-            {period === '6months' && '6 Months'}
+            {period === '3months' && 'Last 3 Months'}
+            {period === '6months' && 'Last 6 Months'}
+            {period === '12months' && 'Last 12 Months'}
           </button>
         ))}
       </div>
 
-      {/* Chart */}
+      {/* Chart - Monthly view */}
       <ProviderCostChart
+        providerId={providerId}
         providerName={providerName}
-        providerIcon={providerIcon}
         data={getChartData()}
         currentMonth={currentMonth}
         lastMonth={lastMonth}
-        period={selectedPeriod}
+        period="monthly"
+        isMonthlyView={true}
       />
 
       {/* Quick Stats */}

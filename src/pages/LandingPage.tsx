@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check } from 'lucide-react'
+import { Globe, TrendingDown, Shield, Zap, ArrowRight } from 'lucide-react'
 
 export default function LandingPage() {
   return (

@@ -5,7 +5,10 @@ import {
   addCloudProvider,
   getUserCloudProviders,
   deleteCloudProvider,
+  deleteCloudProviderByAccountId,
   updateCloudProviderStatus,
+  updateCloudProviderStatusByAccountId,
+  updateCloudProviderAlias,
 } from '../database.js'
 
 const router = express.Router()
@@ -22,8 +25,10 @@ router.get('/', async (req, res) => {
     // Format response (don't include encrypted credentials)
     const formattedProviders = providers.map(provider => ({
       id: provider.id,
+      accountId: provider.id, // Include account ID explicitly
       providerId: provider.provider_id,
       providerName: provider.provider_name,
+      accountAlias: provider.account_alias || provider.provider_name,
       isActive: provider.is_active,
       lastSyncAt: provider.last_sync_at,
       createdAt: provider.created_at,
@@ -37,7 +42,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-// Add a new cloud provider
+// Add a new cloud provider (supports multiple accounts per provider)
 router.post('/',
   [
     body('providerId').notEmpty().withMessage('Provider ID is required'),
@@ -52,15 +57,17 @@ router.post('/',
       }
 
       const userId = req.user.userId
-      const { providerId, providerName, credentials } = req.body
+      const { providerId, providerName, credentials, accountAlias } = req.body
 
-      await addCloudProvider(userId, providerId, providerName, credentials)
+      const accountId = await addCloudProvider(userId, providerId, providerName, credentials, accountAlias)
 
       res.json({ 
-        message: 'Cloud provider added successfully',
+        message: 'Cloud provider account added successfully',
         provider: {
+          accountId,
           providerId,
           providerName,
+          accountAlias: accountAlias || `${providerName} Account`,
         }
       })
     } catch (error) {
@@ -70,7 +77,30 @@ router.post('/',
   }
 )
 
-// Delete a cloud provider
+// Delete a cloud provider account by account ID
+router.delete('/account/:accountId', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const accountId = parseInt(req.params.accountId, 10)
+
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    const deleted = await deleteCloudProviderByAccountId(userId, accountId)
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Cloud provider account not found' })
+    }
+
+    res.json({ message: 'Cloud provider account deleted successfully' })
+  } catch (error) {
+    console.error('Delete cloud provider account error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Legacy: Delete all accounts of a provider type
 router.delete('/:providerId', async (req, res) => {
   try {
     const userId = req.user.userId
@@ -89,7 +119,60 @@ router.delete('/:providerId', async (req, res) => {
   }
 })
 
-// Toggle provider active status
+// Toggle account active status by account ID
+router.patch('/account/:accountId/status', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const accountId = parseInt(req.params.accountId, 10)
+    const { isActive } = req.body
+
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ error: 'isActive must be a boolean' })
+    }
+
+    await updateCloudProviderStatusByAccountId(userId, accountId, isActive)
+
+    res.json({ 
+      message: `Cloud provider account ${isActive ? 'activated' : 'deactivated'} successfully` 
+    })
+  } catch (error) {
+    console.error('Update cloud provider account status error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Update account alias
+router.patch('/account/:accountId/alias', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const accountId = parseInt(req.params.accountId, 10)
+    const { accountAlias } = req.body
+
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    if (!accountAlias || typeof accountAlias !== 'string') {
+      return res.status(400).json({ error: 'accountAlias must be a non-empty string' })
+    }
+
+    await updateCloudProviderAlias(userId, accountId, accountAlias)
+
+    res.json({ 
+      message: 'Account alias updated successfully',
+      accountAlias
+    })
+  } catch (error) {
+    console.error('Update account alias error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Legacy: Toggle provider active status by provider ID
 router.patch('/:providerId/status', async (req, res) => {
   try {
     const userId = req.user.userId

@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import SettingsPage from './pages/SettingsPage'
 import ProviderDetailPage from './pages/ProviderDetailPage'
+import DebugPage from './pages/DebugPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -43,6 +44,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProviderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/debug"
+              element={
+                <ProtectedRoute>
+                  <DebugPage />
                 </ProtectedRoute>
               }
             />
