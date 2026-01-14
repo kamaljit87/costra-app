@@ -998,6 +998,21 @@ export const clearExpiredCache = async () => {
   }
 }
 
+// Clear all cache for a user (used during sync to ensure fresh data)
+export const clearUserCache = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'DELETE FROM cost_data_cache WHERE user_id = $1',
+      [userId]
+    )
+    console.log(`[clearUserCache] Cleared ${result.rowCount} cache entries for user ${userId}`)
+    return result.rowCount
+  } finally {
+    client.release()
+  }
+}
+
 // Close database connection pool
 export const closeDatabase = async () => {
   await pool.end()

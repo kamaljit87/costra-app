@@ -14,7 +14,7 @@ interface ProviderCostChartProps {
   data: CostDataPoint[]
   currentMonth: number
   lastMonth: number
-  period: '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | 'custom' | 'monthly'
+  period: '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | '12months' | 'custom' | 'monthly'
   isMonthlyView?: boolean
 }
 
@@ -33,7 +33,6 @@ export default function ProviderCostChart({
     ? ((currentMonth - lastMonth) / lastMonth) * 100
     : 0
 
-  // Get currency symbol for Y-axis
   const getCurrencySymbol = () => {
     const symbols: Record<string, string> = {
       USD: '$',
@@ -43,19 +42,17 @@ export default function ProviderCostChart({
       JPY: '¥',
       CAD: 'C$',
       AUD: 'A$',
+      CNY: '¥',
+      CHF: 'CHF',
+      SGD: 'S$',
     }
     return symbols[selectedCurrency] || '$'
   }
 
-  // Format chart data - convert to selected currency for display
-  // Note: Don't double-convert! The tooltip uses formatCurrency which expects original USD values
   const chartData = data.map(point => ({
     ...point,
-    // Store converted cost for chart display
     cost: convertAmount(point.cost),
-    // Store original cost for tooltip formatting
     originalCost: point.cost,
-    // Add month label for monthly view
     monthLabel: isMonthlyView 
       ? new Date(point.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       : point.date,
@@ -70,6 +67,7 @@ export default function ProviderCostChart({
       case '180days': return 'Last 180 Days'
       case '4months': return 'Last 4 Months'
       case '6months': return 'Last 6 Months'
+      case '12months': return 'Last 12 Months'
       case 'custom': return 'Custom Date Range'
       case 'monthly': return 'Monthly View'
       default: return ''
@@ -78,19 +76,40 @@ export default function ProviderCostChart({
 
   const providerColor = getProviderColor(providerId)
 
+  // Modern tooltip style
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const originalCost = payload[0]?.payload?.originalCost ?? payload[0]?.value
+      const displayDate = isMonthlyView 
+        ? label 
+        : new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      
+      return (
+        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-4">
+          <p className="text-sm text-gray-500 mb-1">{displayDate}</p>
+          <p className="text-lg font-bold text-gray-900">{formatCurrency(originalCost)}</p>
+        </div>
+      )
+    }
+    return null
+  }
+
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-2xl">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <div 
-            className="w-10 h-10 flex items-center justify-center rounded-lg"
-            style={{ backgroundColor: `${providerColor}15` }}
+            className="w-12 h-12 flex items-center justify-center rounded-xl"
+            style={{ 
+              backgroundColor: `${providerColor}15`,
+              boxShadow: `0 4px 14px ${providerColor}15`
+            }}
           >
-            <ProviderIcon providerId={providerId} size={24} />
+            <ProviderIcon providerId={providerId} size={26} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">{providerName}</h3>
-            <p className="text-sm text-gray-600">{getPeriodLabel()}</p>
+            <h3 className="text-lg font-bold text-gray-900">{providerName}</h3>
+            <p className="text-sm text-gray-500">{getPeriodLabel()}</p>
           </div>
         </div>
         <div className="text-right">
@@ -98,120 +117,99 @@ export default function ProviderCostChart({
             {formatCurrency(convertAmount(currentMonth))}
           </div>
           {changePercent !== 0 && (
-            <div className={`flex items-center justify-end text-sm ${
-              changePercent >= 0 ? 'text-red-600' : 'text-green-600'
+            <div className={`flex items-center justify-end text-sm font-medium ${
+              changePercent >= 0 ? 'text-red-500' : 'text-emerald-500'
             }`}>
               {changePercent >= 0 ? (
                 <TrendingUp className="h-4 w-4 mr-1" />
               ) : (
                 <TrendingDown className="h-4 w-4 mr-1" />
               )}
-              <span>{Math.abs(changePercent).toFixed(1)}%</span>
+              <span>{changePercent >= 0 ? '+' : ''}{changePercent.toFixed(1)}%</span>
             </div>
           )}
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={250}>
+      <ResponsiveContainer width="100%" height={280}>
         {isMonthlyView ? (
-          // Bar chart for monthly view
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <BarChart data={chartData} barCategoryGap="20%">
+            <defs>
+              <linearGradient id={`barGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" />
+                <stop offset="100%" stopColor="#06b6d4" />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis
               dataKey="monthLabel"
-              stroke="#6b7280"
+              stroke="#94a3b8"
               fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              dy={10}
             />
             <YAxis
-              stroke="#6b7280"
+              stroke="#94a3b8"
               fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              dx={-10}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
-                if (value >= 1000) {
-                  return `${symbol}${(value / 1000).toFixed(1)}k`
-                }
-                return `${symbol}${value.toFixed(2)}`
+                if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
+                if (value >= 1000) return `${symbol}${(value / 1000).toFixed(0)}k`
+                return `${symbol}${value.toFixed(0)}`
               }}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-              }}
-              formatter={(value: number, _name: string, props: any) => {
-                // Use originalCost to avoid double conversion
-                const originalCost = props.payload?.originalCost ?? value
-                return [formatCurrency(originalCost), 'Monthly Cost']
-              }}
-              labelFormatter={(label) => label}
-            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
             <Bar 
               dataKey="cost" 
-              fill="#0ea5e9" 
-              radius={[4, 4, 0, 0]}
+              fill={`url(#barGradient-${providerId})`}
+              radius={[8, 8, 0, 0]}
             />
           </BarChart>
         ) : (
-          // Area chart for daily view
           <AreaChart data={chartData}>
             <defs>
-              <linearGradient id={`color${providerName}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+              <linearGradient id={`areaGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#6b7280"
+              stroke="#94a3b8"
               fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              dy={10}
               tickFormatter={(value) => {
                 const date = new Date(value)
-                if (data.length > 60) {
-                  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                }
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }}
             />
             <YAxis
-              stroke="#6b7280"
+              stroke="#94a3b8"
               fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              dx={-10}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
-                if (value >= 1000) {
-                  return `${symbol}${(value / 1000).toFixed(1)}k`
-                }
-                return `${symbol}${value.toFixed(2)}`
+                if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
+                if (value >= 1000) return `${symbol}${(value / 1000).toFixed(0)}k`
+                return `${symbol}${value.toFixed(0)}`
               }}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-              }}
-              formatter={(value: number, _name: string, props: any) => {
-                // Use originalCost to avoid double conversion
-                const originalCost = props.payload?.originalCost ?? value
-                return [formatCurrency(originalCost), 'Daily Cost']
-              }}
-              labelFormatter={(label) => {
-                const date = new Date(label)
-                return date.toLocaleDateString('en-US', { 
-                  month: 'long', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })
-              }}
-            />
+            <Tooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
               dataKey="cost"
-              stroke="#0ea5e9"
-              strokeWidth={2}
-              fillOpacity={1}
-              fill={`url(#color${providerName})`}
+              stroke="#3b82f6"
+              strokeWidth={2.5}
+              fill={`url(#areaGradient-${providerId})`}
             />
           </AreaChart>
         )}

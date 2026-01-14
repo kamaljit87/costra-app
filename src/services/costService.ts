@@ -302,7 +302,7 @@ const getMockSavingsPlans = (): SavingsPlan[] => {
 }
 
 // Helper function to get date range for a period
-export const getDateRangeForPeriod = (period: '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | 'custom', customStartDate?: string, customEndDate?: string): { startDate: Date, endDate: Date } => {
+export const getDateRangeForPeriod = (period: '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | '12months' | 'custom', customStartDate?: string, customEndDate?: string): { startDate: Date, endDate: Date } => {
   const endDate = new Date()
   endDate.setHours(23, 59, 59, 999)
   const startDate = new Date()
@@ -335,6 +335,10 @@ export const getDateRangeForPeriod = (period: '30days' | '60days' | '120days' | 
     case '6months':
       // Use days instead of months to avoid date overflow issues
       startDate.setDate(startDate.getDate() - 180) // ~6 months
+      break
+    case '12months':
+      // Full year of data
+      startDate.setDate(startDate.getDate() - 365) // ~12 months
       break
     default:
       startDate.setDate(startDate.getDate() - 30)

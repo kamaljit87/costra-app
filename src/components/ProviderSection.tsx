@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useCurrency } from '../contexts/CurrencyContext'
 import ProviderCostChart from './ProviderCostChart'
-import { ArrowRight, TrendingUp, TrendingDown, Gift } from 'lucide-react'
+import { ArrowRight, TrendingUp, TrendingDown, Gift, Target, PiggyBank } from 'lucide-react'
 import { aggregateToMonthly } from '../services/costService'
 import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 
@@ -42,12 +42,12 @@ export default function ProviderSection({
   chartData4Months: _chartData4Months,
   chartData6Months: _chartData6Months,
 }: ProviderSectionProps) {
-  // Suppress unused variable warnings - these props are passed but we only use 180 days for monthly aggregation
   void _chartData30Days
   void _chartData60Days
   void _chartData120Days
   void _chartData4Months
   void _chartData6Months
+  
   const { formatCurrency, convertAmount } = useCurrency()
   const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>('6months')
 
@@ -55,58 +55,56 @@ export default function ProviderSection({
     ? ((currentMonth - lastMonth) / lastMonth) * 100
     : 0
 
-  // Aggregate daily data to monthly for dashboard view
   const monthlyData = useMemo(() => {
-    // Combine all available daily data for monthly aggregation
     const allData = [...chartData180Days]
     return aggregateToMonthly(allData)
   }, [chartData180Days])
 
-  // Get chart data based on selected period (monthly)
   const getChartData = () => {
     const monthsToShow = selectedPeriod === '3months' ? 3 : selectedPeriod === '6months' ? 6 : 12
     return monthlyData.slice(-monthsToShow)
   }
 
+  const providerColor = getProviderColor(providerId)
+
   return (
-    <div className="mb-8">
+    <div className="card group animate-fade-in">
       {/* Provider Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center space-x-4">
           <div 
-            className="w-12 h-12 flex items-center justify-center rounded-xl"
-            style={{ backgroundColor: `${getProviderColor(providerId)}15` }}
+            className="w-14 h-14 flex items-center justify-center rounded-2xl transition-transform group-hover:scale-105"
+            style={{ 
+              backgroundColor: `${providerColor}15`,
+              boxShadow: `0 4px 14px ${providerColor}20`
+            }}
           >
             <ProviderIcon providerId={providerId} size={32} />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-xl font-semibold text-gray-900">{providerName}</h2>
+            <div className="flex items-center space-x-3 mb-1">
+              <h2 className="text-xl font-bold text-gray-900">{providerName}</h2>
               {credits > 0 && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                <span className="badge-success">
                   <Gift className="h-3 w-3 mr-1" />
-                  Credits Applied
+                  Credits
                 </span>
               )}
             </div>
-            <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-              <span>Current: {formatCurrency(convertAmount(currentMonth))}</span>
-              {credits > 0 && (
-                <span className="flex items-center text-green-600 font-medium">
-                  <Gift className="h-3 w-3 mr-1" />
-                  -{formatCurrency(convertAmount(credits))} credits
-                </span>
-              )}
+            <div className="flex items-center space-x-4 text-sm">
+              <span className="font-semibold text-gray-900">
+                {formatCurrency(convertAmount(currentMonth))}
+              </span>
               {changePercent !== 0 && (
-                <span className={`flex items-center ${
-                  changePercent >= 0 ? 'text-red-600' : 'text-green-600'
+                <span className={`flex items-center font-medium ${
+                  changePercent >= 0 ? 'text-red-500' : 'text-emerald-500'
                 }`}>
                   {changePercent >= 0 ? (
-                    <TrendingUp className="h-3 w-3 mr-1" />
+                    <TrendingUp className="h-3.5 w-3.5 mr-1" />
                   ) : (
-                    <TrendingDown className="h-3 w-3 mr-1" />
+                    <TrendingDown className="h-3.5 w-3.5 mr-1" />
                   )}
-                  {Math.abs(changePercent).toFixed(1)}% vs last month
+                  {Math.abs(changePercent).toFixed(1)}%
                 </span>
               )}
             </div>
@@ -114,60 +112,73 @@ export default function ProviderSection({
         </div>
         <Link
           to={`/provider/${providerId}`}
-          className="flex items-center space-x-2 px-4 py-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+          className="flex items-center space-x-2 px-4 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl transition-all duration-200"
         >
-          <span>View Details</span>
+          <span>Details</span>
           <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
 
-      {/* Period Selector - Monthly view */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {(['3months', '6months', '12months'] as const).map((period) => (
-          <button
-            key={period}
-            onClick={() => setSelectedPeriod(period)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedPeriod === period
-                ? 'bg-primary-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {period === '3months' && 'Last 3 Months'}
-            {period === '6months' && 'Last 6 Months'}
-            {period === '12months' && 'Last 12 Months'}
-          </button>
-        ))}
+      {/* Period Selector */}
+      <div className="flex items-center space-x-2 mb-4">
+        <div className="flex bg-gray-100 rounded-xl p-1">
+          {(['3months', '6months', '12months'] as const).map((period) => (
+            <button
+              key={period}
+              onClick={() => setSelectedPeriod(period)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                selectedPeriod === period
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {period === '3months' && '3M'}
+              {period === '6months' && '6M'}
+              {period === '12months' && '12M'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Chart - Monthly view */}
-      <ProviderCostChart
-        providerId={providerId}
-        providerName={providerName}
-        data={getChartData()}
-        currentMonth={currentMonth}
-        lastMonth={lastMonth}
-        period="monthly"
-        isMonthlyView={true}
-      />
+      {/* Chart */}
+      <div className="chart-container mb-6">
+        <ProviderCostChart
+          providerId={providerId}
+          providerName={providerName}
+          data={getChartData()}
+          currentMonth={currentMonth}
+          lastMonth={lastMonth}
+          period="monthly"
+          isMonthlyView={true}
+        />
+      </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        <div className="bg-gray-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">Forecast</div>
-          <div className="text-lg font-semibold text-gray-900">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-surface-50 rounded-xl p-4 border border-gray-100">
+          <div className="flex items-center space-x-2 text-gray-500 mb-2">
+            <Target className="h-4 w-4" />
+            <span className="text-xs font-medium uppercase tracking-wide">Forecast</span>
+          </div>
+          <div className="text-lg font-bold text-gray-900">
             {formatCurrency(convertAmount(forecast))}
           </div>
         </div>
-        <div className="bg-green-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">Credits</div>
-          <div className="text-lg font-semibold text-green-700">
+        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+          <div className="flex items-center space-x-2 text-emerald-600 mb-2">
+            <Gift className="h-4 w-4" />
+            <span className="text-xs font-medium uppercase tracking-wide">Credits</span>
+          </div>
+          <div className="text-lg font-bold text-emerald-700">
             {formatCurrency(convertAmount(credits))}
           </div>
         </div>
-        <div className="bg-blue-50 rounded-lg p-4">
-          <div className="text-sm text-gray-600 mb-1">Savings</div>
-          <div className="text-lg font-semibold text-blue-700">
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <div className="flex items-center space-x-2 text-blue-600 mb-2">
+            <PiggyBank className="h-4 w-4" />
+            <span className="text-xs font-medium uppercase tracking-wide">Savings</span>
+          </div>
+          <div className="text-lg font-bold text-blue-700">
             {formatCurrency(convertAmount(savings))}
           </div>
         </div>

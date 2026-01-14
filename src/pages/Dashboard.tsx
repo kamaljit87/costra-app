@@ -1,15 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
-import { useFilters } from '../contexts/FilterContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
 import { cloudProvidersAPI, syncAPI } from '../services/api'
 import Layout from '../components/Layout'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
-import FilterBar from '../components/FilterBar'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -22,16 +20,13 @@ interface ConfiguredProvider {
   isActive: boolean
 }
 
-
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
   const { convertAmount } = useCurrency()
-  const { selectedService, showCreditsOnly } = useFilters()
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
   const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
 
   const loadData = async () => {
@@ -48,65 +43,12 @@ export default function Dashboard() {
       console.error('Failed to load data:', error)
     } finally {
       setIsLoading(false)
-      setIsRefreshing(false)
     }
   }
-
-  // Get all unique services from cost data
-  const allServices = useMemo(() => {
-    const services: string[] = []
-    costData.forEach(data => {
-      data.services.forEach(service => {
-        if (service.name && !services.includes(service.name)) {
-          services.push(service.name)
-        }
-      })
-    })
-    return services.sort()
-  }, [costData])
-
-  // Check if any provider has credits
-  const hasAnyCredits = useMemo(() => {
-    return costData.some(data => data.credits > 0)
-  }, [costData])
-
-  // Filter cost data based on selected filters
-  const filteredCostData = useMemo(() => {
-    let filtered = [...costData]
-
-    // Filter by credits
-    if (showCreditsOnly) {
-      filtered = filtered.filter(data => data.credits > 0)
-    }
-
-    // Filter services within each provider if a service is selected
-    if (selectedService) {
-      filtered = filtered.map(data => {
-        const matchingServices = data.services.filter(s => s.name === selectedService)
-        if (matchingServices.length > 0) {
-          // Calculate cost from matching service only
-          const serviceCost = matchingServices.reduce((sum, s) => sum + s.cost, 0)
-          return {
-            ...data,
-            currentMonth: serviceCost,
-            services: matchingServices,
-          }
-        }
-        return null
-      }).filter((data): data is CostData => data !== null && data.services.length > 0)
-    }
-
-    return filtered
-  }, [costData, selectedService, showCreditsOnly])
 
   useEffect(() => {
     loadData()
   }, [isDemoMode])
-
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    loadData()
-  }
 
   const handleSync = async () => {
     if (isDemoMode) {
@@ -116,11 +58,12 @@ export default function Dashboard() {
 
     setIsSyncing(true)
     try {
+      // Clear cache and sync fresh data
       const result = await syncAPI.syncAll()
       if (result.errors && result.errors.length > 0) {
-        alert(`Sync completed with some errors:\n${result.errors.map((e: any) => `${e.providerId}: ${e.error}`).join('\n')}`)
+        alert(`Sync completed with some errors:\n${result.errors.map((e: any) => `${e.providerId || e.accountAlias}: ${e.error}`).join('\n')}`)
       } else {
-        alert('Sync completed successfully!')
+        alert('Sync completed successfully! Data refreshed from cloud providers.')
       }
       // Reload data after sync
       await loadData()
@@ -132,71 +75,61 @@ export default function Dashboard() {
     }
   }
 
-  // Calculate totals based on filtered data
-  const totalCurrent = filteredCostData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
-  const totalLastMonth = filteredCostData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
-  const totalForecast = filteredCostData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
-  const totalCredits = filteredCostData.reduce((sum, data) => sum + convertAmount(data.credits), 0)
-  const totalSavings = filteredCostData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
+  // Calculate totals
+  const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
+  const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
+  const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
+  const totalCredits = costData.reduce((sum, data) => sum + convertAmount(data.credits), 0)
+  const totalSavings = costData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
 
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Demo Mode Banner */}
         {isDemoMode && (
-          <div className="mb-6 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3 flex items-center space-x-2">
-            <Sparkles className="h-5 w-5 text-primary-600" />
-            <span className="text-primary-700 font-medium">Demo Mode</span>
-            <span className="text-primary-600 text-sm">
-              - You're viewing sample data. Sign up to connect your cloud accounts.
-            </span>
+          <div className="mb-6 bg-primary-50 border border-primary-200 rounded-2xl px-5 py-4 flex items-center space-x-3 animate-fade-in">
+            <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-primary-600" />
+            </div>
+            <div>
+              <span className="text-primary-700 font-semibold">Demo Mode</span>
+              <span className="text-primary-600 text-sm ml-2">
+                You're viewing sample data. Sign up to connect your cloud accounts.
+              </span>
+            </div>
           </div>
         )}
 
-        {/* Header with Refresh and Sync */}
-        <div className="flex items-center justify-between mb-6">
+        {/* Header with Sync */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Cost Dashboard</h1>
-            <p className="text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">Cost Dashboard</h1>
+            <p className="text-gray-500">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            {!isDemoMode && (
-              <button
-                onClick={handleSync}
-                disabled={isSyncing}
-                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Sync cost data from cloud providers"
-              >
-                <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-              </button>
-            )}
+          {!isDemoMode && (
             <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              title="Refresh data"
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="btn-primary flex items-center space-x-2"
+              title="Sync fresh data from all cloud providers (clears cache)"
             >
-              <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refresh</span>
+              <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
             </button>
-          </div>
+          )}
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <RefreshCw className="h-8 w-8 text-primary-600 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Loading cost data...</p>
+              <p className="text-gray-500">Loading cost data...</p>
             </div>
           </div>
         ) : (
           <>
-            {/* Filter Bar */}
-            <FilterBar services={allServices} hasCredits={hasAnyCredits} />
-
             {/* Total Bill Summary */}
             <TotalBillSummary
               totalCurrent={totalCurrent}
@@ -208,23 +141,19 @@ export default function Dashboard() {
 
             {/* Provider Sections with Charts */}
             {(() => {
-              // Merge configured providers with cost data
-              // Show all configured providers, even if they don't have cost data yet
               const allProviders = new Map<string, CostData>()
               
-              // Add providers with cost data (using filtered data)
-              filteredCostData.forEach(data => {
+              // Add providers with cost data
+              costData.forEach(data => {
                 allProviders.set(data.provider.id, data)
               })
               
-              // Add configured providers without cost data (show as empty/zero)
-              // Only show when no filters are active
-              if (!isDemoMode && !selectedService && !showCreditsOnly) {
+              // Add configured providers without cost data
+              if (!isDemoMode) {
                 configuredProviders
                   .filter(p => p.isActive)
                   .forEach(provider => {
                     if (!allProviders.has(provider.providerId)) {
-                      // Create empty cost data for configured providers without cost data
                       allProviders.set(provider.providerId, {
                         provider: {
                           id: provider.providerId,
@@ -253,12 +182,12 @@ export default function Dashboard() {
               if (providersToShow.length > 0) {
                 return (
                   <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-6">By Provider</h2>
-                    <div className="space-y-8">
+                    <h2 className="text-xl font-bold text-gray-900 mb-6">By Provider</h2>
+                    <div className="space-y-6">
                       {providersToShow.map((data) => {
                         const hasData = data.currentMonth > 0 || data.services.length > 0
                         return (
-                          <div key={data.provider.id}>
+                          <div key={data.provider.id} className="animate-fade-in">
                             {hasData ? (
                               <ProviderSection
                                 providerId={data.provider.id}
@@ -278,28 +207,29 @@ export default function Dashboard() {
                             ) : (
                               <div className="card">
                                 <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center space-x-3">
+                                  <div className="flex items-center space-x-4">
                                     <div 
-                                      className="w-12 h-12 flex items-center justify-center rounded-xl"
+                                      className="w-14 h-14 flex items-center justify-center rounded-2xl"
                                       style={{ backgroundColor: `${getProviderColor(data.provider.id)}15` }}
                                     >
                                       <ProviderIcon providerId={data.provider.id} size={32} />
                                     </div>
                                     <div>
-                                      <h2 className="text-xl font-semibold text-gray-900">{data.provider.name}</h2>
-                                      <p className="text-sm text-gray-600">No cost data available yet</p>
+                                      <h2 className="text-xl font-bold text-gray-900">{data.provider.name}</h2>
+                                      <p className="text-sm text-gray-500">No cost data available yet</p>
                                     </div>
                                   </div>
                                   <Link
                                     to={`/provider/${data.provider.id}`}
-                                    className="flex items-center space-x-2 px-4 py-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                                    className="btn-secondary"
+                                    title="View provider details"
                                   >
-                                    <span>View Details</span>
+                                    View Details
                                   </Link>
                                 </div>
-                                <div className="bg-gray-50 rounded-lg p-6 text-center">
+                                <div className="bg-surface-50 rounded-xl p-6 text-center border border-gray-100">
                                   <p className="text-gray-600 mb-2">Cost data will appear here once your provider is synced.</p>
-                                  <p className="text-sm text-gray-500">Cost data is typically synced every 24 hours.</p>
+                                  <p className="text-sm text-gray-400">Click "Sync Data" to fetch the latest costs from your cloud provider.</p>
                                 </div>
                               </div>
                             )}
@@ -312,32 +242,18 @@ export default function Dashboard() {
               } else {
                 return (
                   <div className="mb-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-6">By Provider</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-6">By Provider</h2>
                     <div className="card text-center py-12">
-                      {(selectedService || showCreditsOnly) ? (
-                        <>
-                          <p className="text-gray-600 mb-4">No providers match the current filters.</p>
-                          <button
-                            onClick={() => {
-                              // This will be handled by the FilterBar clearFilters
-                              window.location.reload()
-                            }}
-                            className="text-primary-600 hover:text-primary-700 font-medium"
-                          >
-                            Clear filters to see all providers
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
-                          <Link
-                            to="/settings"
-                            className="text-primary-600 hover:text-primary-700 font-medium"
-                          >
-                            Add a cloud provider in Settings →
-                          </Link>
-                        </>
-                      )}
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                        <Cloud className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
+                      <Link
+                        to="/settings"
+                        className="btn-primary inline-flex"
+                      >
+                        Add Cloud Provider
+                      </Link>
                     </div>
                   </div>
                 )

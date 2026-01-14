@@ -8,6 +8,7 @@ import {
   getCachedCostData,
   setCachedCostData,
   updateCloudProviderSyncTime,
+  clearUserCache,
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
@@ -28,6 +29,10 @@ router.post('/', async (req, res) => {
 
     console.log(`[Sync] Starting sync for user ${userId}, account: ${accountId || 'ALL'}`)
 
+    // Clear user cache first to ensure fresh data
+    const clearedCount = await clearUserCache(userId)
+    console.log(`[Sync] Cleared ${clearedCount} cache entries for user ${userId}`)
+
     // Get all active provider accounts or specific account
     let accounts = await getUserCloudProviders(userId)
     
@@ -41,13 +46,13 @@ router.post('/', async (req, res) => {
     const results = []
     const errors = []
 
-    // Calculate date range - fetch last 180 days for historical data
+    // Calculate date range - fetch last 365 days for historical data
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
 
-    // Fetch 180 days of data for historical tracking
-    const { startDate, endDate } = getDateRange(180)
+    // Fetch 365 days of data for full year historical tracking
+    const { startDate, endDate } = getDateRange(365)
     console.log(`[Sync] Date range: ${startDate} to ${endDate}`)
 
     for (const account of accounts) {
@@ -194,11 +199,11 @@ router.post('/account/:accountId', async (req, res) => {
     const { providerId, providerName, accountAlias, credentials } = accountData
     const accountLabel = accountAlias || `${providerId} (${accountId})`
 
-    // Calculate date range - fetch last 180 days for historical data
+    // Calculate date range - fetch last 365 days for historical data
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
-    const { startDate, endDate } = getDateRange(180)
+    const { startDate, endDate } = getDateRange(365)
 
     // Check cache first
     const cacheKey = `account-${accountId}-${startDate}-${endDate}`
@@ -277,7 +282,7 @@ router.post('/:providerId', async (req, res) => {
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
-    const { startDate, endDate } = getDateRange(180)
+    const { startDate, endDate } = getDateRange(365)
 
     const results = []
     const errors = []
