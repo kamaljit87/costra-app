@@ -8,6 +8,7 @@ interface CurrencyContextType {
   setSelectedCurrency: (currency: Currency) => void
   convertAmount: (amount: number, fromCurrency?: Currency) => number
   formatCurrency: (amount: number) => string
+  getCurrencySymbol: () => string
   isLoading: boolean
 }
 
@@ -89,6 +90,22 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
     }).format(convertedAmount)
   }
 
+  const getCurrencySymbol = (): string => {
+    const symbols: Record<Currency, string> = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      INR: '₹',
+      JPY: '¥',
+      AUD: 'A$',
+      CAD: 'C$',
+      CNY: '¥',
+      CHF: 'CHF',
+      SGD: 'S$',
+    }
+    return symbols[selectedCurrency] || '$'
+  }
+
   return (
     <CurrencyContext.Provider
       value={{
@@ -97,6 +114,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
         setSelectedCurrency: handleCurrencyChange,
         convertAmount,
         formatCurrency,
+        getCurrencySymbol,
         isLoading,
       }}
     >

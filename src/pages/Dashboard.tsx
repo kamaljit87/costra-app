@@ -1,20 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
+import { useFilters } from '../contexts/FilterContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
 import { cloudProvidersAPI, syncAPI } from '../services/api'
 import Layout from '../components/Layout'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
+import FilterBar from '../components/FilterBar'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
 interface ConfiguredProvider {
   id: number
+  accountId: number
   providerId: string
   providerName: string
+  accountAlias: string
   isActive: boolean
 }
 
@@ -22,6 +26,7 @@ interface ConfiguredProvider {
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
   const { convertAmount } = useCurrency()
+  const { selectedService, showCreditsOnly } = useFilters()
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
   const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([])
@@ -46,6 +51,53 @@ export default function Dashboard() {
       setIsRefreshing(false)
     }
   }
+
+  // Get all unique services from cost data
+  const allServices = useMemo(() => {
+    const services: string[] = []
+    costData.forEach(data => {
+      data.services.forEach(service => {
+        if (service.name && !services.includes(service.name)) {
+          services.push(service.name)
+        }
+      })
+    })
+    return services.sort()
+  }, [costData])
+
+  // Check if any provider has credits
+  const hasAnyCredits = useMemo(() => {
+    return costData.some(data => data.credits > 0)
+  }, [costData])
+
+  // Filter cost data based on selected filters
+  const filteredCostData = useMemo(() => {
+    let filtered = [...costData]
+
+    // Filter by credits
+    if (showCreditsOnly) {
+      filtered = filtered.filter(data => data.credits > 0)
+    }
+
+    // Filter services within each provider if a service is selected
+    if (selectedService) {
+      filtered = filtered.map(data => {
+        const matchingServices = data.services.filter(s => s.name === selectedService)
+        if (matchingServices.length > 0) {
+          // Calculate cost from matching service only
+          const serviceCost = matchingServices.reduce((sum, s) => sum + s.cost, 0)
+          return {
+            ...data,
+            currentMonth: serviceCost,
+            services: matchingServices,
+          }
+        }
+        return null
+      }).filter((data): data is CostData => data !== null && data.services.length > 0)
+    }
+
+    return filtered
+  }, [costData, selectedService, showCreditsOnly])
 
   useEffect(() => {
     loadData()
@@ -80,12 +132,12 @@ export default function Dashboard() {
     }
   }
 
-  // Calculate totals
-  const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
-  const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
-  const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
-  const totalCredits = costData.reduce((sum, data) => sum + convertAmount(data.credits), 0)
-  const totalSavings = costData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
+  // Calculate totals based on filtered data
+  const totalCurrent = filteredCostData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
+  const totalLastMonth = filteredCostData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
+  const totalForecast = filteredCostData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
+  const totalCredits = filteredCostData.reduce((sum, data) => sum + convertAmount(data.credits), 0)
+  const totalSavings = filteredCostData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
 
   return (
     <Layout>
@@ -142,6 +194,9 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
+            {/* Filter Bar */}
+            <FilterBar services={allServices} hasCredits={hasAnyCredits} />
+
             {/* Total Bill Summary */}
             <TotalBillSummary
               totalCurrent={totalCurrent}
@@ -157,13 +212,14 @@ export default function Dashboard() {
               // Show all configured providers, even if they don't have cost data yet
               const allProviders = new Map<string, CostData>()
               
-              // Add providers with cost data
-              costData.forEach(data => {
+              // Add providers with cost data (using filtered data)
+              filteredCostData.forEach(data => {
                 allProviders.set(data.provider.id, data)
               })
               
               // Add configured providers without cost data (show as empty/zero)
-              if (!isDemoMode) {
+              // Only show when no filters are active
+              if (!isDemoMode && !selectedService && !showCreditsOnly) {
                 configuredProviders
                   .filter(p => p.isActive)
                   .forEach(provider => {
@@ -172,7 +228,7 @@ export default function Dashboard() {
                       allProviders.set(provider.providerId, {
                         provider: {
                           id: provider.providerId,
-                          name: provider.providerName,
+                          name: provider.accountAlias || provider.providerName,
                         },
                         currentMonth: 0,
                         lastMonth: 0,
@@ -258,13 +314,30 @@ export default function Dashboard() {
                   <div className="mb-8">
                     <h2 className="text-xl font-semibold text-gray-900 mb-6">By Provider</h2>
                     <div className="card text-center py-12">
-                      <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
-                      <Link
-                        to="/settings"
-                        className="text-primary-600 hover:text-primary-700 font-medium"
-                      >
-                        Add a cloud provider in Settings →
-                      </Link>
+                      {(selectedService || showCreditsOnly) ? (
+                        <>
+                          <p className="text-gray-600 mb-4">No providers match the current filters.</p>
+                          <button
+                            onClick={() => {
+                              // This will be handled by the FilterBar clearFilters
+                              window.location.reload()
+                            }}
+                            className="text-primary-600 hover:text-primary-700 font-medium"
+                          >
+                            Clear filters to see all providers
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
+                          <Link
+                            to="/settings"
+                            className="text-primary-600 hover:text-primary-700 font-medium"
+                          >
+                            Add a cloud provider in Settings →
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </div>
                 )

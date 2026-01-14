@@ -31,12 +31,17 @@ router.get('/', async (req, res) => {
         name: cost.provider_name,
         icon: cost.icon || '☁️',
       },
-      currentMonth: cost.current_month_cost,
-      lastMonth: cost.last_month_cost,
-      forecast: cost.forecast_cost,
-      credits: cost.credits,
-      savings: cost.savings,
-      services: cost.services || [],
+      currentMonth: parseFloat(cost.current_month_cost) || 0,
+      lastMonth: parseFloat(cost.last_month_cost) || 0,
+      forecast: parseFloat(cost.forecast_cost) || 0,
+      credits: parseFloat(cost.credits) || 0,
+      savings: parseFloat(cost.savings) || 0,
+      // Transform service_name to name and change_percent to change for frontend compatibility
+      services: (cost.services || []).map(service => ({
+        name: service.service_name,
+        cost: parseFloat(service.cost) || 0,
+        change: parseFloat(service.change_percent) || 0,
+      })),
     }))
 
     res.json({ costData: formattedData })

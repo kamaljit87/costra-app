@@ -15,7 +15,7 @@ type PeriodType = '30days' | '60days' | '120days' | '180days' | '4months' | '6mo
 export default function ProviderDetailPage() {
   const { providerId } = useParams<{ providerId: string }>()
   const { isDemoMode } = useAuth()
-  const { formatCurrency, convertAmount } = useCurrency()
+  const { formatCurrency, convertAmount, getCurrencySymbol } = useCurrency()
   const [providerData, setProviderData] = useState<CostData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('30days')
@@ -321,14 +321,19 @@ export default function ProviderDetailPage() {
     }
   }
 
-  // Prepare service cost data for pie chart
+  // Calculate total from services (in case currentMonth is 0)
+  const serviceTotalCost = providerData.services.reduce((sum, s) => sum + (s.cost || 0), 0)
+  const effectiveTotal = providerData.currentMonth > 0 ? providerData.currentMonth : serviceTotalCost
+
+  // Prepare service cost data for pie chart (already converted to selected currency)
   const serviceCostData = providerData.services.map(service => ({
     name: service.name,
     value: convertAmount(service.cost),
+    originalCost: service.cost, // Keep original for percentage calculation
     change: service.change,
   }))
 
-  const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7']
+  const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e']
 
   const chartData = getChartData()
 
@@ -631,10 +636,14 @@ export default function ProviderDetailPage() {
                   stroke="#6b7280"
                   fontSize={12}
                   tickFormatter={(value) => {
-                    if (value >= 1000) {
-                      return `$${(value / 1000).toFixed(1)}k`
+                    const symbol = getCurrencySymbol()
+                    if (value >= 1000000) {
+                      return `${symbol}${(value / 1000000).toFixed(1)}M`
                     }
-                    return `$${value}`
+                    if (value >= 1000) {
+                      return `${symbol}${(value / 1000).toFixed(1)}k`
+                    }
+                    return `${symbol}${value.toFixed(0)}`
                   }}
                 />
                 <Tooltip
@@ -668,14 +677,14 @@ export default function ProviderDetailPage() {
                 </thead>
                 <tbody>
                   {providerData.services.map((service, index) => {
-                    const percentage = providerData.currentMonth > 0 
-                      ? (service.cost / providerData.currentMonth) * 100 
+                    const percentage = effectiveTotal > 0 
+                      ? (service.cost / effectiveTotal) * 100 
                       : 0
                     return (
                       <tr key={`service-${index}-${service.name}`} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-4 text-gray-900">{service.name}</td>
                         <td className="py-3 px-4 text-right font-medium text-gray-900">
-                          {formatCurrency(convertAmount(service.cost))}
+                          {formatCurrency(service.cost)}
                         </td>
                         <td className={`py-3 px-4 text-right ${
                           (service.change || 0) >= 0 ? 'text-red-600' : 'text-green-600'

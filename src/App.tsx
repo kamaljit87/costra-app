@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { CurrencyProvider } from './contexts/CurrencyContext'
+import { FilterProvider } from './contexts/FilterContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
@@ -19,6 +20,7 @@ function App() {
     <Router>
       <AuthProvider>
         <CurrencyProvider>
+          <FilterProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -56,6 +58,7 @@ function App() {
               }
             />
           </Routes>
+          </FilterProvider>
         </CurrencyProvider>
       </AuthProvider>
     </Router>
