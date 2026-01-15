@@ -2,15 +2,28 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
-import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly } from '../services/costService'
-import { cloudProvidersAPI, syncAPI } from '../services/api'
+import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
+import { cloudProvidersAPI, syncAPI, costDataAPI } from '../services/api'
 import Layout from '../components/Layout'
 import ProviderCostChart from '../components/ProviderCostChart'
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
-type PeriodType = '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | '12months' | 'custom'
+// Helper function to get colors for sub-service categories
+const getCategoryColor = (category: string): string => {
+  const categoryColors: Record<string, string> = {
+    'Compute': '#3B82F6',      // Blue
+    'Storage': '#10B981',      // Green
+    'Data Transfer': '#8B5CF6', // Purple
+    'Networking': '#F59E0B',   // Amber
+    'Load Balancing': '#EF4444', // Red
+    'Requests': '#EC4899',     // Pink
+    'IP Addresses': '#6366F1', // Indigo
+    'Other': '#6B7280',        // Gray
+  }
+  return categoryColors[category] || categoryColors['Other']
+}
 
 export default function ProviderDetailPage() {
   const { providerId } = useParams<{ providerId: string }>()
@@ -18,7 +31,7 @@ export default function ProviderDetailPage() {
   const { formatCurrency, convertAmount, getCurrencySymbol } = useCurrency()
   const [providerData, setProviderData] = useState<CostData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('30days')
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('1month')
   const [showCustomFilter, setShowCustomFilter] = useState(false)
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
@@ -30,6 +43,34 @@ export default function ProviderDetailPage() {
   // Service filter state
   const [selectedService, setSelectedService] = useState<string | null>(null)
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false)
+  
+  // Advanced filter states
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [serviceSearch, setServiceSearch] = useState('')
+  const [minCost, setMinCost] = useState<number | ''>('')
+  const [maxCost, setMaxCost] = useState<number | ''>('')
+  const [costChangeFilter, setCostChangeFilter] = useState<'all' | 'increase' | 'decrease'>('all')
+  const [sortBy, setSortBy] = useState<'cost' | 'name' | 'change'>('cost')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [showCredits, setShowCredits] = useState(true)
+  
+  // Period-based services state
+  const [periodServices, setPeriodServices] = useState<ServiceCost[]>([])
+  const [isLoadingServices, setIsLoadingServices] = useState(false)
+  
+  // Sub-service details state
+  const [expandedService, setExpandedService] = useState<string | null>(null)
+  const [subServices, setSubServices] = useState<any[]>([])
+  const [isLoadingSubServices, setIsLoadingSubServices] = useState(false)
+
+  // Define sub-service type
+  interface SubService {
+    name: string
+    cost: number
+    category: string
+    usageType?: string
+    percentage?: number
+  }
 
   useEffect(() => {
     const loadData = async () => {
@@ -60,12 +101,12 @@ export default function ProviderDetailPage() {
                 credits: 0,
                 savings: 0,
                 services: [],
-                chartData30Days: [],
-                chartData60Days: [],
-                chartData120Days: [],
-                chartData180Days: [],
+                chartData1Month: [],
+                chartData2Months: [],
+                chartData3Months: [],
                 chartData4Months: [],
                 chartData6Months: [],
+                chartData12Months: [],
                 allHistoricalData: [],
               }
             }
@@ -110,33 +151,26 @@ export default function ProviderDetailPage() {
     }
 
     const fetchDataForPeriod = async () => {
-      // For standard periods (30days, 60days, 120days, 180days), use preloaded data
-      if (['30days', '60days', '120days', '180days'].includes(selectedPeriod)) {
+      // For standard periods with preloaded data, use them directly
+      if (['1month', '2months', '3months', '4months', '6months', '12months'].includes(selectedPeriod)) {
         setFilteredData([])
         setIsLoadingChartData(false)
         return
       }
 
-      // For 4months, 6months, 12months, or custom, always fetch fresh data from API
+      // For custom periods, fetch fresh data from API
+      if (selectedPeriod !== 'custom' || !customStartDate || !customEndDate) {
+        setIsLoadingChartData(false)
+        return
+      }
+
       setIsLoadingChartData(true)
       setFilteredData([]) // Clear previous data
 
       try {
-        let startDate: Date
-        let endDate: Date
-
-        if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
-          const range = getDateRangeForPeriod('custom', customStartDate, customEndDate)
-          startDate = range.startDate
-          endDate = range.endDate
-        } else if (selectedPeriod === '4months' || selectedPeriod === '6months' || selectedPeriod === '12months') {
-          const range = getDateRangeForPeriod(selectedPeriod)
-          startDate = range.startDate
-          endDate = range.endDate
-        } else {
-          setIsLoadingChartData(false)
-          return
-        }
+        const range = getDateRangeForPeriod('custom', customStartDate, customEndDate)
+        const startDate = range.startDate
+        const endDate = range.endDate
 
         console.log(`Fetching data for ${selectedPeriod}:`, {
           startDate: startDate.toISOString().split('T')[0],
@@ -161,13 +195,8 @@ export default function ProviderDetailPage() {
           if (filtered.length > 0) {
             setFilteredData(filtered)
           } else {
-            // Last resort: use preloaded chart data
-            const fallbackData = selectedPeriod === '4months' 
-              ? providerData.chartData4Months 
-              : selectedPeriod === '6months'
-              ? providerData.chartData6Months
-              : []
-            setFilteredData(fallbackData)
+            // No data available for this custom range
+            setFilteredData([])
           }
         }
       } catch (error) {
@@ -195,18 +224,156 @@ export default function ProviderDetailPage() {
     fetchDataForPeriod()
   }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId, isDemoMode])
 
-  // Get unique services from provider data
-  const allServices = useMemo(() => {
-    if (!providerData) return []
-    return [...new Set(providerData.services.map(s => s.name))].sort()
-  }, [providerData])
+  // Fetch services when period changes
+  useEffect(() => {
+    if (!providerData || !providerId) {
+      setPeriodServices([])
+      return
+    }
 
-  // Filter services based on selected service filter
+    // In demo mode, use provider's services directly
+    if (isDemoMode) {
+      setPeriodServices(providerData.services)
+      return
+    }
+
+    const fetchServicesForPeriod = async () => {
+      setIsLoadingServices(true)
+      setPeriodServices([]) // Clear previous data to show loading state
+      
+      try {
+        // Get the date range for the selected period
+        const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+          ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+          : getDateRangeForPeriod(selectedPeriod)
+        
+        const startDateStr = range.startDate.toISOString().split('T')[0]
+        const endDateStr = range.endDate.toISOString().split('T')[0]
+        
+        console.log(`[Services] Fetching services for ${selectedPeriod}: ${startDateStr} to ${endDateStr}`)
+        
+        const response = await costDataAPI.getServicesForDateRange(providerId, startDateStr, endDateStr)
+        const services = response.services || []
+        const totalCost = response.totalCost || 0
+        
+        console.log(`[Services] Fetched ${services.length} services for period, total: $${totalCost.toFixed(2)}`)
+        
+        // Always set the services - even if empty or zero cost
+        // This ensures the UI updates to reflect the current period
+        setPeriodServices(services.length > 0 ? services : [])
+      } catch (error) {
+        console.error('Failed to fetch services for period:', error)
+        // On error, show empty services rather than stale data
+        setPeriodServices([])
+      } finally {
+        setIsLoadingServices(false)
+      }
+    }
+
+    fetchServicesForPeriod()
+  }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId, isDemoMode])
+
+  // Handle service expansion to show sub-services
+  const handleServiceExpand = async (serviceName: string, serviceCost: number) => {
+    if (expandedService === serviceName) {
+      // Collapse if already expanded
+      setExpandedService(null)
+      setSubServices([])
+      return
+    }
+
+    setExpandedService(serviceName)
+    setIsLoadingSubServices(true)
+    setSubServices([])
+
+    try {
+      const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+        ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+        : getDateRangeForPeriod(selectedPeriod)
+      
+      const startDateStr = range.startDate.toISOString().split('T')[0]
+      const endDateStr = range.endDate.toISOString().split('T')[0]
+
+      console.log(`[SubServices] Fetching details for ${serviceName}`)
+      
+      const response = await costDataAPI.getServiceDetails(providerId!, serviceName, startDateStr, endDateStr)
+      let fetchedSubServices = response.subServices || []
+      
+      // If sub-services have percentages but no costs, calculate costs from parent
+      fetchedSubServices = fetchedSubServices.map((sub: SubService) => ({
+        ...sub,
+        cost: sub.cost > 0 ? sub.cost : (serviceCost * (sub.percentage || 0) / 100),
+      }))
+
+      console.log(`[SubServices] Fetched ${fetchedSubServices.length} sub-services`)
+      setSubServices(fetchedSubServices)
+    } catch (error) {
+      console.error('Failed to fetch sub-service details:', error)
+      setSubServices([])
+    } finally {
+      setIsLoadingSubServices(false)
+    }
+  }
+
+  // Get unique services from period services
+  const allServices = useMemo(() => {
+    const services = periodServices.length > 0 ? periodServices : (providerData?.services || [])
+    return [...new Set(services.map(s => s.name))].sort()
+  }, [periodServices, providerData])
+
+  // Filter and sort services based on all filter criteria
   const filteredServices = useMemo(() => {
-    if (!providerData) return []
-    if (!selectedService) return providerData.services
-    return providerData.services.filter(s => s.name === selectedService)
-  }, [providerData, selectedService])
+    // Use period services if available, otherwise fall back to provider data
+    const sourceServices = periodServices.length > 0 ? periodServices : (providerData?.services || [])
+    if (sourceServices.length === 0) return []
+    
+    let services = [...sourceServices]
+    
+    // Filter by selected service
+    if (selectedService) {
+      services = services.filter(s => s.name === selectedService)
+    }
+    
+    // Filter by search term
+    if (serviceSearch) {
+      const searchLower = serviceSearch.toLowerCase()
+      services = services.filter(s => s.name.toLowerCase().includes(searchLower))
+    }
+    
+    // Filter by cost range
+    if (minCost !== '' && minCost > 0) {
+      services = services.filter(s => s.cost >= minCost)
+    }
+    if (maxCost !== '' && maxCost > 0) {
+      services = services.filter(s => s.cost <= maxCost)
+    }
+    
+    // Filter by cost change
+    if (costChangeFilter === 'increase') {
+      services = services.filter(s => s.change > 0)
+    } else if (costChangeFilter === 'decrease') {
+      services = services.filter(s => s.change < 0)
+    }
+    
+    // Sort services
+    services.sort((a, b) => {
+      let comparison = 0
+      switch (sortBy) {
+        case 'cost':
+          comparison = a.cost - b.cost
+          break
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'change':
+          comparison = a.change - b.change
+          break
+      }
+      return sortOrder === 'desc' ? -comparison : comparison
+    })
+    
+    return services
+  }, [periodServices, providerData, selectedService, serviceSearch, minCost, maxCost, costChangeFilter, sortBy, sortOrder])
 
   const handleSync = async () => {
     if (isDemoMode) {
@@ -270,15 +437,17 @@ export default function ProviderDetailPage() {
     )
   }
 
-  const hasNoData = providerData.currentMonth === 0 && providerData.services.length === 0
+  // Use period services for determining if we have data to show
+  const currentServices = periodServices.length > 0 ? periodServices : providerData.services
+  const hasNoData = providerData.currentMonth === 0 && currentServices.length === 0
 
   const changePercent = providerData.lastMonth > 0
     ? ((providerData.currentMonth - providerData.lastMonth) / providerData.lastMonth) * 100
     : 0
 
   const getDailyChartData = (): CostDataPoint[] => {
-    // For custom, 4months, 6months, or 12months, prioritize filteredData (freshly fetched)
-    if (selectedPeriod === 'custom' || selectedPeriod === '4months' || selectedPeriod === '6months' || selectedPeriod === '12months') {
+    // For custom periods, prioritize filteredData (freshly fetched)
+    if (selectedPeriod === 'custom') {
       if (filteredData.length > 0) {
         return filteredData
       }
@@ -289,7 +458,7 @@ export default function ProviderDetailPage() {
       }
       
       // Fallback: try to filter from allHistoricalData
-      if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
+      if (customStartDate && customEndDate) {
         const { startDate, endDate } = getDateRangeForPeriod('custom', customStartDate, customEndDate)
         const filtered = providerData.allHistoricalData.filter(point => {
           const pointDate = new Date(point.date)
@@ -298,29 +467,25 @@ export default function ProviderDetailPage() {
         return filtered.length > 0 ? filtered : []
       }
       
-      // For 4months or 6months, use preloaded data as fallback
-      if (selectedPeriod === '4months') {
-        return providerData.chartData4Months
-      }
-      if (selectedPeriod === '6months') {
-        return providerData.chartData6Months
-      }
-      
       return []
     }
 
     // For standard periods, use preloaded data
     switch (selectedPeriod) {
-      case '30days':
-        return providerData.chartData30Days
-      case '60days':
-        return providerData.chartData60Days
-      case '120days':
-        return providerData.chartData120Days
-      case '180days':
-        return providerData.chartData180Days
+      case '1month':
+        return providerData.chartData1Month
+      case '2months':
+        return providerData.chartData2Months
+      case '3months':
+        return providerData.chartData3Months
+      case '4months':
+        return providerData.chartData4Months
+      case '6months':
+        return providerData.chartData6Months
+      case '12months':
+        return providerData.chartData12Months
       default:
-        return providerData.chartData30Days
+        return providerData.chartData1Month
     }
   }
 
@@ -333,20 +498,6 @@ export default function ProviderDetailPage() {
     }
     
     return dailyData
-  }
-
-  const getPeriodLabel = (period: PeriodType): string => {
-    switch (period) {
-      case '30days': return '30 Days'
-      case '60days': return '60 Days'
-      case '120days': return '120 Days'
-      case '180days': return '180 Days'
-      case '4months': return '4 Months'
-      case '6months': return '6 Months'
-      case '12months': return '1 Year'
-      case 'custom': return 'Custom Range'
-      default: return '30 Days'
-    }
   }
 
   const handleCustomFilter = async () => {
@@ -421,7 +572,7 @@ export default function ProviderDetailPage() {
             <div className="flex-1">
               <div className="flex items-center space-x-3">
                 <h1 className="text-3xl font-bold text-gray-900">{providerData.provider.name}</h1>
-                {providerData.credits > 0 && (
+                {showCredits && providerData.credits > 0 && (
                   <span 
                     className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200"
                     title="This account has credits applied"
@@ -432,7 +583,7 @@ export default function ProviderDetailPage() {
                 )}
               </div>
               <p className="text-gray-500 mt-1">Detailed cost breakdown and analytics</p>
-              {providerData.credits > 0 && (
+              {showCredits && providerData.credits > 0 && (
                 <p className="text-sm text-green-700 mt-2 flex items-center">
                   <Gift className="h-4 w-4 mr-1.5" />
                   <span className="font-medium">-{formatCurrency(convertAmount(providerData.credits))} in credits applied to this account</span>
@@ -469,12 +620,14 @@ export default function ProviderDetailPage() {
               </div>
             </div>
 
-            <div className="card bg-green-50 border-green-200" title="Credits applied to this account">
-              <div className="text-sm text-gray-600 mb-1">Credits</div>
-              <div className="text-2xl font-bold text-green-700">
-                {formatCurrency(convertAmount(providerData.credits))}
+            {showCredits && (
+              <div className="card bg-green-50 border-green-200" title="Credits applied to this account">
+                <div className="text-sm text-gray-600 mb-1">Credits</div>
+                <div className="text-2xl font-bold text-green-700">
+                  {formatCurrency(convertAmount(providerData.credits))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="card bg-blue-50 border-blue-200" title="Savings from reserved instances and commitment plans">
               <div className="text-sm text-gray-600 mb-1">Savings</div>
@@ -595,6 +748,166 @@ export default function ProviderDetailPage() {
                 </button>
               </span>
             )}
+
+            {/* Advanced Filters Toggle */}
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`
+                flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200
+                ${showAdvancedFilters 
+                  ? 'bg-primary-50 border-2 border-primary-200 text-primary-700' 
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+                }
+              `}
+              title="Show advanced filtering options"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Advanced Filters</span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        )}
+
+        {/* Advanced Filters Panel */}
+        {showAdvancedFilters && !hasNoData && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl border border-gray-200 animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {/* Service Search */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Search Services
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    placeholder="Search by name..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    title="Filter services by name"
+                  />
+                </div>
+              </div>
+
+              {/* Cost Range */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Cost Range (USD)
+                </label>
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-1">
+                    <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="number"
+                      value={minCost}
+                      onChange={(e) => setMinCost(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      placeholder="Min"
+                      min="0"
+                      className="w-full pl-7 pr-2 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      title="Minimum cost filter"
+                    />
+                  </div>
+                  <span className="text-gray-400">–</span>
+                  <div className="relative flex-1">
+                    <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="number"
+                      value={maxCost}
+                      onChange={(e) => setMaxCost(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                      placeholder="Max"
+                      min="0"
+                      className="w-full pl-7 pr-2 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      title="Maximum cost filter"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Cost Change Filter */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Cost Trend
+                </label>
+                <select
+                  value={costChangeFilter}
+                  onChange={(e) => setCostChangeFilter(e.target.value as 'all' | 'increase' | 'decrease')}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                  title="Filter by cost trend"
+                >
+                  <option value="all">All Services</option>
+                  <option value="increase">↑ Cost Increased</option>
+                  <option value="decrease">↓ Cost Decreased</option>
+                </select>
+              </div>
+
+              {/* Show Credits Toggle */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Display
+                </label>
+                <label className="flex items-center space-x-3 px-4 py-2.5 rounded-xl border border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={showCredits}
+                    onChange={(e) => setShowCredits(e.target.checked)}
+                    className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                  />
+                  <Gift className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-gray-700">Show Credits</span>
+                </label>
+              </div>
+
+              {/* Sort Options */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Sort By
+                </label>
+                <div className="flex items-center space-x-2">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'cost' | 'name' | 'change')}
+                    className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    title="Sort services by"
+                  >
+                    <option value="cost">Cost</option>
+                    <option value="name">Name</option>
+                    <option value="change">Change %</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                    title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                  >
+                    <ArrowUpDown className={`h-4 w-4 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Summary & Reset */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center space-x-2 text-sm text-gray-500">
+                <span>Showing <strong className="text-gray-700">{filteredServices.length}</strong> of <strong className="text-gray-700">{providerData?.services.length || 0}</strong> services</span>
+              </div>
+              <button
+                onClick={() => {
+                  setServiceSearch('')
+                  setMinCost('')
+                  setMaxCost('')
+                  setCostChangeFilter('all')
+                  setSortBy('cost')
+                  setSortOrder('desc')
+                  setSelectedService(null)
+                  setShowCredits(true)
+                }}
+                className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Reset all filters to default"
+              >
+                <X className="h-4 w-4" />
+                <span>Reset Filters</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -641,17 +954,13 @@ export default function ProviderDetailPage() {
               <div className="flex items-center space-x-2">
                 {/* Period Buttons */}
                 <div className="flex flex-wrap gap-2">
-                  {(['30days', '60days', '120days', '180days', '4months', '6months', '12months'] as PeriodType[]).map((period) => (
+                  {(['1month', '2months', '3months', '4months', '6months', '12months'] as PeriodType[]).map((period) => (
                     <button
                       key={period}
                       onClick={() => {
                         console.log(`Period button clicked: ${period}`)
                         setSelectedPeriod(period)
                         setShowCustomFilter(false)
-                        // Clear filtered data to trigger fresh fetch for extended periods
-                        if (period === '4months' || period === '6months' || period === '12months') {
-                          setFilteredData([])
-                        }
                       }}
                       className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                         selectedPeriod === period
@@ -770,8 +1079,17 @@ export default function ProviderDetailPage() {
           <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Pie Chart - Service Distribution */}
           <div className="card">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Cost by Service</h3>
-            {serviceCostData.length > 0 ? (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Cost by Service</h3>
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                {getPeriodLabel(selectedPeriod)}
+              </span>
+            </div>
+            {isLoadingServices ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            ) : serviceCostData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
@@ -800,8 +1118,17 @@ export default function ProviderDetailPage() {
 
           {/* Bar Chart - Service Costs */}
           <div className="card">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Service Costs</h3>
-            {serviceCostData.length > 0 ? (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Service Costs</h3>
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                {getPeriodLabel(selectedPeriod)}
+              </span>
+            </div>
+            {isLoadingServices ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            ) : serviceCostData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={serviceCostData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -850,18 +1177,24 @@ export default function ProviderDetailPage() {
         {/* Service Details Table */}
         {!hasNoData && (
           <div className="card">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">
-              Service Breakdown
-              {selectedService && (
-                <span className="text-sm font-normal text-gray-500 ml-2">
-                  (filtered by {selectedService})
-                </span>
-              )}
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                Service Breakdown
+                {selectedService && (
+                  <span className="text-sm font-normal text-gray-500 ml-2">
+                    (filtered by {selectedService})
+                  </span>
+                )}
+              </h3>
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                {getPeriodLabel(selectedPeriod)}
+              </span>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-900 w-8"></th>
                     <th className="text-left py-3 px-4 font-semibold text-gray-900">Service</th>
                     <th className="text-right py-3 px-4 font-semibold text-gray-900">Cost</th>
                     <th className="text-right py-3 px-4 font-semibold text-gray-900">Change</th>
@@ -874,26 +1207,128 @@ export default function ProviderDetailPage() {
                       const percentage = effectiveTotal > 0 
                         ? (service.cost / effectiveTotal) * 100 
                         : 0
+                      const isExpanded = expandedService === service.name
                       return (
-                        <tr key={`service-${index}-${service.name}`} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-3 px-4 text-gray-900">{service.name}</td>
-                          <td className="py-3 px-4 text-right font-medium text-gray-900">
-                            {formatCurrency(service.cost)}
-                          </td>
-                          <td className={`py-3 px-4 text-right ${
-                            (service.change || 0) >= 0 ? 'text-red-600' : 'text-green-600'
-                          }`}>
-                            {(service.change || 0) >= 0 ? '+' : ''}{(service.change || 0).toFixed(1)}%
-                          </td>
-                          <td className="py-3 px-4 text-right text-gray-500">
-                            {percentage.toFixed(1)}%
-                          </td>
-                        </tr>
+                        <>
+                          <tr 
+                            key={`service-${index}-${service.name}`} 
+                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50' : ''}`}
+                            onClick={() => handleServiceExpand(service.name, service.cost)}
+                            title="Click to see sub-service breakdown"
+                          >
+                            <td className="py-3 px-2 text-center">
+                              <ChevronDown 
+                                className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                              />
+                            </td>
+                            <td className="py-3 px-4 text-gray-900 font-medium">
+                              <div className="flex items-center gap-2">
+                                <Layers className="h-4 w-4 text-gray-400" />
+                                {service.name}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right font-medium text-gray-900">
+                              {formatCurrency(service.cost)}
+                            </td>
+                            <td className={`py-3 px-4 text-right ${
+                              (service.change || 0) >= 0 ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              {(service.change || 0) >= 0 ? '+' : ''}{(service.change || 0).toFixed(1)}%
+                            </td>
+                            <td className="py-3 px-4 text-right text-gray-500">
+                              {percentage.toFixed(1)}%
+                            </td>
+                          </tr>
+                          
+                          {/* Sub-services expandable row */}
+                          {isExpanded && (
+                            <tr key={`sub-${index}-${service.name}`}>
+                              <td colSpan={5} className="bg-gradient-to-b from-blue-50 to-gray-50 p-0">
+                                <div className="px-8 py-4">
+                                  {isLoadingSubServices ? (
+                                    <div className="flex items-center justify-center py-6">
+                                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                      <span className="ml-3 text-gray-500">Loading sub-service details...</span>
+                                    </div>
+                                  ) : subServices.length > 0 ? (
+                                    <div className="space-y-3">
+                                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                                        <BarChart2 className="h-4 w-4" />
+                                        Sub-service Breakdown
+                                      </h4>
+                                      
+                                      {/* Group by category */}
+                                      {(() => {
+                                        const categories = new Map<string, typeof subServices>()
+                                        subServices.forEach(sub => {
+                                          const cat = sub.category || 'Other'
+                                          if (!categories.has(cat)) categories.set(cat, [])
+                                          categories.get(cat)!.push(sub)
+                                        })
+                                        
+                                        return Array.from(categories.entries()).map(([category, subs]) => (
+                                          <div key={category} className="mb-4">
+                                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                              {category}
+                                            </div>
+                                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                              {subs.map((sub: SubService, subIndex: number) => {
+                                                const subPercentage = service.cost > 0 ? (sub.cost / service.cost) * 100 : 0
+                                                return (
+                                                  <div 
+                                                    key={`${sub.name}-${subIndex}`}
+                                                    className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
+                                                  >
+                                                    <div className="flex items-center gap-3">
+                                                      <div className="w-2 h-2 rounded-full" style={{ 
+                                                        backgroundColor: getCategoryColor(category) 
+                                                      }}></div>
+                                                      <span className="text-sm text-gray-700">{sub.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-6">
+                                                      <div className="w-24">
+                                                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                          <div 
+                                                            className="h-full rounded-full transition-all duration-500"
+                                                            style={{ 
+                                                              width: `${subPercentage}%`,
+                                                              backgroundColor: getCategoryColor(category)
+                                                            }}
+                                                          ></div>
+                                                        </div>
+                                                      </div>
+                                                      <span className="text-xs text-gray-500 w-12 text-right">
+                                                        {subPercentage.toFixed(1)}%
+                                                      </span>
+                                                      <span className="text-sm font-medium text-gray-900 w-24 text-right">
+                                                        {formatCurrency(sub.cost)}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                        ))
+                                      })()}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-6 text-gray-500">
+                                      <Layers className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                      <p className="text-sm">No detailed sub-service data available</p>
+                                      <p className="text-xs text-gray-400 mt-1">Sub-service breakdown may not be available for all services</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       )
                     })
                   ) : (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-gray-500">
+                      <td colSpan={5} className="py-8 text-center text-gray-500">
                         No services found {selectedService ? `matching "${selectedService}"` : ''}
                       </td>
                     </tr>

@@ -14,7 +14,7 @@ interface ProviderCostChartProps {
   data: CostDataPoint[]
   currentMonth: number
   lastMonth: number
-  period: '30days' | '60days' | '120days' | '180days' | '4months' | '6months' | '12months' | 'custom' | 'monthly'
+  period: '1month' | '2months' | '3months' | '4months' | '6months' | '12months' | 'custom' | 'monthly'
   isMonthlyView?: boolean
 }
 
@@ -61,13 +61,12 @@ export default function ProviderCostChart({
   const getPeriodLabel = () => {
     if (isMonthlyView) return 'Monthly Cost Overview'
     switch (period) {
-      case '30days': return 'Last 30 Days'
-      case '60days': return 'Last 60 Days'
-      case '120days': return 'Last 120 Days'
-      case '180days': return 'Last 180 Days'
+      case '1month': return 'Last 1 Month'
+      case '2months': return 'Last 2 Months'
+      case '3months': return 'Last 3 Months'
       case '4months': return 'Last 4 Months'
       case '6months': return 'Last 6 Months'
-      case '12months': return 'Last 12 Months'
+      case '12months': return 'Last 1 Year'
       case 'custom': return 'Custom Date Range'
       case 'monthly': return 'Monthly View'
       default: return ''

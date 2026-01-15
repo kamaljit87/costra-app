@@ -7,7 +7,18 @@ import {
   updateUserCurrency,
   updateProviderCredits,
   getDailyCostData,
+  getServiceCostsForDateRange,
+  getCloudProviderCredentials,
 } from '../database.js'
+import { 
+  fetchAWSServiceDetails, 
+  fetchAzureServiceDetails,
+  fetchGCPServiceDetails,
+  fetchDigitalOceanServiceDetails,
+  fetchIBMServiceDetails,
+  fetchLinodeServiceDetails,
+  fetchVultrServiceDetails
+} from '../services/cloudProviderIntegrations.js'
 
 const router = express.Router()
 
@@ -37,11 +48,17 @@ router.get('/', async (req, res) => {
       credits: parseFloat(cost.credits) || 0,
       savings: parseFloat(cost.savings) || 0,
       // Transform service_name to name and change_percent to change for frontend compatibility
-      services: (cost.services || []).map(service => ({
-        name: service.service_name,
-        cost: parseFloat(service.cost) || 0,
-        change: parseFloat(service.change_percent) || 0,
-      })),
+      // Filter out Tax entries - they are not services
+      services: (cost.services || [])
+        .filter(service => {
+          const name = (service.service_name || '').toLowerCase()
+          return name !== 'tax' && !name.includes('tax -') && name !== 'vat'
+        })
+        .map(service => ({
+          name: service.service_name,
+          cost: parseFloat(service.cost) || 0,
+          change: parseFloat(service.change_percent) || 0,
+        })),
     }))
 
     res.json({ costData: formattedData })
@@ -73,6 +90,230 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 })
+
+// Get aggregated service costs for a date range
+router.get('/services/:providerId', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId } = req.params
+    const { startDate, endDate } = req.query
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+
+    console.log(`[Services API] Fetching services for user ${userId}, provider ${providerId}, range: ${startDate} to ${endDate}`)
+
+    const allServices = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
+    
+    // Filter out Tax - it's not a service but a fee
+    const services = allServices.filter(s => 
+      s.name.toLowerCase() !== 'tax' && 
+      !s.name.toLowerCase().includes('tax -') &&
+      s.name.toLowerCase() !== 'vat'
+    )
+    
+    // Calculate total for the response (excluding tax)
+    const totalCost = services.reduce((sum, s) => sum + s.cost, 0)
+
+    console.log(`[Services API] Found ${services.length} services (filtered from ${allServices.length}), total: $${totalCost.toFixed(2)}`)
+
+    // Include metadata to help frontend detect changes
+    res.json({ 
+      services,
+      period: { startDate, endDate },
+      totalCost,
+      timestamp: Date.now()
+    })
+  } catch (error) {
+    console.error('Get services error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Get sub-service details for a specific service (e.g., EC2 -> compute, storage, etc.)
+router.get('/services/:providerId/:serviceName/details', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId, serviceName } = req.params
+    const { startDate, endDate } = req.query
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+
+    const decodedServiceName = decodeURIComponent(serviceName)
+    console.log(`[Service Details API] Fetching details for ${decodedServiceName} (${providerId})`)
+
+    // Skip tax - it doesn't have sub-services
+    if (decodedServiceName.toLowerCase() === 'tax') {
+      return res.json({
+        serviceName: decodedServiceName,
+        providerId,
+        subServices: [],
+        message: 'Tax charges do not have sub-service breakdown',
+        period: { startDate, endDate },
+        timestamp: Date.now()
+      })
+    }
+
+    // Get provider credentials (returns the decrypted credentials object directly)
+    const credentials = await getCloudProviderCredentials(userId, providerId)
+    
+    if (!credentials) {
+      return res.status(404).json({ error: 'Provider not configured' })
+    }
+
+    let subServices = []
+
+    // Fetch sub-service details based on provider
+    switch (providerId) {
+      case 'aws':
+        try {
+          const awsResult = await fetchAWSServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = awsResult.subServices || []
+        } catch (err) {
+          console.error('[AWS Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      case 'azure':
+        try {
+          const azureResult = await fetchAzureServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = azureResult.subServices || []
+        } catch (err) {
+          console.error('[Azure Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      case 'gcp':
+      case 'google':
+        try {
+          const gcpResult = await fetchGCPServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = gcpResult.subServices || []
+        } catch (err) {
+          console.error('[GCP Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      case 'digitalocean':
+      case 'do':
+        try {
+          const doResult = await fetchDigitalOceanServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = doResult.subServices || []
+        } catch (err) {
+          console.error('[DO Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      case 'ibm':
+      case 'ibmcloud':
+        try {
+          const ibmResult = await fetchIBMServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = ibmResult.subServices || []
+        } catch (err) {
+          console.error('[IBM Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      case 'linode':
+      case 'akamai':
+        try {
+          const linodeResult = await fetchLinodeServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = linodeResult.subServices || []
+        } catch (err) {
+          console.error('[Linode Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      case 'vultr':
+        try {
+          const vultrResult = await fetchVultrServiceDetails(credentials, decodedServiceName, startDate, endDate)
+          subServices = vultrResult.subServices || []
+        } catch (err) {
+          console.error('[Vultr Service Details] API failed, using simulated data:', err.message)
+          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+        }
+        break
+      
+      default:
+        // For other providers, provide generic sub-service simulation based on service type
+        subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+    }
+
+    console.log(`[Service Details API] Found ${subServices.length} sub-services`)
+
+    res.json({
+      serviceName: decodedServiceName,
+      providerId,
+      subServices,
+      period: { startDate, endDate },
+      timestamp: Date.now()
+    })
+  } catch (error) {
+    console.error('Get service details error:', error)
+    res.status(500).json({ error: error.message || 'Internal server error' })
+  }
+})
+
+// Helper function to generate simulated sub-services for providers without detailed API
+async function getSimulatedSubServices(serviceName, providerId) {
+  const serviceNameLower = serviceName.toLowerCase()
+  
+  // Define common sub-service patterns
+  const subServicePatterns = {
+    // Compute services
+    compute: [
+      { name: 'Compute Hours', category: 'Compute', percentage: 60 },
+      { name: 'Storage (Attached Disks)', category: 'Storage', percentage: 25 },
+      { name: 'Data Transfer', category: 'Data Transfer', percentage: 10 },
+      { name: 'Snapshots', category: 'Storage', percentage: 5 },
+    ],
+    // Storage services
+    storage: [
+      { name: 'Standard Storage', category: 'Storage', percentage: 50 },
+      { name: 'Premium Storage', category: 'Storage', percentage: 30 },
+      { name: 'Operations', category: 'Requests', percentage: 15 },
+      { name: 'Data Retrieval', category: 'Data Transfer', percentage: 5 },
+    ],
+    // Database services
+    database: [
+      { name: 'Instance Hours', category: 'Compute', percentage: 55 },
+      { name: 'Storage', category: 'Storage', percentage: 25 },
+      { name: 'I/O Operations', category: 'Requests', percentage: 10 },
+      { name: 'Backup Storage', category: 'Storage', percentage: 10 },
+    ],
+    // Network services
+    network: [
+      { name: 'Data Processing', category: 'Compute', percentage: 40 },
+      { name: 'Data Transfer Out', category: 'Data Transfer', percentage: 35 },
+      { name: 'Data Transfer In', category: 'Data Transfer', percentage: 15 },
+      { name: 'Connection Hours', category: 'Compute', percentage: 10 },
+    ],
+  }
+
+  // Detect service type
+  let serviceType = 'compute' // default
+  if (serviceNameLower.includes('storage') || serviceNameLower.includes('s3') || serviceNameLower.includes('blob')) {
+    serviceType = 'storage'
+  } else if (serviceNameLower.includes('database') || serviceNameLower.includes('sql') || serviceNameLower.includes('rds') || serviceNameLower.includes('dynamo')) {
+    serviceType = 'database'
+  } else if (serviceNameLower.includes('vpc') || serviceNameLower.includes('network') || serviceNameLower.includes('load') || serviceNameLower.includes('cdn') || serviceNameLower.includes('cloudfront')) {
+    serviceType = 'network'
+  }
+
+  return subServicePatterns[serviceType].map(sub => ({
+    ...sub,
+    cost: 0, // Will be calculated on frontend based on parent service cost
+    usageType: `${providerId}-${sub.name.replace(/\s+/g, '')}`,
+  }))
+}
 
 // Get user preferences (currency)
 router.get('/preferences', async (req, res) => {

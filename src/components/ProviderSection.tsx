@@ -19,12 +19,12 @@ interface ProviderSectionProps {
   forecast: number
   credits: number
   savings: number
-  chartData30Days: CostDataPoint[]
-  chartData60Days: CostDataPoint[]
-  chartData120Days: CostDataPoint[]
-  chartData180Days: CostDataPoint[]
+  chartData1Month: CostDataPoint[]
+  chartData2Months: CostDataPoint[]
+  chartData3Months: CostDataPoint[]
   chartData4Months: CostDataPoint[]
   chartData6Months: CostDataPoint[]
+  chartData12Months: CostDataPoint[]
 }
 
 export default function ProviderSection({
@@ -35,16 +35,16 @@ export default function ProviderSection({
   forecast,
   credits,
   savings,
-  chartData30Days: _chartData30Days,
-  chartData60Days: _chartData60Days,
-  chartData120Days: _chartData120Days,
-  chartData180Days,
+  chartData1Month: _chartData1Month,
+  chartData2Months: _chartData2Months,
+  chartData3Months: _chartData3Months,
   chartData4Months: _chartData4Months,
   chartData6Months: _chartData6Months,
+  chartData12Months,
 }: ProviderSectionProps) {
-  void _chartData30Days
-  void _chartData60Days
-  void _chartData120Days
+  void _chartData1Month
+  void _chartData2Months
+  void _chartData3Months
   void _chartData4Months
   void _chartData6Months
   
@@ -56,9 +56,9 @@ export default function ProviderSection({
     : 0
 
   const monthlyData = useMemo(() => {
-    const allData = [...chartData180Days]
+    const allData = [...chartData12Months]
     return aggregateToMonthly(allData)
-  }, [chartData180Days])
+  }, [chartData12Months])
 
   const getChartData = () => {
     const monthsToShow = selectedPeriod === '3months' ? 3 : selectedPeriod === '6months' ? 6 : 12

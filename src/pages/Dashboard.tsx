@@ -165,12 +165,12 @@ export default function Dashboard() {
                         credits: 0,
                         savings: 0,
                         services: [],
-                        chartData30Days: [],
-                        chartData60Days: [],
-                        chartData120Days: [],
-                        chartData180Days: [],
+                        chartData1Month: [],
+                        chartData2Months: [],
+                        chartData3Months: [],
                         chartData4Months: [],
                         chartData6Months: [],
+                        chartData12Months: [],
                         allHistoricalData: [],
                       })
                     }
@@ -197,12 +197,12 @@ export default function Dashboard() {
                                 forecast={data.forecast}
                                 credits={data.credits}
                                 savings={data.savings}
-                                chartData30Days={data.chartData30Days}
-                                chartData60Days={data.chartData60Days}
-                                chartData120Days={data.chartData120Days}
-                                chartData180Days={data.chartData180Days}
+                                chartData1Month={data.chartData1Month}
+                                chartData2Months={data.chartData2Months}
+                                chartData3Months={data.chartData3Months}
                                 chartData4Months={data.chartData4Months}
                                 chartData6Months={data.chartData6Months}
+                                chartData12Months={data.chartData12Months}
                               />
                             ) : (
                               <div className="card">

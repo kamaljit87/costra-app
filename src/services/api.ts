@@ -135,6 +135,20 @@ export const costDataAPI = {
     const response = await apiRequest(`/cost-data/${providerId}/daily?startDate=${startDate}&endDate=${endDate}`)
     return response.json()
   },
+
+  getServicesForDateRange: async (providerId: string, startDate: string, endDate: string) => {
+    // Add cache-busting timestamp to ensure fresh data
+    const timestamp = Date.now()
+    const response = await apiRequest(`/cost-data/services/${providerId}?startDate=${startDate}&endDate=${endDate}&_t=${timestamp}`)
+    return response.json()
+  },
+
+  getServiceDetails: async (providerId: string, serviceName: string, startDate: string, endDate: string) => {
+    const timestamp = Date.now()
+    const encodedServiceName = encodeURIComponent(serviceName)
+    const response = await apiRequest(`/cost-data/services/${providerId}/${encodedServiceName}/details?startDate=${startDate}&endDate=${endDate}&_t=${timestamp}`)
+    return response.json()
+  },
 }
 
 // Savings Plans API
@@ -278,6 +292,27 @@ export const profileAPI = {
       method: 'PUT',
       body: JSON.stringify({ currentPassword, newPassword }),
     })
+    return response.json()
+  },
+}
+
+// AI API
+export const aiAPI = {
+  chat: async (message: string, conversationHistory: { role: string; content: string }[] = []) => {
+    const response = await apiRequest('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, conversationHistory }),
+    })
+    return response.json()
+  },
+
+  getInsights: async () => {
+    const response = await apiRequest('/ai/insights')
+    return response.json()
+  },
+
+  getAnomalies: async () => {
+    const response = await apiRequest('/ai/anomalies')
     return response.json()
   },
 }

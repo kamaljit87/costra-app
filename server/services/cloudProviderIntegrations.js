@@ -9,6 +9,33 @@ import { CostExplorerClient, GetCostAndUsageCommand } from '@aws-sdk/client-cost
 const clientCache = new Map()
 
 /**
+ * Helper function to check if a service name is a tax/fee entry
+ * These should be excluded from service breakdowns
+ */
+const isTaxOrFee = (serviceName) => {
+  if (!serviceName) return false
+  const name = serviceName.toLowerCase()
+  return (
+    name === 'tax' ||
+    name === 'vat' ||
+    name.startsWith('tax -') ||
+    name.includes(' tax') ||
+    name === 'sales tax' ||
+    name === 'gst' ||
+    name === 'hst' ||
+    name === 'pst' ||
+    name === 'withholding tax'
+  )
+}
+
+/**
+ * Filter out tax entries from services array
+ */
+const filterOutTaxServices = (services) => {
+  return services.filter(service => !isTaxOrFee(service.name))
+}
+
+/**
  * AWS Cost Explorer API Integration using official SDK
  */
 export const fetchAWSCostData = async (credentials, startDate, endDate) => {
@@ -216,14 +243,17 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
   console.log(`  - Last month total: $${lastMonth.toFixed(2)}`)
   console.log(`  - Services found: ${serviceMap.size}`)
 
-  // Convert service map to array
-  const services = Array.from(serviceMap.entries())
+  // Convert service map to array and filter out tax entries
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({
       name,
       cost,
       change: 0, // Calculate change from previous period if needed
     }))
     .sort((a, b) => b.cost - a.cost)
+
+  const services = filterOutTaxServices(allServices)
+  console.log(`  - Services after tax filter: ${services.length}`)
 
   return {
     currentMonth,
@@ -234,6 +264,798 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
     services,
     dailyData,
   }
+}
+
+/**
+ * Fetch sub-service details for a specific AWS service
+ * Groups by USAGE_TYPE to show detailed breakdown (e.g., EC2 compute vs storage)
+ */
+export const fetchAWSServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { accessKeyId, secretAccessKey, region = 'us-east-1' } = credentials
+
+  console.log(`[AWS Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[AWS Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    const cacheKey = `aws-${accessKeyId}-${region}`
+    let client = clientCache.get(cacheKey)
+    
+    if (!client) {
+      client = new CostExplorerClient({
+        region,
+        credentials: { accessKeyId, secretAccessKey },
+      })
+      clientCache.set(cacheKey, client)
+    }
+
+    // Fetch costs grouped by USAGE_TYPE for the specific service
+    const command = new GetCostAndUsageCommand({
+      TimePeriod: {
+        Start: startDate,
+        End: endDate,
+      },
+      Granularity: 'MONTHLY',
+      Metrics: ['UnblendedCost'],
+      GroupBy: [
+        { Type: 'DIMENSION', Key: 'USAGE_TYPE' },
+      ],
+      Filter: {
+        Dimensions: {
+          Key: 'SERVICE',
+          Values: [serviceName],
+        },
+      },
+    })
+
+    const response = await client.send(command)
+    
+    // Aggregate usage types
+    const usageTypeMap = new Map()
+    
+    for (const result of response.ResultsByTime || []) {
+      for (const group of result.Groups || []) {
+        const usageType = group.Keys?.[0] || 'Unknown'
+        const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || 0)
+        
+        if (cost > 0) {
+          const existing = usageTypeMap.get(usageType) || 0
+          usageTypeMap.set(usageType, existing + cost)
+        }
+      }
+    }
+
+    // Convert to array and categorize
+    const subServices = Array.from(usageTypeMap.entries())
+      .map(([usageType, cost]) => ({
+        name: formatUsageType(usageType),
+        usageType,
+        cost,
+        category: categorizeUsageType(usageType),
+      }))
+      .sort((a, b) => b.cost - a.cost)
+
+    console.log(`[AWS Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[AWS Service Details] Error:`, error)
+    throw error
+  }
+}
+
+// Helper to format AWS usage types into readable names
+function formatUsageType(usageType) {
+  // Common patterns: region-UsageType or just UsageType
+  // e.g., "USE1-BoxUsage:t3.micro" -> "BoxUsage: t3.micro (US East 1)"
+  // e.g., "DataTransfer-Out-Bytes" -> "Data Transfer Out"
+  
+  const patterns = {
+    'BoxUsage': 'Compute Instance',
+    'EBS:VolumeUsage': 'EBS Volume Storage',
+    'EBS:SnapshotUsage': 'EBS Snapshots',
+    'DataTransfer-Out': 'Data Transfer Out',
+    'DataTransfer-In': 'Data Transfer In',
+    'DataTransfer-Regional': 'Regional Data Transfer',
+    'NatGateway': 'NAT Gateway',
+    'LoadBalancerUsage': 'Load Balancer',
+    'Requests': 'API Requests',
+    'TimedStorage': 'Storage',
+    'VpcEndpoint': 'VPC Endpoint',
+    'PublicIP': 'Elastic IP',
+    'ElasticIP': 'Elastic IP',
+  }
+
+  let formatted = usageType
+  
+  // Remove region prefix (e.g., "USE1-", "USW2-", "EUW1-")
+  formatted = formatted.replace(/^[A-Z]{2,4}\d?-/, '')
+  
+  // Apply known patterns
+  for (const [pattern, replacement] of Object.entries(patterns)) {
+    if (formatted.includes(pattern)) {
+      // Extract any instance type or additional info
+      const match = formatted.match(/:(.+)$/)
+      const extra = match ? ` (${match[1]})` : ''
+      formatted = replacement + extra
+      break
+    }
+  }
+  
+  // Clean up remaining technical names
+  formatted = formatted
+    .replace(/([a-z])([A-Z])/g, '$1 $2')  // CamelCase to spaces
+    .replace(/-/g, ' ')
+    .replace(/:/, ': ')
+  
+  return formatted
+}
+
+// Categorize usage types for grouping
+function categorizeUsageType(usageType) {
+  if (usageType.includes('BoxUsage') || usageType.includes('SpotUsage')) return 'Compute'
+  if (usageType.includes('EBS') || usageType.includes('Storage') || usageType.includes('Volume')) return 'Storage'
+  if (usageType.includes('DataTransfer') || usageType.includes('Bytes')) return 'Data Transfer'
+  if (usageType.includes('LoadBalancer') || usageType.includes('LCU')) return 'Load Balancing'
+  if (usageType.includes('NatGateway') || usageType.includes('VpcEndpoint')) return 'Networking'
+  if (usageType.includes('Request') || usageType.includes('API')) return 'Requests'
+  if (usageType.includes('IP') || usageType.includes('Address')) return 'IP Addresses'
+  return 'Other'
+}
+
+/**
+ * Fetch sub-service details for Azure (by Meter category)
+ */
+export const fetchAzureServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { tenantId, clientId, clientSecret, subscriptionId } = credentials
+
+  console.log(`[Azure Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[Azure Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    const token = await getAzureAccessToken(tenantId, clientId, clientSecret)
+    const baseUrl = `https://management.azure.com/subscriptions/${subscriptionId}/providers/Microsoft.CostManagement/query?api-version=2021-10-01`
+
+    // Query costs grouped by MeterSubCategory for the specific service
+    const payload = {
+      type: 'ActualCost',
+      timeframe: 'Custom',
+      timePeriod: { from: startDate, to: endDate },
+      dataset: {
+        granularity: 'None',
+        aggregation: {
+          totalCost: { name: 'Cost', function: 'Sum' },
+        },
+        grouping: [
+          { type: 'Dimension', name: 'MeterSubCategory' },
+        ],
+        filter: {
+          dimensions: {
+            name: 'ServiceName',
+            operator: 'In',
+            values: [serviceName],
+          },
+        },
+      },
+    }
+
+    const response = await fetch(baseUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      console.error(`[Azure Service Details] API error: ${response.status}`)
+      return { serviceName, totalCost: 0, subServices: [] }
+    }
+
+    const result = await response.json()
+    const rows = result.properties?.rows || []
+
+    // Transform rows to sub-services
+    const subServices = rows
+      .filter(row => row[0] && row[1] > 0)
+      .map(row => ({
+        name: formatAzureMeter(row[0]),
+        usageType: row[0],
+        cost: row[1],
+        category: categorizeAzureMeter(row[0]),
+      }))
+      .sort((a, b) => b.cost - a.cost)
+
+    console.log(`[Azure Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[Azure Service Details] Error:`, error)
+    throw error
+  }
+}
+
+// Helper to format Azure meter names
+function formatAzureMeter(meter) {
+  if (!meter) return 'Unknown'
+  // Remove region prefixes and clean up
+  return meter
+    .replace(/^[A-Z]{2,3}\s+/, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+}
+
+// Categorize Azure meters
+function categorizeAzureMeter(meter) {
+  const meterLower = (meter || '').toLowerCase()
+  if (meterLower.includes('compute') || meterLower.includes('vcore') || meterLower.includes('hours')) return 'Compute'
+  if (meterLower.includes('storage') || meterLower.includes('disk') || meterLower.includes('snapshot')) return 'Storage'
+  if (meterLower.includes('bandwidth') || meterLower.includes('data transfer') || meterLower.includes('egress')) return 'Data Transfer'
+  if (meterLower.includes('network') || meterLower.includes('gateway') || meterLower.includes('load balancer')) return 'Networking'
+  if (meterLower.includes('operation') || meterLower.includes('transaction') || meterLower.includes('request')) return 'Requests'
+  return 'Other'
+}
+
+/**
+ * Fetch sub-service details for GCP (by SKU description)
+ */
+export const fetchGCPServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { projectId, serviceAccountKey, bigQueryDataset } = credentials
+
+  console.log(`[GCP Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[GCP Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    if (!serviceAccountKey || !bigQueryDataset) {
+      console.log(`[GCP Service Details] BigQuery not configured, using simulated data`)
+      return { serviceName, totalCost: 0, subServices: [] }
+    }
+
+    const keyData = typeof serviceAccountKey === 'string' 
+      ? JSON.parse(serviceAccountKey) 
+      : serviceAccountKey
+
+    const token = await getGCPAccessToken(keyData)
+    
+    // Query SKU-level costs for the specific service
+    const query = `
+      SELECT 
+        sku.description as sku_name,
+        SUM(cost) as cost,
+        SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) as credits
+      FROM \`${bigQueryDataset}.gcp_billing_export_v1_*\`
+      WHERE DATE(usage_start_time) >= '${startDate}'
+        AND DATE(usage_start_time) <= '${endDate}'
+        AND service.description = '${serviceName.replace(/'/g, "\\'")}'
+      GROUP BY sku_name
+      HAVING cost > 0
+      ORDER BY cost DESC
+      LIMIT 50
+    `
+
+    const bigQueryUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries`
+    
+    const response = await fetch(bigQueryUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, useLegacySql: false }),
+    })
+
+    if (!response.ok) {
+      console.error(`[GCP Service Details] BigQuery error: ${response.status}`)
+      return { serviceName, totalCost: 0, subServices: [] }
+    }
+
+    const result = await response.json()
+    const rows = result.rows || []
+
+    const subServices = rows
+      .filter(row => row.f && row.f[0]?.v && parseFloat(row.f[1]?.v || 0) > 0)
+      .map(row => ({
+        name: row.f[0].v,
+        usageType: row.f[0].v,
+        cost: parseFloat(row.f[1]?.v || 0),
+        category: categorizeGCPSku(row.f[0].v),
+      }))
+
+    console.log(`[GCP Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[GCP Service Details] Error:`, error)
+    return { serviceName, totalCost: 0, subServices: [] }
+  }
+}
+
+// Categorize GCP SKUs
+function categorizeGCPSku(sku) {
+  const skuLower = (sku || '').toLowerCase()
+  if (skuLower.includes('core') || skuLower.includes('cpu') || skuLower.includes('instance') || skuLower.includes('vcpu')) return 'Compute'
+  if (skuLower.includes('ram') || skuLower.includes('memory')) return 'Memory'
+  if (skuLower.includes('storage') || skuLower.includes('disk') || skuLower.includes('pd ') || skuLower.includes('ssd')) return 'Storage'
+  if (skuLower.includes('network') || skuLower.includes('egress') || skuLower.includes('ingress') || skuLower.includes('bandwidth')) return 'Data Transfer'
+  if (skuLower.includes('ip') || skuLower.includes('address')) return 'IP Addresses'
+  if (skuLower.includes('operation') || skuLower.includes('request') || skuLower.includes('api')) return 'Requests'
+  return 'Other'
+}
+
+/**
+ * Fetch sub-service details for DigitalOcean (by invoice items)
+ */
+export const fetchDigitalOceanServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { apiToken } = credentials
+
+  console.log(`[DO Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[DO Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    }
+
+    // Fetch invoices with items
+    const invoicesResponse = await fetch('https://api.digitalocean.com/v2/customers/my/invoices?per_page=50', { headers })
+    
+    if (!invoicesResponse.ok) {
+      console.error(`[DO Service Details] API error: ${invoicesResponse.status}`)
+      return { serviceName, totalCost: 0, subServices: [] }
+    }
+
+    const invoicesData = await invoicesResponse.json()
+    const invoices = invoicesData.invoices || []
+    
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const subServiceMap = new Map()
+
+    // Process invoice items
+    for (const invoice of invoices) {
+      const invoiceDate = new Date(invoice.invoice_period || invoice.invoice_date)
+      if (invoiceDate < start || invoiceDate > end) continue
+
+      // Fetch invoice items if available
+      if (invoice.invoice_uuid) {
+        try {
+          const itemsResponse = await fetch(
+            `https://api.digitalocean.com/v2/customers/my/invoices/${invoice.invoice_uuid}/items?per_page=200`,
+            { headers }
+          )
+          
+          if (itemsResponse.ok) {
+            const itemsData = await itemsResponse.json()
+            const items = itemsData.invoice_items || []
+            
+            items.forEach(item => {
+              // Match items to the selected service
+              const itemService = item.product || item.description || 'DigitalOcean Services'
+              if (itemService.toLowerCase().includes(serviceName.toLowerCase()) || 
+                  serviceName.toLowerCase().includes(itemService.toLowerCase().split(' ')[0])) {
+                const itemName = item.description || item.product || 'Usage'
+                const cost = parseFloat(item.amount || 0)
+                
+                if (cost > 0) {
+                  const existing = subServiceMap.get(itemName) || 0
+                  subServiceMap.set(itemName, existing + cost)
+                }
+              }
+            })
+          }
+        } catch (itemError) {
+          console.warn(`[DO Service Details] Error fetching invoice items: ${itemError.message}`)
+        }
+      }
+    }
+
+    const subServices = Array.from(subServiceMap.entries())
+      .map(([name, cost]) => ({
+        name: formatDOItemName(name),
+        usageType: name,
+        cost,
+        category: categorizeDOItem(name),
+      }))
+      .sort((a, b) => b.cost - a.cost)
+
+    console.log(`[DO Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[DO Service Details] Error:`, error)
+    return { serviceName, totalCost: 0, subServices: [] }
+  }
+}
+
+function formatDOItemName(name) {
+  return name
+    .replace(/^\d+x\s*/, '')
+    .replace(/\s*-\s*\d+\s*(GB|TB|MB|hours?|hrs?)/gi, '')
+    .trim()
+}
+
+function categorizeDOItem(item) {
+  const itemLower = (item || '').toLowerCase()
+  if (itemLower.includes('droplet') || itemLower.includes('cpu') || itemLower.includes('vcpu')) return 'Compute'
+  if (itemLower.includes('volume') || itemLower.includes('storage') || itemLower.includes('space')) return 'Storage'
+  if (itemLower.includes('bandwidth') || itemLower.includes('transfer') || itemLower.includes('outbound')) return 'Data Transfer'
+  if (itemLower.includes('database') || itemLower.includes('db') || itemLower.includes('postgres') || itemLower.includes('mysql')) return 'Database'
+  if (itemLower.includes('kubernetes') || itemLower.includes('k8s')) return 'Kubernetes'
+  if (itemLower.includes('load balancer') || itemLower.includes('lb')) return 'Load Balancing'
+  if (itemLower.includes('snapshot') || itemLower.includes('backup')) return 'Backups'
+  return 'Other'
+}
+
+/**
+ * Fetch sub-service details for IBM Cloud (by resource usage)
+ */
+export const fetchIBMServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { apiKey, accountId } = credentials
+
+  console.log(`[IBM Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[IBM Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    // Get IAM access token
+    const tokenResponse = await fetch('https://iam.cloud.ibm.com/identity/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: new URLSearchParams({
+        grant_type: 'urn:ibm:params:oauth:grant-type:apikey',
+        apikey: apiKey,
+      }),
+    })
+
+    if (!tokenResponse.ok) {
+      console.error(`[IBM Service Details] Auth failed`)
+      return { serviceName, totalCost: 0, subServices: [] }
+    }
+
+    const tokenData = await tokenResponse.json()
+    const accessToken = tokenData.access_token
+
+    // Fetch resource usage
+    const billingMonth = startDate.substring(0, 7)
+    const usageUrl = `https://billing.cloud.ibm.com/v4/accounts/${accountId}/resource_instances/usage/${billingMonth}`
+    
+    const usageResponse = await fetch(usageUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!usageResponse.ok) {
+      console.error(`[IBM Service Details] Usage API error: ${usageResponse.status}`)
+      return { serviceName, totalCost: 0, subServices: [] }
+    }
+
+    const usageData = await usageResponse.json()
+    const resources = usageData.resources || []
+    
+    const subServiceMap = new Map()
+
+    // Process resource usage
+    resources.forEach(resource => {
+      const resourceService = resource.resource_name || resource.service_name || ''
+      
+      // Match to selected service
+      if (resourceService.toLowerCase().includes(serviceName.toLowerCase()) ||
+          serviceName.toLowerCase().includes(resourceService.toLowerCase())) {
+        
+        (resource.usage || []).forEach(usage => {
+          const metricName = usage.metric || usage.unit || 'Usage'
+          const cost = parseFloat(usage.cost || 0)
+          
+          if (cost > 0) {
+            const existing = subServiceMap.get(metricName) || 0
+            subServiceMap.set(metricName, existing + cost)
+          }
+        })
+      }
+    })
+
+    const subServices = Array.from(subServiceMap.entries())
+      .map(([name, cost]) => ({
+        name: formatIBMMetric(name),
+        usageType: name,
+        cost,
+        category: categorizeIBMMetric(name),
+      }))
+      .sort((a, b) => b.cost - a.cost)
+
+    console.log(`[IBM Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[IBM Service Details] Error:`, error)
+    return { serviceName, totalCost: 0, subServices: [] }
+  }
+}
+
+function formatIBMMetric(metric) {
+  return metric
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, l => l.toUpperCase())
+}
+
+function categorizeIBMMetric(metric) {
+  const metricLower = (metric || '').toLowerCase()
+  if (metricLower.includes('instance') || metricLower.includes('core') || metricLower.includes('vcpu')) return 'Compute'
+  if (metricLower.includes('storage') || metricLower.includes('gb') || metricLower.includes('disk')) return 'Storage'
+  if (metricLower.includes('bandwidth') || metricLower.includes('network') || metricLower.includes('transfer')) return 'Data Transfer'
+  if (metricLower.includes('api') || metricLower.includes('request') || metricLower.includes('call')) return 'Requests'
+  if (metricLower.includes('memory') || metricLower.includes('ram')) return 'Memory'
+  return 'Other'
+}
+
+/**
+ * Fetch sub-service details for Linode (by invoice items)
+ */
+export const fetchLinodeServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { apiToken } = credentials
+
+  console.log(`[Linode Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[Linode Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    }
+
+    // Fetch current invoice items for detailed breakdown
+    const itemsResponse = await fetch('https://api.linode.com/v4/account/invoices/current/items?page_size=500', { headers })
+    
+    const subServiceMap = new Map()
+
+    if (itemsResponse.ok) {
+      const itemsData = await itemsResponse.json()
+      const items = itemsData.data || []
+      
+      items.forEach(item => {
+        // Match items to selected service
+        const itemLabel = item.label || item.type || ''
+        const itemType = item.type || ''
+        
+        if (itemLabel.toLowerCase().includes(serviceName.toLowerCase()) ||
+            serviceName.toLowerCase().includes(itemType.toLowerCase())) {
+          
+          const itemName = `${itemLabel} (${item.quantity || 1} units)`
+          const cost = parseFloat(item.total || item.amount || 0)
+          
+          if (cost > 0) {
+            const existing = subServiceMap.get(itemName) || 0
+            subServiceMap.set(itemName, existing + cost)
+          }
+        }
+      })
+    }
+
+    // Also fetch historical invoice items
+    const invoicesResponse = await fetch('https://api.linode.com/v4/account/invoices?page_size=12', { headers })
+    
+    if (invoicesResponse.ok) {
+      const invoicesData = await invoicesResponse.json()
+      const invoices = invoicesData.data || []
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      
+      for (const invoice of invoices) {
+        const invoiceDate = new Date(invoice.date)
+        if (invoiceDate < start || invoiceDate > end) continue
+        
+        try {
+          const invoiceItemsResponse = await fetch(
+            `https://api.linode.com/v4/account/invoices/${invoice.id}/items?page_size=500`,
+            { headers }
+          )
+          
+          if (invoiceItemsResponse.ok) {
+            const invoiceItemsData = await invoiceItemsResponse.json()
+            const invoiceItems = invoiceItemsData.data || []
+            
+            invoiceItems.forEach(item => {
+              const itemLabel = item.label || item.type || ''
+              const itemType = item.type || ''
+              
+              if (itemLabel.toLowerCase().includes(serviceName.toLowerCase()) ||
+                  serviceName.toLowerCase().includes(itemType.toLowerCase())) {
+                
+                const itemName = formatLinodeItem(itemLabel, item.type)
+                const cost = parseFloat(item.total || item.amount || 0)
+                
+                if (cost > 0) {
+                  const existing = subServiceMap.get(itemName) || 0
+                  subServiceMap.set(itemName, existing + cost)
+                }
+              }
+            })
+          }
+        } catch (itemError) {
+          console.warn(`[Linode Service Details] Error fetching invoice ${invoice.id} items: ${itemError.message}`)
+        }
+      }
+    }
+
+    const subServices = Array.from(subServiceMap.entries())
+      .map(([name, cost]) => ({
+        name,
+        usageType: name,
+        cost,
+        category: categorizeLinodeItem(name),
+      }))
+      .sort((a, b) => b.cost - a.cost)
+
+    console.log(`[Linode Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[Linode Service Details] Error:`, error)
+    return { serviceName, totalCost: 0, subServices: [] }
+  }
+}
+
+function formatLinodeItem(label, type) {
+  if (label && type && label !== type) {
+    return `${label} (${type})`
+  }
+  return label || type || 'Linode Service'
+}
+
+function categorizeLinodeItem(item) {
+  const itemLower = (item || '').toLowerCase()
+  if (itemLower.includes('linode') && (itemLower.includes('gb') || itemLower.includes('cpu'))) return 'Compute'
+  if (itemLower.includes('volume') || itemLower.includes('storage') || itemLower.includes('block')) return 'Storage'
+  if (itemLower.includes('backup')) return 'Backups'
+  if (itemLower.includes('transfer') || itemLower.includes('bandwidth') || itemLower.includes('network')) return 'Data Transfer'
+  if (itemLower.includes('nodebalancer') || itemLower.includes('load')) return 'Load Balancing'
+  if (itemLower.includes('kubernetes') || itemLower.includes('lke')) return 'Kubernetes'
+  if (itemLower.includes('object') || itemLower.includes('s3')) return 'Object Storage'
+  return 'Other'
+}
+
+/**
+ * Fetch sub-service details for Vultr (by billing history)
+ */
+export const fetchVultrServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { apiKey } = credentials
+
+  console.log(`[Vultr Service Details] Fetching details for: ${serviceName}`)
+  console.log(`[Vultr Service Details] Date range: ${startDate} to ${endDate}`)
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    }
+
+    // Fetch billing history for detailed breakdown
+    const billingResponse = await fetch('https://api.vultr.com/v2/billing/history?per_page=500', { headers })
+    
+    const subServiceMap = new Map()
+
+    if (billingResponse.ok) {
+      const billingData = await billingResponse.json()
+      const history = billingData.billing_history || []
+      
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      
+      history.forEach(entry => {
+        const entryDate = new Date(entry.date)
+        if (entryDate < start || entryDate > end) return
+        
+        const description = entry.description || ''
+        const amount = parseFloat(entry.amount || 0)
+        
+        // Match to selected service
+        if (amount > 0 && (
+          description.toLowerCase().includes(serviceName.toLowerCase()) ||
+          serviceName.toLowerCase().includes(description.split(' ')[0].toLowerCase())
+        )) {
+          const itemName = formatVultrDescription(description)
+          const existing = subServiceMap.get(itemName) || 0
+          subServiceMap.set(itemName, existing + amount)
+        }
+      })
+    }
+
+    // Also try to get instance-level details
+    try {
+      const instancesResponse = await fetch('https://api.vultr.com/v2/instances', { headers })
+      
+      if (instancesResponse.ok) {
+        const instancesData = await instancesResponse.json()
+        const instances = instancesData.instances || []
+        
+        instances.forEach(instance => {
+          // Add instance plan details if matching service
+          if (serviceName.toLowerCase().includes('compute') || 
+              serviceName.toLowerCase().includes('instance') ||
+              serviceName.toLowerCase().includes('vultr')) {
+            const planName = `${instance.plan} - ${instance.region}`
+            const monthlyCost = parseFloat(instance.monthly_cost || 0)
+            
+            if (monthlyCost > 0 && !subServiceMap.has(planName)) {
+              // Estimate based on date range
+              subServiceMap.set(planName, monthlyCost)
+            }
+          }
+        })
+      }
+    } catch (instanceError) {
+      console.warn(`[Vultr Service Details] Error fetching instances: ${instanceError.message}`)
+    }
+
+    const subServices = Array.from(subServiceMap.entries())
+      .map(([name, cost]) => ({
+        name,
+        usageType: name,
+        cost,
+        category: categorizeVultrItem(name),
+      }))
+      .sort((a, b) => b.cost - a.cost)
+
+    console.log(`[Vultr Service Details] Found ${subServices.length} sub-services`)
+
+    return {
+      serviceName,
+      totalCost: subServices.reduce((sum, s) => sum + s.cost, 0),
+      subServices,
+    }
+  } catch (error) {
+    console.error(`[Vultr Service Details] Error:`, error)
+    return { serviceName, totalCost: 0, subServices: [] }
+  }
+}
+
+function formatVultrDescription(description) {
+  return description
+    .replace(/^\d{4}-\d{2}-\d{2}\s*/, '')
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim() || 'Vultr Service'
+}
+
+function categorizeVultrItem(item) {
+  const itemLower = (item || '').toLowerCase()
+  if (itemLower.includes('compute') || itemLower.includes('instance') || itemLower.includes('vc2') || itemLower.includes('vhf')) return 'Compute'
+  if (itemLower.includes('block') || itemLower.includes('storage') || itemLower.includes('volume')) return 'Storage'
+  if (itemLower.includes('bandwidth') || itemLower.includes('transfer') || itemLower.includes('overage')) return 'Data Transfer'
+  if (itemLower.includes('load balancer') || itemLower.includes('lb')) return 'Load Balancing'
+  if (itemLower.includes('kubernetes') || itemLower.includes('vke')) return 'Kubernetes'
+  if (itemLower.includes('object') || itemLower.includes('s3')) return 'Object Storage'
+  if (itemLower.includes('bare metal') || itemLower.includes('dedicated')) return 'Bare Metal'
+  if (itemLower.includes('snapshot') || itemLower.includes('backup')) return 'Backups'
+  return 'Other'
 }
 
 /**
@@ -486,8 +1308,8 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate, cred
     }
   })
 
-  // Convert service map to array
-  const services = Array.from(serviceMap.entries())
+  // Convert service map to array and filter out tax entries
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({
       name,
       cost,
@@ -495,11 +1317,13 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate, cred
     }))
     .sort((a, b) => b.cost - a.cost)
 
+  const services = filterOutTaxServices(allServices)
+
   console.log(`[Azure Transform] Processed data:`)
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month total: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month total: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services found: ${services.length}`)
+  console.log(`  - Services found: ${allServices.length}, after tax filter: ${services.length}`)
   console.log(`  - Credits: $${creditsUsed.toFixed(2)}`)
 
   return {
@@ -732,14 +1556,17 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
     .map(([date, cost]) => ({ date, cost }))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-  const services = Array.from(serviceMap.entries())
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({ name, cost, change: 0 }))
     .sort((a, b) => b.cost - a.cost)
+
+  const services = filterOutTaxServices(allServices)
 
   console.log(`[GCP Transform] Processed data:`)
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
+  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
   console.log(`  - Credits: $${totalCredits.toFixed(2)}`)
 
   return {
@@ -883,14 +1710,17 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, creditsBala
     serviceMap.set('DigitalOcean Services', currentMonth + lastMonth)
   }
 
-  const services = Array.from(serviceMap.entries())
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({ name, cost, change: 0 }))
     .sort((a, b) => b.cost - a.cost)
+
+  const services = filterOutTaxServices(allServices)
 
   console.log(`[DO Transform] Processed data:`)
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
+  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
   console.log(`  - Credits used: $${creditsUsed.toFixed(2)}`)
   console.log(`  - Credits balance: $${creditsBalance.toFixed(2)}`)
 
@@ -1045,14 +1875,16 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
     serviceMap.set('IBM Cloud Services', currentMonth)
   }
 
-  const services = Array.from(serviceMap.entries())
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({ name, cost, change: 0 }))
     .sort((a, b) => b.cost - a.cost)
+
+  const services = filterOutTaxServices(allServices)
 
   console.log(`[IBM Transform] Processed data:`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Credits: $${credits.toFixed(2)}`)
-  console.log(`  - Services: ${services.length}`)
+  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
 
   return {
     currentMonth,
@@ -1216,16 +2048,18 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, cre
     serviceMap.set('Linode Services', currentMonth + lastMonth)
   }
 
-  const services = Array.from(serviceMap.entries())
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({ name, cost, change: 0 }))
     .sort((a, b) => b.cost - a.cost)
+
+  const services = filterOutTaxServices(allServices)
 
   console.log(`[Linode Transform] Processed data:`)
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
   console.log(`  - Credits: $${creditsBalance.toFixed(2)}`)
-  console.log(`  - Services: ${services.length}`)
+  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
 
   return {
     currentMonth,
@@ -1376,16 +2210,18 @@ const transformVultrCostData = (account, billingHistory, invoices, creditsBalanc
     serviceMap.set('Vultr Services', currentMonth + lastMonth)
   }
 
-  const services = Array.from(serviceMap.entries())
+  const allServices = Array.from(serviceMap.entries())
     .map(([name, cost]) => ({ name, cost, change: 0 }))
     .sort((a, b) => b.cost - a.cost)
+
+  const services = filterOutTaxServices(allServices)
 
   console.log(`[Vultr Transform] Processed data:`)
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
   console.log(`  - Credits: $${creditsBalance.toFixed(2)}`)
-  console.log(`  - Services: ${services.length}`)
+  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
 
   return {
     currentMonth,

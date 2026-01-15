@@ -453,6 +453,78 @@ export const updateUserCurrency = async (userId, currency) => {
   }
 }
 
+// Get aggregated service costs for a date range
+// This calculates proportional service costs based on the period's total cost
+export const getServiceCostsForDateRange = async (userId, providerId, startDate, endDate) => {
+  const client = await pool.connect()
+  try {
+    // Step 1: Get total daily costs for the date range
+    const dailyTotalResult = await client.query(
+      `SELECT COALESCE(SUM(cost), 0) as total_cost
+       FROM daily_cost_data
+       WHERE user_id = $1 
+         AND provider_id = $2
+         AND date >= $3::date
+         AND date <= $4::date`,
+      [userId, providerId, startDate, endDate]
+    )
+    
+    const periodTotalCost = parseFloat(dailyTotalResult.rows[0]?.total_cost) || 0
+    
+    console.log(`[getServiceCostsForDateRange] Period total cost: $${periodTotalCost.toFixed(2)}`)
+    
+    // Step 2: Get the latest month's service breakdown to use as proportions
+    const latestCostDataResult = await client.query(
+      `SELECT cd.id
+       FROM cost_data cd
+       WHERE cd.user_id = $1 AND cd.provider_id = $2
+       ORDER BY cd.year DESC, cd.month DESC
+       LIMIT 1`,
+      [userId, providerId]
+    )
+    
+    if (latestCostDataResult.rows.length === 0) {
+      return []
+    }
+    
+    const costDataId = latestCostDataResult.rows[0].id
+    
+    // Step 3: Get service costs and calculate their percentages
+    const servicesResult = await client.query(
+      `SELECT service_name, cost, change_percent
+       FROM service_costs 
+       WHERE cost_data_id = $1
+       ORDER BY cost DESC`,
+      [costDataId]
+    )
+    
+    if (servicesResult.rows.length === 0) {
+      return []
+    }
+    
+    // Calculate total of all services to get percentages
+    const servicesTotalCost = servicesResult.rows.reduce(
+      (sum, row) => sum + (parseFloat(row.cost) || 0), 0
+    )
+    
+    // Always apply proportions based on period's total cost
+    // If period total is 0, services will show 0 (which is correct)
+    return servicesResult.rows.map(row => {
+      const serviceCost = parseFloat(row.cost) || 0
+      const proportion = servicesTotalCost > 0 ? serviceCost / servicesTotalCost : 0
+      
+      return {
+        name: row.service_name,
+        // Apply the proportion to the period's total cost
+        cost: periodTotalCost * proportion,
+        change: parseFloat(row.change_percent) || 0,
+      }
+    })
+  } finally {
+    client.release()
+  }
+}
+
 // Cost data operations
 export const getCostDataForUser = async (userId, month, year) => {
   const client = await pool.connect()

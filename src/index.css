@@ -215,9 +215,7 @@
 
   .bg-gradient-primary {
     @apply bg-gradient-to-r from-primary-600 to-primary-500;
-  }
-
-  .bg-gradient-accent {
+  }  .bg-gradient-accent {
     @apply bg-gradient-to-r from-accent-500 to-accent-400;
   }  .border-gradient {
     border-image: linear-gradient(to right, theme('colors.primary.500'), theme('colors.accent.500')) 1;

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
+import AIChat from './AIChat'
 import { Menu } from 'lucide-react'
 
 interface LayoutProps {
@@ -32,6 +33,9 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </main>
       </div>
+
+      {/* AI Chat Assistant */}
+      <AIChat />
     </div>
   )
 }

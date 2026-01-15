@@ -135,7 +135,7 @@ export default function ProfilePage() {
 
     try {
       await profileAPI.removeAvatar()
-      updateUser({ ...user!, avatarUrl: null })
+      updateUser({ ...user!, avatarUrl: undefined })
       setAvatarPreview(null)
       setAvatarFile(null)
       setAvatarSuccess('Avatar removed successfully!')
