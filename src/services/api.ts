@@ -399,4 +399,44 @@ export const insightsAPI = {
     const response = await apiRequest(`/insights/cost-by-dimension?${params.toString()}`)
     return response.json()
   },
+
+  saveBusinessMetric: async (metric: {
+    metricType: string
+    metricName: string
+    date: string
+    metricValue: number
+    unit?: string
+    notes?: string
+    providerId?: string
+    accountId?: number
+  }) => {
+    const response = await apiRequest('/insights/business-metrics', {
+      method: 'POST',
+      body: JSON.stringify(metric),
+    })
+    return response.json()
+  },
+
+  getBusinessMetrics: async (startDate: string, endDate: string, metricType?: string, metricName?: string, providerId?: string) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (metricType) params.append('metricType', metricType)
+    if (metricName) params.append('metricName', metricName)
+    if (providerId) params.append('providerId', providerId)
+    
+    const response = await apiRequest(`/insights/business-metrics?${params.toString()}`)
+    return response.json()
+  },
+
+  getUnitEconomics: async (startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/unit-economics?${params.toString()}`)
+    return response.json()
+  },
 }

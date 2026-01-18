@@ -295,6 +295,29 @@ export const initDatabase = async () => {
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_explanations_user_month ON cost_explanations(user_id, provider_id, explanation_month, explanation_year)`)
 
+      // Business metrics table - stores business metrics for unit economics (customers, API calls, transactions)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS business_metrics (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT,
+          metric_type TEXT NOT NULL,
+          metric_name TEXT NOT NULL,
+          date DATE NOT NULL,
+          metric_value DECIMAL(15, 4) NOT NULL,
+          unit TEXT,
+          notes TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          UNIQUE(user_id, metric_type, metric_name, date, provider_id, account_id)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_business_metrics_user_date ON business_metrics(user_id, date)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_business_metrics_type_name ON business_metrics(metric_type, metric_name)`)
+
       // Cloud provider credentials table (encrypted) - supports multiple accounts per provider
       await client.query(`
         CREATE TABLE IF NOT EXISTS cloud_provider_credentials (

@@ -13,6 +13,7 @@ import SavingsPlansList from '../components/SavingsPlansList'
 import UntaggedResources from '../components/UntaggedResources'
 import AnomalyDetection from '../components/AnomalyDetection'
 import CostByDimension from '../components/CostByDimension'
+import UnitEconomics from '../components/UnitEconomics'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -180,6 +181,13 @@ export default function Dashboard() {
             {!isDemoMode && (
               <div className="mb-12">
                 <CostByDimension />
+              </div>
+            )}
+
+            {/* Unit Economics - Cost per Business Metric */}
+            {!isDemoMode && (
+              <div className="mb-12">
+                <UnitEconomics period="1month" />
               </div>
             )}
 

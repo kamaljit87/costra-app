@@ -8,6 +8,9 @@ import {
   getCostExplanation,
   getCostByDimension,
   getAvailableDimensions,
+  saveBusinessMetric,
+  getBusinessMetrics,
+  getUnitEconomics,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 
@@ -246,6 +249,94 @@ router.get('/cost-by-dimension', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Cost by dimension error:', error)
     res.status(500).json({ error: 'Failed to fetch cost by dimension' })
+  }
+})
+
+/**
+ * POST /api/insights/business-metrics
+ * Save or update a business metric
+ */
+router.post('/business-metrics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { metricType, metricName, date, metricValue, unit, notes, providerId, accountId } = req.body
+    
+    if (!metricType || !metricName || !date || metricValue === undefined) {
+      return res.status(400).json({ error: 'metricType, metricName, date, and metricValue are required' })
+    }
+    
+    const metricId = await saveBusinessMetric(userId, {
+      metricType,
+      metricName,
+      date,
+      metricValue: parseFloat(metricValue),
+      unit: unit || null,
+      notes: notes || null,
+      providerId: providerId || null,
+      accountId: accountId ? parseInt(accountId) : null
+    })
+    
+    res.json({ id: metricId, message: 'Business metric saved successfully' })
+  } catch (error) {
+    console.error('Save business metric error:', error)
+    res.status(500).json({ error: 'Failed to save business metric' })
+  }
+})
+
+/**
+ * GET /api/insights/business-metrics
+ * Get business metrics for a date range
+ */
+router.get('/business-metrics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { startDate, endDate, metricType, metricName, providerId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const metrics = await getBusinessMetrics(
+      userId,
+      startDate,
+      endDate,
+      metricType || null,
+      metricName || null,
+      providerId || null
+    )
+    
+    res.json({ metrics })
+  } catch (error) {
+    console.error('Get business metrics error:', error)
+    res.status(500).json({ error: 'Failed to fetch business metrics' })
+  }
+})
+
+/**
+ * GET /api/insights/unit-economics
+ * Get unit economics (cost per business metric)
+ */
+router.get('/unit-economics', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const data = await getUnitEconomics(
+      userId,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ data })
+  } catch (error) {
+    console.error('Unit economics error:', error)
+    res.status(500).json({ error: 'Failed to fetch unit economics' })
   }
 })
 
