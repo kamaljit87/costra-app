@@ -385,6 +385,42 @@ export const initDatabase = async () => {
             WHERE table_name = 'cost_data' AND column_name = 'account_id'
           ) THEN
             ALTER TABLE cost_data ADD COLUMN account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE;
+            -- Drop old unique constraint
+            ALTER TABLE cost_data DROP CONSTRAINT IF EXISTS cost_data_user_id_provider_id_month_year_key;
+            -- Add new unique constraint with account_id
+            ALTER TABLE cost_data ADD CONSTRAINT cost_data_user_provider_account_month_year_key 
+              UNIQUE(user_id, provider_id, account_id, month, year);
+          END IF;
+        END $$;
+      `)
+      
+      // Ensure unique constraint includes account_id (handle case where column exists but constraint doesn't)
+      // Use partial unique index to handle NULL account_id properly
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cost_data' AND column_name = 'account_id'
+          ) THEN
+            -- Drop old unique constraint if it exists
+            ALTER TABLE cost_data DROP CONSTRAINT IF EXISTS cost_data_user_id_provider_id_month_year_key;
+            ALTER TABLE cost_data DROP CONSTRAINT IF EXISTS cost_data_user_provider_account_month_year_key;
+            
+            -- Drop old indexes if they exist
+            DROP INDEX IF EXISTS cost_data_user_provider_account_month_year_idx;
+            DROP INDEX IF EXISTS cost_data_user_provider_month_year_null_account_idx;
+            
+            -- Create partial unique indexes to handle NULL account_id
+            -- For records with account_id
+            CREATE UNIQUE INDEX IF NOT EXISTS cost_data_user_provider_account_month_year_idx 
+              ON cost_data(user_id, provider_id, account_id, month, year) 
+              WHERE account_id IS NOT NULL;
+            
+            -- For records without account_id (legacy)
+            CREATE UNIQUE INDEX IF NOT EXISTS cost_data_user_provider_month_year_null_account_idx 
+              ON cost_data(user_id, provider_id, month, year) 
+              WHERE account_id IS NULL;
           END IF;
         END $$;
       `)
@@ -714,34 +750,66 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
         [userId, providerId, costData.providerName, costData.icon]
       )
 
-      // Save cost data
-      const costResult = await client.query(
-        `INSERT INTO cost_data 
-         (user_id, provider_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-         ON CONFLICT (user_id, provider_id, month, year) 
-         DO UPDATE SET 
-           current_month_cost = EXCLUDED.current_month_cost,
-           last_month_cost = EXCLUDED.last_month_cost,
-           forecast_cost = EXCLUDED.forecast_cost,
-           credits = EXCLUDED.credits,
-           savings = EXCLUDED.savings,
-           updated_at = CURRENT_TIMESTAMP
-         RETURNING id`,
-        [
-          userId,
-          providerId,
-          month,
-          year,
-          costData.currentMonth,
-          costData.lastMonth,
-          costData.forecast,
-          costData.credits,
-          costData.savings
-        ]
+      // Save cost data (with account_id support)
+      const accountId = costData.accountId || null
+      
+      // Check if record exists first, then update or insert
+      const existingResult = await client.query(
+        `SELECT id FROM cost_data 
+         WHERE user_id = $1 AND provider_id = $2 AND month = $4 AND year = $5
+           AND (account_id = $3 OR (account_id IS NULL AND $3 IS NULL))`,
+        [userId, providerId, accountId, month, year]
       )
-
-      const costDataId = costResult.rows[0].id
+      
+      let finalCostDataId
+      if (existingResult.rows.length > 0) {
+        // Update existing record
+        const updateResult = await client.query(
+          `UPDATE cost_data SET
+             current_month_cost = $1,
+             last_month_cost = $2,
+             forecast_cost = $3,
+             credits = $4,
+             savings = $5,
+             account_id = COALESCE($6, account_id),
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = $7
+           RETURNING id`,
+          [
+            costData.currentMonth,
+            costData.lastMonth,
+            costData.forecast,
+            costData.credits,
+            costData.savings,
+            accountId,
+            existingResult.rows[0].id
+          ]
+        )
+        finalCostDataId = updateResult.rows[0].id
+      } else {
+        // Insert new record
+        const insertResult = await client.query(
+          `INSERT INTO cost_data 
+           (user_id, provider_id, account_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+           RETURNING id`,
+          [
+            userId,
+            providerId,
+            accountId,
+            month,
+            year,
+            costData.currentMonth,
+            costData.lastMonth,
+            costData.forecast,
+            costData.credits,
+            costData.savings
+          ]
+        )
+        finalCostDataId = insertResult.rows[0].id
+      }
+      
+      const costDataId = finalCostDataId
 
       // Clear old service costs and insert new ones
       await client.query('DELETE FROM service_costs WHERE cost_data_id = $1', [costDataId])

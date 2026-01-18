@@ -1956,7 +1956,7 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
     // Fetch payments for credits info
     console.log(`[Linode Fetch] Fetching payments...`)
     let payments = []
-    let credits = 0
+    let creditsBalance = 0
     try {
       const paymentsResponse = await fetch('https://api.linode.com/v4/account/payments?page_size=100', { headers })
       if (paymentsResponse.ok) {
@@ -1971,17 +1971,17 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
     // Check for promotional credits in account
     if (accountData.active_promotions) {
       accountData.active_promotions.forEach((promo) => {
-        credits += parseFloat(promo.credit_remaining || 0)
+        creditsBalance += parseFloat(promo.credit_remaining || 0)
       })
-      console.log(`[Linode Fetch] Promotional credits: $${credits.toFixed(2)}`)
+      console.log(`[Linode Fetch] Promotional credits: $${creditsBalance.toFixed(2)}`)
     }
 
     // Account balance can be negative (credits)
-    if (accountData.balance < 0) {
-      credits += Math.abs(accountData.balance)
+    if (accountData.balance && accountData.balance < 0) {
+      creditsBalance += Math.abs(accountData.balance)
     }
 
-    return transformLinodeCostData(accountData, invoices, currentInvoiceItems, credits, startDate, endDate)
+    return transformLinodeCostData(accountData, invoices, currentInvoiceItems, creditsBalance, startDate, endDate)
   } catch (error) {
     console.error('[Linode Fetch] Linode API error:', error)
     throw new Error(`Linode API Error: ${error.message}`)
