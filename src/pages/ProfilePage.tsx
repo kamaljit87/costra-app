@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import Layout from '../components/Layout'
+import Breadcrumbs from '../components/Breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
 import { profileAPI } from '../services/api'
 import { 
@@ -193,7 +194,10 @@ export default function ProfilePage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 xl:px-16 py-10">
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile</h1>

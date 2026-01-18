@@ -62,15 +62,13 @@ export default function TotalBillSummary({
   ]
 
   return (
-    <div className="mb-8 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Total Spend</h2>
-          <p className="text-gray-500 mt-1">Overview across all cloud providers</p>
-        </div>
+    <div className="mb-10 animate-fade-in">
+      {/* Header - Centered */}
+      <div className="flex flex-col items-center text-center mb-10">
+        <h2 className="text-4xl font-bold text-gray-900 mb-3">Total Spend</h2>
+        <p className="text-xl text-gray-500">Overview across all cloud providers</p>
         {changePercent !== 0 && (
-          <div className={`flex items-center px-4 py-2 rounded-xl ${
+          <div className={`flex items-center px-5 py-2.5 rounded-xl mt-4 ${
             changePercent >= 0 
               ? 'bg-red-50 text-red-600 border border-red-100' 
               : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
@@ -87,8 +85,8 @@ export default function TotalBillSummary({
         )}
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid md:grid-cols-4 gap-4">
+      {/* Stats Grid - Centered and balanced layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto justify-items-center">
         {stats.map((stat, index) => {
           const Icon = stat.icon
           return (

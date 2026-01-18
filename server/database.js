@@ -1364,13 +1364,13 @@ export const getUntaggedResources = async (userId, providerId = null, limit = 50
   const client = await pool.connect()
   try {
     let query = `
-      SELECT r.*, COALESCE(SUM(rt.id), 0) as tag_count
+      SELECT r.*, COALESCE(COUNT(rt.id), 0) as tag_count
       FROM resources r
       LEFT JOIN resource_tags rt ON r.id = rt.resource_id
       WHERE r.user_id = $1
       ${providerId ? 'AND r.provider_id = $2' : ''}
       GROUP BY r.id
-      HAVING COALESCE(SUM(rt.id), 0) = 0
+      HAVING COALESCE(COUNT(rt.id), 0) = 0
       ORDER BY r.cost DESC, r.last_seen_date DESC
       LIMIT $${providerId ? 3 : 2}
     `
@@ -1392,6 +1392,10 @@ export const getUntaggedResources = async (userId, providerId = null, limit = 50
       ageDays: row.first_seen_date ? 
         Math.floor((new Date() - new Date(row.first_seen_date)) / (1000 * 60 * 60 * 24)) : null
     }))
+  } catch (error) {
+    console.error('[getUntaggedResources] Error:', error)
+    // Return empty array if table doesn't exist or query fails
+    return []
   } finally {
     client.release()
   }
@@ -1441,10 +1445,12 @@ export const saveServiceUsageMetrics = async (userId, accountId, providerId, met
 
 /**
  * Get cost vs usage data for services
+ * Falls back to service_costs if service_usage_metrics is empty
  */
 export const getCostVsUsage = async (userId, providerId, startDate, endDate, accountId = null) => {
   const client = await pool.connect()
   try {
+    // First try service_usage_metrics (has usage data)
     let query = `
       SELECT 
         service_name,
@@ -1469,21 +1475,57 @@ export const getCostVsUsage = async (userId, providerId, startDate, endDate, acc
     
     const result = await client.query(query, params)
     
-    return result.rows.map(row => {
-      const totalCost = parseFloat(row.total_cost) || 0
-      const totalUsage = parseFloat(row.total_usage) || 0
-      const unitCost = totalUsage > 0 ? totalCost / totalUsage : null
-      
-      return {
-        serviceName: row.service_name,
-        cost: totalCost,
-        usage: totalUsage,
-        usageUnit: row.usage_unit,
-        usageType: row.usage_type,
-        unitCost: unitCost,
-        daysWithData: parseInt(row.days_with_data) || 0
-      }
-    })
+    // If we have usage metrics, return them
+    if (result.rows.length > 0) {
+      return result.rows.map(row => {
+        const totalCost = parseFloat(row.total_cost) || 0
+        const totalUsage = parseFloat(row.total_usage) || 0
+        const unitCost = totalUsage > 0 ? totalCost / totalUsage : null
+        
+        return {
+          serviceName: row.service_name,
+          cost: totalCost,
+          usage: totalUsage,
+          usageUnit: row.usage_unit,
+          usageType: row.usage_type,
+          unitCost: unitCost,
+          daysWithData: parseInt(row.days_with_data) || 0
+        }
+      })
+    }
+    
+    // Fallback: Use service_costs from cost_data (cost only, no usage)
+    // Get the most recent cost data for the period
+    const startDateObj = new Date(startDate)
+    const endDateObj = new Date(endDate)
+    
+    const fallbackQuery = `
+      SELECT DISTINCT sc.service_name, sc.cost, sc.change_percent
+      FROM service_costs sc
+      JOIN cost_data cd ON sc.cost_data_id = cd.id
+      WHERE cd.user_id = $1 AND cd.provider_id = $2
+        AND (cd.year > ${startDateObj.getFullYear()} OR 
+             (cd.year = ${startDateObj.getFullYear()} AND cd.month >= ${startDateObj.getMonth() + 1}))
+        AND (cd.year < ${endDateObj.getFullYear()} OR 
+             (cd.year = ${endDateObj.getFullYear()} AND cd.month <= ${endDateObj.getMonth() + 1}))
+      ORDER BY sc.cost DESC
+      LIMIT 50
+    `
+    
+    const fallbackResult = await client.query(fallbackQuery, [userId, providerId])
+    
+    return fallbackResult.rows.map(row => ({
+      serviceName: row.service_name,
+      cost: parseFloat(row.cost) || 0,
+      usage: null, // No usage data available
+      usageUnit: null,
+      usageType: null,
+      unitCost: null,
+      daysWithData: 0
+    }))
+  } catch (error) {
+    console.error('[getCostVsUsage] Error:', error)
+    return []
   } finally {
     client.release()
   }
@@ -1574,28 +1616,44 @@ export const getAnomalies = async (userId, providerId = null, thresholdPercent =
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
     
+    // Build query and params dynamically
+    let params = [userId, sevenDaysAgo.toISOString().split('T')[0]]
+    let paramIndex = 3
+    
     let query = `
       SELECT 
         ab.*,
         CASE 
-          WHEN ab.baseline_cost > 0 THEN
+          WHEN ab.baseline_cost > 0 AND ab.rolling_30day_avg > 0 THEN
             ((ab.baseline_cost - ab.rolling_30day_avg) / ab.rolling_30day_avg * 100)
           ELSE 0
         END as variance_percent
       FROM anomaly_baselines ab
       WHERE ab.user_id = $1
         AND ab.baseline_date >= $2::date
-        ${providerId ? 'AND ab.provider_id = $3' : ''}
-        ${accountId ? 'AND ab.account_id = $4' : 'AND ab.account_id IS NULL'}
-        AND ABS((ab.baseline_cost - ab.rolling_30day_avg) / NULLIF(ab.rolling_30day_avg, 0) * 100) >= $${providerId && accountId ? 5 : providerId || accountId ? 4 : 3}
+    `
+    
+    if (providerId) {
+      query += ` AND ab.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND ab.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    } else {
+      query += ` AND ab.account_id IS NULL`
+    }
+    
+    query += ` AND ABS((ab.baseline_cost - ab.rolling_30day_avg) / NULLIF(ab.rolling_30day_avg, 0) * 100) >= $${paramIndex}`
+    params.push(thresholdPercent)
+    
+    query += `
       ORDER BY ABS(variance_percent) DESC
       LIMIT 50
     `
-    
-    let params = [userId, sevenDaysAgo.toISOString().split('T')[0]]
-    if (providerId) params.push(providerId)
-    if (accountId) params.push(accountId)
-    params.push(thresholdPercent)
     
     const result = await client.query(query, params)
     
@@ -1614,6 +1672,10 @@ export const getAnomalies = async (userId, providerId = null, thresholdPercent =
         message: `${row.service_name} costs are ${Math.abs(variancePercent).toFixed(1)}% ${isIncrease ? 'higher' : 'lower'} than their 30-day baseline`
       }
     })
+  } catch (error) {
+    console.error('[getAnomalies] Database error:', error)
+    // Return empty array if table doesn't exist or query fails
+    return []
   } finally {
     client.release()
   }

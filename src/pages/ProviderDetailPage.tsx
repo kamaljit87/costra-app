@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
@@ -6,6 +6,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
 import { cloudProvidersAPI, syncAPI, costDataAPI } from '../services/api'
 import Layout from '../components/Layout'
+import Breadcrumbs from '../components/Breadcrumbs'
 import ProviderCostChart from '../components/ProviderCostChart'
 import CostVsUsage from '../components/CostVsUsage'
 import CostSummary from '../components/CostSummary'
@@ -419,7 +420,7 @@ export default function ProviderDetailPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 xl:px-16 py-10">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
@@ -434,7 +435,7 @@ export default function ProviderDetailPage() {
   if (!providerData) {
     return (
       <Layout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 xl:px-16 py-10">
           <Link
             to="/dashboard"
             className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-6"
@@ -516,21 +517,6 @@ export default function ProviderDetailPage() {
     return dailyData
   }
 
-  const handleCustomFilter = async () => {
-    if (customStartDate && customEndDate) {
-      const start = new Date(customStartDate)
-      const end = new Date(customEndDate)
-      
-      if (start > end) {
-        alert('Start date must be before end date')
-        return
-      }
-      
-      setSelectedPeriod('custom')
-      setShowCustomFilter(false)
-      // The useEffect will handle fetching the data
-    }
-  }
 
   // Calculate total from services (in case currentMonth is 0)
   const serviceTotalCost = filteredServices.reduce((sum, s) => sum + (s.cost || 0), 0)
@@ -550,44 +536,23 @@ export default function ProviderDetailPage() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Back and Sync */}
-        <div className="flex items-center justify-between mb-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            title="Return to dashboard"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Link>
-          
-          {!isDemoMode && (
-            <button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="btn-primary flex items-center space-x-2"
-              title="Sync fresh data from cloud provider (clears cache)"
-            >
-              <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
-            </button>
-          )}
-        </div>
+      <div className="w-full max-w-[1600px] mx-auto px-8 lg:px-12 xl:px-16 py-12">
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
 
-        {/* Provider Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-4 mb-4">
+        {/* Provider Header - Centered */}
+        <div className="mb-10">
+          <div className="flex flex-col items-center text-center mb-8">
             <div 
-              className="w-16 h-16 flex items-center justify-center rounded-2xl shadow-sm"
+              className="w-20 h-20 flex items-center justify-center rounded-2xl shadow-sm mb-4"
               style={{ backgroundColor: `${getProviderColor(providerId || '')}15` }}
               title={`${providerData.provider.name} cloud provider`}
             >
-              <ProviderIcon providerId={providerId || ''} size={40} />
+              <ProviderIcon providerId={providerId || ''} size={48} />
             </div>
-            <div className="flex-1">
-              <div className="flex items-center space-x-3">
-                <h1 className="text-3xl font-bold text-gray-900">{providerData.provider.name}</h1>
+            <div className="flex flex-col items-center">
+              <div className="flex items-center space-x-3 mb-3">
+                <h1 className="text-5xl font-bold text-gray-900">{providerData.provider.name}</h1>
                 {showCredits && providerData.credits > 0 && (
                   <span 
                     className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200"
@@ -598,18 +563,33 @@ export default function ProviderDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-gray-500 mt-1">Detailed cost breakdown and analytics</p>
+              <p className="text-xl text-gray-500">Detailed cost breakdown and analytics</p>
               {showCredits && providerData.credits > 0 && (
-                <p className="text-sm text-green-700 mt-2 flex items-center">
+                <p className="text-sm text-green-700 mt-3 flex items-center">
                   <Gift className="h-4 w-4 mr-1.5" />
                   <span className="font-medium">-{formatCurrency(convertAmount(providerData.credits))} in credits applied to this account</span>
                 </p>
               )}
             </div>
+            
+            {/* Sync Button - Centered */}
+            {!isDemoMode && (
+              <div className="mt-6">
+                <button
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="btn-primary flex items-center space-x-2"
+                  title="Sync fresh data from cloud provider (clears cache)"
+                >
+                  <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid md:grid-cols-4 gap-4 mt-6">
+          {/* Summary Cards - Centered and balanced layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto justify-items-center mt-10">
             <div className="card" title="Total cost for the current billing month">
               <div className="text-sm text-gray-500 mb-1">Current Month</div>
               <div className="text-2xl font-bold text-gray-900">
@@ -654,6 +634,331 @@ export default function ProviderDetailPage() {
           </div>
         </div>
 
+        {/* Inline Filter Bar */}
+        {!hasNoData && (
+          <div className="mb-6 border-b border-gray-200 pb-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Period Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                {(['1month', '2months', '3months', '4months', '6months', '12months'] as PeriodType[]).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => {
+                      console.log(`Period button clicked: ${period}`)
+                      setSelectedPeriod(period)
+                      setShowCustomFilter(false)
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      selectedPeriod === period
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title={`View costs for ${getPeriodLabel(period).toLowerCase()}`}
+                  >
+                    {getPeriodLabel(period)}
+                  </button>
+                ))}
+                
+                {/* Custom Filter Button */}
+                <button
+                  onClick={() => {
+                    setShowCustomFilter(!showCustomFilter)
+                    if (!showCustomFilter) {
+                      setSelectedPeriod('custom')
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1 ${
+                    selectedPeriod === 'custom'
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Select a custom date range"
+                >
+                  <Calendar className="h-3 w-3" />
+                  <span>Custom</span>
+                </button>
+              </div>
+
+              {/* Service Filter */}
+              {allServices.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1 ${
+                      selectedService 
+                        ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    title="Filter charts and data by service"
+                  >
+                    <Layers className="h-3 w-3" />
+                    <span>{selectedService || 'All Services'}</span>
+                    <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${isServiceDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isServiceDropdownOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setIsServiceDropdownOpen(false)}
+                      />
+                      <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-80 overflow-hidden animate-fade-in">
+                        <div className="p-2 max-h-72 overflow-y-auto">
+                          <button
+                            onClick={() => {
+                              setSelectedService(null)
+                              setIsServiceDropdownOpen(false)
+                            }}
+                            className={`
+                              w-full px-3 py-2 text-left text-xs rounded-lg transition-colors
+                              ${selectedService === null 
+                                ? 'bg-blue-50 text-blue-700 font-medium' 
+                                : 'text-gray-700 hover:bg-gray-50'
+                              }
+                            `}
+                          >
+                            All Services
+                          </button>
+                          {allServices.map((service) => (
+                            <button
+                              key={service}
+                              onClick={() => {
+                                setSelectedService(service)
+                                setIsServiceDropdownOpen(false)
+                              }}
+                              className={`
+                                w-full px-3 py-2 text-left text-xs rounded-lg truncate transition-colors
+                                ${selectedService === service 
+                                  ? 'bg-blue-50 text-blue-700 font-medium' 
+                                  : 'text-gray-700 hover:bg-gray-50'
+                                }
+                              `}
+                            >
+                              {service}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Active Filter Pills */}
+              {selectedService && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                  {selectedService}
+                  <button 
+                    onClick={() => setSelectedService(null)}
+                    className="ml-1.5 hover:text-blue-900"
+                    title="Remove this filter"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+
+              {/* Advanced Filters Toggle */}
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1 ${
+                  showAdvancedFilters 
+                    ? 'bg-gray-900 text-white shadow-sm' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                title="Show advanced filtering options"
+              >
+                <SlidersHorizontal className="h-3 w-3" />
+                <span>More Filters</span>
+                <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showAdvancedFilters ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+
+            {/* Custom Date Range Input */}
+            {showCustomFilter && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center space-x-4">
+                  <Filter className="h-4 w-4 text-gray-600" />
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        onClick={() => {
+                          setShowCustomFilter(false)
+                          setSelectedPeriod('1month')
+                        }}
+                        className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Advanced Filters Panel */}
+            {showAdvancedFilters && (
+              <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                  {/* Service Search */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Search Services
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+                      <input
+                        type="text"
+                        value={serviceSearch}
+                        onChange={(e) => setServiceSearch(e.target.value)}
+                        placeholder="Search by name..."
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        title="Filter services by name"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Cost Range */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Cost Range
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <div className="relative flex-1">
+                        <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+                        <input
+                          type="number"
+                          value={minCost}
+                          onChange={(e) => setMinCost(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          placeholder="Min"
+                          min="0"
+                          className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          title="Minimum cost filter"
+                        />
+                      </div>
+                      <span className="text-gray-400 text-xs">–</span>
+                      <div className="relative flex-1">
+                        <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-gray-400" />
+                        <input
+                          type="number"
+                          value={maxCost}
+                          onChange={(e) => setMaxCost(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          placeholder="Max"
+                          min="0"
+                          className="w-full pl-6 pr-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          title="Maximum cost filter"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cost Change Filter */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Cost Trend
+                    </label>
+                    <select
+                      value={costChangeFilter}
+                      onChange={(e) => setCostChangeFilter(e.target.value as 'all' | 'increase' | 'decrease')}
+                      className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                      title="Filter by cost trend"
+                    >
+                      <option value="all">All Services</option>
+                      <option value="increase">↑ Cost Increased</option>
+                      <option value="decrease">↓ Cost Decreased</option>
+                    </select>
+                  </div>
+
+                  {/* Show Credits Toggle */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Display
+                    </label>
+                    <label className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={showCredits}
+                        onChange={(e) => setShowCredits(e.target.checked)}
+                        className="w-3 h-3 text-primary-600 rounded focus:ring-primary-500"
+                      />
+                      <Gift className="h-3 w-3 text-green-600" />
+                      <span className="text-xs text-gray-700">Show Credits</span>
+                    </label>
+                  </div>
+
+                  {/* Sort Options */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Sort By
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as 'cost' | 'name' | 'change')}
+                        className="flex-1 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                        title="Sort services by"
+                      >
+                        <option value="cost">Cost</option>
+                        <option value="name">Name</option>
+                        <option value="change">Change %</option>
+                      </select>
+                      <button
+                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                        className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                        title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                      >
+                        <ArrowUpDown className={`h-3 w-3 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Summary & Reset */}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+                  <div className="text-xs text-gray-500">
+                    Showing <strong className="text-gray-700">{filteredServices.length}</strong> of <strong className="text-gray-700">{providerData?.services.length || 0}</strong> services
+                  </div>
+                  <button
+                    onClick={() => {
+                      setServiceSearch('')
+                      setMinCost('')
+                      setMaxCost('')
+                      setCostChangeFilter('all')
+                      setSortBy('cost')
+                      setSortOrder('desc')
+                      setSelectedService(null)
+                      setShowCredits(true)
+                    }}
+                    className="flex items-center space-x-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                    title="Reset all filters to default"
+                  >
+                    <X className="h-3 w-3" />
+                    <span>Reset</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Cost Summary - Plain-English Explanation */}
         {!hasNoData && providerId && (() => {
           // Calculate the most recent month in the selected period
@@ -667,7 +972,7 @@ export default function ProviderDetailPage() {
           const summaryYear = endDate.getFullYear()
           
           return (
-            <div className="mb-8" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
+            <div className="mb-12 max-w-5xl mx-auto" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
               <CostSummary
                 providerId={providerId}
                 month={summaryMonth}
@@ -679,284 +984,23 @@ export default function ProviderDetailPage() {
 
         {/* No Data Message */}
         {hasNoData && (
-          <div className="mb-8 card bg-blue-50 border-blue-200">
-            <div className="p-6 text-center">
-              <p className="text-blue-900 font-medium mb-2">No cost data available yet</p>
-              <p className="text-blue-700 text-sm">
+          <div className="mb-8 card bg-blue-50 border-blue-200 max-w-3xl mx-auto">
+            <div className="p-8 text-center">
+              <p className="text-blue-900 font-medium mb-2 text-lg">No cost data available yet</p>
+              <p className="text-blue-700">
                 Cost data will appear here once your provider is synced. Click "Sync Data" to fetch the latest costs.
               </p>
             </div>
           </div>
         )}
 
-        {/* Service Filter Section */}
-        {!hasNoData && allServices.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 mb-6 animate-fade-in">
-            <div className="flex items-center space-x-2 text-gray-500">
-              <Filter className="h-4 w-4" />
-              <span className="text-sm font-medium">Filter by Service</span>
-            </div>
-
-            {/* Service Filter Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
-                className={`
-                  flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200
-                  ${selectedService 
-                    ? 'bg-primary-50 border-2 border-primary-200 text-primary-700' 
-                    : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
-                  }
-                `}
-                title="Filter charts and data by service"
-              >
-                <Layers className="h-4 w-4" />
-                <span>{selectedService || 'All Services'}</span>
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isServiceDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isServiceDropdownOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setIsServiceDropdownOpen(false)}
-                  />
-                  <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-20 max-h-80 overflow-hidden animate-fade-in">
-                    <div className="p-2 max-h-72 overflow-y-auto">
-                      <button
-                        onClick={() => {
-                          setSelectedService(null)
-                          setIsServiceDropdownOpen(false)
-                        }}
-                        className={`
-                          w-full px-4 py-2.5 text-left text-sm rounded-xl transition-colors
-                          ${selectedService === null 
-                            ? 'bg-primary-50 text-primary-700 font-medium' 
-                            : 'text-gray-700 hover:bg-gray-50'
-                          }
-                        `}
-                      >
-                        All Services
-                      </button>
-                      {allServices.map((service) => (
-                        <button
-                          key={service}
-                          onClick={() => {
-                            setSelectedService(service)
-                            setIsServiceDropdownOpen(false)
-                          }}
-                          className={`
-                            w-full px-4 py-2.5 text-left text-sm rounded-xl truncate transition-colors
-                            ${selectedService === service 
-                              ? 'bg-primary-50 text-primary-700 font-medium' 
-                              : 'text-gray-700 hover:bg-gray-50'
-                            }
-                          `}
-                        >
-                          {service}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Clear Filter Button */}
-            {selectedService && (
-              <button
-                onClick={() => setSelectedService(null)}
-                className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-                title="Clear service filter"
-              >
-                <X className="h-4 w-4" />
-                <span>Clear filter</span>
-              </button>
-            )}
-
-            {/* Active Filter Tag */}
-            {selectedService && (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
-                {selectedService}
-                <button 
-                  onClick={() => setSelectedService(null)}
-                  className="ml-2 hover:text-primary-900"
-                  title="Remove this filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {/* Advanced Filters Toggle */}
-            <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`
-                flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200
-                ${showAdvancedFilters 
-                  ? 'bg-primary-50 border-2 border-primary-200 text-primary-700' 
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
-                }
-              `}
-              title="Show advanced filtering options"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span>Advanced Filters</span>
-              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedFilters ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        )}
-
-        {/* Advanced Filters Panel */}
-        {showAdvancedFilters && !hasNoData && (
-          <div className="mb-6 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl border border-gray-200 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {/* Service Search */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Search Services
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={serviceSearch}
-                    onChange={(e) => setServiceSearch(e.target.value)}
-                    placeholder="Search by name..."
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    title="Filter services by name"
-                  />
-                </div>
-              </div>
-
-              {/* Cost Range */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Cost Range (USD)
-                </label>
-                <div className="flex items-center space-x-2">
-                  <div className="relative flex-1">
-                    <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="number"
-                      value={minCost}
-                      onChange={(e) => setMinCost(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Min"
-                      min="0"
-                      className="w-full pl-7 pr-2 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      title="Minimum cost filter"
-                    />
-                  </div>
-                  <span className="text-gray-400">–</span>
-                  <div className="relative flex-1">
-                    <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="number"
-                      value={maxCost}
-                      onChange={(e) => setMaxCost(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Max"
-                      min="0"
-                      className="w-full pl-7 pr-2 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      title="Maximum cost filter"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Cost Change Filter */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Cost Trend
-                </label>
-                <select
-                  value={costChangeFilter}
-                  onChange={(e) => setCostChangeFilter(e.target.value as 'all' | 'increase' | 'decrease')}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
-                  title="Filter by cost trend"
-                >
-                  <option value="all">All Services</option>
-                  <option value="increase">↑ Cost Increased</option>
-                  <option value="decrease">↓ Cost Decreased</option>
-                </select>
-              </div>
-
-              {/* Show Credits Toggle */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Display
-                </label>
-                <label className="flex items-center space-x-3 px-4 py-2.5 rounded-xl border border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={showCredits}
-                    onChange={(e) => setShowCredits(e.target.checked)}
-                    className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
-                  />
-                  <Gift className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-gray-700">Show Credits</span>
-                </label>
-              </div>
-
-              {/* Sort Options */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                  Sort By
-                </label>
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'cost' | 'name' | 'change')}
-                    className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
-                    title="Sort services by"
-                  >
-                    <option value="cost">Cost</option>
-                    <option value="name">Name</option>
-                    <option value="change">Change %</option>
-                  </select>
-                  <button
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
-                    title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-                  >
-                    <ArrowUpDown className={`h-4 w-4 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Filter Summary & Reset */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <span>Showing <strong className="text-gray-700">{filteredServices.length}</strong> of <strong className="text-gray-700">{providerData?.services.length || 0}</strong> services</span>
-              </div>
-              <button
-                onClick={() => {
-                  setServiceSearch('')
-                  setMinCost('')
-                  setMaxCost('')
-                  setCostChangeFilter('all')
-                  setSortBy('cost')
-                  setSortOrder('desc')
-                  setSelectedService(null)
-                  setShowCredits(true)
-                }}
-                className="flex items-center space-x-1 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Reset all filters to default"
-              >
-                <X className="h-4 w-4" />
-                <span>Reset Filters</span>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Cost Trend Chart */}
         {!hasNoData && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Cost Trends</h2>
+          <div className="mb-12 max-w-5xl mx-auto">
+            <div className="flex flex-col items-center text-center mb-6">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">Cost Trends</h2>
               
-              {/* View Mode Toggle */}
+              {/* View Mode Toggle - Centered */}
               <div 
                 className="flex items-center space-x-2 bg-gray-100 rounded-xl p-1"
                 title="Toggle between daily and monthly view"
@@ -988,110 +1032,7 @@ export default function ProviderDetailPage() {
               </div>
             </div>
 
-            {/* Period Selector */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                {/* Period Buttons */}
-                <div className="flex flex-wrap gap-2">
-                  {(['1month', '2months', '3months', '4months', '6months', '12months'] as PeriodType[]).map((period) => (
-                    <button
-                      key={period}
-                      onClick={() => {
-                        console.log(`Period button clicked: ${period}`)
-                        setSelectedPeriod(period)
-                        setShowCustomFilter(false)
-                      }}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                        selectedPeriod === period
-                          ? 'bg-primary-600 text-white shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title={`View costs for ${getPeriodLabel(period).toLowerCase()}`}
-                    >
-                      {getPeriodLabel(period)}
-                    </button>
-                  ))}
-                  
-                  {/* Custom Filter Button */}
-                  <button
-                    onClick={() => {
-                      setShowCustomFilter(!showCustomFilter)
-                      if (!showCustomFilter) {
-                        setSelectedPeriod('custom')
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center space-x-2 ${
-                      selectedPeriod === 'custom'
-                        ? 'bg-primary-600 text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                    title="Select a custom date range"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span>Custom</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Custom Date Range Filter */}
-            {showCustomFilter && (
-              <div className="mb-4 p-4 bg-gray-50 rounded-2xl border border-gray-200">
-                <div className="flex items-center space-x-4">
-                  <Filter className="h-5 w-5 text-gray-600" />
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Start Date
-                      </label>
-                      <input
-                        type="date"
-                        value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="input-field"
-                        max={customEndDate || new Date().toISOString().split('T')[0]}
-                        title="Select the start date for your custom range"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        End Date
-                      </label>
-                      <input
-                        type="date"
-                        value={customEndDate}
-                        onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="input-field"
-                        min={customStartDate}
-                        max={new Date().toISOString().split('T')[0]}
-                        title="Select the end date for your custom range"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <button
-                        onClick={handleCustomFilter}
-                        className="btn-primary w-full"
-                        title="Apply the selected date range"
-                      >
-                        Apply Filter
-                      </button>
-                    </div>
-                  </div>
-                  {selectedPeriod === 'custom' && (
-                    <div className="mt-3 text-sm text-gray-600">
-                      {isLoadingChartData ? (
-                        <span>Loading data...</span>
-                      ) : filteredData.length > 0 ? (
-                        <span>Showing {filteredData.length} data points from {new Date(customStartDate).toLocaleDateString()} to {new Date(customEndDate).toLocaleDateString()}</span>
-                      ) : (
-                        <span className="text-yellow-600">No data available for the selected date range</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
+            {/* Chart Content */}
             {isLoadingChartData ? (
               <div className="card flex items-center justify-center h-64">
                 <div className="text-center">
@@ -1113,9 +1054,11 @@ export default function ProviderDetailPage() {
           </div>
         )}
 
-        {/* Service Breakdown */}
+        {/* Service Breakdown - Centered layout */}
         {!hasNoData && (
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Service Breakdown</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-10">
           {/* Pie Chart - Service Distribution */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
@@ -1210,7 +1153,8 @@ export default function ProviderDetailPage() {
               </div>
             )}
           </div>
-        </div>
+            </div>
+          </div>
         )}
 
         {/* Cost vs Usage Section */}
@@ -1224,7 +1168,7 @@ export default function ProviderDetailPage() {
           
           // Use key to force re-render when period changes
           return (
-            <div className="mb-8" key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
+            <div className="mb-12 max-w-5xl mx-auto" key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
               <CostVsUsage
                 providerId={providerId || undefined}
                 startDate={startDateStr}
@@ -1236,7 +1180,9 @@ export default function ProviderDetailPage() {
 
         {/* Service Details Table */}
         {!hasNoData && (
-          <div className="card">
+          <div className="mb-12 max-w-5xl mx-auto">
+            <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Service Details</h2>
+            <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900">
                 Service Breakdown
@@ -1269,9 +1215,8 @@ export default function ProviderDetailPage() {
                         : 0
                       const isExpanded = expandedService === service.name
                       return (
-                        <>
+                        <React.Fragment key={`service-${index}-${service.name}`}>
                           <tr 
-                            key={`service-${index}-${service.name}`} 
                             className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50' : ''}`}
                             onClick={() => handleServiceExpand(service.name, service.cost)}
                             title="Click to see sub-service breakdown"
@@ -1383,7 +1328,7 @@ export default function ProviderDetailPage() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </React.Fragment>
                       )
                     })
                   ) : (
@@ -1395,6 +1340,7 @@ export default function ProviderDetailPage() {
                   )}
                 </tbody>
               </table>
+            </div>
             </div>
           </div>
         )}

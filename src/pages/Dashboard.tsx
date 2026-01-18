@@ -6,6 +6,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
 import { cloudProvidersAPI, syncAPI } from '../services/api'
 import Layout from '../components/Layout'
+import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
@@ -100,14 +101,17 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-[1600px] mx-auto px-8 lg:px-12 xl:px-16 py-12">
+        {/* Breadcrumbs */}
+        <Breadcrumbs />
+
         {/* Demo Mode Banner */}
         {isDemoMode && (
-          <div className="mb-6 bg-primary-50 border border-primary-200 rounded-2xl px-5 py-4 flex items-center space-x-3 animate-fade-in">
+          <div className="mb-8 bg-primary-50 border border-primary-200 rounded-2xl px-6 py-5 flex items-center justify-center space-x-3 animate-fade-in max-w-4xl mx-auto">
             <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center">
               <Sparkles className="h-5 w-5 text-primary-600" />
             </div>
-            <div>
+            <div className="text-center">
               <span className="text-primary-700 font-semibold">Demo Mode</span>
               <span className="text-primary-600 text-sm ml-2">
                 You're viewing sample data. Sign up to connect your cloud accounts.
@@ -116,11 +120,11 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Header with Sync */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">Cost Dashboard</h1>
-            <p className="text-gray-500">
+        {/* Header with Sync - Centered */}
+        <div className="flex flex-col items-center text-center mb-12">
+          <div className="mb-6">
+            <h1 className="text-5xl font-bold text-gray-900 mb-3">Cost Dashboard</h1>
+            <p className="text-xl text-gray-500">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
@@ -147,24 +151,26 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Total Bill Summary */}
-            <TotalBillSummary
-              totalCurrent={totalCurrent}
-              totalLastMonth={totalLastMonth}
-              totalForecast={totalForecast}
-              totalCredits={totalCredits}
-              totalSavings={totalSavings}
-            />
+            <div className="mb-16">
+              <TotalBillSummary
+                totalCurrent={totalCurrent}
+                totalLastMonth={totalLastMonth}
+                totalForecast={totalForecast}
+                totalCredits={totalCredits}
+                totalSavings={totalSavings}
+              />
+            </div>
 
             {/* Untagged Resources - Action Required */}
             {!isDemoMode && (
-              <div className="mb-8">
+              <div className="mb-12">
                 <UntaggedResources />
               </div>
             )}
 
             {/* Cost Anomalies - Low-Noise Alerts */}
             {!isDemoMode && (
-              <div className="mb-8">
+              <div className="mb-12">
                 <AnomalyDetection thresholdPercent={20} />
               </div>
             )}
@@ -211,9 +217,9 @@ export default function Dashboard() {
               
               if (providersToShow.length > 0) {
                 return (
-                  <div className="mb-8">
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">By Provider</h2>
-                    <div className="space-y-6">
+                  <div className="mb-16">
+                    <h2 className="text-3xl font-bold text-gray-900 mb-10 text-center">By Provider</h2>
+                    <div className="space-y-10 max-w-5xl mx-auto">
                       {providersToShow.map((data) => {
                         const hasData = data.currentMonth > 0 || data.services.length > 0
                         return (
@@ -271,9 +277,9 @@ export default function Dashboard() {
                 )
               } else {
                 return (
-                  <div className="mb-8">
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">By Provider</h2>
-                    <div className="card text-center py-12">
+                  <div className="mb-12">
+                    <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">By Provider</h2>
+                    <div className="card text-center py-16 max-w-2xl mx-auto">
                       <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
                         <Cloud className="h-8 w-8 text-gray-400" />
                       </div>
@@ -291,7 +297,7 @@ export default function Dashboard() {
             })()}
 
             {/* Savings Plans */}
-            <div className="mb-8">
+            <div className="mb-12">
               <SavingsPlansList plans={savingsPlans} />
             </div>
           </>

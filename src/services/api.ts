@@ -361,8 +361,16 @@ export const insightsAPI = {
     const params = new URLSearchParams()
     if (accountId) params.append('accountId', accountId.toString())
     
-    const response = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`)
-    return response.json()
+    try {
+      const response = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`)
+      return response.json()
+    } catch (error: any) {
+      // 404 is expected when no cost data exists - return null instead of throwing
+      if (error.message && (error.message.includes('404') || error.message.includes('No cost data'))) {
+        return { explanation: null }
+      }
+      throw error
+    }
   },
 
   regenerateCostSummary: async (providerId: string, month: number, year: number, accountId?: number) => {

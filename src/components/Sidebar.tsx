@@ -115,13 +115,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Hidden on desktop when TopNav is shown, only for mobile */}
       <aside
         className={`
           fixed top-0 left-0 h-full bg-sidebar-bg z-50
           transform transition-transform duration-300 ease-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:static lg:z-auto
+          lg:hidden
           w-72 flex flex-col
           border-r border-sidebar-border/50
         `}

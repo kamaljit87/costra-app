@@ -40,6 +40,7 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
       const result = await insightsAPI.getCostSummary(providerId, month, year, accountId)
       setSummary(result.explanation || null)
     } catch (err: any) {
+      // Only log unexpected errors
       console.error('Failed to fetch cost summary:', err)
       setError(err.message || 'Failed to load cost summary')
     } finally {
