@@ -48,7 +48,7 @@ export default function LoginPage() {
             <img 
               src="/logo.png" 
               alt="Costra" 
-              className="h-12 w-auto"
+              className="h-16 w-auto"
             />
           </div>
 
