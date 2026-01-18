@@ -10,6 +10,7 @@ import googleAuthRoutes from './routes/googleAuth.js'
 import syncRoutes from './routes/sync.js'
 import profileRoutes from './routes/profile.js'
 import aiRoutes from './routes/ai.js'
+import insightsRoutes from './routes/insights.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -55,6 +56,7 @@ app.use('/api/savings-plans', savingsPlansRoutes)
 app.use('/api/cloud-providers', cloudProvidersRoutes)
 app.use('/api/sync', syncRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/insights', insightsRoutes)
 
 // Health check
 app.get('/api/health', (req, res) => {

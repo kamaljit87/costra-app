@@ -7,6 +7,8 @@ import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForR
 import { cloudProvidersAPI, syncAPI, costDataAPI } from '../services/api'
 import Layout from '../components/Layout'
 import ProviderCostChart from '../components/ProviderCostChart'
+import CostVsUsage from '../components/CostVsUsage'
+import CostSummary from '../components/CostSummary'
 import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
@@ -652,6 +654,29 @@ export default function ProviderDetailPage() {
           </div>
         </div>
 
+        {/* Cost Summary - Plain-English Explanation */}
+        {!hasNoData && providerId && (() => {
+          // Calculate the most recent month in the selected period
+          const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+            ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+            : getDateRangeForPeriod(selectedPeriod)
+          
+          // Get the most recent month in the range
+          const endDate = range.endDate
+          const summaryMonth = endDate.getMonth() + 1
+          const summaryYear = endDate.getFullYear()
+          
+          return (
+            <div className="mb-8" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
+              <CostSummary
+                providerId={providerId}
+                month={summaryMonth}
+                year={summaryYear}
+              />
+            </div>
+          )
+        })()}
+
         {/* No Data Message */}
         {hasNoData && (
           <div className="mb-8 card bg-blue-50 border-blue-200">
@@ -1187,6 +1212,27 @@ export default function ProviderDetailPage() {
           </div>
         </div>
         )}
+
+        {/* Cost vs Usage Section */}
+        {!hasNoData && (() => {
+          const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+            ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+            : getDateRangeForPeriod(selectedPeriod)
+          
+          const startDateStr = range.startDate.toISOString().split('T')[0]
+          const endDateStr = range.endDate.toISOString().split('T')[0]
+          
+          // Use key to force re-render when period changes
+          return (
+            <div className="mb-8" key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
+              <CostVsUsage
+                providerId={providerId || undefined}
+                startDate={startDateStr}
+                endDate={endDateStr}
+              />
+            </div>
+          )
+        })()}
 
         {/* Service Details Table */}
         {!hasNoData && (

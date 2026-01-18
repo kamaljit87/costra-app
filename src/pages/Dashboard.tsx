@@ -9,6 +9,8 @@ import Layout from '../components/Layout'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
+import UntaggedResources from '../components/UntaggedResources'
+import AnomalyDetection from '../components/AnomalyDetection'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -152,6 +154,20 @@ export default function Dashboard() {
               totalCredits={totalCredits}
               totalSavings={totalSavings}
             />
+
+            {/* Untagged Resources - Action Required */}
+            {!isDemoMode && (
+              <div className="mb-8">
+                <UntaggedResources />
+              </div>
+            )}
+
+            {/* Cost Anomalies - Low-Noise Alerts */}
+            {!isDemoMode && (
+              <div className="mb-8">
+                <AnomalyDetection thresholdPercent={20} />
+              </div>
+            )}
 
             {/* Provider Sections with Charts */}
             {(() => {

@@ -316,3 +316,60 @@ export const aiAPI = {
     return response.json()
   },
 }
+
+// Insights API
+export const insightsAPI = {
+  getCostVsUsage: async (providerId?: string, startDate?: string, endDate?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    if (startDate) params.append('startDate', startDate)
+    if (endDate) params.append('endDate', endDate)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/cost-vs-usage?${params.toString()}`)
+    return response.json()
+  },
+
+  getUntaggedResources: async (providerId?: string, limit: number = 50) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    params.append('limit', limit.toString())
+    
+    const response = await apiRequest(`/insights/untagged-resources?${params.toString()}`)
+    return response.json()
+  },
+
+  getAnomalies: async (providerId?: string, thresholdPercent: number = 20, accountId?: number) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    params.append('thresholdPercent', thresholdPercent.toString())
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/anomalies?${params.toString()}`)
+    return response.json()
+  },
+
+  calculateAnomalyBaseline: async (providerId: string, serviceName: string, baselineDate: string, accountId?: number) => {
+    const response = await apiRequest('/insights/anomalies/calculate', {
+      method: 'POST',
+      body: JSON.stringify({ providerId, serviceName, baselineDate, accountId }),
+    })
+    return response.json()
+  },
+
+  getCostSummary: async (providerId: string, month: number, year: number, accountId?: number) => {
+    const params = new URLSearchParams()
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`)
+    return response.json()
+  },
+
+  regenerateCostSummary: async (providerId: string, month: number, year: number, accountId?: number) => {
+    const response = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}/regenerate`, {
+      method: 'POST',
+      body: JSON.stringify({ accountId }),
+    })
+    return response.json()
+  },
+}

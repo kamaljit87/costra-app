@@ -189,6 +189,112 @@ export const initDatabase = async () => {
         )
       `)
 
+      // Resources table - stores resource-level cost and metadata
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS resources (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT NOT NULL,
+          resource_id TEXT NOT NULL,
+          resource_name TEXT,
+          resource_type TEXT NOT NULL,
+          service_name TEXT NOT NULL,
+          region TEXT,
+          cost DECIMAL(15, 2) DEFAULT 0,
+          usage_quantity DECIMAL(15, 4),
+          usage_unit TEXT,
+          usage_type TEXT,
+          first_seen_date DATE,
+          last_seen_date DATE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, resource_id, last_seen_date)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_resources_user_provider ON resources(user_id, provider_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_resources_service ON resources(user_id, service_name)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_resources_region ON resources(user_id, region)`)
+
+      // Resource tags table - stores tags for resources
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS resource_tags (
+          id SERIAL PRIMARY KEY,
+          resource_id INTEGER NOT NULL,
+          tag_key TEXT NOT NULL,
+          tag_value TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE,
+          UNIQUE(resource_id, tag_key)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_resource_tags_resource ON resource_tags(resource_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_resource_tags_key_value ON resource_tags(tag_key, tag_value)`)
+
+      // Service usage metrics table - stores usage alongside costs per service
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS service_usage_metrics (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT NOT NULL,
+          service_name TEXT NOT NULL,
+          date DATE NOT NULL,
+          cost DECIMAL(15, 2) DEFAULT 0,
+          usage_quantity DECIMAL(15, 4),
+          usage_unit TEXT,
+          usage_type TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, service_name, date, usage_type)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_service_usage_user_service_date ON service_usage_metrics(user_id, provider_id, service_name, date)`)
+
+      // Anomaly baselines table - stores 30-day rolling averages for anomaly detection
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS anomaly_baselines (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT NOT NULL,
+          service_name TEXT NOT NULL,
+          baseline_date DATE NOT NULL,
+          baseline_cost DECIMAL(15, 2) NOT NULL,
+          baseline_usage DECIMAL(15, 4),
+          rolling_30day_avg DECIMAL(15, 2) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, service_name, baseline_date)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_anomaly_baselines_user_service_date ON anomaly_baselines(user_id, provider_id, service_name, baseline_date)`)
+
+      // Cost explanations table - stores plain-English explanations for cost changes
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cost_explanations (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT NOT NULL,
+          explanation_month INTEGER NOT NULL,
+          explanation_year INTEGER NOT NULL,
+          explanation_text TEXT NOT NULL,
+          cost_change DECIMAL(15, 2) NOT NULL,
+          contributing_factors JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, explanation_month, explanation_year)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_explanations_user_month ON cost_explanations(user_id, provider_id, explanation_month, explanation_year)`)
+
       // Cloud provider credentials table (encrypted) - supports multiple accounts per provider
       await client.query(`
         CREATE TABLE IF NOT EXISTS cloud_provider_credentials (
@@ -1172,6 +1278,457 @@ export const updateUserPassword = async (userId, passwordHash) => {
       'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [passwordHash, userId]
     )
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Resource and Tag Operations
+// ============================================================================
+
+/**
+ * Save or update a resource
+ */
+export const saveResource = async (userId, accountId, providerId, resource) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO resources (
+        user_id, account_id, provider_id, resource_id, resource_name,
+        resource_type, service_name, region, cost, usage_quantity,
+        usage_unit, usage_type, first_seen_date, last_seen_date, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, provider_id, resource_id, last_seen_date)
+      DO UPDATE SET
+        resource_name = EXCLUDED.resource_name,
+        resource_type = EXCLUDED.resource_type,
+        service_name = EXCLUDED.service_name,
+        region = EXCLUDED.region,
+        cost = EXCLUDED.cost,
+        usage_quantity = EXCLUDED.usage_quantity,
+        usage_unit = EXCLUDED.usage_unit,
+        usage_type = EXCLUDED.usage_type,
+        last_seen_date = EXCLUDED.last_seen_date,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id`,
+      [
+        userId, accountId, providerId, resource.resourceId,
+        resource.resourceName || null, resource.resourceType,
+        resource.serviceName, resource.region || null,
+        resource.cost || 0, resource.usageQuantity || null,
+        resource.usageUnit || null, resource.usageType || null,
+        resource.firstSeenDate || null, resource.lastSeenDate || new Date().toISOString().split('T')[0]
+      ]
+    )
+    return result.rows[0].id
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Save tags for a resource
+ */
+export const saveResourceTags = async (resourceId, tags) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    
+    // Delete existing tags for this resource
+    await client.query('DELETE FROM resource_tags WHERE resource_id = $1', [resourceId])
+    
+    // Insert new tags
+    if (tags && Object.keys(tags).length > 0) {
+      for (const [key, value] of Object.entries(tags)) {
+        await client.query(
+          'INSERT INTO resource_tags (resource_id, tag_key, tag_value) VALUES ($1, $2, $3)',
+          [resourceId, key, value || null]
+        )
+      }
+    }
+    
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get untagged resources ranked by cost
+ */
+export const getUntaggedResources = async (userId, providerId = null, limit = 50) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT r.*, COALESCE(SUM(rt.id), 0) as tag_count
+      FROM resources r
+      LEFT JOIN resource_tags rt ON r.id = rt.resource_id
+      WHERE r.user_id = $1
+      ${providerId ? 'AND r.provider_id = $2' : ''}
+      GROUP BY r.id
+      HAVING COALESCE(SUM(rt.id), 0) = 0
+      ORDER BY r.cost DESC, r.last_seen_date DESC
+      LIMIT $${providerId ? 3 : 2}
+    `
+    
+    const params = providerId ? [userId, providerId, limit] : [userId, limit]
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      resourceId: row.resource_id,
+      resourceName: row.resource_name,
+      resourceType: row.resource_type,
+      serviceName: row.service_name,
+      region: row.region,
+      cost: parseFloat(row.cost) || 0,
+      providerId: row.provider_id,
+      firstSeenDate: row.first_seen_date,
+      lastSeenDate: row.last_seen_date,
+      ageDays: row.first_seen_date ? 
+        Math.floor((new Date() - new Date(row.first_seen_date)) / (1000 * 60 * 60 * 24)) : null
+    }))
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Service Usage Metrics Operations
+// ============================================================================
+
+/**
+ * Save service usage metrics
+ */
+export const saveServiceUsageMetrics = async (userId, accountId, providerId, metrics) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    
+    for (const metric of metrics) {
+      await client.query(
+        `INSERT INTO service_usage_metrics (
+          user_id, account_id, provider_id, service_name, date,
+          cost, usage_quantity, usage_unit, usage_type, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, provider_id, service_name, date, usage_type)
+        DO UPDATE SET
+          cost = EXCLUDED.cost,
+          usage_quantity = EXCLUDED.usage_quantity,
+          usage_unit = EXCLUDED.usage_unit,
+          updated_at = CURRENT_TIMESTAMP`,
+        [
+          userId, accountId, providerId,
+          metric.serviceName, metric.date,
+          metric.cost || 0, metric.usageQuantity || null,
+          metric.usageUnit || null, metric.usageType || null
+        ]
+      )
+    }
+    
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get cost vs usage data for services
+ */
+export const getCostVsUsage = async (userId, providerId, startDate, endDate, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        service_name,
+        SUM(cost) as total_cost,
+        SUM(usage_quantity) as total_usage,
+        usage_unit,
+        usage_type,
+        COUNT(DISTINCT date) as days_with_data
+      FROM service_usage_metrics
+      WHERE user_id = $1
+        AND provider_id = $2
+        AND date >= $3::date
+        AND date <= $4::date
+        ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}
+      GROUP BY service_name, usage_unit, usage_type
+      HAVING SUM(cost) > 0
+      ORDER BY SUM(cost) DESC
+    `
+    
+    const params = accountId ? [userId, providerId, startDate, endDate, accountId] : 
+                              [userId, providerId, startDate, endDate]
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => {
+      const totalCost = parseFloat(row.total_cost) || 0
+      const totalUsage = parseFloat(row.total_usage) || 0
+      const unitCost = totalUsage > 0 ? totalCost / totalUsage : null
+      
+      return {
+        serviceName: row.service_name,
+        cost: totalCost,
+        usage: totalUsage,
+        usageUnit: row.usage_unit,
+        usageType: row.usage_type,
+        unitCost: unitCost,
+        daysWithData: parseInt(row.days_with_data) || 0
+      }
+    })
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Anomaly Detection Operations
+// ============================================================================
+
+/**
+ * Calculate and save 30-day rolling average baseline
+ */
+export const calculateAnomalyBaseline = async (userId, providerId, serviceName, baselineDate, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Get 30 days of historical data ending at baselineDate
+    const endDate = new Date(baselineDate)
+    const startDate = new Date(endDate)
+    startDate.setDate(startDate.getDate() - 30)
+    
+    // Calculate 30-day rolling average from daily cost data
+    const costData = await getDailyCostData(userId, providerId, startDate.toISOString().split('T')[0], 
+                                            endDate.toISOString().split('T')[0], accountId)
+    
+    // Get service-specific costs if available
+    let serviceCostData = []
+    try {
+      const usageResult = await client.query(
+        `SELECT date, SUM(cost) as daily_cost
+         FROM service_usage_metrics
+         WHERE user_id = $1 AND provider_id = $2 AND service_name = $3
+           AND date >= $4::date AND date <= $5::date
+           ${accountId ? 'AND account_id = $6' : 'AND account_id IS NULL'}
+         GROUP BY date
+         ORDER BY date ASC`,
+        accountId ? [userId, providerId, serviceName, startDate.toISOString().split('T')[0], 
+                     endDate.toISOString().split('T')[0], accountId] :
+                    [userId, providerId, serviceName, startDate.toISOString().split('T')[0], 
+                     endDate.toISOString().split('T')[0]]
+      )
+      serviceCostData = usageResult.rows
+    } catch (err) {
+      // If service_usage_metrics doesn't have data, use daily_cost_data
+      console.log(`[calculateAnomalyBaseline] No usage metrics for ${serviceName}, using daily costs`)
+    }
+    
+    // Calculate baseline (average daily cost over 30 days)
+    let dailyCosts = []
+    if (serviceCostData.length > 0) {
+      dailyCosts = serviceCostData.map(r => parseFloat(r.daily_cost) || 0)
+    } else {
+      // Fall back to daily_cost_data (will need service-level breakdown from API)
+      dailyCosts = costData.map(d => d.cost)
+    }
+    
+    const rollingAvg = dailyCosts.length > 0 ? 
+      dailyCosts.reduce((sum, cost) => sum + cost, 0) / dailyCosts.length : 0
+    
+    // Get current cost for baseline date
+    const currentCost = dailyCosts[dailyCosts.length - 1] || 0
+    
+    // Save baseline
+    await client.query(
+      `INSERT INTO anomaly_baselines (
+        user_id, account_id, provider_id, service_name, baseline_date,
+        baseline_cost, rolling_30day_avg, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, provider_id, service_name, baseline_date)
+      DO UPDATE SET
+        baseline_cost = EXCLUDED.baseline_cost,
+        rolling_30day_avg = EXCLUDED.rolling_30day_avg`,
+      [userId, accountId, providerId, serviceName, baselineDate, currentCost, rollingAvg]
+    )
+    
+    return { baselineCost: currentCost, rollingAvg }
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get anomalies (costs significantly different from baseline)
+ */
+export const getAnomalies = async (userId, providerId = null, thresholdPercent = 20, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Get recent baselines (last 7 days)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    
+    let query = `
+      SELECT 
+        ab.*,
+        CASE 
+          WHEN ab.baseline_cost > 0 THEN
+            ((ab.baseline_cost - ab.rolling_30day_avg) / ab.rolling_30day_avg * 100)
+          ELSE 0
+        END as variance_percent
+      FROM anomaly_baselines ab
+      WHERE ab.user_id = $1
+        AND ab.baseline_date >= $2::date
+        ${providerId ? 'AND ab.provider_id = $3' : ''}
+        ${accountId ? 'AND ab.account_id = $4' : 'AND ab.account_id IS NULL'}
+        AND ABS((ab.baseline_cost - ab.rolling_30day_avg) / NULLIF(ab.rolling_30day_avg, 0) * 100) >= $${providerId && accountId ? 5 : providerId || accountId ? 4 : 3}
+      ORDER BY ABS(variance_percent) DESC
+      LIMIT 50
+    `
+    
+    let params = [userId, sevenDaysAgo.toISOString().split('T')[0]]
+    if (providerId) params.push(providerId)
+    if (accountId) params.push(accountId)
+    params.push(thresholdPercent)
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => {
+      const variancePercent = parseFloat(row.variance_percent) || 0
+      const isIncrease = variancePercent > 0
+      
+      return {
+        providerId: row.provider_id,
+        serviceName: row.service_name,
+        baselineDate: row.baseline_date,
+        baselineCost: parseFloat(row.baseline_cost) || 0,
+        rollingAvg: parseFloat(row.rolling_30day_avg) || 0,
+        variancePercent: Math.abs(variancePercent),
+        isIncrease,
+        message: `${row.service_name} costs are ${Math.abs(variancePercent).toFixed(1)}% ${isIncrease ? 'higher' : 'lower'} than their 30-day baseline`
+      }
+    })
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Cost Explanation Operations
+// ============================================================================
+
+/**
+ * Generate and save cost explanation for a month
+ */
+export const generateCostExplanation = async (userId, providerId, month, year, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Get current month and last month costs
+    const currentCostResult = await client.query(
+      `SELECT current_month_cost, last_month_cost
+       FROM cost_data
+       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4`,
+      [userId, providerId, month, year]
+    )
+    
+    if (currentCostResult.rows.length === 0) {
+      return null
+    }
+    
+    const currentCost = parseFloat(currentCostResult.rows[0].current_month_cost) || 0
+    const lastMonthCost = parseFloat(currentCostResult.rows[0].last_month_cost) || 0
+    const costChange = currentCost - lastMonthCost
+    const changePercent = lastMonthCost > 0 ? (costChange / lastMonthCost) * 100 : 0
+    
+    // Get service-level changes
+    const servicesResult = await client.query(
+      `SELECT sc.service_name, sc.cost, sc.change_percent
+       FROM service_costs sc
+       JOIN cost_data cd ON sc.cost_data_id = cd.id
+       WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.month = $3 AND cd.year = $4
+       ORDER BY ABS(sc.change_percent) DESC
+       LIMIT 5`,
+      [userId, providerId, month, year]
+    )
+    
+    // Build explanation
+    let explanation = `Your ${providerId.toUpperCase()} cloud spend `
+    if (costChange > 0) {
+      explanation += `increased by ${Math.abs(costChange).toFixed(2)} this month `
+      explanation += `(${Math.abs(changePercent).toFixed(1)}% increase). `
+    } else if (costChange < 0) {
+      explanation += `decreased by ${Math.abs(costChange).toFixed(2)} this month `
+      explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease). `
+    } else {
+      explanation += `remained the same this month. `
+    }
+    
+    const contributingFactors = []
+    if (servicesResult.rows.length > 0) {
+      const topChange = servicesResult.rows[0]
+      if (Math.abs(parseFloat(topChange.change_percent)) > 10) {
+        explanation += `This change was primarily driven by ${topChange.service_name}, `
+        explanation += `which ${parseFloat(topChange.change_percent) > 0 ? 'increased' : 'decreased'} `
+        explanation += `by ${Math.abs(parseFloat(topChange.change_percent)).toFixed(1)}%. `
+        
+        contributingFactors.push({
+          service: topChange.service_name,
+          changePercent: parseFloat(topChange.change_percent),
+          cost: parseFloat(topChange.cost)
+        })
+      }
+    }
+    
+    // Save explanation
+    await client.query(
+      `INSERT INTO cost_explanations (
+        user_id, account_id, provider_id, explanation_month, explanation_year,
+        explanation_text, cost_change, contributing_factors, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, provider_id, explanation_month, explanation_year)
+      DO UPDATE SET
+        explanation_text = EXCLUDED.explanation_text,
+        cost_change = EXCLUDED.cost_change,
+        contributing_factors = EXCLUDED.contributing_factors`,
+      [userId, accountId, providerId, month, year, explanation, costChange, JSON.stringify(contributingFactors)]
+    )
+    
+    return { explanation, costChange, contributingFactors }
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get cost explanation for a month
+ */
+export const getCostExplanation = async (userId, providerId, month, year, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT explanation_text, cost_change, contributing_factors
+       FROM cost_explanations
+       WHERE user_id = $1 AND provider_id = $2 AND explanation_month = $3 AND explanation_year = $4
+         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
+      accountId ? [userId, providerId, month, year, accountId] : [userId, providerId, month, year]
+    )
+    
+    if (result.rows.length > 0) {
+      const row = result.rows[0]
+      return {
+        explanation: row.explanation_text,
+        costChange: parseFloat(row.cost_change) || 0,
+        contributingFactors: row.contributing_factors || []
+      }
+    }
+    
+    return null
   } finally {
     client.release()
   }
