@@ -6,6 +6,8 @@ import {
   calculateAnomalyBaseline,
   generateCostExplanation,
   getCostExplanation,
+  getCostByDimension,
+  getAvailableDimensions,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 
@@ -195,6 +197,55 @@ router.post('/cost-summary/:providerId/:month/:year/regenerate', authenticateTok
   } catch (error) {
     console.error('Cost summary regeneration error:', error)
     res.status(500).json({ error: 'Failed to regenerate cost summary' })
+  }
+})
+
+/**
+ * GET /api/insights/dimensions
+ * Get available dimensions (tag keys) and their values
+ */
+router.get('/dimensions', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { providerId } = req.query
+    
+    const dimensions = await getAvailableDimensions(
+      userId,
+      providerId || null
+    )
+    
+    res.json({ dimensions })
+  } catch (error) {
+    console.error('Get dimensions error:', error)
+    res.status(500).json({ error: 'Failed to fetch dimensions' })
+  }
+})
+
+/**
+ * GET /api/insights/cost-by-dimension
+ * Get costs grouped by dimension (tag)
+ */
+router.get('/cost-by-dimension', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { dimensionKey, dimensionValue, providerId, accountId } = req.query
+    
+    if (!dimensionKey) {
+      return res.status(400).json({ error: 'dimensionKey is required' })
+    }
+    
+    const data = await getCostByDimension(
+      userId,
+      dimensionKey,
+      dimensionValue || null,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ data })
+  } catch (error) {
+    console.error('Cost by dimension error:', error)
+    res.status(500).json({ error: 'Failed to fetch cost by dimension' })
   }
 })
 

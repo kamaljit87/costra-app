@@ -12,6 +12,7 @@ import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
 import UntaggedResources from '../components/UntaggedResources'
 import AnomalyDetection from '../components/AnomalyDetection'
+import CostByDimension from '../components/CostByDimension'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -172,6 +173,13 @@ export default function Dashboard() {
             {!isDemoMode && (
               <div className="mb-12">
                 <AnomalyDetection thresholdPercent={20} />
+              </div>
+            )}
+
+            {/* Cost Allocation by Dimension */}
+            {!isDemoMode && (
+              <div className="mb-12">
+                <CostByDimension />
               </div>
             )}
 

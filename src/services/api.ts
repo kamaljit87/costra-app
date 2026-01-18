@@ -380,4 +380,23 @@ export const insightsAPI = {
     })
     return response.json()
   },
+
+  getAvailableDimensions: async (providerId?: string) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    
+    const response = await apiRequest(`/insights/dimensions?${params.toString()}`)
+    return response.json()
+  },
+
+  getCostByDimension: async (dimensionKey: string, dimensionValue?: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('dimensionKey', dimensionKey)
+    if (dimensionValue) params.append('dimensionValue', dimensionValue)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/cost-by-dimension?${params.toString()}`)
+    return response.json()
+  },
 }

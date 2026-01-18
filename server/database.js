@@ -1358,6 +1358,140 @@ export const saveResourceTags = async (resourceId, tags) => {
 }
 
 /**
+ * Get available dimensions (tag keys) and their values
+ */
+export const getAvailableDimensions = async (userId, providerId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT DISTINCT rt.tag_key, rt.tag_value, COUNT(DISTINCT r.id) as resource_count
+      FROM resource_tags rt
+      JOIN resources r ON rt.resource_id = r.id
+      WHERE r.user_id = $1
+      ${providerId ? 'AND r.provider_id = $2' : ''}
+      GROUP BY rt.tag_key, rt.tag_value
+      ORDER BY rt.tag_key, rt.tag_value
+    `
+    
+    const params = providerId ? [userId, providerId] : [userId]
+    const result = await client.query(query, params)
+    
+    // Group by dimension (tag_key)
+    const dimensions: Record<string, Array<{value: string, resourceCount: number}>> = {}
+    
+    result.rows.forEach(row => {
+      const key = row.tag_key
+      if (!dimensions[key]) {
+        dimensions[key] = []
+      }
+      dimensions[key].push({
+        value: row.tag_value || '(empty)',
+        resourceCount: parseInt(row.resource_count) || 0
+      })
+    })
+    
+    return dimensions
+  } catch (error) {
+    console.error('[getAvailableDimensions] Error:', error)
+    return {}
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get costs grouped by dimension (tag)
+ */
+export const getCostByDimension = async (userId, dimensionKey, dimensionValue = null, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Build query to aggregate costs by dimension value
+    let query = `
+      SELECT 
+        COALESCE(rt.tag_value, '(untagged)') as dimension_value,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count,
+        COUNT(DISTINCT r.service_name) as service_count,
+        COUNT(DISTINCT r.region) as region_count
+      FROM resources r
+      LEFT JOIN resource_tags rt ON r.id = rt.resource_id AND rt.tag_key = $1
+      WHERE r.user_id = $2
+      ${providerId ? 'AND r.provider_id = $3' : ''}
+      ${accountId ? 'AND r.account_id = $4' : 'AND r.account_id IS NULL'}
+      ${dimensionValue ? `AND (rt.tag_value = $${providerId ? (accountId ? 5 : 4) : (accountId ? 4 : 3)} OR rt.tag_value IS NULL)` : ''}
+      GROUP BY rt.tag_value
+      ORDER BY SUM(r.cost) DESC
+    `
+    
+    const params = [dimensionKey, userId]
+    let paramIndex = 3
+    
+    if (providerId) {
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    if (dimensionValue) {
+      params.push(dimensionValue)
+    }
+    
+    const result = await client.query(query, params)
+    
+    // Get service breakdown for each dimension value
+    const breakdownPromises = result.rows.map(async (row) => {
+      const servicesQuery = `
+        SELECT 
+          r.service_name,
+          SUM(r.cost) as service_cost,
+          COUNT(DISTINCT r.id) as resource_count
+        FROM resources r
+        LEFT JOIN resource_tags rt ON r.id = rt.resource_id AND rt.tag_key = $1
+        WHERE r.user_id = $2
+          AND COALESCE(rt.tag_value, '(untagged)') = $3
+          ${providerId ? 'AND r.provider_id = $4' : ''}
+          ${accountId ? 'AND r.account_id = $5' : 'AND r.account_id IS NULL'}
+        GROUP BY r.service_name
+        ORDER BY SUM(r.cost) DESC
+        LIMIT 10
+      `
+      
+      const servicesParams = [dimensionKey, userId, row.dimension_value]
+      if (providerId) servicesParams.push(providerId)
+      if (accountId) servicesParams.push(accountId)
+      
+      const servicesResult = await client.query(servicesQuery, servicesParams)
+      
+      return {
+        dimensionValue: row.dimension_value,
+        totalCost: parseFloat(row.total_cost) || 0,
+        resourceCount: parseInt(row.resource_count) || 0,
+        serviceCount: parseInt(row.service_count) || 0,
+        regionCount: parseInt(row.region_count) || 0,
+        services: servicesResult.rows.map(s => ({
+          serviceName: s.service_name,
+          cost: parseFloat(s.service_cost) || 0,
+          resourceCount: parseInt(s.resource_count) || 0
+        }))
+      }
+    })
+    
+    const breakdowns = await Promise.all(breakdownPromises)
+    
+    return breakdowns
+  } catch (error) {
+    console.error('[getCostByDimension] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
  * Get untagged resources ranked by cost
  */
 export const getUntaggedResources = async (userId, providerId = null, limit = 50) => {
