@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { CurrencyProvider } from './contexts/CurrencyContext'
 import { FilterProvider } from './contexts/FilterContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { NotificationProvider } from './contexts/NotificationContext'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import LoginPage from './pages/LoginPage'
@@ -22,6 +23,7 @@ function App() {
       <AuthProvider>
         <CurrencyProvider>
           <FilterProvider>
+            <NotificationProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -67,6 +69,7 @@ function App() {
               }
             />
           </Routes>
+            </NotificationProvider>
           </FilterProvider>
         </CurrencyProvider>
       </AuthProvider>

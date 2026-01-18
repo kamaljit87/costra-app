@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
+import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
 import { cloudProvidersAPI, syncAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -23,6 +24,7 @@ interface ConfiguredProvider {
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
   const { convertAmount } = useCurrency()
+  const { showSuccess, showError, showWarning } = useNotification()
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
   const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([])
@@ -52,7 +54,10 @@ export default function Dashboard() {
 
   const handleSync = async () => {
     if (isDemoMode) {
-      alert('Sync is not available in demo mode. Please sign up to sync your cloud providers.')
+      showWarning(
+        'Demo Mode',
+        'Sync is not available in demo mode. Please sign up to sync your cloud providers.'
+      )
       return
     }
 
@@ -61,15 +66,24 @@ export default function Dashboard() {
       // Clear cache and sync fresh data
       const result = await syncAPI.syncAll()
       if (result.errors && result.errors.length > 0) {
-        alert(`Sync completed with some errors:\n${result.errors.map((e: any) => `${e.providerId || e.accountAlias}: ${e.error}`).join('\n')}`)
+        showWarning(
+          'Sync Completed with Errors',
+          result.errors.map((e: any) => `${e.providerId || e.accountAlias}: ${e.error}`).join('\n')
+        )
       } else {
-        alert('Sync completed successfully! Data refreshed from cloud providers.')
+        showSuccess(
+          'Sync Completed Successfully',
+          'Data refreshed from cloud providers.'
+        )
       }
       // Reload data after sync
       await loadData()
     } catch (error: any) {
       console.error('Sync error:', error)
-      alert(`Sync failed: ${error.message || 'Unknown error'}`)
+      showError(
+        'Sync Failed',
+        error.message || 'Unknown error occurred while syncing.'
+      )
     } finally {
       setIsSyncing(false)
     }

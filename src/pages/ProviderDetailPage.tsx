@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
+import { useNotification } from '../contexts/NotificationContext'
 import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
 import { cloudProvidersAPI, syncAPI, costDataAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -29,6 +30,7 @@ export default function ProviderDetailPage() {
   const { providerId } = useParams<{ providerId: string }>()
   const { isDemoMode } = useAuth()
   const { formatCurrency, convertAmount, getCurrencySymbol } = useCurrency()
+  const { showSuccess, showError, showWarning } = useNotification()
   const [providerData, setProviderData] = useState<CostData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('1month')
@@ -377,7 +379,10 @@ export default function ProviderDetailPage() {
 
   const handleSync = async () => {
     if (isDemoMode) {
-      alert('Sync is not available in demo mode. Please sign up to sync your cloud providers.')
+      showWarning(
+        'Demo Mode',
+        'Sync is not available in demo mode. Please sign up to sync your cloud providers.'
+      )
       return
     }
 
@@ -385,16 +390,25 @@ export default function ProviderDetailPage() {
     try {
       const result = await syncAPI.syncAll()
       if (result.errors && result.errors.length > 0) {
-        alert(`Sync completed with some errors:\n${result.errors.map((e: any) => `${e.providerId || e.accountAlias}: ${e.error}`).join('\n')}`)
+        showWarning(
+          'Sync Completed with Errors',
+          result.errors.map((e: any) => `${e.providerId || e.accountAlias}: ${e.error}`).join('\n')
+        )
       } else {
-        alert('Sync completed successfully! Refreshing data...')
+        showSuccess(
+          'Sync Completed Successfully',
+          'Refreshing data...'
+        )
       }
       // Reload data after sync
       const data = await getProviderCostDetails(providerId!, isDemoMode)
       setProviderData(data)
     } catch (error: any) {
       console.error('Sync error:', error)
-      alert(`Sync failed: ${error.message || 'Unknown error'}`)
+      showError(
+        'Sync Failed',
+        error.message || 'Unknown error occurred while syncing.'
+      )
     } finally {
       setIsSyncing(false)
     }
