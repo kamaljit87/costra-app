@@ -5,6 +5,7 @@ import {
   getAnomalies,
   calculateAnomalyBaseline,
   generateCostExplanation,
+  generateCustomDateRangeExplanation,
   getCostExplanation,
   getCostByDimension,
   getAvailableDimensions,
@@ -207,6 +208,51 @@ router.post('/cost-summary/:providerId/:month/:year/regenerate', authenticateTok
   } catch (error) {
     console.error('Cost summary regeneration error:', error)
     res.status(500).json({ error: 'Failed to regenerate cost summary' })
+  }
+})
+
+/**
+ * POST /api/insights/cost-summary-range/:providerId
+ * Generate cost explanation for a custom date range
+ */
+router.post('/cost-summary-range/:providerId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const { providerId } = req.params
+    const { startDate, endDate, accountId } = req.body
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    // Validate dates
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ error: 'Invalid date format' })
+    }
+    
+    if (start > end) {
+      return res.status(400).json({ error: 'startDate must be before endDate' })
+    }
+    
+    const explanation = await generateCustomDateRangeExplanation(
+      userId,
+      providerId,
+      startDate,
+      endDate,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    if (!explanation) {
+      return res.status(404).json({ explanation: null })
+    }
+    
+    res.json(explanation)
+  } catch (error) {
+    console.error('Custom date range summary error:', error)
+    res.status(500).json({ error: 'Failed to generate cost summary for date range' })
   }
 })
 

@@ -161,4 +161,40 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 })
 
+// Refresh token endpoint
+router.post('/refresh', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
+    
+    const user = await getUserById(userId)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Generate new JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    res.json({
+      message: 'Token refreshed successfully',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatar_url || null,
+      },
+    })
+  } catch (error) {
+    console.error('Refresh token error:', error)
+    res.status(500).json({ error: error.message || 'Internal server error' })
+  }
+})
+
 export default router

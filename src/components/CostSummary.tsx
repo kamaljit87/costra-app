@@ -5,9 +5,11 @@ import { FileText, RefreshCw, TrendingUp, TrendingDown, DollarSign, Calendar } f
 
 interface CostSummaryProps {
   providerId: string
-  month: number
-  year: number
+  month?: number
+  year?: number
   accountId?: number
+  startDate?: string
+  endDate?: string
 }
 
 interface ContributingFactor {
@@ -22,22 +24,35 @@ interface CostSummaryData {
   contributingFactors?: ContributingFactor[]
 }
 
-export default function CostSummary({ providerId, month, year, accountId }: CostSummaryProps) {
+export default function CostSummary({ providerId, month, year, accountId, startDate, endDate }: CostSummaryProps) {
   const { formatCurrency } = useCurrency()
   const [summary, setSummary] = useState<CostSummaryData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isCustomRange = !!(startDate && endDate)
 
   useEffect(() => {
     fetchSummary()
-  }, [providerId, month, year, accountId])
+  }, [providerId, month, year, accountId, startDate, endDate])
 
   const fetchSummary = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const result = await insightsAPI.getCostSummary(providerId, month, year, accountId)
+      let result
+      if (isCustomRange && startDate && endDate) {
+        // Use custom date range API
+        result = await insightsAPI.getCustomDateRangeSummary(providerId, startDate, endDate, accountId)
+      } else if (month && year) {
+        // Use monthly summary API
+        result = await insightsAPI.getCostSummary(providerId, month, year, accountId)
+      } else {
+        setSummary(null)
+        setIsLoading(false)
+        return
+      }
+      
       // API returns { explanation, costChange, contributingFactors } or { explanation: null }
       if (result && result.explanation) {
         setSummary(result)
@@ -61,7 +76,18 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
     setIsRegenerating(true)
     setError(null)
     try {
-      const result = await insightsAPI.regenerateCostSummary(providerId, month, year, accountId)
+      let result
+      if (isCustomRange && startDate && endDate) {
+        // Regenerate custom date range summary
+        result = await insightsAPI.getCustomDateRangeSummary(providerId, startDate, endDate, accountId)
+      } else if (month && year) {
+        // Regenerate monthly summary
+        result = await insightsAPI.regenerateCostSummary(providerId, month, year, accountId)
+      } else {
+        setIsRegenerating(false)
+        return
+      }
+      
       // API returns { explanation, costChange, contributingFactors } or { explanation: null }
       if (result && result.explanation) {
         setSummary(result)
@@ -137,7 +163,11 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">Cost Summary</h3>
           <p className="text-sm text-gray-500">
-            {monthNames[month - 1]} {year} - What Changed & Why
+            {isCustomRange && startDate && endDate
+              ? `${new Date(startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - What Changed & Why`
+              : month && year
+                ? `${monthNames[month - 1]} ${year} - What Changed & Why`
+                : 'Cost Summary'}
           </p>
         </div>
         <div className="flex items-center gap-2">

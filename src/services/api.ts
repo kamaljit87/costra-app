@@ -28,6 +28,11 @@ const apiRequest = async (
     })
 
     if (!response.ok) {
+      // For 404s, include status in error message so callers can handle it
+      if (response.status === 404) {
+        throw new Error(`404: ${response.statusText || 'Not Found'}`)
+      }
+      
       let error
       try {
         const errorData = await response.json()
@@ -82,6 +87,20 @@ export const authAPI = {
   getCurrentUser: async () => {
     const response = await apiRequest('/auth/me')
     return response.json()
+  },
+
+  refreshToken: async () => {
+    const response = await apiRequest('/auth/refresh', {
+      method: 'POST',
+    })
+    const data = await response.json()
+    if (data.token) {
+      localStorage.setItem('authToken', data.token)
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user))
+      }
+    }
+    return data
   },
 
   logout: () => {
@@ -362,31 +381,38 @@ export const insightsAPI = {
     if (accountId) params.append('accountId', accountId.toString())
     
     try {
-      const response = await fetch(`${API_BASE_URL}/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
-        },
-      })
-      
-      if (response.status === 404) {
-        // 404 is expected when no cost data exists - return null silently
-        return { explanation: null }
-      }
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
-      }
-      
+      const response = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`)
       const data = await response.json()
       // API returns { explanation, costChange, contributingFactors } or { explanation: null }
       return data
     } catch (error: any) {
       // 404 is expected when no cost data exists - return null instead of throwing
-      if (error.message && (error.message.includes('404') || error.message.includes('No cost data'))) {
+      if (error.message && (error.message.includes('404') || error.message.includes('Not Found'))) {
         return { explanation: null }
+      }
+      // Handle 401 (Unauthorized) - token might be expired or missing
+      if (error.message && (error.message.includes('401') || error.message.includes('Access token required') || error.message.includes('Unauthorized') || error.message.includes('Invalid or expired token'))) {
+        // Check if we have a token to refresh
+        const token = getToken()
+        if (token) {
+          // Try to refresh token and retry once
+          try {
+            await authAPI.refreshToken()
+            const retryResponse = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`)
+            const retryData = await retryResponse.json()
+            return retryData
+          } catch (retryError: any) {
+            // If retry also fails with 404, that's expected
+            if (retryError.message && (retryError.message.includes('404') || retryError.message.includes('Not Found'))) {
+              return { explanation: null }
+            }
+            // Refresh failed, return null
+            return { explanation: null }
+          }
+        } else {
+          // No token available, return null (user might be in demo mode)
+          return { explanation: null }
+        }
       }
       // Only log unexpected errors
       if (!error.message?.includes('404')) {
@@ -402,6 +428,32 @@ export const insightsAPI = {
       body: JSON.stringify({ accountId }),
     })
     return response.json()
+  },
+
+  getCustomDateRangeSummary: async (providerId: string, startDate: string, endDate: string, accountId?: number) => {
+    try {
+      const response = await apiRequest(`/insights/cost-summary-range/${providerId}`, {
+        method: 'POST',
+        body: JSON.stringify({ startDate, endDate, accountId }),
+      })
+      
+      if (response.status === 404) {
+        return { explanation: null }
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
+      
+      return response.json()
+    } catch (error: any) {
+      if (error.message && (error.message.includes('404') || error.message.includes('No cost data'))) {
+        return { explanation: null }
+      }
+      console.error('Failed to fetch custom date range summary:', error)
+      throw error
+    }
   },
 
   getAvailableDimensions: async (providerId?: string) => {

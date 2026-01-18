@@ -2051,6 +2051,204 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
   }
 }
 
+/**
+ * Generate cost explanation for a custom date range
+ * Compares costs at start date vs end date and generates a narrative
+ */
+export const generateCustomDateRangeExplanation = async (userId, providerId, startDate, endDate, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Parse dates
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const startMonth = start.getMonth() + 1
+    const startYear = start.getFullYear()
+    const endMonth = end.getMonth() + 1
+    const endYear = end.getFullYear()
+    
+    // Get cost data for start period
+    const startCostResult = await client.query(
+      `SELECT current_month_cost, credits, savings
+       FROM cost_data
+       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4
+         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
+      accountId ? [userId, providerId, startMonth, startYear, accountId] : [userId, providerId, startMonth, startYear]
+    )
+    
+    // Get cost data for end period
+    const endCostResult = await client.query(
+      `SELECT current_month_cost, credits, savings
+       FROM cost_data
+       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4
+         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
+      accountId ? [userId, providerId, endMonth, endYear, accountId] : [userId, providerId, endMonth, endYear]
+    )
+    
+    if (startCostResult.rows.length === 0 || endCostResult.rows.length === 0) {
+      return null
+    }
+    
+    const startCost = parseFloat(startCostResult.rows[0].current_month_cost) || 0
+    const startCredits = parseFloat(startCostResult.rows[0].credits) || 0
+    const startSavings = parseFloat(startCostResult.rows[0].savings) || 0
+    const startGrossCost = startCost + startCredits + startSavings
+    
+    const endCost = parseFloat(endCostResult.rows[0].current_month_cost) || 0
+    const endCredits = parseFloat(endCostResult.rows[0].credits) || 0
+    const endSavings = parseFloat(endCostResult.rows[0].savings) || 0
+    const endGrossCost = endCost + endCredits + endSavings
+    
+    const totalChange = endGrossCost - startGrossCost
+    const changePercent = startGrossCost > 0 ? (totalChange / startGrossCost) * 100 : 0
+    
+    // Get service-level breakdown for start period
+    const startServiceParams = accountId ? [userId, providerId, startMonth, startYear, accountId] : [userId, providerId, startMonth, startYear]
+    const startServicesResult = await client.query(
+      `SELECT sc.service_name, sc.cost
+       FROM service_costs sc
+       JOIN cost_data cd ON sc.cost_data_id = cd.id
+       WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.month = $3 AND cd.year = $4
+         ${accountId ? 'AND cd.account_id = $5' : 'AND cd.account_id IS NULL'}
+       ORDER BY sc.cost DESC
+       LIMIT 10`,
+      startServiceParams
+    )
+    
+    // Get service-level breakdown for end period
+    const endServiceParams = accountId ? [userId, providerId, endMonth, endYear, accountId] : [userId, providerId, endMonth, endYear]
+    const endServicesResult = await client.query(
+      `SELECT sc.service_name, sc.cost
+       FROM service_costs sc
+       JOIN cost_data cd ON sc.cost_data_id = cd.id
+       WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.month = $3 AND cd.year = $4
+         ${accountId ? 'AND cd.account_id = $5' : 'AND cd.account_id IS NULL'}
+       ORDER BY sc.cost DESC
+       LIMIT 10`,
+      endServiceParams
+    )
+    
+    // Build service comparison map
+    const startServicesMap = new Map()
+    startServicesResult.rows.forEach(row => {
+      startServicesMap.set(row.service_name, parseFloat(row.cost) || 0)
+    })
+    
+    const endServicesMap = new Map()
+    endServicesResult.rows.forEach(row => {
+      endServicesMap.set(row.service_name, parseFloat(row.cost) || 0)
+    })
+    
+    // Find services with biggest changes
+    const serviceChanges = []
+    const allServices = new Set([...startServicesMap.keys(), ...endServicesMap.keys()])
+    
+    allServices.forEach(serviceName => {
+      const startCost = startServicesMap.get(serviceName) || 0
+      const endCost = endServicesMap.get(serviceName) || 0
+      const change = endCost - startCost
+      const changePercent = startCost > 0 ? (change / startCost) * 100 : (endCost > 0 ? 100 : 0)
+      
+      if (Math.abs(change) > 0.01) { // Only include services with meaningful changes
+        serviceChanges.push({
+          service: serviceName,
+          startCost,
+          endCost,
+          change,
+          changePercent
+        })
+      }
+    })
+    
+    // Sort by absolute change
+    serviceChanges.sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+    
+    // Build explanation narrative
+    const formatDate = (date) => {
+      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    }
+    
+    let explanation = `Over the period from ${formatDate(start)} to ${formatDate(end)}, `
+    explanation += `your ${providerId.toUpperCase()} cloud spending `
+    
+    if (totalChange > 0) {
+      explanation += `increased by $${Math.abs(totalChange).toFixed(2)} `
+      explanation += `(${Math.abs(changePercent).toFixed(1)}% increase). `
+    } else if (totalChange < 0) {
+      explanation += `decreased by $${Math.abs(totalChange).toFixed(2)} `
+      explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease). `
+    } else {
+      explanation += `remained relatively stable. `
+    }
+    
+    explanation += `Starting costs were $${startGrossCost.toFixed(2)} `
+    if (startCredits > 0 || startSavings > 0) {
+      explanation += `(before $${(startCredits + startSavings).toFixed(2)} in credits and savings), `
+    }
+    explanation += `and ending costs were $${endGrossCost.toFixed(2)} `
+    if (endCredits > 0 || endSavings > 0) {
+      explanation += `(before $${(endCredits + endSavings).toFixed(2)} in credits and savings). `
+    }
+    explanation += `\n\n`
+    
+    // Add service-level insights
+    if (serviceChanges.length > 0) {
+      explanation += `**Service Changes:**\n`
+      
+      const topIncrease = serviceChanges.filter(s => s.change > 0).slice(0, 3)
+      const topDecrease = serviceChanges.filter(s => s.change < 0).slice(0, 3)
+      
+      if (topIncrease.length > 0) {
+        explanation += `The services with the largest cost increases were: `
+        explanation += topIncrease.map(s => 
+          `${s.service} ($${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)}, +${s.changePercent.toFixed(1)}%)`
+        ).join(', ')
+        explanation += `. `
+      }
+      
+      if (topDecrease.length > 0) {
+        explanation += `The services with the largest cost decreases were: `
+        explanation += topDecrease.map(s => 
+          `${s.service} ($${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)}, ${s.changePercent.toFixed(1)}%)`
+        ).join(', ')
+        explanation += `. `
+      }
+      
+      explanation += `\n\n`
+    }
+    
+    // Add credits summary if applicable
+    if (endCredits > 0 || startCredits > 0) {
+      const creditsChange = endCredits - startCredits
+      if (creditsChange !== 0) {
+        explanation += `Credits usage ${creditsChange > 0 ? 'increased' : 'decreased'} by $${Math.abs(creditsChange).toFixed(2)} `
+        explanation += `during this period (from $${startCredits.toFixed(2)} to $${endCredits.toFixed(2)}). `
+      }
+    }
+    
+    // Build contributing factors
+    const contributingFactors = serviceChanges.slice(0, 5).map(s => ({
+      service: s.service,
+      changePercent: s.changePercent,
+      cost: s.endCost
+    }))
+    
+    return {
+      explanation,
+      costChange: totalChange,
+      contributingFactors,
+      startDate: startDate,
+      endDate: endDate,
+      startCost: startGrossCost,
+      endCost: endGrossCost
+    }
+  } catch (error) {
+    console.error('[generateCustomDateRangeExplanation] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 // ============================================================================
 // Business Metrics & Unit Economics Operations
 // ============================================================================

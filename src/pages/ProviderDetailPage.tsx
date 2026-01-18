@@ -960,20 +960,36 @@ export default function ProviderDetailPage() {
             ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
             : getDateRangeForPeriod(selectedPeriod)
           
-          // Get the most recent month in the range
-          const endDate = range.endDate
-          const summaryMonth = endDate.getMonth() + 1
-          const summaryYear = endDate.getFullYear()
+          // For custom date ranges, pass startDate and endDate
+          // For period-based ranges, use the end month/year
+          const isCustomRange = selectedPeriod === 'custom' && customStartDate && customEndDate
           
-          return (
-            <div className="mb-8" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
-              <CostSummary
-                providerId={providerId}
-                month={summaryMonth}
-                year={summaryYear}
-              />
-            </div>
-          )
+          if (isCustomRange) {
+            return (
+              <div className="mb-8" key={`cost-summary-custom-${customStartDate}-${customEndDate}`}>
+                <CostSummary
+                  providerId={providerId}
+                  startDate={customStartDate}
+                  endDate={customEndDate}
+                />
+              </div>
+            )
+          } else {
+            // Get the most recent month in the range
+            const endDate = range.endDate
+            const summaryMonth = endDate.getMonth() + 1
+            const summaryYear = endDate.getFullYear()
+            
+            return (
+              <div className="mb-8" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
+                <CostSummary
+                  providerId={providerId}
+                  month={summaryMonth}
+                  year={summaryYear}
+                />
+              </div>
+            )
+          }
         })()}
 
         {/* No Data Message */}

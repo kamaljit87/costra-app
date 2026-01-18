@@ -27,6 +27,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [user, setUser] = useState<User | null>(null)
 
+  const logout = () => {
+    setIsAuthenticated(false)
+    setIsDemoMode(false)
+    setUser(null)
+    authAPI.logout()
+    localStorage.removeItem('demoMode')
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('user')
+  }
+
+  // Verify token and refresh if needed
+  const verifyAndRefreshToken = async () => {
+    try {
+      const response = await authAPI.getCurrentUser()
+      if (response.user) {
+        // Token is valid, update user data if needed
+        setUser(response.user)
+        localStorage.setItem('user', JSON.stringify(response.user))
+      }
+    } catch (error: any) {
+      // Token invalid or expired, try to refresh
+      if (error.message?.includes('expired') || error.message?.includes('Invalid')) {
+        try {
+          const refreshed = await authAPI.refreshToken()
+          if (refreshed.token && refreshed.user) {
+            setUser(refreshed.user)
+            setIsAuthenticated(true)
+            setIsDemoMode(false)
+            localStorage.setItem('authToken', refreshed.token)
+            localStorage.setItem('user', JSON.stringify(refreshed.user))
+          } else {
+            logout()
+          }
+        } catch (refreshError) {
+          // Refresh failed, logout
+          logout()
+        }
+      } else {
+        // Other error, logout
+        logout()
+      }
+    }
+  }
+
   useEffect(() => {
     // Check if user is already logged in
     const token = localStorage.getItem('authToken')
@@ -42,17 +86,48 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(userData)
         setIsAuthenticated(true)
         setIsDemoMode(false)
-        // Verify token is still valid
-        authAPI.getCurrentUser().catch(() => {
-          // Token invalid, logout
-          logout()
-        })
+        // Verify token is still valid and refresh if needed
+        verifyAndRefreshToken()
       } catch (error) {
         console.error('Error parsing user data:', error)
         logout()
       }
     }
   }, [])
+
+  // Set up automatic token refresh before expiration
+  useEffect(() => {
+    if (!isAuthenticated || isDemoMode) return
+
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+
+    // Decode token to check expiration (without verification)
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const expirationTime = payload.exp * 1000 // Convert to milliseconds
+      const currentTime = Date.now()
+      const timeUntilExpiry = expirationTime - currentTime
+      
+      // Refresh token if it expires in less than 1 hour
+      const oneHour = 60 * 60 * 1000
+      if (timeUntilExpiry < oneHour && timeUntilExpiry > 0) {
+        // Schedule refresh 5 minutes before expiration
+        const refreshTime = timeUntilExpiry - (5 * 60 * 1000) // 5 minutes before expiry
+        if (refreshTime > 0) {
+          const timeoutId = setTimeout(() => {
+            verifyAndRefreshToken()
+          }, refreshTime)
+          
+          return () => clearTimeout(timeoutId)
+        }
+      }
+    } catch (error) {
+      // Invalid token format, logout
+      console.error('Invalid token format:', error)
+      logout()
+    }
+  }, [isAuthenticated, isDemoMode])
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
@@ -109,14 +184,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsDemoMode(true)
     localStorage.setItem('demoMode', 'true')
     // Don't set authToken for demo mode
-  }
-
-  const logout = () => {
-    setIsAuthenticated(false)
-    setIsDemoMode(false)
-    setUser(null)
-    authAPI.logout()
-    localStorage.removeItem('demoMode')
   }
 
   const updateUser = (userData: Partial<User>) => {
