@@ -4,7 +4,6 @@ import {
   LayoutDashboard, 
   ChevronDown,
   Sparkles,
-  Cloud,
   ChevronUp
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -101,12 +100,13 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-frozenWater-600/30">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-frozenWater-600/30 bg-white">
           <Link to="/dashboard" className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
-              <Cloud className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">Costra</span>
+            <img 
+              src="/logo.png" 
+              alt="Costra" 
+              className="h-16 w-auto"
+            />
           </Link>
           {!isPermanent && (
             <button

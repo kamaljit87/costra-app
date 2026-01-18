@@ -68,10 +68,11 @@ export default function SignupPage() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-frozenWater-600 to-frozenWater-500 flex items-center justify-center">
-              <Cloud className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-frozenWater-600">costra</span>
+            <img 
+              src="/logo.png" 
+              alt="Costra" 
+              className="h-12 w-auto"
+            />
           </div>
 
           {/* Title */}
