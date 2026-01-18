@@ -551,6 +551,9 @@ export const getUserById = async (id) => {
       [id]
     )
     return result.rows[0] || null
+  } catch (error) {
+    console.error('getUserById error:', error)
+    throw error
   } finally {
     client.release()
   }
@@ -564,7 +567,19 @@ export const getUserPreferences = async (userId) => {
       'SELECT * FROM user_preferences WHERE user_id = $1',
       [userId]
     )
-    return result.rows[0] || null
+    if (result.rows[0]) {
+      return result.rows[0]
+    }
+    // If no preferences exist, create default ones
+    const insertResult = await client.query(
+      'INSERT INTO user_preferences (user_id, currency) VALUES ($1, $2) RETURNING *',
+      [userId, 'USD']
+    )
+    return insertResult.rows[0]
+  } catch (error) {
+    console.error('getUserPreferences error:', error)
+    // Return default preferences if table doesn't exist or other error
+    return { user_id: userId, currency: 'USD' }
   } finally {
     client.release()
   }
@@ -1400,7 +1415,7 @@ export const getAvailableDimensions = async (userId, providerId = null) => {
     const result = await client.query(query, params)
     
     // Group by dimension (tag_key)
-    const dimensions: Record<string, Array<{value: string, resourceCount: number}>> = {}
+    const dimensions = {}
     
     result.rows.forEach(row => {
       const key = row.tag_key
@@ -1777,37 +1792,42 @@ export const getAnomalies = async (userId, providerId = null, thresholdPercent =
     let params = [userId, sevenDaysAgo.toISOString().split('T')[0]]
     let paramIndex = 3
     
-    let query = `
-      SELECT 
-        ab.*,
-        CASE 
-          WHEN ab.baseline_cost > 0 AND ab.rolling_30day_avg > 0 THEN
-            ((ab.baseline_cost - ab.rolling_30day_avg) / ab.rolling_30day_avg * 100)
-          ELSE 0
-        END as variance_percent
-      FROM anomaly_baselines ab
-      WHERE ab.user_id = $1
-        AND ab.baseline_date >= $2::date
-    `
+    // Build WHERE conditions
+    let whereConditions = ['ab.user_id = $1', 'ab.baseline_date >= $2::date']
     
     if (providerId) {
-      query += ` AND ab.provider_id = $${paramIndex}`
+      whereConditions.push(`ab.provider_id = $${paramIndex}`)
       params.push(providerId)
       paramIndex++
     }
     
     if (accountId) {
-      query += ` AND ab.account_id = $${paramIndex}`
+      whereConditions.push(`ab.account_id = $${paramIndex}`)
       params.push(accountId)
       paramIndex++
     } else {
-      query += ` AND ab.account_id IS NULL`
+      whereConditions.push('ab.account_id IS NULL')
     }
     
-    query += ` AND ABS((ab.baseline_cost - ab.rolling_30day_avg) / NULLIF(ab.rolling_30day_avg, 0) * 100) >= $${paramIndex}`
-    params.push(thresholdPercent)
+    // Calculate variance expression
+    const varianceExpr = `CASE 
+      WHEN ab.baseline_cost > 0 AND ab.rolling_30day_avg > 0 THEN
+        ((ab.baseline_cost - ab.rolling_30day_avg) / ab.rolling_30day_avg * 100)
+      ELSE 0
+    END`
     
-    query += `
+    // Use CTE to allow alias in ORDER BY
+    params.push(thresholdPercent)
+    let query = `
+      WITH anomalies_with_variance AS (
+        SELECT 
+          ab.*,
+          ${varianceExpr} as variance_percent
+        FROM anomaly_baselines ab
+        WHERE ${whereConditions.join(' AND ')}
+          AND ABS(${varianceExpr}) >= $${paramIndex}
+      )
+      SELECT * FROM anomalies_with_variance
       ORDER BY ABS(variance_percent) DESC
       LIMIT 50
     `
@@ -1848,12 +1868,13 @@ export const getAnomalies = async (userId, providerId = null, thresholdPercent =
 export const generateCostExplanation = async (userId, providerId, month, year, accountId = null) => {
   const client = await pool.connect()
   try {
-    // Get current month and last month costs
+    // Get current month and last month costs, including credits
     const currentCostResult = await client.query(
-      `SELECT current_month_cost, last_month_cost
+      `SELECT current_month_cost, last_month_cost, credits, savings
        FROM cost_data
-       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4`,
-      [userId, providerId, month, year]
+       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4
+         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
+      accountId ? [userId, providerId, month, year, accountId] : [userId, providerId, month, year]
     )
     
     if (currentCostResult.rows.length === 0) {
@@ -1862,30 +1883,68 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
     
     const currentCost = parseFloat(currentCostResult.rows[0].current_month_cost) || 0
     const lastMonthCost = parseFloat(currentCostResult.rows[0].last_month_cost) || 0
-    const costChange = currentCost - lastMonthCost
-    const changePercent = lastMonthCost > 0 ? (costChange / lastMonthCost) * 100 : 0
+    const credits = parseFloat(currentCostResult.rows[0].credits) || 0
+    const savings = parseFloat(currentCostResult.rows[0].savings) || 0
+    
+    // Calculate gross cost (before credits) and net cost (after credits)
+    const grossCost = currentCost + credits + savings
+    const netCost = currentCost
+    const netCostChange = netCost - lastMonthCost
+    const grossCostChange = grossCost - lastMonthCost
+    const changePercent = lastMonthCost > 0 ? (grossCostChange / lastMonthCost) * 100 : 0
     
     // Get service-level changes
+    const serviceParams = accountId ? [userId, providerId, month, year, accountId] : [userId, providerId, month, year]
     const servicesResult = await client.query(
       `SELECT sc.service_name, sc.cost, sc.change_percent
        FROM service_costs sc
        JOIN cost_data cd ON sc.cost_data_id = cd.id
        WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.month = $3 AND cd.year = $4
+         ${accountId ? 'AND cd.account_id = $5' : 'AND cd.account_id IS NULL'}
        ORDER BY ABS(sc.change_percent) DESC
        LIMIT 5`,
-      [userId, providerId, month, year]
+      serviceParams
     )
     
-    // Build explanation
+    // Build explanation - account for credits properly
     let explanation = `Your ${providerId.toUpperCase()} cloud spend `
-    if (costChange > 0) {
-      explanation += `increased by ${Math.abs(costChange).toFixed(2)} this month `
-      explanation += `(${Math.abs(changePercent).toFixed(1)}% increase). `
-    } else if (costChange < 0) {
-      explanation += `decreased by ${Math.abs(costChange).toFixed(2)} this month `
-      explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease). `
+    
+    // If credits are applied, explain the net cost vs gross cost
+    if (credits > 0 || savings > 0) {
+      const totalDiscounts = credits + savings
+      explanation += `this month is $${grossCost.toFixed(2)} before credits and savings. `
+      explanation += `After applying $${totalDiscounts.toFixed(2)} in credits`
+      if (savings > 0) {
+        explanation += ` and $${savings.toFixed(2)} in savings`
+      }
+      explanation += `, your net cost is $${netCost.toFixed(2)}. `
+      
+      // Compare gross costs month-over-month
+      if (grossCostChange > 0) {
+        explanation += `Your actual spending increased by $${Math.abs(grossCostChange).toFixed(2)} `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase) compared to last month. `
+      } else if (grossCostChange < 0) {
+        explanation += `Your actual spending decreased by $${Math.abs(grossCostChange).toFixed(2)} `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease) compared to last month. `
+      } else {
+        explanation += `Your actual spending remained the same compared to last month. `
+      }
+      
+      // Add credits information
+      if (credits > 0) {
+        explanation += `You've used $${credits.toFixed(2)} in credits this month. `
+      }
     } else {
-      explanation += `remained the same this month. `
+      // No credits - standard explanation
+      if (netCostChange > 0) {
+        explanation += `increased by $${Math.abs(netCostChange).toFixed(2)} this month `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase). `
+      } else if (netCostChange < 0) {
+        explanation += `decreased by $${Math.abs(netCostChange).toFixed(2)} this month `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease). `
+      } else {
+        explanation += `remained the same this month. `
+      }
     }
     
     const contributingFactors = []
@@ -1915,10 +1974,172 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
         explanation_text = EXCLUDED.explanation_text,
         cost_change = EXCLUDED.cost_change,
         contributing_factors = EXCLUDED.contributing_factors`,
-      [userId, accountId, providerId, month, year, explanation, costChange, JSON.stringify(contributingFactors)]
+      [userId, accountId, providerId, month, year, explanation, netCostChange, JSON.stringify(contributingFactors)]
     )
     
-    return { explanation, costChange, contributingFactors }
+    return { explanation, costChange: netCostChange, contributingFactors }
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Business Metrics & Unit Economics Operations
+// ============================================================================
+
+/**
+ * Save or update business metric
+ */
+export const saveBusinessMetric = async (userId, metric) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO business_metrics (
+        user_id, account_id, provider_id, metric_type, metric_name,
+        date, metric_value, unit, notes, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, metric_type, metric_name, date, provider_id, account_id)
+      DO UPDATE SET
+        metric_value = EXCLUDED.metric_value,
+        unit = EXCLUDED.unit,
+        notes = EXCLUDED.notes,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id`,
+      [
+        userId,
+        metric.accountId || null,
+        metric.providerId || null,
+        metric.metricType,
+        metric.metricName,
+        metric.date,
+        metric.metricValue,
+        metric.unit || null,
+        metric.notes || null
+      ]
+    )
+    return result.rows[0].id
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get business metrics for a date range
+ */
+export const getBusinessMetrics = async (userId, startDate, endDate, metricType = null, metricName = null, providerId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT *
+      FROM business_metrics
+      WHERE user_id = $1
+        AND date >= $2::date
+        AND date <= $3::date
+      ${metricType ? 'AND metric_type = $4' : ''}
+      ${metricName ? `AND metric_name = $${metricType ? 5 : 4}` : ''}
+      ${providerId ? `AND (provider_id = $${metricType ? (metricName ? 6 : 5) : (metricName ? 5 : 4)} OR provider_id IS NULL)` : ''}
+      ORDER BY date DESC, metric_type, metric_name
+    `
+    
+    const params = [userId, startDate, endDate]
+    if (metricType) params.push(metricType)
+    if (metricName) params.push(metricName)
+    if (providerId) params.push(providerId)
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      metricType: row.metric_type,
+      metricName: row.metric_name,
+      date: row.date,
+      metricValue: parseFloat(row.metric_value) || 0,
+      unit: row.unit,
+      notes: row.notes,
+      providerId: row.provider_id
+    }))
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get unit economics (cost per business metric)
+ */
+export const getUnitEconomics = async (userId, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Get total cost for the period
+    let costQuery = `
+      SELECT SUM(cost) as total_cost
+      FROM daily_cost_data
+      WHERE user_id = $1
+        AND date >= $2::date
+        AND date <= $3::date
+      ${providerId ? 'AND provider_id = $4' : ''}
+      ${accountId ? `AND account_id = $${providerId ? 5 : 4}` : 'AND account_id IS NULL'}
+    `
+    
+    const costParams = [userId, startDate, endDate]
+    if (providerId) costParams.push(providerId)
+    if (accountId) costParams.push(accountId)
+    
+    const costResult = await client.query(costQuery, costParams)
+    const totalCost = parseFloat(costResult.rows[0]?.total_cost) || 0
+    
+    // Get business metrics aggregated by type and name
+    let metricsQuery = `
+      SELECT 
+        metric_type,
+        metric_name,
+        unit,
+        SUM(metric_value) as total_metric_value,
+        COUNT(DISTINCT date) as days_with_data
+      FROM business_metrics
+      WHERE user_id = $1
+        AND date >= $2::date
+        AND date <= $3::date
+      ${providerId ? 'AND (provider_id = $4 OR provider_id IS NULL)' : ''}
+      ${accountId ? `AND (account_id = $${providerId ? 5 : 4} OR account_id IS NULL)` : ''}
+      GROUP BY metric_type, metric_name, unit
+      HAVING SUM(metric_value) > 0
+      ORDER BY metric_type, metric_name
+    `
+    
+    const metricsParams = [userId, startDate, endDate]
+    if (providerId) metricsParams.push(providerId)
+    if (accountId) metricsParams.push(accountId)
+    
+    const metricsResult = await client.query(metricsQuery, metricsParams)
+    
+    // Calculate unit economics
+    const unitEconomics = metricsResult.rows.map(row => {
+      const totalMetricValue = parseFloat(row.total_metric_value) || 0
+      const unitCost = totalMetricValue > 0 ? totalCost / totalMetricValue : null
+      
+      return {
+        metricType: row.metric_type,
+        metricName: row.metric_name,
+        unit: row.unit,
+        totalMetricValue: totalMetricValue,
+        totalCost: totalCost,
+        unitCost: unitCost,
+        daysWithData: parseInt(row.days_with_data) || 0
+      }
+    })
+    
+    return {
+      totalCost,
+      unitEconomics,
+      period: { startDate, endDate }
+    }
+  } catch (error) {
+    console.error('[getUnitEconomics] Error:', error)
+    return {
+      totalCost: 0,
+      unitEconomics: [],
+      period: { startDate, endDate }
+    }
   } finally {
     client.release()
   }

@@ -318,13 +318,27 @@ async function getSimulatedSubServices(serviceName, providerId) {
 // Get user preferences (currency)
 router.get('/preferences', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const preferences = await getUserPreferences(userId)
-    res.json({ preferences })
+    // Always return preferences, even if null (will use defaults)
+    res.json({ 
+      preferences: preferences || {
+        user_id: userId,
+        currency: 'USD'
+      }
+    })
   } catch (error) {
     console.error('Get preferences error:', error)
-    console.error('Get preferences error stack:', error.stack)
-    res.status(500).json({ error: error.message || 'Internal server error' })
+    // Return default preferences instead of 500 error
+    res.json({ 
+      preferences: {
+        user_id: req.user.userId || req.user.id,
+        currency: 'USD'
+      }
+    })
   }
 })
 

@@ -99,7 +99,12 @@ router.get('/anomalies', authenticateToken, async (req, res) => {
     })
   } catch (error) {
     console.error('Anomalies error:', error)
-    res.status(500).json({ error: 'Failed to fetch anomalies' })
+    // Return empty array instead of 500 error if table doesn't exist
+    res.json({
+      anomalies: [],
+      count: 0,
+      thresholdPercent: parseFloat(req.query.thresholdPercent || 20)
+    })
   }
 })
 
@@ -139,7 +144,7 @@ router.post('/anomalies/calculate', authenticateToken, async (req, res) => {
  */
 router.get('/cost-summary/:providerId/:month/:year', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, month, year } = req.params
     const { accountId } = req.query
     
@@ -164,10 +169,11 @@ router.get('/cost-summary/:providerId/:month/:year', authenticateToken, async (r
     }
     
     if (!explanation) {
-      return res.status(404).json({ error: 'No cost data found for this period' })
+      return res.status(404).json({ explanation: null })
     }
     
-    res.json({ explanation })
+    // Return the full explanation object (includes explanation, costChange, contributingFactors)
+    res.json(explanation)
   } catch (error) {
     console.error('Cost summary error:', error)
     res.status(500).json({ error: 'Failed to generate cost summary' })
@@ -180,7 +186,7 @@ router.get('/cost-summary/:providerId/:month/:year', authenticateToken, async (r
  */
 router.post('/cost-summary/:providerId/:month/:year/regenerate', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, month, year } = req.params
     const { accountId } = req.body
     
@@ -193,10 +199,11 @@ router.post('/cost-summary/:providerId/:month/:year/regenerate', authenticateTok
     )
     
     if (!explanation) {
-      return res.status(404).json({ error: 'No cost data found for this period' })
+      return res.status(404).json({ explanation: null })
     }
     
-    res.json({ explanation })
+    // Return the full explanation object (includes explanation, costChange, contributingFactors)
+    res.json(explanation)
   } catch (error) {
     console.error('Cost summary regeneration error:', error)
     res.status(500).json({ error: 'Failed to regenerate cost summary' })
@@ -220,7 +227,8 @@ router.get('/dimensions', authenticateToken, async (req, res) => {
     res.json({ dimensions })
   } catch (error) {
     console.error('Get dimensions error:', error)
-    res.status(500).json({ error: 'Failed to fetch dimensions' })
+    // Return empty array if table doesn't exist
+    res.json({ dimensions: [] })
   }
 })
 
@@ -336,7 +344,17 @@ router.get('/unit-economics', authenticateToken, async (req, res) => {
     res.json({ data })
   } catch (error) {
     console.error('Unit economics error:', error)
-    res.status(500).json({ error: 'Failed to fetch unit economics' })
+    // Return empty data if table doesn't exist
+    res.json({ 
+      data: {
+        totalCost: 0,
+        unitEconomics: [],
+        period: {
+          startDate: req.query.startDate,
+          endDate: req.query.endDate
+        }
+      }
+    })
   }
 })
 

@@ -112,7 +112,7 @@ export default function ProviderSection({
         </div>
         <Link
           to={`/provider/${providerId}`}
-          className="flex items-center space-x-2 px-4 py-2.5 text-sm font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl transition-all duration-200"
+          className="flex items-center space-x-2 px-4 py-2.5 text-sm font-medium text-frozenWater-600 hover:text-frozenWater-700 bg-frozenWater-50 hover:bg-frozenWater-100 rounded-xl transition-all duration-200"
         >
           <span>Details</span>
           <ArrowRight className="h-4 w-4" />

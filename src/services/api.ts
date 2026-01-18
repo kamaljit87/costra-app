@@ -362,14 +362,37 @@ export const insightsAPI = {
     if (accountId) params.append('accountId', accountId.toString())
     
     try {
-      const response = await apiRequest(`/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`)
-      return response.json()
+      const response = await fetch(`${API_BASE_URL}/insights/cost-summary/${providerId}/${month}/${year}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {}),
+        },
+      })
+      
+      if (response.status === 404) {
+        // 404 is expected when no cost data exists - return null silently
+        return { explanation: null }
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      // API returns { explanation, costChange, contributingFactors } or { explanation: null }
+      return data
     } catch (error: any) {
       // 404 is expected when no cost data exists - return null instead of throwing
       if (error.message && (error.message.includes('404') || error.message.includes('No cost data'))) {
         return { explanation: null }
       }
-      throw error
+      // Only log unexpected errors
+      if (!error.message?.includes('404')) {
+        console.error('Failed to fetch cost summary:', error)
+      }
+      return { explanation: null }
     }
   },
 

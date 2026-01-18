@@ -29,34 +29,34 @@ export default function TotalBillSummary({
       label: 'Current Month',
       value: formatCurrency(convertAmount(totalCurrent)),
       icon: Wallet,
-      gradient: 'from-blue-500 to-blue-600',
-      iconBg: 'bg-blue-500/10',
-      iconColor: 'text-blue-500',
+      gradient: 'from-frozenWater-400 to-frozenWater-500',
+      iconBg: 'bg-frozenWater-100',
+      iconColor: 'text-frozenWater-500',
     },
     {
       label: 'Forecast',
       value: formatCurrency(convertAmount(totalForecast)),
       icon: Target,
-      gradient: 'from-purple-500 to-purple-600',
-      iconBg: 'bg-purple-500/10',
-      iconColor: 'text-purple-500',
+      gradient: 'from-frozenWater-300 to-frozenWater-400',
+      iconBg: 'bg-frozenWater-100',
+      iconColor: 'text-frozenWater-500',
     },
     {
       label: 'Credits Applied',
       value: `-${formatCurrency(convertAmount(totalCredits))}`,
       icon: Gift,
-      gradient: 'from-emerald-500 to-emerald-600',
-      iconBg: 'bg-emerald-500/10',
-      iconColor: 'text-emerald-500',
-      valueColor: 'text-emerald-600',
+      gradient: 'from-frozenWater-400 to-frozenWater-500',
+      iconBg: 'bg-frozenWater-100',
+      iconColor: 'text-frozenWater-500',
+      valueColor: 'text-frozenWater-600',
     },
     {
       label: 'Net Cost',
       value: formatCurrency(convertAmount(netCost)),
       icon: Zap,
-      gradient: 'from-primary-500 to-accent-500',
-      iconBg: 'bg-primary-500/10',
-      iconColor: 'text-primary-500',
+      gradient: 'from-frozenWater-600 to-frozenWater-500',
+      iconBg: 'bg-white/20',
+      iconColor: 'text-white',
       highlight: true,
     },
   ]
@@ -68,10 +68,10 @@ export default function TotalBillSummary({
         <h2 className="text-4xl font-bold text-gray-900 mb-3">Total Spend</h2>
         <p className="text-xl text-gray-500">Overview across all cloud providers</p>
         {changePercent !== 0 && (
-          <div className={`flex items-center px-5 py-2.5 rounded-xl mt-4 ${
+          <div className={`flex items-center px-5 py-2.5 rounded-full mt-4 ${
             changePercent >= 0 
               ? 'bg-red-50 text-red-600 border border-red-100' 
-              : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+              : 'bg-frozenWater-50 text-frozenWater-700 border border-frozenWater-200'
           }`}>
             {changePercent >= 0 ? (
               <TrendingUp className="h-4 w-4 mr-2" />
@@ -86,42 +86,42 @@ export default function TotalBillSummary({
       </div>
 
       {/* Stats Grid - Centered and balanced layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto justify-items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
         {stats.map((stat, index) => {
           const Icon = stat.icon
           return (
             <div 
               key={stat.label}
               className={`
-                relative overflow-hidden rounded-2xl p-5
+                relative overflow-hidden rounded-2xl p-6
                 ${stat.highlight 
-                  ? 'bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-lg shadow-primary-500/25' 
-                  : 'bg-white border border-gray-100 shadow-card hover:shadow-card-hover'
+                  ? 'bg-gradient-to-br from-frozenWater-600 to-frozenWater-500 text-white shadow-xl shadow-frozenWater-500/30' 
+                  : 'bg-white border border-gray-100 shadow-md hover:shadow-lg'
                 }
-                transition-all duration-300 hover:-translate-y-0.5
+                transition-all duration-300 hover:-translate-y-1
                 animate-slide-up
               `}
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Background decoration */}
-              <div className={`absolute -top-4 -right-4 w-24 h-24 rounded-full opacity-10 ${
-                stat.highlight ? 'bg-white' : `bg-gradient-to-br ${stat.gradient}`
+              <div className={`absolute -top-6 -right-6 w-28 h-28 rounded-full opacity-10 ${
+                stat.highlight ? 'bg-white' : 'bg-frozenWater-200'
               }`} />
               
               <div className="relative">
-                <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl mb-3 ${
+                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4 ${
                   stat.highlight ? 'bg-white/20' : stat.iconBg
                 }`}>
-                  <Icon className={`h-5 w-5 ${stat.highlight ? 'text-white' : stat.iconColor}`} />
+                  <Icon className={`h-6 w-6 ${stat.highlight ? 'text-white' : stat.iconColor}`} />
                 </div>
                 
-                <div className={`text-sm font-medium mb-1 ${
-                  stat.highlight ? 'text-white/80' : 'text-gray-500'
+                <div className={`text-sm font-medium mb-2 ${
+                  stat.highlight ? 'text-white/90' : 'text-gray-600'
                 }`}>
                   {stat.label}
                 </div>
                 
-                <div className={`text-2xl font-bold tracking-tight ${
+                <div className={`text-3xl font-bold tracking-tight ${
                   stat.highlight ? 'text-white' : stat.valueColor || 'text-gray-900'
                 }`}>
                   {stat.value}

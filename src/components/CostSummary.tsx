@@ -38,11 +38,20 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
     setError(null)
     try {
       const result = await insightsAPI.getCostSummary(providerId, month, year, accountId)
-      setSummary(result.explanation || null)
+      // API returns { explanation, costChange, contributingFactors } or { explanation: null }
+      if (result && result.explanation) {
+        setSummary(result)
+      } else {
+        setSummary(null)
+      }
     } catch (err: any) {
-      // Only log unexpected errors
-      console.error('Failed to fetch cost summary:', err)
-      setError(err.message || 'Failed to load cost summary')
+      // Only log unexpected errors (not 404s)
+      if (!err.message?.includes('404')) {
+        console.error('Failed to fetch cost summary:', err)
+        setError(err.message || 'Failed to load cost summary')
+      } else {
+        setSummary(null)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -53,7 +62,12 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
     setError(null)
     try {
       const result = await insightsAPI.regenerateCostSummary(providerId, month, year, accountId)
-      setSummary(result.explanation || null)
+      // API returns { explanation, costChange, contributingFactors } or { explanation: null }
+      if (result && result.explanation) {
+        setSummary(result)
+      } else {
+        setSummary(null)
+      }
     } catch (err: any) {
       console.error('Failed to regenerate cost summary:', err)
       setError(err.message || 'Failed to regenerate cost summary')
@@ -72,7 +86,7 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
       <div className="card">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <FileText className="h-8 w-8 text-primary-600 animate-pulse mx-auto mb-4" />
+            <FileText className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
             <p className="text-gray-600">Generating cost summary...</p>
           </div>
         </div>
@@ -110,11 +124,9 @@ export default function CostSummary({ providerId, month, year, accountId }: Cost
     )
   }
 
-  const costChange = typeof summary.costChange === 'number' ? summary.costChange : 0
-  const explanation = typeof summary === 'string' ? summary : summary.explanation
-  const contributingFactors = typeof summary === 'object' && 'contributingFactors' in summary 
-    ? (summary.contributingFactors || []) 
-    : []
+  const costChange = summary.costChange || 0
+  const explanation = summary.explanation || ''
+  const contributingFactors = summary.contributingFactors || []
 
   const isIncrease = costChange > 0
   const isDecrease = costChange < 0

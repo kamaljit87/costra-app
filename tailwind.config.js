@@ -47,13 +47,30 @@ export default {
           800: '#065f46',
           900: '#064e3b',
         },
-        // Dark sidebar colors
+        // Frozen Water color palette
+        frozenWater: {
+          50: '#ecf8f6',
+          100: '#daf1ed',
+          200: '#b5e3db',
+          300: '#8fd6c9',
+          400: '#6ac8b7',
+          500: '#45baa5',
+          600: '#379584',
+          700: '#297063',
+          800: '#1c4a42',
+          900: '#0e2521',
+          950: '#0a1a17',
+        },
+        // Dark sidebar colors (using frozen-water palette)
         sidebar: {
-          bg: '#0f172a',
-          hover: '#1e293b',
-          border: '#334155',
-          text: '#94a3b8',
-          active: '#3b82f6',
+          bg: '#297063', // frozen-water-700
+          'bg-dark': '#1c4a42', // frozen-water-800
+          hover: '#379584', // frozen-water-600
+          border: '#379584', // frozen-water-600
+          text: '#daf1ed', // frozen-water-100
+          'text-muted': '#8fd6c9', // frozen-water-300
+          active: '#ffffff', // White for active items
+          'active-bg': '#297063', // frozen-water-700
         },
         // Surface colors for cards
         surface: {

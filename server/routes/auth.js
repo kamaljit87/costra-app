@@ -87,7 +87,14 @@ router.post('/login',
       const { email, password } = req.body
 
       // Find user
-      const user = await getUserByEmail(email)
+      let user
+      try {
+        user = await getUserByEmail(email)
+      } catch (dbError) {
+        console.error('Database error in login:', dbError)
+        return res.status(500).json({ error: 'Database connection error. Please try again later.' })
+      }
+      
       if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' })
       }
@@ -130,7 +137,11 @@ router.post('/login',
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = await getUserById(req.user.userId)
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
+    const user = await getUserById(userId)
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
@@ -145,6 +156,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get user error:', error)
     console.error('Get user error stack:', error.stack)
+    // Return error but don't crash - let frontend handle gracefully
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })

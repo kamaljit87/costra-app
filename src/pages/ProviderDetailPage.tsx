@@ -536,60 +536,54 @@ export default function ProviderDetailPage() {
 
   return (
     <Layout>
-      <div className="w-full max-w-[1600px] mx-auto px-8 lg:px-12 xl:px-16 py-12">
+      <div className="w-full px-6 lg:px-8 py-8">
         {/* Breadcrumbs */}
         <Breadcrumbs />
 
-        {/* Provider Header - Centered */}
-        <div className="mb-10">
-          <div className="flex flex-col items-center text-center mb-8">
-            <div 
-              className="w-20 h-20 flex items-center justify-center rounded-2xl shadow-sm mb-4"
-              style={{ backgroundColor: `${getProviderColor(providerId || '')}15` }}
-              title={`${providerData.provider.name} cloud provider`}
-            >
-              <ProviderIcon providerId={providerId || ''} size={48} />
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="flex items-center space-x-3 mb-3">
-                <h1 className="text-5xl font-bold text-gray-900">{providerData.provider.name}</h1>
-                {showCredits && providerData.credits > 0 && (
-                  <span 
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200"
-                    title="This account has credits applied"
-                  >
-                    <Gift className="h-4 w-4 mr-1.5" />
-                    Credits Applied
-                  </span>
-                )}
+        {/* Provider Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div 
+                className="w-16 h-16 flex items-center justify-center rounded-xl shadow-sm"
+                style={{ backgroundColor: `${getProviderColor(providerId || '')}15` }}
+                title={`${providerData.provider.name} cloud provider`}
+              >
+                <ProviderIcon providerId={providerId || ''} size={40} />
               </div>
-              <p className="text-xl text-gray-500">Detailed cost breakdown and analytics</p>
-              {showCredits && providerData.credits > 0 && (
-                <p className="text-sm text-green-700 mt-3 flex items-center">
-                  <Gift className="h-4 w-4 mr-1.5" />
-                  <span className="font-medium">-{formatCurrency(convertAmount(providerData.credits))} in credits applied to this account</span>
-                </p>
-              )}
+              <div>
+                <div className="flex items-center space-x-3 mb-1">
+                  <h1 className="text-3xl font-bold text-gray-900">{providerData.provider.name}</h1>
+                  {showCredits && providerData.credits > 0 && (
+                    <span 
+                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200"
+                      title="This account has credits applied"
+                    >
+                      <Gift className="h-3 w-3 mr-1" />
+                      Credits Applied
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-600">Detailed cost breakdown and analytics</p>
+              </div>
             </div>
             
-            {/* Sync Button - Centered */}
+            {/* Sync Button */}
             {!isDemoMode && (
-              <div className="mt-6">
-                <button
-                  onClick={handleSync}
-                  disabled={isSyncing}
-                  className="btn-primary flex items-center space-x-2"
-                  title="Sync fresh data from cloud provider (clears cache)"
-                >
-                  <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
-                </button>
-              </div>
+              <button
+                onClick={handleSync}
+                disabled={isSyncing}
+                className="btn-primary flex items-center space-x-2"
+                title="Sync fresh data from cloud provider (clears cache)"
+              >
+                <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+              </button>
             )}
           </div>
 
-          {/* Summary Cards - Centered and balanced layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto justify-items-center mt-10">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="card" title="Total cost for the current billing month">
               <div className="text-sm text-gray-500 mb-1">Current Month</div>
               <div className="text-2xl font-bold text-gray-900">
@@ -636,7 +630,7 @@ export default function ProviderDetailPage() {
 
         {/* Inline Filter Bar */}
         {!hasNoData && (
-          <div className="mb-6 border-b border-gray-200 pb-4">
+          <div className="mb-6 bg-white rounded-lg border border-gray-200 px-4 py-3">
             <div className="flex flex-wrap items-center gap-3">
               {/* Period Pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -972,7 +966,7 @@ export default function ProviderDetailPage() {
           const summaryYear = endDate.getFullYear()
           
           return (
-            <div className="mb-12 max-w-5xl mx-auto" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
+            <div className="mb-8" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
               <CostSummary
                 providerId={providerId}
                 month={summaryMonth}
@@ -996,9 +990,9 @@ export default function ProviderDetailPage() {
 
         {/* Cost Trend Chart */}
         {!hasNoData && (
-          <div className="mb-12 max-w-5xl mx-auto">
+            <div className="mb-8">
             <div className="flex flex-col items-center text-center mb-6">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Cost Trends</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Cost Trends</h2>
               
               {/* View Mode Toggle - Centered */}
               <div 
@@ -1054,10 +1048,10 @@ export default function ProviderDetailPage() {
           </div>
         )}
 
-        {/* Service Breakdown - Centered layout */}
+        {/* Service Breakdown */}
         {!hasNoData && (
-          <div className="mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">Service Breakdown</h2>
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Service Breakdown</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-10">
           {/* Pie Chart - Service Distribution */}
           <div className="card">
@@ -1168,7 +1162,7 @@ export default function ProviderDetailPage() {
           
           // Use key to force re-render when period changes
           return (
-            <div className="mb-12 max-w-5xl mx-auto" key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
+            <div className="mb-8" key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
               <CostVsUsage
                 providerId={providerId || undefined}
                 startDate={startDateStr}
@@ -1180,7 +1174,7 @@ export default function ProviderDetailPage() {
 
         {/* Service Details Table */}
         {!hasNoData && (
-          <div className="mb-12 max-w-5xl mx-auto">
+            <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Service Details</h2>
             <div className="card">
             <div className="flex items-center justify-between mb-4">

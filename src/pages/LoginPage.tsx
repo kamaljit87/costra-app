@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="text-3xl font-bold text-primary-600 mb-2">Costra</div>
+          <div className="text-3xl font-bold text-frozenWater-600 mb-2">Costra</div>
           <p className="text-gray-600">Multi-Cloud Cost Management</p>
         </div>
 
@@ -128,7 +128,7 @@ export default function LoginPage() {
 
             <button
               onClick={handleDemoLogin}
-              className="mt-6 w-full btn-secondary flex items-center justify-center border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100"
+              className="mt-6 w-full btn-secondary flex items-center justify-center border-frozenWater-200 bg-frozenWater-50 text-frozenWater-700 hover:bg-frozenWater-100"
             >
               <Sparkles className="mr-2 h-5 w-5" />
               Try Demo Mode
@@ -141,7 +141,7 @@ export default function LoginPage() {
 
           <p className="mt-4 text-center text-sm text-gray-600">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-primary-600 hover:text-primary-700 font-medium">
+            <Link to="/signup" className="text-frozenWater-600 hover:text-frozenWater-700 font-medium">
               Sign up
             </Link>
           </p>
@@ -149,7 +149,7 @@ export default function LoginPage() {
 
         {/* Back to home */}
         <div className="mt-6 text-center">
-          <Link to="/" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+          <Link to="/" className="text-frozenWater-600 hover:text-frozenWater-700 text-sm font-medium">
             ← Back to home
           </Link>
         </div>

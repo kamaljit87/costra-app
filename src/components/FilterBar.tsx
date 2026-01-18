@@ -36,7 +36,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
           className={`
             flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200
             ${selectedService 
-              ? 'bg-primary-50 border-2 border-primary-200 text-primary-700' 
+              ? 'bg-frozenWater-50 border-2 border-frozenWater-200 text-frozenWater-700' 
               : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
             }
           `}
@@ -62,7 +62,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
                   className={`
                     w-full px-4 py-2.5 text-left text-sm rounded-xl transition-colors
                     ${selectedService === null 
-                      ? 'bg-primary-50 text-primary-700 font-medium' 
+                      ? 'bg-frozenWater-50 text-frozenWater-700 font-medium' 
                       : 'text-gray-700 hover:bg-gray-50'
                     }
                   `}
@@ -79,7 +79,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
                     className={`
                       w-full px-4 py-2.5 text-left text-sm rounded-xl truncate transition-colors
                       ${selectedService === service 
-                        ? 'bg-primary-50 text-primary-700 font-medium' 
+                        ? 'bg-frozenWater-50 text-frozenWater-700 font-medium' 
                         : 'text-gray-700 hover:bg-gray-50'
                       }
                     `}
@@ -133,11 +133,11 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
       {hasActiveFilters && (
         <div className="flex items-center gap-2 ml-2 pl-3 border-l border-gray-200">
           {selectedService && (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-frozenWater-100 text-frozenWater-700">
               {selectedService}
               <button 
                 onClick={() => setSelectedService(null)}
-                className="ml-2 hover:text-primary-900"
+                className="ml-2 hover:text-frozenWater-900"
               >
                 <X className="h-3 w-3" />
               </button>

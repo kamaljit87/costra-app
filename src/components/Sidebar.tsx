@@ -1,23 +1,20 @@
-import { useState, useEffect, useRef } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { 
   LayoutDashboard, 
-  LogOut, 
   ChevronDown,
-  Settings,
-  Bug,
-  User,
-  CreditCard,
-  ChevronRight,
-  Sparkles
+  Sparkles,
+  Cloud,
+  ChevronUp
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cloudProvidersAPI } from '../services/api'
-import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
+import { ProviderIcon } from './CloudProviderIcons'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
+  isPermanent?: boolean
 }
 
 interface CloudAccount {
@@ -30,14 +27,11 @@ interface CloudAccount {
   lastSyncAt: string | null
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, isPermanent = false }: SidebarProps) {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { logout, user, isDemoMode } = useAuth()
+  const { isDemoMode } = useAuth()
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([])
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set())
-  const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isDemoMode) {
@@ -45,15 +39,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
   }, [isDemoMode])
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   const loadCloudAccounts = async () => {
     try {
@@ -68,10 +53,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    navigate('/')
-  }
 
   const isActive = (path: string) => location.pathname === path
   const isProviderActive = (providerId: string) => location.pathname === `/provider/${providerId}`
@@ -98,12 +79,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       return acc
     }, {} as Record<string, CloudAccount[]>)
 
-  const userMenuItems = [
-    { label: 'Profile', icon: User, path: '/profile', tooltip: 'Manage your account profile' },
-    { label: 'Billing', icon: CreditCard, path: '/settings#billing', tooltip: 'View billing and invoices' },
-    { label: 'API Debug', icon: Bug, path: '/debug', tooltip: 'Test API endpoints' },
-    { label: 'Settings', icon: Settings, path: '/settings', tooltip: 'Configure app preferences' },
-  ]
 
   return (
     <>
@@ -115,31 +90,32 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar - Hidden on desktop when TopNav is shown, only for mobile */}
+      {/* Sidebar - Permanent on desktop, drawer on mobile */}
       <aside
         className={`
-          fixed top-0 left-0 h-full bg-sidebar-bg z-50
-          transform transition-transform duration-300 ease-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:hidden
-          w-72 flex flex-col
-          border-r border-sidebar-border/50
+          ${isPermanent ? 'relative' : 'fixed'} top-0 left-0 h-full bg-frozenWater-800 z-50
+          ${isPermanent ? '' : `transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          ${isPermanent ? 'lg:block' : 'lg:hidden'}
+          w-64 flex flex-col
+          border-r border-frozenWater-600/30
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-sidebar-border/50">
-          <Link to="/dashboard" className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
+        <div className="flex items-center justify-between h-16 px-6 border-b border-frozenWater-600/30">
+          <Link to="/dashboard" className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+              <Cloud className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-bold text-white">Costra</span>
           </Link>
-          <button
-            onClick={onClose}
-            className="lg:hidden text-sidebar-text hover:text-white transition-colors"
-          >
-            ✕
-          </button>
+          {!isPermanent && (
+            <button
+              onClick={onClose}
+              className="lg:hidden text-white/80 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -149,26 +125,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             to="/dashboard"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-xl
+              flex items-center space-x-3 px-4 py-3 rounded-lg
               transition-all duration-200 group
-              ${isActive('/dashboard')
-                ? 'bg-primary-500/10 text-primary-400'
-                : 'text-sidebar-text hover:text-white hover:bg-sidebar-hover'
-              }
+                        ${isActive('/dashboard')
+                          ? 'bg-frozenWater-600 text-white'
+                          : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                        }
             `}
           >
-            <LayoutDashboard className={`h-5 w-5 ${isActive('/dashboard') ? 'text-primary-400' : 'text-sidebar-text group-hover:text-white'}`} />
+            <LayoutDashboard className="h-5 w-5" />
             <span className="font-medium">Dashboard</span>
-            {isActive('/dashboard') && (
-              <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400" />
-            )}
           </Link>
 
           {/* Cloud Accounts Section */}
           {!isDemoMode && Object.keys(groupedAccounts).length > 0 && (
             <div className="pt-6">
-              <div className="px-4 pb-2 text-xs font-semibold text-sidebar-text/60 uppercase tracking-wider">
-                Cloud Accounts
+              <div className="px-4 pb-2 text-xs font-semibold text-frozenWater-300 uppercase tracking-wider">
+                Cloud Providers
               </div>
               
               {Object.entries(groupedAccounts).map(([providerId, accounts]) => (
@@ -178,50 +151,52 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                       to={`/provider/${providerId}`}
                       onClick={onClose}
                       className={`
-                        flex items-center space-x-3 px-4 py-2.5 rounded-xl
+                        flex items-center space-x-3 px-4 py-2.5 rounded-lg
                         transition-all duration-200 group
                         ${isProviderActive(providerId)
-                          ? 'bg-primary-500/10 text-primary-400'
-                          : 'text-sidebar-text hover:text-white hover:bg-sidebar-hover'
+                          ? 'bg-frozenWater-600 text-white'
+                          : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
                         }
                       `}
                     >
                       <div 
-                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-transform group-hover:scale-105"
-                        style={{ backgroundColor: `${getProviderColor(providerId)}20` }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10"
                       >
                         <ProviderIcon providerId={providerId} size={18} />
                       </div>
                       <span className="flex-1 truncate text-sm font-medium">
                         {accounts[0].accountAlias || accounts[0].providerName}
                       </span>
-                      {isProviderActive(providerId) && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary-400" />
-                      )}
                     </Link>
                   ) : (
                     <>
                       <button
                         onClick={() => toggleProviderExpand(providerId)}
-                        className="flex items-center space-x-3 px-4 py-2.5 w-full rounded-xl text-sidebar-text hover:text-white hover:bg-sidebar-hover transition-all duration-200 group"
+                        className={`
+                          flex items-center space-x-3 px-4 py-2.5 w-full rounded-lg
+                          transition-all duration-200 group
+                          ${expandedProviders.has(providerId)
+                            ? 'bg-frozenWater-600 text-white'
+                            : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                          }
+                        `}
                       >
                         <div 
-                          className="w-8 h-8 flex items-center justify-center rounded-lg transition-transform group-hover:scale-105"
-                          style={{ backgroundColor: `${getProviderColor(providerId)}20` }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10"
                         >
                           <ProviderIcon providerId={providerId} size={18} />
                         </div>
                         <span className="flex-1 text-left text-sm font-medium">
                           {accounts[0].providerName}
                         </span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-sidebar-hover text-sidebar-text">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">
                           {accounts.length}
                         </span>
-                        <ChevronRight 
-                          className={`h-4 w-4 text-sidebar-text transition-transform duration-200 ${
-                            expandedProviders.has(providerId) ? 'rotate-90' : ''
-                          }`}
-                        />
+                        {expandedProviders.has(providerId) ? (
+                          <ChevronUp className="h-4 w-4 text-white transition-transform duration-200" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-white transition-transform duration-200" />
+                        )}
                       </button>
                       
                       {expandedProviders.has(providerId) && (
@@ -235,14 +210,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 flex items-center space-x-2 px-4 py-2 rounded-lg text-sm
                                 transition-all duration-200
                                 ${location.search.includes(`account=${account.accountId}`)
-                                  ? 'bg-primary-500/10 text-primary-400'
-                                  : 'text-sidebar-text hover:text-white hover:bg-sidebar-hover'
+                                  ? 'bg-frozenWater-600 text-white'
+                                  : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
                                 }
                               `}
                             >
                               <div 
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: getProviderColor(providerId) }}
+                                className="w-2 h-2 rounded-full bg-white"
                               />
                               <span className="truncate">
                                 {account.accountAlias || `Account ${account.accountId}`}
@@ -261,102 +235,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* Demo Mode Placeholder */}
           {isDemoMode && (
             <div className="pt-6">
-              <div className="px-4 pb-2 text-xs font-semibold text-sidebar-text/60 uppercase tracking-wider">
-                Cloud Accounts
+              <div className="px-4 pb-2 text-xs font-semibold text-frozenWater-300 uppercase tracking-wider">
+                Cloud Providers
               </div>
               <div className="px-4 py-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-sidebar-hover flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-sidebar-text" />
+                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-white/10 flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
                 </div>
-                <p className="text-xs text-sidebar-text mb-3">
+                <p className="text-xs text-frozenWater-100 mb-3">
                   Connect cloud providers to track costs
                 </p>
                 <Link
                   to="/signup"
-                  className="inline-flex items-center text-xs text-primary-400 hover:text-primary-300 font-medium transition-colors"
+                  className="inline-flex items-center text-xs text-white hover:text-white/80 font-medium transition-colors"
                 >
                   Get started →
                 </Link>
               </div>
             </div>
           )}
+          
         </nav>
 
-        {/* User Menu */}
-        {user && (
-          <div className="border-t border-sidebar-border/50" ref={userMenuRef}>
-            <button
-              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-sidebar-hover transition-colors"
-              title="Click to access account settings"
-            >
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="w-9 h-9 rounded-xl object-cover ring-2 ring-sidebar-border"
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
-                  <span className="text-white font-semibold text-sm">
-                    {user.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-white truncate">
-                  {user.name}
-                </p>
-                <p className="text-xs text-sidebar-text truncate">{user.email}</p>
-              </div>
-              <ChevronDown 
-                className={`h-4 w-4 text-sidebar-text transition-transform duration-200 ${
-                  isUserMenuOpen ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
-
-            {/* Dropdown Menu */}
-            {isUserMenuOpen && (
-              <div className="border-t border-sidebar-border/50 bg-sidebar-hover/50 animate-fade-in">
-                {userMenuItems.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => {
-                        setIsUserMenuOpen(false)
-                        onClose()
-                      }}
-                      title={item.tooltip}
-                      className={`
-                        flex items-center space-x-3 px-4 py-3
-                        text-sm text-sidebar-text hover:text-white hover:bg-sidebar-hover transition-colors
-                        ${isActive(item.path.split('#')[0]) ? 'text-white bg-sidebar-hover' : ''}
-                      `}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Logout Button - Always visible at the very bottom */}
-        <div className="px-3 py-3 border-t border-sidebar-border/50">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 text-sm text-red-400 hover:text-white hover:bg-red-500/20 rounded-xl transition-all duration-200 border border-red-500/20 hover:border-red-500/40"
-            title="Sign out of your account"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Logout</span>
-          </button>
-        </div>
       </aside>
     </>
   )
