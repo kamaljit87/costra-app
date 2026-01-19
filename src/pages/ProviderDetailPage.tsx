@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
-import { cloudProvidersAPI, syncAPI, costDataAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI, costDataAPI, productTeamAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import ProviderCostChart from '../components/ProviderCostChart'
@@ -16,7 +16,9 @@ import AnomalyDetection from '../components/AnomalyDetection'
 import UnitEconomics from '../components/UnitEconomics'
 import CostEfficiencyMetrics from '../components/CostEfficiencyMetrics'
 import RightsizingRecommendations from '../components/RightsizingRecommendations'
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon } from 'lucide-react'
+import ProductCostCard from '../components/ProductCostCard'
+import TeamCostCard from '../components/TeamCostCard'
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -76,7 +78,13 @@ export default function ProviderDetailPage() {
   const [isLoadingSubServices, setIsLoadingSubServices] = useState(false)
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'analytics'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'analytics' | 'products' | 'teams'>('overview')
+  
+  // Products and Teams state
+  const [products, setProducts] = useState<any[]>([])
+  const [teams, setTeams] = useState<any[]>([])
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false)
 
   // Define sub-service type
   interface SubService {
@@ -241,6 +249,46 @@ export default function ProviderDetailPage() {
 
     fetchDataForPeriod()
   }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId, isDemoMode])
+
+  // Load products and teams when tab is active
+  useEffect(() => {
+    if ((activeTab === 'products' || activeTab === 'teams') && !isDemoMode && providerId) {
+      const loadData = async () => {
+        const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+          ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+          : getDateRangeForPeriod(selectedPeriod)
+        
+        const startDateStr = range.startDate.toISOString().split('T')[0]
+        const endDateStr = range.endDate.toISOString().split('T')[0]
+        const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+
+        if (activeTab === 'products') {
+          setIsLoadingProducts(true)
+          try {
+            const response = await productTeamAPI.getCostByProduct(startDateStr, endDateStr, providerId, accountId)
+            setProducts(response.products || [])
+          } catch (error) {
+            console.error('Failed to load products:', error)
+            setProducts([])
+          } finally {
+            setIsLoadingProducts(false)
+          }
+        } else if (activeTab === 'teams') {
+          setIsLoadingTeams(true)
+          try {
+            const response = await productTeamAPI.getCostByTeam(startDateStr, endDateStr, providerId, accountId)
+            setTeams(response.teams || [])
+          } catch (error) {
+            console.error('Failed to load teams:', error)
+            setTeams([])
+          } finally {
+            setIsLoadingTeams(false)
+          }
+        }
+      }
+      loadData()
+    }
+  }, [activeTab, selectedPeriod, customStartDate, customEndDate, providerId, providerAccounts, isDemoMode])
 
   // Fetch services when period changes
   useEffect(() => {
@@ -1016,6 +1064,38 @@ export default function ProviderDetailPage() {
                   <span>Analytics</span>
                 </div>
               </button>
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  ${
+                    activeTab === 'products'
+                      ? 'border-frozenWater-500 text-frozenWater-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }
+                `}
+              >
+                <div className="flex items-center space-x-2">
+                  <Package className="h-4 w-4" />
+                  <span>Products</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('teams')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  ${
+                    activeTab === 'teams'
+                      ? 'border-frozenWater-500 text-frozenWater-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }
+                `}
+              >
+                <div className="flex items-center space-x-2">
+                  <Users className="h-4 w-4" />
+                  <span>Teams</span>
+                </div>
+              </button>
             </nav>
           </div>
         )}
@@ -1577,6 +1657,108 @@ export default function ProviderDetailPage() {
                     accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
                   />
                 )}
+              </div>
+            )}
+
+            {/* Products Tab */}
+            {activeTab === 'products' && (
+              <div className="space-y-8">
+                {(() => {
+                  const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+                    ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+                    : getDateRangeForPeriod(selectedPeriod)
+                  
+                  const startDateStr = range.startDate.toISOString().split('T')[0]
+                  const endDateStr = range.endDate.toISOString().split('T')[0]
+                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+
+                  if (isLoadingProducts) {
+                    return (
+                      <div className="flex items-center justify-center h-64">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                      </div>
+                    )
+                  }
+
+                  if (products.length === 0) {
+                    return (
+                      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+                        <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Product Costs Found</h3>
+                        <p className="text-gray-600">
+                          No resources with product tags found for the selected period. Tag your resources with
+                          "product", "productname", or "product_name" tags to see product-level cost allocation.
+                        </p>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {products.map((product) => (
+                        <ProductCostCard
+                          key={product.productName}
+                          product={product}
+                          startDate={startDateStr}
+                          endDate={endDateStr}
+                          providerId={providerId || undefined}
+                          accountId={accountId}
+                        />
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+            )}
+
+            {/* Teams Tab */}
+            {activeTab === 'teams' && (
+              <div className="space-y-8">
+                {(() => {
+                  const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+                    ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+                    : getDateRangeForPeriod(selectedPeriod)
+                  
+                  const startDateStr = range.startDate.toISOString().split('T')[0]
+                  const endDateStr = range.endDate.toISOString().split('T')[0]
+                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+
+                  if (isLoadingTeams) {
+                    return (
+                      <div className="flex items-center justify-center h-64">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                      </div>
+                    )
+                  }
+
+                  if (teams.length === 0) {
+                    return (
+                      <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+                        <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Team Costs Found</h3>
+                        <p className="text-gray-600">
+                          No resources with team tags found for the selected period. Tag your resources with
+                          "team", "teamname", "team_name", or "owner" tags to see team-level cost allocation.
+                        </p>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {teams.map((team) => (
+                        <TeamCostCard
+                          key={team.teamName}
+                          team={team}
+                          startDate={startDateStr}
+                          endDate={endDateStr}
+                          providerId={providerId || undefined}
+                          accountId={accountId}
+                        />
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
             )}
           </>
