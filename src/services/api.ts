@@ -472,9 +472,10 @@ export const insightsAPI = {
     }
   },
 
-  getAvailableDimensions: async (providerId?: string) => {
+  getAvailableDimensions: async (providerId?: string, accountId?: number) => {
     const params = new URLSearchParams()
     if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
     
     const response = await apiRequest(`/insights/dimensions?${params.toString()}`)
     return response.json()

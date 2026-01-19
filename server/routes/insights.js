@@ -282,18 +282,19 @@ router.post('/cost-summary-range/:providerId', authenticateToken, async (req, re
 router.get('/dimensions', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id
-    const { providerId } = req.query
+    const { providerId, accountId } = req.query
     
     const dimensions = await getAvailableDimensions(
       userId,
-      providerId || null
+      providerId || null,
+      accountId ? parseInt(accountId) : null
     )
     
     res.json({ dimensions })
   } catch (error) {
     console.error('Get dimensions error:', error)
-    // Return empty array if table doesn't exist
-    res.json({ dimensions: [] })
+    // Return empty object if table doesn't exist
+    res.json({ dimensions: {} })
   }
 })
 

@@ -38,7 +38,7 @@
 - **Components**: `CostVsUsage.tsx`
 - **API**: `/api/insights/cost-vs-usage`
 - **Database**: `service_usage_metrics` table (fallback to `service_costs`)
-- **Note**: Works with existing cost data, usage metrics collection in progress
+- **Features**: Info dialog explaining cost vs usage analysis, frozen-water theme
 
 ### 7. Tagging Enforcement & Ownership ✅
 - **Status**: ✅ Implemented (Phase 1 - Core FinOps)
@@ -46,23 +46,23 @@
 - **Components**: `UntaggedResources.tsx`
 - **API**: `/api/insights/untagged-resources`
 - **Database**: `resources`, `resource_tags` tables
-- **Features**: Resource age, region, cost ranking
+- **Features**: Resource age, region, cost ranking, info dialog, frozen-water theme
 
 ### 8. Low-Noise Anomaly Detection ✅
 - **Status**: ✅ Implemented (Phase 1 - Core FinOps)
-- **Details**: 30-day rolling average baseline, self-relative anomalies
+- **Details**: 30-day rolling average baseline, self-relative anomalies, automatic baseline calculation
 - **Components**: `AnomalyDetection.tsx`
 - **API**: `/api/insights/anomalies`
 - **Database**: `anomaly_baselines` table
-- **Features**: Threshold-based alerts, variance percentage
+- **Features**: Threshold-based alerts, variance percentage, automatic baseline calculation during sync, info dialog
 
 ### 9. Plain-English Cost Summary ✅
 - **Status**: ✅ Implemented (Phase 1 - Core FinOps)
-- **Details**: Natural language explanations of cost changes
+- **Details**: Natural language explanations of cost changes with AI enhancement
 - **Components**: `CostSummary.tsx`
-- **API**: `/api/insights/cost-summary/:providerId/:month/:year`
-- **Database**: `cost_explanations` table
-- **Features**: Contributing factors, cost change analysis
+- **API**: `/api/insights/cost-summary/:providerId/:month/:year`, `/api/insights/cost-summary-range/:providerId`
+- **Database**: `cost_explanations`, `cost_explanations_range` tables
+- **Features**: Contributing factors, cost change analysis, custom date range summaries, AI-enhanced explanations with caching, info dialog
 
 ### 10. AI Chat Assistant ✅
 - **Status**: ✅ Implemented
@@ -94,62 +94,87 @@
 - **Components**: `TopNav.tsx`
 - **Features**: Hierarchical provider → account structure
 
+### 15. Custom Date Range Cost Summary ✅
+- **Status**: ✅ Implemented
+- **Details**: AI-enhanced cost explanations for custom date ranges
+- **Components**: `CostSummary.tsx`
+- **API**: `/api/insights/cost-summary-range/:providerId`
+- **Database**: `cost_explanations_range` table
+- **Features**: Custom date range selection, AI-enhanced explanations with caching, comparison periods, service-level breakdown
+
+### 16. Feature Info Dialogs ✅
+- **Status**: ✅ Implemented
+- **Details**: Educational dialogs explaining key features
+- **Components**: Info dialogs in `CostSummary.tsx`, `CostVsUsage.tsx`, `UntaggedResources.tsx`, `CostByDimension.tsx`, `AnomalyDetection.tsx`, `UnitEconomics.tsx`
+- **Features**: Contextual help, feature explanations, usage guidance
+
+### 17. Automatic Anomaly Baseline Calculation ✅
+- **Status**: ✅ Implemented
+- **Details**: Automatic calculation of anomaly baselines during data sync
+- **Components**: Integrated into sync process
+- **API**: Automatic during `/api/sync` operations
+- **Database**: `anomaly_baselines` table
+- **Features**: Calculates baselines for all services, updates last 7 days, non-blocking async operation
+
+### 18. Multi-Account Support ✅
+- **Status**: ✅ Implemented
+- **Details**: Support for multiple accounts per cloud provider
+- **Components**: `CloudProviderManager.tsx`, `Sidebar.tsx`, `ProviderDetailPage.tsx`
+- **API**: `/api/cloud-providers/account/:accountId/credentials`
+- **Features**: Account management, credential updates, account-specific filtering, inactive account display
+
+### 19. Frozen-Water Theme ✅
+- **Status**: ✅ Implemented
+- **Details**: Consistent frozen-water color theme across all components
+- **Components**: All components updated
+- **Features**: Consistent branding, gradient backgrounds, themed borders and icons
+
 ---
 
 ## ⚠️ PARTIALLY IMPLEMENTED / NEEDS DATA
 
-### 15. Cost Allocation by Dimension ⚠️
-- **Status**: ⚠️ Database Schema Ready, UI Not Implemented
-- **Database**: `resource_tags` table exists
-- **Missing**: Dimension filtering UI, `/api/cost-by-dimension` endpoint
-- **Priority**: High (Phase 2)
-
-### 16. Unit Economics / Unit Cost Analysis ⚠️
-- **Status**: ⚠️ Partial (Cost vs Usage shows unit cost, but no business metrics)
-- **Current**: Basic unit cost calculation (cost per GB, per hour)
-- **Missing**: Business metrics integration (cost per customer, per API call)
-- **Priority**: High (Phase 2)
+_All previously partial features have been fully implemented. This section is reserved for future features that may be partially implemented._
 
 ---
 
 ## ❌ NOT IMPLEMENTED
 
-### 17. Product/Team-Level Cost Visibility ❌
+### 20. Product/Team-Level Cost Visibility ❌
 - **Status**: ❌ Not Implemented
 - **Missing**: Team/product aggregation views, filters
 - **Priority**: Medium (Phase 4)
 
-### 18. Showback/Chargeback Reports ❌
+### 21. Showback/Chargeback Reports ❌
 - **Status**: ❌ Not Implemented
 - **Missing**: Report generation, PDF/CSV export
 - **Priority**: Low
 
-### 19. Rightsizing Recommendations ❌
+### 22. Rightsizing Recommendations ❌
 - **Status**: ❌ Not Implemented
 - **Missing**: Resource utilization analysis, optimization suggestions
 - **Priority**: Medium (Phase 3)
 
-### 20. Cost Budgets & Alerts ❌
+### 23. Cost Budgets & Alerts ❌
 - **Status**: ❌ Not Implemented
 - **Missing**: Budget management, alert system
 - **Priority**: Medium (Phase 4)
 
-### 21. Cost Correlation with Business Metrics ❌
+### 24. Cost Correlation with Business Metrics ❌
 - **Status**: ❌ Not Implemented
 - **Missing**: Business metrics tracking, dual-axis charts
 - **Priority**: Low
 
-### 22. Multi-Dimensional Cost Views ❌
+### 25. Multi-Dimensional Cost Views ❌
 - **Status**: ❌ Not Implemented
 - **Missing**: Pivot tables, multi-dimensional filters
 - **Priority**: Low
 
-### 23. Resource Lifecycle Tracking ❌
+### 26. Resource Lifecycle Tracking ❌
 - **Status**: ⚠️ Database Schema Ready (first_seen_date, last_seen_date)
 - **Missing**: Lifecycle UI, zombie resource identification
 - **Priority**: Low
 
-### 24. Advanced Forecasting Models ❌
+### 27. Advanced Forecasting Models ❌
 - **Status**: ⚠️ Basic forecasting exists
 - **Missing**: Multiple models (linear, seasonal), confidence intervals
 - **Priority**: Low
@@ -162,10 +187,10 @@
 |----------|------------|---------|-----------------|-------|
 | **Core FinOps** | 4 | 0 | 0 | 4 |
 | **Cost Visualization** | 5 | 0 | 0 | 5 |
-| **Cost Optimization** | 1 | 1 | 2 | 4 |
-| **Cost Allocation** | 0 | 1 | 3 | 4 |
-| **Advanced Features** | 4 | 0 | 7 | 11 |
-| **TOTAL** | **14** | **2** | **12** | **28** |
+| **Cost Optimization** | 1 | 0 | 2 | 3 |
+| **Cost Allocation** | 1 | 0 | 3 | 4 |
+| **Advanced Features** | 8 | 0 | 7 | 15 |
+| **TOTAL** | **19** | **0** | **12** | **31** |
 
 ---
 
@@ -177,9 +202,9 @@
 - ✅ Anomaly Detection
 - ✅ Plain-English Cost Summary
 
-### Phase 2: Unit Economics & Allocation ⚠️ **25% Complete**
-- ⚠️ Unit Economics (partial - basic unit costs only)
-- ⚠️ Cost Allocation by Dimension (schema ready, UI needed)
+### Phase 2: Unit Economics & Allocation ✅ **100% Complete**
+- ✅ Unit Economics (fully implemented with business metrics support)
+- ✅ Cost Allocation by Dimension (fully implemented with UI and filtering)
 
 ### Phase 3: Optimization Features ❌ **0% Complete**
 - ❌ Cost Efficiency Metrics
@@ -197,20 +222,26 @@
 ### What Costra Has (CloudZero Equivalents):
 - ✅ Multi-cloud aggregation (AnyCost™ equivalent)
 - ✅ Service-level breakdown
-- ✅ Cost vs Usage (Unit Economics equivalent - basic)
-- ✅ Anomaly Detection (CloudZero's anomaly detection)
-- ✅ Plain-English Summaries (AI Advisor equivalent - rule-based)
+- ✅ Cost vs Usage (Unit Economics equivalent)
+- ✅ Cost Allocation by Dimension (tag-based cost allocation)
+- ✅ Unit Economics (cost per customer, API call, transaction)
+- ✅ Anomaly Detection (CloudZero's anomaly detection with automatic baselines)
+- ✅ Plain-English Summaries (AI Advisor equivalent - AI-enhanced with caching)
 - ✅ AI Chat Assistant (AI-native FinOps - via Claude)
+- ✅ Custom Date Range Cost Summaries (AI-enhanced)
+- ✅ Multi-account support per provider
 
 ### What CloudZero Has (Costra Missing):
 - ❌ FOCUS Spec support (standardized data model)
 - ❌ Kubernetes-specific visibility
 - ❌ Hourly granularity for K8s
 - ❌ Automated report generation
-- ❌ Business metrics correlation
-- ❌ Advanced unit economics (cost per customer, per API call)
+- ❌ Business metrics correlation (dual-axis charts, correlation views)
 - ❌ Rightsizing recommendations engine
 - ❌ Budget management system
+- ❌ Showback/Chargeback report generation
+- ❌ Product/Team-level cost visibility
+- ❌ Multi-dimensional pivot tables
 
 ---
 
@@ -222,13 +253,20 @@
 - [x] Daily/monthly tracking
 - [x] Cost forecasting
 - [x] Cost trends & charts
-- [x] Cost vs Usage view
-- [x] Untagged resources detection
-- [x] Anomaly detection
-- [x] Plain-English cost summary
+- [x] Cost vs Usage view (with info dialog)
+- [x] Untagged resources detection (with info dialog)
+- [x] Anomaly detection (with automatic baseline calculation and info dialog)
+- [x] Plain-English cost summary (monthly and custom date range, AI-enhanced)
+- [x] Cost Allocation by Dimension (with info dialog)
+- [x] Unit Economics (with business metrics support and info dialog)
 - [x] AI Chat Assistant
 - [x] Savings plans tracking
 - [x] Currency conversion
+- [x] Multi-account support per provider
+- [x] Custom date range cost summaries
+- [x] Feature info dialogs
+- [x] Automatic anomaly baseline calculation
+- [x] Frozen-water theme consistency
 
 ### Data-Dependent Features (Schema Ready, Needs Population):
 - [x] Resources table (for untagged resources)
@@ -241,24 +279,38 @@
 
 ## 📝 CONCLUSION
 
-**Costra has implemented approximately 50% of CloudZero's core features:**
+**Costra has implemented approximately 61% of CloudZero's core features:**
 
-✅ **Fully Implemented (14 features):**
+✅ **Fully Implemented (19 features):**
 - All core FinOps features (Cost vs Usage, Tagging, Anomaly Detection, Cost Summary)
+- Cost Allocation by Dimension (fully implemented with UI)
+- Unit Economics (fully implemented with business metrics support)
 - Multi-cloud aggregation
 - Cost visualization and trends
-- AI Chat Assistant
+- AI Chat Assistant with enhanced cost summaries
 - Currency conversion
 - Savings plans tracking
-
-⚠️ **Partially Implemented (2 features):**
-- Unit Economics (basic unit costs, no business metrics)
-- Cost Allocation (schema ready, UI needed)
+- Custom date range cost summaries
+- Multi-account support per provider
+- Automatic anomaly baseline calculation
+- Feature info dialogs for user education
+- Frozen-water theme consistency
 
 ❌ **Not Implemented (12 features):**
 - Enterprise features (budgets, showback/chargeback)
 - Advanced optimization (rightsizing recommendations)
-- Business metrics correlation
+- Business metrics correlation (tracking exists, correlation views needed)
 - Multi-dimensional views
+- Product/Team-level visibility
+- Resource lifecycle tracking UI
+- Advanced forecasting models
 
-**Status**: Costra is a **functional FinOps platform** with core features implemented. The missing features are primarily enterprise/advanced features that can be added in future phases.
+**Status**: Costra is a **fully functional FinOps platform** with all Phase 1 and Phase 2 features implemented. The platform now includes:
+- Complete cost allocation and dimension filtering
+- Full unit economics with business metrics support
+- AI-enhanced cost explanations for both monthly and custom date ranges
+- Automatic anomaly detection with baseline calculation
+- Comprehensive user education through info dialogs
+- Consistent theming and multi-account support
+
+The missing features are primarily enterprise/advanced features (Phase 3 and Phase 4) that can be added in future development phases.

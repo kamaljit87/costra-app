@@ -541,8 +541,6 @@ export default function ProviderDetailPage() {
     change: service.change,
   }))
 
-  const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e']
-
   const chartData = getChartData()
 
   return (
@@ -1139,12 +1137,15 @@ export default function ProviderDetailPage() {
                 {/* Service Breakdown */}
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Service Breakdown</h2>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-10">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto mb-10">
                     {/* Pie Chart - Service Distribution */}
-                    <div className="card">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-900">Cost by Service</h3>
-                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                          <BarChart2 className="h-5 w-5 text-frozenWater-600" />
+                          Cost by Service
+                        </h3>
+                        <span className="text-xs font-semibold text-frozenWater-700 bg-frozenWater-100 px-3 py-1.5 rounded-full border border-frozenWater-200">
                           {getPeriodLabel(selectedPeriod)}
                         </span>
                       </div>
@@ -1153,37 +1154,74 @@ export default function ProviderDetailPage() {
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
                         </div>
                       ) : serviceCostData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={serviceCostData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                              outerRadius={100}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {serviceCostData.map((_entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
+                        <div className="relative">
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={serviceCostData}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }) => {
+                                  const percentValue = (percent * 100).toFixed(0)
+                                  if (percentValue === '0') return ''
+                                  return `${name.length > 15 ? name.substring(0, 15) + '...' : name}: ${percentValue}%`
+                                }}
+                                outerRadius={100}
+                                innerRadius={40}
+                                fill="#8884d8"
+                                dataKey="value"
+                                stroke="#ffffff"
+                                strokeWidth={2}
+                              >
+                              {serviceCostData.map((_entry, index) => {
+                                // Use frozen-water color palette with variations
+                                const frozenWaterColors = [
+                                  '#45baa5', // frozenWater-500
+                                  '#379584', // frozenWater-600
+                                  '#6ac8b7', // frozenWater-400
+                                  '#8fd6c9', // frozenWater-300
+                                  '#297063', // frozenWater-700
+                                  '#b5e3db', // frozenWater-200
+                                  '#1c4a42', // frozenWater-800
+                                  '#daf1ed', // frozenWater-100
+                                ]
+                                return (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={frozenWaterColors[index % frozenWaterColors.length]} 
+                                  />
+                                )
+                              })}
                             </Pie>
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Tooltip 
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '2px solid #b5e3db',
+                                borderRadius: '12px',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              }}
+                              formatter={(value: number) => formatCurrency(value)}
+                            />
                           </PieChart>
                         </ResponsiveContainer>
+                        </div>
                       ) : (
-                        <div className="flex items-center justify-center h-64 text-gray-500">
-                          No services found
+                        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                          <Layers className="h-12 w-12 mb-3 text-gray-300" />
+                          <p className="text-sm">No services found</p>
                         </div>
                       )}
                     </div>
 
                     {/* Bar Chart - Service Costs */}
-                    <div className="card">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-900">Service Costs</h3>
-                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                          <BarChart2 className="h-5 w-5 text-frozenWater-600" />
+                          Service Costs
+                        </h3>
+                        <span className="text-xs font-semibold text-frozenWater-700 bg-frozenWater-100 px-3 py-1.5 rounded-full border border-frozenWater-200">
                           {getPeriodLabel(selectedPeriod)}
                         </span>
                       </div>
@@ -1193,19 +1231,21 @@ export default function ProviderDetailPage() {
                         </div>
                       ) : serviceCostData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={serviceCostData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <BarChart data={serviceCostData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#b5e3db" opacity={0.3} />
                             <XAxis
                               dataKey="name"
-                              stroke="#6b7280"
-                              fontSize={12}
+                              stroke="#379584"
+                              fontSize={11}
                               angle={-45}
                               textAnchor="end"
                               height={80}
+                              tick={{ fill: '#297063' }}
                             />
                             <YAxis
-                              stroke="#6b7280"
-                              fontSize={12}
+                              stroke="#379584"
+                              fontSize={11}
+                              tick={{ fill: '#297063' }}
                               tickFormatter={(value) => {
                                 const symbol = getCurrencySymbol()
                                 if (value >= 1000000) {
@@ -1220,17 +1260,43 @@ export default function ProviderDetailPage() {
                             <Tooltip
                               contentStyle={{
                                 backgroundColor: 'white',
-                                border: '1px solid #e5e7eb',
+                                border: '2px solid #b5e3db',
                                 borderRadius: '12px',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                               }}
                               formatter={(value: number) => formatCurrency(value)}
+                              labelStyle={{ color: '#297063', fontWeight: '600' }}
                             />
-                            <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+                            <Bar 
+                              dataKey="value" 
+                              fill="#45baa5" 
+                              radius={[8, 8, 0, 0]}
+                              stroke="#379584"
+                              strokeWidth={1}
+                            >
+                              {serviceCostData.map((_entry, index) => {
+                                const frozenWaterColors = [
+                                  '#45baa5', // frozenWater-500
+                                  '#379584', // frozenWater-600
+                                  '#6ac8b7', // frozenWater-400
+                                  '#8fd6c9', // frozenWater-300
+                                  '#297063', // frozenWater-700
+                                ]
+                                return (
+                                  <Cell 
+                                    key={`bar-cell-${index}`} 
+                                    fill={frozenWaterColors[index % frozenWaterColors.length]}
+                                    stroke={frozenWaterColors[index % frozenWaterColors.length]}
+                                  />
+                                )
+                              })}
+                            </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
-                        <div className="flex items-center justify-center h-64 text-gray-500">
-                          No services found
+                        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                          <BarChart2 className="h-12 w-12 mb-3 text-gray-300" />
+                          <p className="text-sm">No services found</p>
                         </div>
                       )}
                     </div>
@@ -1240,29 +1306,30 @@ export default function ProviderDetailPage() {
                 {/* Service Details Table */}
                 <div>
                   <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Service Details</h2>
-                  <div className="card">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-bold text-gray-900">
+                  <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-frozenWater-600" />
                         Service Breakdown
                         {selectedService && (
-                          <span className="text-sm font-normal text-gray-500 ml-2">
+                          <span className="text-sm font-normal text-frozenWater-700 ml-2 bg-frozenWater-100 px-2 py-1 rounded-full">
                             (filtered by {selectedService})
                           </span>
                         )}
                       </h3>
-                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                      <span className="text-xs font-semibold text-frozenWater-700 bg-frozenWater-100 px-3 py-1.5 rounded-full border border-frozenWater-200">
                         {getPeriodLabel(selectedPeriod)}
                       </span>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-gray-200">
-                            <th className="text-left py-3 px-4 font-semibold text-gray-900 w-8"></th>
-                            <th className="text-left py-3 px-4 font-semibold text-gray-900">Service</th>
-                            <th className="text-right py-3 px-4 font-semibold text-gray-900">Cost</th>
-                            <th className="text-right py-3 px-4 font-semibold text-gray-900">Change</th>
-                            <th className="text-right py-3 px-4 font-semibold text-gray-900">% of Total</th>
+                          <tr className="border-b-2 border-frozenWater-200 bg-frozenWater-50/50">
+                            <th className="text-left py-4 px-4 font-semibold text-frozenWater-900 w-8"></th>
+                            <th className="text-left py-4 px-4 font-semibold text-frozenWater-900">Service</th>
+                            <th className="text-right py-4 px-4 font-semibold text-frozenWater-900">Cost</th>
+                            <th className="text-right py-4 px-4 font-semibold text-frozenWater-900">Change</th>
+                            <th className="text-right py-4 px-4 font-semibold text-frozenWater-900">% of Total</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1275,30 +1342,30 @@ export default function ProviderDetailPage() {
                               return (
                                 <React.Fragment key={`service-${index}-${service.name}`}>
                                   <tr 
-                                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50' : ''}`}
+                                    className={`border-b border-frozenWater-100 hover:bg-frozenWater-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-frozenWater-100/70' : ''}`}
                                     onClick={() => handleServiceExpand(service.name, service.cost)}
                                     title="Click to see sub-service breakdown"
                                   >
-                                    <td className="py-3 px-2 text-center">
+                                    <td className="py-4 px-2 text-center">
                                       <ChevronDown 
-                                        className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                        className={`h-4 w-4 text-frozenWater-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                                       />
                                     </td>
-                                    <td className="py-3 px-4 text-gray-900 font-medium">
+                                    <td className="py-4 px-4 text-gray-900 font-medium">
                                       <div className="flex items-center gap-2">
-                                        <Layers className="h-4 w-4 text-gray-400" />
+                                        <Layers className="h-4 w-4 text-frozenWater-500" />
                                         {service.name}
                                       </div>
                                     </td>
-                                    <td className="py-3 px-4 text-right font-medium text-gray-900">
+                                    <td className="py-4 px-4 text-right font-semibold text-gray-900">
                                       {formatCurrency(service.cost)}
                                     </td>
-                                    <td className={`py-3 px-4 text-right ${
+                                    <td className={`py-4 px-4 text-right font-medium ${
                                       (service.change || 0) >= 0 ? 'text-red-600' : 'text-green-600'
                                     }`}>
                                       {(service.change || 0) >= 0 ? '+' : ''}{(service.change || 0).toFixed(1)}%
                                     </td>
-                                    <td className="py-3 px-4 text-right text-gray-500">
+                                    <td className="py-4 px-4 text-right text-frozenWater-700 font-medium">
                                       {percentage.toFixed(1)}%
                                     </td>
                                   </tr>
@@ -1306,17 +1373,17 @@ export default function ProviderDetailPage() {
                                   {/* Sub-services expandable row */}
                                   {isExpanded && (
                                     <tr key={`sub-${index}-${service.name}`}>
-                                      <td colSpan={5} className="bg-gradient-to-b from-blue-50 to-gray-50 p-0">
-                                        <div className="px-8 py-4">
+                                      <td colSpan={5} className="bg-gradient-to-b from-frozenWater-50/70 to-frozenWater-50/30 p-0">
+                                        <div className="px-8 py-6">
                                           {isLoadingSubServices ? (
                                             <div className="flex items-center justify-center py-6">
-                                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                                              <span className="ml-3 text-gray-500">Loading sub-service details...</span>
+                                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-frozenWater-600"></div>
+                                              <span className="ml-3 text-frozenWater-700">Loading sub-service details...</span>
                                             </div>
                                           ) : subServices.length > 0 ? (
                                             <div className="space-y-3">
-                                              <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
-                                                <BarChart2 className="h-4 w-4" />
+                                              <h4 className="text-sm font-semibold text-frozenWater-800 flex items-center gap-2 mb-4">
+                                                <BarChart2 className="h-4 w-4 text-frozenWater-600" />
                                                 Sub-service Breakdown
                                               </h4>
                                               
@@ -1334,13 +1401,13 @@ export default function ProviderDetailPage() {
                                                     <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                                                       {category}
                                                     </div>
-                                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                                    <div className="bg-white rounded-lg border border-frozenWater-200 overflow-hidden shadow-sm">
                                                       {subs.map((sub: SubService, subIndex: number) => {
                                                         const subPercentage = service.cost > 0 ? (sub.cost / service.cost) * 100 : 0
                                                         return (
                                                           <div 
                                                             key={`${sub.name}-${subIndex}`}
-                                                            className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
+                                                            className="flex items-center justify-between px-4 py-2.5 border-b border-frozenWater-100 last:border-b-0 hover:bg-frozenWater-50/50 transition-colors"
                                                           >
                                                             <div className="flex items-center gap-3">
                                                               <div className="w-2 h-2 rounded-full" style={{ 

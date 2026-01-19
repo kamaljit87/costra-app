@@ -10,6 +10,7 @@ import {
   updateCloudProviderSyncTime,
   clearUserCache,
   clearCostExplanationsCache,
+  calculateAnomalyBaseline,
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
@@ -146,6 +147,10 @@ router.post('/', async (req, res) => {
           console.log(`[Sync] No daily data to save for account: ${accountLabel}`)
         }
 
+        // Calculate anomaly baselines for all services (async, non-blocking)
+        calculateBaselinesForServices(userId, account.provider_id, account.id, costData)
+          .catch(err => console.error(`[Sync] Baseline calculation failed for ${accountLabel}:`, err.message))
+
         // Update last sync time for this account
         await updateCloudProviderSyncTime(userId, account.id)
 
@@ -251,6 +256,10 @@ router.post('/account/:accountId', async (req, res) => {
       await saveBulkDailyCostData(userId, providerId, costData.dailyData, accountId)
     }
 
+    // Calculate anomaly baselines for all services (async, non-blocking)
+    calculateBaselinesForServices(userId, providerId, accountId, costData)
+      .catch(err => console.error(`[Sync] Baseline calculation failed for account ${accountId}:`, err.message))
+
     // Update last sync time for this account
     await updateCloudProviderSyncTime(userId, accountId)
 
@@ -336,6 +345,10 @@ router.post('/:providerId', async (req, res) => {
           await saveBulkDailyCostData(userId, providerId, costData.dailyData, account.id)
         }
 
+        // Calculate anomaly baselines for all services (async, non-blocking)
+        calculateBaselinesForServices(userId, providerId, account.id, costData)
+          .catch(err => console.error(`[Sync] Baseline calculation failed for account ${account.id}:`, err.message))
+
         await updateCloudProviderSyncTime(userId, account.id)
 
         results.push({
@@ -360,6 +373,58 @@ router.post('/:providerId', async (req, res) => {
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
+
+/**
+ * Helper function to calculate anomaly baselines for all services after sync
+ */
+async function calculateBaselinesForServices(userId, providerId, accountId, costData) {
+  try {
+    // Get unique services from cost data
+    const services = costData.services || []
+    if (services.length === 0) {
+      console.log(`[Baseline Calculation] No services found for ${providerId}, skipping baseline calculation`)
+      return
+    }
+
+    // Calculate baselines for the last 7 days to ensure we have recent data
+    const today = new Date()
+    const datesToCalculate = []
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      datesToCalculate.push(date.toISOString().split('T')[0])
+    }
+
+    console.log(`[Baseline Calculation] Calculating baselines for ${services.length} services, ${datesToCalculate.length} dates`)
+
+    // Calculate baselines for each service and date combination
+    let calculated = 0
+    let errors = 0
+    
+    for (const service of services) {
+      const serviceName = service.name || service.service_name
+      if (!serviceName) continue
+
+      for (const date of datesToCalculate) {
+        try {
+          await calculateAnomalyBaseline(userId, providerId, serviceName, date, accountId)
+          calculated++
+        } catch (err) {
+          // Log but don't fail - baseline calculation is best effort
+          if (errors === 0) { // Only log first error to avoid spam
+            console.error(`[Baseline Calculation] Error calculating baseline for ${serviceName} on ${date}:`, err.message)
+          }
+          errors++
+        }
+      }
+    }
+
+    console.log(`[Baseline Calculation] Completed: ${calculated} baselines calculated, ${errors} errors`)
+  } catch (error) {
+    // Don't fail sync if baseline calculation fails
+    console.error(`[Baseline Calculation] Error calculating baselines:`, error.message)
+  }
+}
 
 /**
  * Helper function to get provider icon

@@ -84,8 +84,8 @@ export default function ProviderCostChart({
         : new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       
       return (
-        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-100 p-4">
-          <p className="text-sm text-gray-500 mb-1">{displayDate}</p>
+        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border-2 border-frozenWater-200 p-4">
+          <p className="text-sm text-frozenWater-700 mb-1">{displayDate}</p>
           <p className="text-lg font-bold text-gray-900">{formatCurrency(originalCost)}</p>
         </div>
       )
@@ -94,7 +94,7 @@ export default function ProviderCostChart({
   }
 
   return (
-    <div className="bg-white rounded-2xl">
+      <div className="bg-white rounded-2xl border border-frozenWater-100 shadow-card">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
           <div 
@@ -135,25 +135,27 @@ export default function ProviderCostChart({
           <BarChart data={chartData} barCategoryGap="20%">
             <defs>
               <linearGradient id={`barGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#06b6d4" />
+                <stop offset="0%" stopColor="#45baa5" />
+                <stop offset="100%" stopColor="#379584" />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#b5e3db" opacity={0.3} vertical={false} />
             <XAxis
               dataKey="monthLabel"
-              stroke="#94a3b8"
+              stroke="#379584"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dy={10}
+              tick={{ fill: '#297063' }}
             />
             <YAxis
-              stroke="#94a3b8"
+              stroke="#379584"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dx={-10}
+              tick={{ fill: '#297063' }}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -161,40 +163,47 @@ export default function ProviderCostChart({
                 return `${symbol}${value.toFixed(0)}`
               }}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f1f5f9' }} />
+            <Tooltip 
+              content={<CustomTooltip />} 
+              cursor={{ fill: '#b5e3db', opacity: 0.3 }} 
+            />
             <Bar 
               dataKey="cost" 
               fill={`url(#barGradient-${providerId})`}
               radius={[8, 8, 0, 0]}
+              stroke="#379584"
+              strokeWidth={1}
             />
           </BarChart>
         ) : (
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id={`areaGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="0%" stopColor="#45baa5" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#45baa5" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#b5e3db" opacity={0.3} vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#94a3b8"
+              stroke="#379584"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dy={10}
+              tick={{ fill: '#297063' }}
               tickFormatter={(value) => {
                 const date = new Date(value)
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }}
             />
             <YAxis
-              stroke="#94a3b8"
+              stroke="#379584"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dx={-10}
+              tick={{ fill: '#297063' }}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -202,11 +211,14 @@ export default function ProviderCostChart({
                 return `${symbol}${value.toFixed(0)}`
               }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              content={<CustomTooltip />}
+              cursor={{ stroke: '#45baa5', strokeWidth: 1, strokeDasharray: '3 3' }}
+            />
             <Area
               type="monotone"
               dataKey="cost"
-              stroke="#3b82f6"
+              stroke="#45baa5"
               strokeWidth={2.5}
               fill={`url(#areaGradient-${providerId})`}
             />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { insightsAPI } from '../services/api'
-import { FileText, RefreshCw, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react'
+import { FileText, RefreshCw, TrendingUp, TrendingDown, DollarSign, Calendar, Info, X } from 'lucide-react'
 
 interface CostSummaryProps {
   providerId: string
@@ -30,6 +30,7 @@ export default function CostSummary({ providerId, month, year, accountId, startD
   const [isLoading, setIsLoading] = useState(true)
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showInfoDialog, setShowInfoDialog] = useState(false)
   const isCustomRange = !!(startDate && endDate)
 
   useEffect(() => {
@@ -158,11 +159,21 @@ export default function CostSummary({ providerId, month, year, accountId, startD
   const isDecrease = costChange < 0
 
   return (
-    <div className="card">
+    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">Cost Summary</h3>
-          <p className="text-sm text-gray-500">
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-frozenWater-600" />
+            Cost Summary
+            <button
+              onClick={() => setShowInfoDialog(true)}
+              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              title="Learn more about Cost Summary"
+            >
+              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+            </button>
+          </h3>
+          <p className="text-sm text-frozenWater-600">
             {isCustomRange && startDate && endDate
               ? `${new Date(startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - What Changed & Why`
               : month && year
@@ -174,7 +185,7 @@ export default function CostSummary({ providerId, month, year, accountId, startD
           <button
             onClick={handleRegenerate}
             disabled={isRegenerating}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg border border-frozenWater-200 hover:bg-frozenWater-50 transition-colors disabled:opacity-50"
             title="Regenerate cost summary"
           >
             <RefreshCw className={`h-4 w-4 text-gray-600 ${isRegenerating ? 'animate-spin' : ''}`} />
@@ -251,6 +262,70 @@ export default function CostSummary({ providerId, month, year, accountId, startD
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Info Dialog */}
+      {showInfoDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <FileText className="h-6 w-6 text-frozenWater-600" />
+                  What is Cost Summary?
+                </h3>
+                <button
+                  onClick={() => setShowInfoDialog(false)}
+                  className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              
+              <div className="space-y-4 text-gray-700">
+                <p>
+                  <strong className="text-frozenWater-700">Cost Summary</strong> provides a plain-English explanation of your cloud cost changes, 
+                  making it easy to understand what happened and why your spending changed.
+                </p>
+                
+                <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
+                  <h4 className="font-semibold text-frozenWater-800 mb-2">What You'll See:</h4>
+                  <ul className="space-y-2 text-sm">
+                    <li className="flex items-start gap-2">
+                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span><strong>Total Cost Change:</strong> The overall dollar amount and percentage change</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span><strong>Plain-English Explanation:</strong> AI-generated narrative explaining the changes in simple terms</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span><strong>Contributing Factors:</strong> Services that drove the most significant cost changes</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <h4 className="font-semibold text-blue-800 mb-2">💡 Powered by AI:</h4>
+                  <p className="text-sm text-blue-700">
+                    Our AI analyzes your cost data and generates detailed, conversational explanations. 
+                    You can regenerate the summary anytime to get fresh insights. Summaries are cached to reduce API calls.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowInfoDialog(false)}
+                  className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
