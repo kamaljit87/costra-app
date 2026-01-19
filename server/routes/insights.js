@@ -14,6 +14,12 @@ import {
   getUnitEconomics,
   getCostEfficiencyMetrics,
   getRightsizingRecommendations,
+  getCostByProduct,
+  getCostByTeam,
+  getProductCostTrends,
+  getTeamCostTrends,
+  getProductServiceBreakdown,
+  getTeamServiceBreakdown,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 
@@ -473,6 +479,182 @@ router.get('/rightsizing-recommendations', authenticateToken, async (req, res) =
   } catch (error) {
     console.error('Rightsizing recommendations error:', error)
     res.status(500).json({ error: 'Failed to fetch rightsizing recommendations' })
+  }
+})
+
+/**
+ * GET /api/insights/cost-by-product
+ * Get costs grouped by product
+ */
+router.get('/cost-by-product', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const products = await getCostByProduct(
+      userId,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ products })
+  } catch (error) {
+    console.error('Cost by product error:', error)
+    res.json({ products: [] })
+  }
+})
+
+/**
+ * GET /api/insights/cost-by-team
+ * Get costs grouped by team
+ */
+router.get('/cost-by-team', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const teams = await getCostByTeam(
+      userId,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ teams })
+  } catch (error) {
+    console.error('Cost by team error:', error)
+    res.json({ teams: [] })
+  }
+})
+
+/**
+ * GET /api/insights/product/:productName/trends
+ * Get product cost trends over time
+ */
+router.get('/product/:productName/trends', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { productName } = req.params
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const trends = await getProductCostTrends(
+      userId,
+      productName,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ trends })
+  } catch (error) {
+    console.error('Product trends error:', error)
+    res.json({ trends: [] })
+  }
+})
+
+/**
+ * GET /api/insights/team/:teamName/trends
+ * Get team cost trends over time
+ */
+router.get('/team/:teamName/trends', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { teamName } = req.params
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const trends = await getTeamCostTrends(
+      userId,
+      teamName,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ trends })
+  } catch (error) {
+    console.error('Team trends error:', error)
+    res.json({ trends: [] })
+  }
+})
+
+/**
+ * GET /api/insights/product/:productName/services
+ * Get service breakdown for a product
+ */
+router.get('/product/:productName/services', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { productName } = req.params
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const services = await getProductServiceBreakdown(
+      userId,
+      productName,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ services })
+  } catch (error) {
+    console.error('Product service breakdown error:', error)
+    res.json({ services: [] })
+  }
+})
+
+/**
+ * GET /api/insights/team/:teamName/services
+ * Get service breakdown for a team
+ */
+router.get('/team/:teamName/services', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { teamName } = req.params
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const services = await getTeamServiceBreakdown(
+      userId,
+      teamName,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ services })
+  } catch (error) {
+    console.error('Team service breakdown error:', error)
+    res.json({ services: [] })
   }
 })
 

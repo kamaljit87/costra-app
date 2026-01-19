@@ -62,6 +62,22 @@ export default function Breadcrumbs() {
             crumbs.push({ label: 'API Debug', path: '/debug' })
             break
 
+          case 'budgets':
+            crumbs.push({ label: 'Budgets' })
+            break
+
+          case 'products':
+            crumbs.push({ label: 'Product Costs' })
+            break
+
+          case 'teams':
+            crumbs.push({ label: 'Team Costs' })
+            break
+
+          case 'reports':
+            crumbs.push({ label: 'Reports' })
+            break
+
           default:
             crumbs.push({ label: first.charAt(0).toUpperCase() + first.slice(1) })
         }

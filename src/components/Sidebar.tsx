@@ -4,7 +4,11 @@ import {
   LayoutDashboard, 
   ChevronDown,
   Sparkles,
-  ChevronUp
+  ChevronUp,
+  Wallet,
+  Package,
+  Users,
+  FileText
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cloudProvidersAPI } from '../services/api'
@@ -133,6 +137,74 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
           >
             <LayoutDashboard className="h-5 w-5" />
             <span className="font-medium">Dashboard</span>
+          </Link>
+
+          {/* Budgets */}
+          <Link
+            to="/budgets"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-all duration-200 group
+              ${isActive('/budgets')
+                ? 'bg-frozenWater-600 text-white'
+                : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+              }
+            `}
+          >
+            <Wallet className="h-5 w-5" />
+            <span className="font-medium">Budgets</span>
+          </Link>
+
+          {/* Products */}
+          <Link
+            to="/products"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-all duration-200 group
+              ${isActive('/products')
+                ? 'bg-frozenWater-600 text-white'
+                : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+              }
+            `}
+          >
+            <Package className="h-5 w-5" />
+            <span className="font-medium">Products</span>
+          </Link>
+
+          {/* Teams */}
+          <Link
+            to="/teams"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-all duration-200 group
+              ${isActive('/teams')
+                ? 'bg-frozenWater-600 text-white'
+                : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+              }
+            `}
+          >
+            <Users className="h-5 w-5" />
+            <span className="font-medium">Teams</span>
+          </Link>
+
+          {/* Reports */}
+          <Link
+            to="/reports"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-all duration-200 group
+              ${isActive('/reports')
+                ? 'bg-frozenWater-600 text-white'
+                : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+              }
+            `}
+          >
+            <FileText className="h-5 w-5" />
+            <span className="font-medium">Reports</span>
           </Link>
 
           {/* Cloud Accounts Section */}

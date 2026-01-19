@@ -552,3 +552,218 @@ export const insightsAPI = {
     return response.json()
   },
 }
+
+// Budgets API
+export const budgetsAPI = {
+  createBudget: async (budgetData: {
+    budgetName: string
+    providerId?: string
+    accountId?: number
+    budgetAmount: number
+    budgetPeriod: 'monthly' | 'quarterly' | 'yearly'
+    alertThreshold?: number
+  }) => {
+    const response = await apiRequest('/budgets', {
+      method: 'POST',
+      body: JSON.stringify(budgetData),
+    })
+    return response.json()
+  },
+
+  getBudgets: async (providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/budgets?${params.toString()}`)
+    return response.json()
+  },
+
+  getBudget: async (budgetId: number) => {
+    const response = await apiRequest(`/budgets/${budgetId}`)
+    return response.json()
+  },
+
+  updateBudget: async (budgetId: number, updateData: Partial<{
+    budgetName: string
+    budgetAmount: number
+    budgetPeriod: 'monthly' | 'quarterly' | 'yearly'
+    alertThreshold: number
+    status: 'active' | 'paused' | 'exceeded'
+  }>) => {
+    const response = await apiRequest(`/budgets/${budgetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updateData),
+    })
+    return response.json()
+  },
+
+  deleteBudget: async (budgetId: number) => {
+    const response = await apiRequest(`/budgets/${budgetId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+
+  getBudgetAlerts: async () => {
+    const response = await apiRequest('/budgets/alerts/all')
+    return response.json()
+  },
+
+  getBudgetAlertHistory: async (limit?: number) => {
+    const params = new URLSearchParams()
+    if (limit) params.append('limit', limit.toString())
+    
+    const response = await apiRequest(`/budgets/alerts/history?${params.toString()}`)
+    return response.json()
+  },
+
+  checkBudget: async (budgetId: number) => {
+    const response = await apiRequest(`/budgets/${budgetId}/check`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+}
+
+// Reports API
+export const reportsAPI = {
+  generateShowbackReport: async (reportData: {
+    reportName: string
+    startDate: string
+    endDate: string
+    providerId?: string
+    accountId?: number
+    teamName?: string
+    productName?: string
+    format?: 'csv' | 'pdf'
+  }) => {
+    const response = await apiRequest('/reports/showback', {
+      method: 'POST',
+      body: JSON.stringify(reportData),
+    })
+    return response.json()
+  },
+
+  generateChargebackReport: async (reportData: {
+    reportName: string
+    startDate: string
+    endDate: string
+    providerId?: string
+    accountId?: number
+    teamName?: string
+    productName?: string
+    format?: 'csv' | 'pdf'
+  }) => {
+    const response = await apiRequest('/reports/chargeback', {
+      method: 'POST',
+      body: JSON.stringify(reportData),
+    })
+    return response.json()
+  },
+
+  getReports: async (reportType?: 'showback' | 'chargeback', limit?: number) => {
+    const params = new URLSearchParams()
+    if (reportType) params.append('reportType', reportType)
+    if (limit) params.append('limit', limit.toString())
+    
+    const response = await apiRequest(`/reports?${params.toString()}`)
+    return response.json()
+  },
+
+  getReport: async (reportId: number) => {
+    const response = await apiRequest(`/reports/${reportId}`)
+    return response.json()
+  },
+
+  downloadReport: async (reportId: number) => {
+    const response = await apiRequest(`/reports/${reportId}/download`)
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const contentType = response.headers.get('content-type') || ''
+    const extension = contentType.includes('pdf') ? 'pdf' : 'csv'
+    a.download = `report_${reportId}.${extension}`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  },
+
+  deleteReport: async (reportId: number) => {
+    const response = await apiRequest(`/reports/${reportId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+}
+
+// Product/Team Cost API
+export const productTeamAPI = {
+  getCostByProduct: async (startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/cost-by-product?${params.toString()}`)
+    return response.json()
+  },
+
+  getCostByTeam: async (startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/cost-by-team?${params.toString()}`)
+    return response.json()
+  },
+
+  getProductTrends: async (productName: string, startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/product/${encodeURIComponent(productName)}/trends?${params.toString()}`)
+    return response.json()
+  },
+
+  getTeamTrends: async (teamName: string, startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/team/${encodeURIComponent(teamName)}/trends?${params.toString()}`)
+    return response.json()
+  },
+
+  getProductServices: async (productName: string, startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/product/${encodeURIComponent(productName)}/services?${params.toString()}`)
+    return response.json()
+  },
+
+  getTeamServices: async (teamName: string, startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/team/${encodeURIComponent(teamName)}/services?${params.toString()}`)
+    return response.json()
+  },
+}

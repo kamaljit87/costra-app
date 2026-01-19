@@ -317,6 +317,70 @@ export const initDatabase = async () => {
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_explanations_range_user ON cost_explanations_range(user_id, provider_id, start_date, end_date)`)
 
+      // Budgets table - for cost budgets and alerts
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS budgets (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT,
+          budget_name TEXT NOT NULL,
+          budget_amount DECIMAL(15, 2) NOT NULL,
+          budget_period TEXT NOT NULL CHECK (budget_period IN ('monthly', 'quarterly', 'yearly')),
+          alert_threshold INTEGER DEFAULT 80 CHECK (alert_threshold >= 0 AND alert_threshold <= 100),
+          current_spend DECIMAL(15, 2) DEFAULT 0,
+          status TEXT DEFAULT 'active' CHECK (status IN ('active', 'paused', 'exceeded')),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_budgets_user ON budgets(user_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_budgets_provider ON budgets(user_id, provider_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_budgets_account ON budgets(user_id, account_id)`)
+
+      // Budget alerts table - for tracking budget alert history
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS budget_alerts (
+          id SERIAL PRIMARY KEY,
+          budget_id INTEGER NOT NULL,
+          alert_type TEXT NOT NULL CHECK (alert_type IN ('threshold', 'exceeded')),
+          alert_percentage INTEGER NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_budget ON budget_alerts(budget_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_budget_alerts_created ON budget_alerts(created_at DESC)`)
+
+      // Reports table - for storing generated showback/chargeback reports
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS reports (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          report_type TEXT NOT NULL CHECK (report_type IN ('showback', 'chargeback')),
+          report_name TEXT NOT NULL,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          provider_id TEXT,
+          account_id INTEGER,
+          team_name TEXT,
+          product_name TEXT,
+          report_data JSONB NOT NULL,
+          file_path TEXT,
+          file_format TEXT CHECK (file_format IN ('pdf', 'csv')),
+          status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'generating', 'completed', 'failed')),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          completed_at TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_type ON reports(user_id, report_type)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(user_id, created_at DESC)`)
+
       // Business metrics table - stores business metrics for unit economics (customers, API calls, transactions)
       await client.query(`
         CREATE TABLE IF NOT EXISTS business_metrics (
@@ -2874,6 +2938,423 @@ export const getUnitEconomics = async (userId, startDate, endDate, providerId = 
   }
 }
 
+// ============================================================================
+// Budget Operations
+// ============================================================================
+
+/**
+ * Create a new budget
+ */
+export const createBudget = async (userId, budgetData) => {
+  const client = await pool.connect()
+  try {
+    const { budgetName, providerId, accountId, budgetAmount, budgetPeriod, alertThreshold } = budgetData
+    
+    const result = await client.query(
+      `INSERT INTO budgets (
+        user_id, account_id, provider_id, budget_name, budget_amount,
+        budget_period, alert_threshold, current_spend, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [userId, accountId || null, providerId || null, budgetName, budgetAmount, budgetPeriod, alertThreshold || 80]
+    )
+    
+    return result.rows[0]
+  } catch (error) {
+    console.error('[createBudget] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get all budgets for a user
+ */
+export const getBudgets = async (userId, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        b.*,
+        CASE 
+          WHEN b.budget_amount > 0 THEN (b.current_spend / b.budget_amount * 100)
+          ELSE 0
+        END as percentage
+      FROM budgets b
+      WHERE b.user_id = $1
+    `
+    const params = [userId]
+    let paramIndex = 2
+    
+    if (providerId) {
+      query += ` AND (b.provider_id = $${paramIndex} OR b.provider_id IS NULL)`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND (b.account_id = $${paramIndex} OR b.account_id IS NULL)`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += ` ORDER BY b.created_at DESC`
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      accountId: row.account_id,
+      providerId: row.provider_id,
+      budgetName: row.budget_name,
+      budgetAmount: parseFloat(row.budget_amount) || 0,
+      budgetPeriod: row.budget_period,
+      alertThreshold: parseInt(row.alert_threshold) || 80,
+      currentSpend: parseFloat(row.current_spend) || 0,
+      status: row.status,
+      percentage: parseFloat(row.percentage) || 0,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  } catch (error) {
+    console.error('[getBudgets] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get a specific budget by ID
+ */
+export const getBudget = async (userId, budgetId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT 
+        b.*,
+        CASE 
+          WHEN b.budget_amount > 0 THEN (b.current_spend / b.budget_amount * 100)
+          ELSE 0
+        END as percentage
+       FROM budgets b
+       WHERE b.id = $1 AND b.user_id = $2`,
+      [budgetId, userId]
+    )
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    const row = result.rows[0]
+    return {
+      id: row.id,
+      userId: row.user_id,
+      accountId: row.account_id,
+      providerId: row.provider_id,
+      budgetName: row.budget_name,
+      budgetAmount: parseFloat(row.budget_amount) || 0,
+      budgetPeriod: row.budget_period,
+      alertThreshold: parseInt(row.alert_threshold) || 80,
+      currentSpend: parseFloat(row.current_spend) || 0,
+      status: row.status,
+      percentage: parseFloat(row.percentage) || 0,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  } catch (error) {
+    console.error('[getBudget] Error:', error)
+    return null
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Update a budget
+ */
+export const updateBudget = async (userId, budgetId, budgetData) => {
+  const client = await pool.connect()
+  try {
+    const updates = []
+    const params = []
+    let paramIndex = 1
+    
+    if (budgetData.budgetName !== undefined) {
+      updates.push(`budget_name = $${paramIndex}`)
+      params.push(budgetData.budgetName)
+      paramIndex++
+    }
+    if (budgetData.budgetAmount !== undefined) {
+      updates.push(`budget_amount = $${paramIndex}`)
+      params.push(budgetData.budgetAmount)
+      paramIndex++
+    }
+    if (budgetData.budgetPeriod !== undefined) {
+      updates.push(`budget_period = $${paramIndex}`)
+      params.push(budgetData.budgetPeriod)
+      paramIndex++
+    }
+    if (budgetData.alertThreshold !== undefined) {
+      updates.push(`alert_threshold = $${paramIndex}`)
+      params.push(budgetData.alertThreshold)
+      paramIndex++
+    }
+    if (budgetData.status !== undefined) {
+      updates.push(`status = $${paramIndex}`)
+      params.push(budgetData.status)
+      paramIndex++
+    }
+    
+    if (updates.length === 0) {
+      return await getBudget(userId, budgetId)
+    }
+    
+    updates.push(`updated_at = CURRENT_TIMESTAMP`)
+    params.push(budgetId, userId)
+    
+    const result = await client.query(
+      `UPDATE budgets 
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
+       RETURNING *`,
+      params
+    )
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    const row = result.rows[0]
+    return {
+      id: row.id,
+      userId: row.user_id,
+      accountId: row.account_id,
+      providerId: row.provider_id,
+      budgetName: row.budget_name,
+      budgetAmount: parseFloat(row.budget_amount) || 0,
+      budgetPeriod: row.budget_period,
+      alertThreshold: parseInt(row.alert_threshold) || 80,
+      currentSpend: parseFloat(row.current_spend) || 0,
+      status: row.status,
+      percentage: row.budget_amount > 0 ? (row.current_spend / row.budget_amount * 100) : 0,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  } catch (error) {
+    console.error('[updateBudget] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Delete a budget
+ */
+export const deleteBudget = async (userId, budgetId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM budgets 
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
+      [budgetId, userId]
+    )
+    
+    return result.rows.length > 0
+  } catch (error) {
+    console.error('[deleteBudget] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Update budget current spend based on actual costs
+ */
+export const updateBudgetSpend = async (userId, budgetId) => {
+  const client = await pool.connect()
+  try {
+    // Get budget details
+    const budget = await getBudget(userId, budgetId)
+    if (!budget) {
+      return null
+    }
+    
+    // Calculate current spend based on budget period
+    const now = new Date()
+    let startDate, endDate
+    
+    if (budget.budgetPeriod === 'monthly') {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    } else if (budget.budgetPeriod === 'quarterly') {
+      const quarter = Math.floor(now.getMonth() / 3)
+      startDate = new Date(now.getFullYear(), quarter * 3, 1)
+      endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0)
+    } else { // yearly
+      startDate = new Date(now.getFullYear(), 0, 1)
+      endDate = new Date(now.getFullYear(), 11, 31)
+    }
+    
+    // Get actual costs for the period
+    let costQuery = `
+      SELECT SUM(cost) as total_cost
+      FROM daily_cost_data
+      WHERE user_id = $1
+        AND date >= $2::date
+        AND date <= $3::date
+    `
+    const costParams = [userId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
+    
+    if (budget.providerId) {
+      costQuery += ` AND provider_id = $4`
+      costParams.push(budget.providerId)
+    }
+    
+    if (budget.accountId) {
+      costQuery += ` AND account_id = $${budget.providerId ? 5 : 4}`
+      costParams.push(budget.accountId)
+    }
+    
+    const costResult = await client.query(costQuery, costParams)
+    const currentSpend = parseFloat(costResult.rows[0]?.total_cost) || 0
+    
+    // Calculate percentage and status
+    const percentage = budget.budgetAmount > 0 ? (currentSpend / budget.budgetAmount * 100) : 0
+    let status = 'active'
+    if (percentage >= 100) {
+      status = 'exceeded'
+    } else if (percentage >= budget.alertThreshold) {
+      status = 'active' // Keep active but will show alert
+    }
+    
+    // Update budget
+    await client.query(
+      `UPDATE budgets 
+       SET current_spend = $1, status = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [currentSpend, status, budgetId]
+    )
+    
+    // Check if we should create an alert
+    if (percentage >= budget.alertThreshold) {
+      const alertType = percentage >= 100 ? 'exceeded' : 'threshold'
+      await client.query(
+        `INSERT INTO budget_alerts (budget_id, alert_type, alert_percentage, created_at)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT DO NOTHING`,
+        [budgetId, alertType, Math.round(percentage)]
+      )
+    }
+    
+    return {
+      ...budget,
+      currentSpend,
+      percentage,
+      status
+    }
+  } catch (error) {
+    console.error('[updateBudgetSpend] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Check all budgets for alerts
+ */
+export const checkBudgetAlerts = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const budgets = await getBudgets(userId)
+    const alerts = []
+    
+    for (const budget of budgets) {
+      if (budget.status === 'paused') continue
+      
+      // Update spend for this budget
+      const updated = await updateBudgetSpend(userId, budget.id)
+      if (!updated) continue
+      
+      // Check if alert should be triggered
+      if (updated.percentage >= updated.alertThreshold) {
+        alerts.push({
+          budgetId: updated.id,
+          budgetName: updated.budgetName,
+          providerId: updated.providerId,
+          accountId: updated.accountId,
+          budgetAmount: updated.budgetAmount,
+          currentSpend: updated.currentSpend,
+          percentage: updated.percentage,
+          alertThreshold: updated.alertThreshold,
+          budgetPeriod: updated.budgetPeriod,
+          status: updated.percentage >= 100 ? 'exceeded' : 'warning',
+          message: updated.percentage >= 100 
+            ? `Budget exceeded by $${(updated.currentSpend - updated.budgetAmount).toFixed(2)}`
+            : `Budget at ${updated.percentage.toFixed(1)}% of limit`
+        })
+      }
+    }
+    
+    return alerts
+  } catch (error) {
+    console.error('[checkBudgetAlerts] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get budget alerts
+ */
+export const getBudgetAlerts = async (userId, limit = 10) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT 
+        ba.*,
+        b.budget_name,
+        b.provider_id,
+        b.account_id,
+        b.budget_amount,
+        b.current_spend,
+        b.budget_period
+       FROM budget_alerts ba
+       JOIN budgets b ON ba.budget_id = b.id
+       WHERE b.user_id = $1
+       ORDER BY ba.created_at DESC
+       LIMIT $2`,
+      [userId, limit]
+    )
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      budgetId: row.budget_id,
+      budgetName: row.budget_name,
+      providerId: row.provider_id,
+      accountId: row.account_id,
+      alertType: row.alert_type,
+      alertPercentage: parseInt(row.alert_percentage) || 0,
+      budgetAmount: parseFloat(row.budget_amount) || 0,
+      currentSpend: parseFloat(row.current_spend) || 0,
+      budgetPeriod: row.budget_period,
+      createdAt: row.created_at
+    }))
+  } catch (error) {
+    console.error('[getBudgetAlerts] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
 /**
  * Get cost efficiency metrics (cost per unit of usage)
  */
@@ -3164,6 +3645,665 @@ export const getRightsizingRecommendations = async (userId, providerId = null, a
       totalPotentialSavings: 0,
       recommendationCount: 0
     }
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Product/Team Cost Visibility
+// ============================================================================
+
+/**
+ * Get costs grouped by product (tag_key = 'product' or 'Product')
+ */
+export const getCostByProduct = async (userId, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        COALESCE(rt.tag_value, 'Untagged') as product_name,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count,
+        COUNT(DISTINCT r.service_name) as service_count,
+        STRING_AGG(DISTINCT r.service_name, ', ') as services
+      FROM resources r
+      LEFT JOIN resource_tags rt ON r.id = rt.resource_id 
+        AND (LOWER(rt.tag_key) = 'product' OR LOWER(rt.tag_key) = 'productname' OR LOWER(rt.tag_key) = 'product_name')
+      WHERE r.user_id = $1
+        AND r.last_seen_date >= $2::date
+        AND r.last_seen_date <= $3::date
+    `
+    
+    const params = [userId, startDate, endDate]
+    let paramIndex = 4
+    
+    if (providerId) {
+      query += ` AND r.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND r.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += `
+      GROUP BY rt.tag_value
+      ORDER BY total_cost DESC
+    `
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      productName: row.product_name || 'Untagged',
+      totalCost: parseFloat(row.total_cost) || 0,
+      resourceCount: parseInt(row.resource_count) || 0,
+      serviceCount: parseInt(row.service_count) || 0,
+      services: row.services ? row.services.split(', ') : []
+    }))
+  } catch (error) {
+    console.error('[getCostByProduct] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get costs grouped by team (tag_key = 'team' or 'Team')
+ */
+export const getCostByTeam = async (userId, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        COALESCE(rt.tag_value, 'Untagged') as team_name,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count,
+        COUNT(DISTINCT r.service_name) as service_count,
+        STRING_AGG(DISTINCT r.service_name, ', ') as services
+      FROM resources r
+      LEFT JOIN resource_tags rt ON r.id = rt.resource_id 
+        AND (LOWER(rt.tag_key) = 'team' OR LOWER(rt.tag_key) = 'teamname' OR LOWER(rt.tag_key) = 'team_name' OR LOWER(rt.tag_key) = 'owner')
+      WHERE r.user_id = $1
+        AND r.last_seen_date >= $2::date
+        AND r.last_seen_date <= $3::date
+    `
+    
+    const params = [userId, startDate, endDate]
+    let paramIndex = 4
+    
+    if (providerId) {
+      query += ` AND r.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND r.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += `
+      GROUP BY rt.tag_value
+      ORDER BY total_cost DESC
+    `
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      teamName: row.team_name || 'Untagged',
+      totalCost: parseFloat(row.total_cost) || 0,
+      resourceCount: parseInt(row.resource_count) || 0,
+      serviceCount: parseInt(row.service_count) || 0,
+      services: row.services ? row.services.split(', ') : []
+    }))
+  } catch (error) {
+    console.error('[getCostByTeam] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get product cost trends over time
+ */
+export const getProductCostTrends = async (userId, productName, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        DATE_TRUNC('month', r.last_seen_date) as month,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count
+      FROM resources r
+      JOIN resource_tags rt ON r.id = rt.resource_id 
+        AND (LOWER(rt.tag_key) = 'product' OR LOWER(rt.tag_key) = 'productname' OR LOWER(rt.tag_key) = 'product_name')
+        AND rt.tag_value = $1
+      WHERE r.user_id = $2
+        AND r.last_seen_date >= $3::date
+        AND r.last_seen_date <= $4::date
+    `
+    
+    const params = [productName, userId, startDate, endDate]
+    let paramIndex = 5
+    
+    if (providerId) {
+      query += ` AND r.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND r.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += `
+      GROUP BY DATE_TRUNC('month', r.last_seen_date)
+      ORDER BY month ASC
+    `
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      month: row.month.toISOString().split('T')[0],
+      totalCost: parseFloat(row.total_cost) || 0,
+      resourceCount: parseInt(row.resource_count) || 0
+    }))
+  } catch (error) {
+    console.error('[getProductCostTrends] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get team cost trends over time
+ */
+export const getTeamCostTrends = async (userId, teamName, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        DATE_TRUNC('month', r.last_seen_date) as month,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count
+      FROM resources r
+      JOIN resource_tags rt ON r.id = rt.resource_id 
+        AND (LOWER(rt.tag_key) = 'team' OR LOWER(rt.tag_key) = 'teamname' OR LOWER(rt.tag_key) = 'team_name' OR LOWER(rt.tag_key) = 'owner')
+        AND rt.tag_value = $1
+      WHERE r.user_id = $2
+        AND r.last_seen_date >= $3::date
+        AND r.last_seen_date <= $4::date
+    `
+    
+    const params = [teamName, userId, startDate, endDate]
+    let paramIndex = 5
+    
+    if (providerId) {
+      query += ` AND r.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND r.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += `
+      GROUP BY DATE_TRUNC('month', r.last_seen_date)
+      ORDER BY month ASC
+    `
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      month: row.month.toISOString().split('T')[0],
+      totalCost: parseFloat(row.total_cost) || 0,
+      resourceCount: parseInt(row.resource_count) || 0
+    }))
+  } catch (error) {
+    console.error('[getTeamCostTrends] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get service breakdown for a product
+ */
+export const getProductServiceBreakdown = async (userId, productName, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        r.service_name,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count
+      FROM resources r
+      JOIN resource_tags rt ON r.id = rt.resource_id 
+        AND (LOWER(rt.tag_key) = 'product' OR LOWER(rt.tag_key) = 'productname' OR LOWER(rt.tag_key) = 'product_name')
+        AND rt.tag_value = $1
+      WHERE r.user_id = $2
+        AND r.last_seen_date >= $3::date
+        AND r.last_seen_date <= $4::date
+    `
+    
+    const params = [productName, userId, startDate, endDate]
+    let paramIndex = 5
+    
+    if (providerId) {
+      query += ` AND r.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND r.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += `
+      GROUP BY r.service_name
+      ORDER BY total_cost DESC
+    `
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      serviceName: row.service_name,
+      cost: parseFloat(row.total_cost) || 0,
+      resourceCount: parseInt(row.resource_count) || 0
+    }))
+  } catch (error) {
+    console.error('[getProductServiceBreakdown] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get service breakdown for a team
+ */
+export const getTeamServiceBreakdown = async (userId, teamName, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT 
+        r.service_name,
+        SUM(r.cost) as total_cost,
+        COUNT(DISTINCT r.id) as resource_count
+      FROM resources r
+      JOIN resource_tags rt ON r.id = rt.resource_id 
+        AND (LOWER(rt.tag_key) = 'team' OR LOWER(rt.tag_key) = 'teamname' OR LOWER(rt.tag_key) = 'team_name' OR LOWER(rt.tag_key) = 'owner')
+        AND rt.tag_value = $1
+      WHERE r.user_id = $2
+        AND r.last_seen_date >= $3::date
+        AND r.last_seen_date <= $4::date
+    `
+    
+    const params = [teamName, userId, startDate, endDate]
+    let paramIndex = 5
+    
+    if (providerId) {
+      query += ` AND r.provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND r.account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    query += `
+      GROUP BY r.service_name
+      ORDER BY total_cost DESC
+    `
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      serviceName: row.service_name,
+      cost: parseFloat(row.total_cost) || 0,
+      resourceCount: parseInt(row.resource_count) || 0
+    }))
+  } catch (error) {
+    console.error('[getTeamServiceBreakdown] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Report Generation
+// ============================================================================
+
+/**
+ * Generate showback/chargeback report data
+ */
+export const generateReportData = async (userId, reportType, startDate, endDate, options = {}) => {
+  const client = await pool.connect()
+  try {
+    const { providerId, accountId, teamName, productName } = options
+    
+    let costData = []
+    let summary = {
+      totalCost: 0,
+      resourceCount: 0,
+      serviceCount: 0,
+      period: { startDate, endDate }
+    }
+    
+    if (teamName) {
+      // Get team costs
+      const teams = await getCostByTeam(userId, startDate, endDate, providerId, accountId)
+      const team = teams.find(t => t.teamName === teamName)
+      if (team) {
+        const services = await getTeamServiceBreakdown(userId, teamName, startDate, endDate, providerId, accountId)
+        costData = services.map(s => ({
+          serviceName: s.serviceName,
+          cost: s.cost,
+          resourceCount: s.resourceCount,
+          category: 'Service'
+        }))
+        summary.totalCost = team.totalCost
+        summary.resourceCount = team.resourceCount
+        summary.serviceCount = team.serviceCount
+      }
+    } else if (productName) {
+      // Get product costs
+      const products = await getCostByProduct(userId, startDate, endDate, providerId, accountId)
+      const product = products.find(p => p.productName === productName)
+      if (product) {
+        const services = await getProductServiceBreakdown(userId, productName, startDate, endDate, providerId, accountId)
+        costData = services.map(s => ({
+          serviceName: s.serviceName,
+          cost: s.cost,
+          resourceCount: s.resourceCount,
+          category: 'Service'
+        }))
+        summary.totalCost = product.totalCost
+        summary.resourceCount = product.resourceCount
+        summary.serviceCount = product.serviceCount
+      }
+    } else {
+      // Get all team/product costs
+      const teams = await getCostByTeam(userId, startDate, endDate, providerId, accountId)
+      const products = await getCostByProduct(userId, startDate, endDate, providerId, accountId)
+      
+      costData = [
+        ...teams.map(t => ({
+          name: t.teamName,
+          cost: t.totalCost,
+          resourceCount: t.resourceCount,
+          serviceCount: t.serviceCount,
+          category: 'Team'
+        })),
+        ...products.map(p => ({
+          name: p.productName,
+          cost: p.totalCost,
+          resourceCount: p.resourceCount,
+          serviceCount: p.serviceCount,
+          category: 'Product'
+        }))
+      ]
+      
+      summary.totalCost = costData.reduce((sum, item) => sum + item.cost, 0)
+      summary.resourceCount = costData.reduce((sum, item) => sum + item.resourceCount, 0)
+      summary.serviceCount = new Set(costData.flatMap(item => item.services || [])).size
+    }
+    
+    return {
+      reportType,
+      summary,
+      costData,
+      generatedAt: new Date().toISOString(),
+      options
+    }
+  } catch (error) {
+    console.error('[generateReportData] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Save report record
+ */
+export const saveReport = async (userId, reportData) => {
+  const client = await pool.connect()
+  try {
+    const {
+      reportType,
+      reportName,
+      startDate,
+      endDate,
+      providerId,
+      accountId,
+      teamName,
+      productName,
+      reportData: data,
+      filePath,
+      fileFormat,
+      status = 'pending'
+    } = reportData
+    
+    const result = await client.query(
+      `INSERT INTO reports (
+        user_id, report_type, report_name, start_date, end_date,
+        provider_id, account_id, team_name, product_name,
+        report_data, file_path, file_format, status, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [
+        userId, reportType, reportName, startDate, endDate,
+        providerId || null, accountId || null, teamName || null, productName || null,
+        JSON.stringify(data), filePath || null, fileFormat || null, status
+      ]
+    )
+    
+    return {
+      id: result.rows[0].id,
+      userId: result.rows[0].user_id,
+      reportType: result.rows[0].report_type,
+      reportName: result.rows[0].report_name,
+      startDate: result.rows[0].start_date,
+      endDate: result.rows[0].end_date,
+      providerId: result.rows[0].provider_id,
+      accountId: result.rows[0].account_id,
+      teamName: result.rows[0].team_name,
+      productName: result.rows[0].product_name,
+      reportData: result.rows[0].report_data,
+      filePath: result.rows[0].file_path,
+      fileFormat: result.rows[0].file_format,
+      status: result.rows[0].status,
+      createdAt: result.rows[0].created_at,
+      completedAt: result.rows[0].completed_at
+    }
+  } catch (error) {
+    console.error('[saveReport] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get reports for a user
+ */
+export const getReports = async (userId, reportType = null, limit = 50) => {
+  const client = await pool.connect()
+  try {
+    let query = `
+      SELECT * FROM reports
+      WHERE user_id = $1
+    `
+    const params = [userId]
+    let paramIndex = 2
+    
+    if (reportType) {
+      query += ` AND report_type = $${paramIndex}`
+      params.push(reportType)
+      paramIndex++
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex}`
+    params.push(limit)
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      reportType: row.report_type,
+      reportName: row.report_name,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      providerId: row.provider_id,
+      accountId: row.account_id,
+      teamName: row.team_name,
+      productName: row.product_name,
+      reportData: row.report_data,
+      filePath: row.file_path,
+      fileFormat: row.file_format,
+      status: row.status,
+      createdAt: row.created_at,
+      completedAt: row.completed_at
+    }))
+  } catch (error) {
+    console.error('[getReports] Error:', error)
+    return []
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get a specific report
+ */
+export const getReport = async (userId, reportId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM reports
+       WHERE id = $1 AND user_id = $2`,
+      [reportId, userId]
+    )
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    const row = result.rows[0]
+    return {
+      id: row.id,
+      userId: row.user_id,
+      reportType: row.report_type,
+      reportName: row.report_name,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      providerId: row.provider_id,
+      accountId: row.account_id,
+      teamName: row.team_name,
+      productName: row.product_name,
+      reportData: row.report_data,
+      filePath: row.file_path,
+      fileFormat: row.file_format,
+      status: row.status,
+      createdAt: row.created_at,
+      completedAt: row.completed_at
+    }
+  } catch (error) {
+    console.error('[getReport] Error:', error)
+    return null
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Update report status
+ */
+export const updateReportStatus = async (userId, reportId, status, filePath = null) => {
+  const client = await pool.connect()
+  try {
+    const updates = [`status = $1`]
+    const params = [status]
+    let paramIndex = 2
+    
+    if (filePath) {
+      updates.push(`file_path = $${paramIndex}`)
+      params.push(filePath)
+      paramIndex++
+    }
+    
+    if (status === 'completed') {
+      updates.push(`completed_at = CURRENT_TIMESTAMP`)
+    }
+    
+    params.push(reportId, userId)
+    
+    const result = await client.query(
+      `UPDATE reports 
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
+       RETURNING *`,
+      params
+    )
+    
+    if (result.rows.length === 0) {
+      return null
+    }
+    
+    const row = result.rows[0]
+    return {
+      id: row.id,
+      status: row.status,
+      filePath: row.file_path,
+      completedAt: row.completed_at
+    }
+  } catch (error) {
+    console.error('[updateReportStatus] Error:', error)
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Delete a report
+ */
+export const deleteReport = async (userId, reportId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM reports 
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
+      [reportId, userId]
+    )
+    
+    return result.rows.length > 0
+  } catch (error) {
+    console.error('[deleteReport] Error:', error)
+    throw error
   } finally {
     client.release()
   }

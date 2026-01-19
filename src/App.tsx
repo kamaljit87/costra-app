@@ -10,6 +10,10 @@ import SignupPage from './pages/SignupPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import ProviderDetailPage from './pages/ProviderDetailPage'
+import BudgetsPage from './pages/BudgetsPage'
+import ProductCostView from './pages/ProductCostView'
+import TeamCostView from './pages/TeamCostView'
+import ReportsPage from './pages/ReportsPage'
 import DebugPage from './pages/DebugPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -57,6 +61,38 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProviderDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/budgets"
+              element={
+                <ProtectedRoute>
+                  <BudgetsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/products"
+              element={
+                <ProtectedRoute>
+                  <ProductCostView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/teams"
+              element={
+                <ProtectedRoute>
+                  <TeamCostView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <ReportsPage />
                 </ProtectedRoute>
               }
             />

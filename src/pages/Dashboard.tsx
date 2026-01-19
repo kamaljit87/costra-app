@@ -10,6 +10,7 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
+import BudgetWidget from '../components/BudgetWidget'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -158,6 +159,13 @@ export default function Dashboard() {
                 totalSavings={totalSavings}
               />
             </div>
+
+            {/* Budget Widget */}
+            {!isDemoMode && (
+              <div className="mb-8">
+                <BudgetWidget />
+              </div>
+            )}
 
 
             {/* Provider Sections with Charts */}
