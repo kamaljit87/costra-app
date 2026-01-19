@@ -295,6 +295,28 @@ export const initDatabase = async () => {
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_explanations_user_month ON cost_explanations(user_id, provider_id, explanation_month, explanation_year)`)
 
+      // Custom date range explanations table - for caching AI-enhanced explanations
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cost_explanations_range (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT NOT NULL,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          explanation_text TEXT NOT NULL,
+          cost_change DECIMAL(15, 2) NOT NULL,
+          contributing_factors JSONB,
+          ai_enhanced BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          UNIQUE(user_id, provider_id, start_date, end_date, account_id)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_explanations_range_user ON cost_explanations_range(user_id, provider_id, start_date, end_date)`)
+
       // Business metrics table - stores business metrics for unit economics (customers, API calls, transactions)
       await client.query(`
         CREATE TABLE IF NOT EXISTS business_metrics (
@@ -947,7 +969,7 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
     const result = await client.query(
       `SELECT id, provider_id, provider_name, account_alias, credentials_encrypted
        FROM cloud_provider_credentials
-       WHERE user_id = $1 AND id = $2 AND is_active = true`,
+       WHERE user_id = $1 AND id = $2`,
       [userId, accountId]
     )
     
@@ -1093,6 +1115,25 @@ export const updateCloudProviderAlias = async (userId, accountId, accountAlias) 
        SET account_alias = $1, updated_at = CURRENT_TIMESTAMP
        WHERE user_id = $2 AND id = $3`,
       [accountAlias, userId, accountId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// Update account credentials
+export const updateCloudProviderCredentials = async (userId, accountId, credentials) => {
+  const client = await pool.connect()
+  try {
+    const { encrypt } = await import('./services/encryption.js')
+    const credentialsJson = JSON.stringify(credentials)
+    const encryptedCredentials = encrypt(credentialsJson)
+
+    await client.query(
+      `UPDATE cloud_provider_credentials
+       SET credentials_encrypted = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = $2 AND id = $3`,
+      [encryptedCredentials, userId, accountId]
     )
   } finally {
     client.release()
@@ -1323,6 +1364,55 @@ export const clearUserCache = async (userId) => {
   }
 }
 
+// Clear cost explanations cache for a user (monthly and date range)
+export const clearCostExplanationsCache = async (userId, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    let query = 'DELETE FROM cost_explanations WHERE user_id = $1'
+    let params = [userId]
+    let paramIndex = 2
+    
+    if (providerId) {
+      query += ` AND provider_id = $${paramIndex}`
+      params.push(providerId)
+      paramIndex++
+    }
+    
+    if (accountId) {
+      query += ` AND account_id = $${paramIndex}`
+      params.push(accountId)
+      paramIndex++
+    }
+    
+    const result1 = await client.query(query, params)
+    
+    // Also clear date range explanations
+    let rangeQuery = 'DELETE FROM cost_explanations_range WHERE user_id = $1'
+    let rangeParams = [userId]
+    let rangeParamIndex = 2
+    
+    if (providerId) {
+      rangeQuery += ` AND provider_id = $${rangeParamIndex}`
+      rangeParams.push(providerId)
+      rangeParamIndex++
+    }
+    
+    if (accountId) {
+      rangeQuery += ` AND account_id = $${rangeParamIndex}`
+      rangeParams.push(accountId)
+      rangeParamIndex++
+    }
+    
+    const result2 = await client.query(rangeQuery, rangeParams)
+    
+    const totalCleared = result1.rowCount + result2.rowCount
+    console.log(`[clearCostExplanationsCache] Cleared ${totalCleared} explanation cache entries for user ${userId}${providerId ? `, provider ${providerId}` : ''}${accountId ? `, account ${accountId}` : ''}`)
+    return totalCleared
+  } finally {
+    client.release()
+  }
+}
+
 // Update user profile (name, email)
 export const updateUserProfile = async (userId, { name, email }) => {
   const client = await pool.connect()
@@ -1523,7 +1613,7 @@ export const getCostByDimension = async (userId, dimensionKey, dimensionValue = 
       LEFT JOIN resource_tags rt ON r.id = rt.resource_id AND rt.tag_key = $1
       WHERE r.user_id = $2
       ${providerId ? 'AND r.provider_id = $3' : ''}
-      ${accountId ? 'AND r.account_id = $4' : 'AND r.account_id IS NULL'}
+      ${accountId ? 'AND r.account_id = $4' : ''}
       ${dimensionValue ? `AND (rt.tag_value = $${providerId ? (accountId ? 5 : 4) : (accountId ? 4 : 3)} OR rt.tag_value IS NULL)` : ''}
       GROUP BY rt.tag_value
       ORDER BY SUM(r.cost) DESC
@@ -1560,7 +1650,7 @@ export const getCostByDimension = async (userId, dimensionKey, dimensionValue = 
         WHERE r.user_id = $2
           AND COALESCE(rt.tag_value, '(untagged)') = $3
           ${providerId ? 'AND r.provider_id = $4' : ''}
-          ${accountId ? 'AND r.account_id = $5' : 'AND r.account_id IS NULL'}
+          ${accountId ? 'AND r.account_id = $5' : ''}
         GROUP BY r.service_name
         ORDER BY SUM(r.cost) DESC
         LIMIT 10
@@ -1600,7 +1690,7 @@ export const getCostByDimension = async (userId, dimensionKey, dimensionValue = 
 /**
  * Get untagged resources ranked by cost
  */
-export const getUntaggedResources = async (userId, providerId = null, limit = 50) => {
+export const getUntaggedResources = async (userId, providerId = null, limit = 50, accountId = null) => {
   const client = await pool.connect()
   try {
     let query = `
@@ -1609,13 +1699,17 @@ export const getUntaggedResources = async (userId, providerId = null, limit = 50
       LEFT JOIN resource_tags rt ON r.id = rt.resource_id
       WHERE r.user_id = $1
       ${providerId ? 'AND r.provider_id = $2' : ''}
+      ${accountId ? `AND r.account_id = $${providerId ? 3 : 2}` : ''}
       GROUP BY r.id
       HAVING COALESCE(COUNT(rt.id), 0) = 0
       ORDER BY r.cost DESC, r.last_seen_date DESC
-      LIMIT $${providerId ? 3 : 2}
+      LIMIT $${providerId ? (accountId ? 4 : 3) : (accountId ? 3 : 2)}
     `
     
-    const params = providerId ? [userId, providerId, limit] : [userId, limit]
+    const params = [userId]
+    if (providerId) params.push(providerId)
+    if (accountId) params.push(accountId)
+    params.push(limit)
     const result = await client.query(query, params)
     
     return result.rows.map(row => ({
@@ -1704,7 +1798,7 @@ export const getCostVsUsage = async (userId, providerId, startDate, endDate, acc
         AND provider_id = $2
         AND date >= $3::date
         AND date <= $4::date
-        ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}
+        ${accountId ? 'AND account_id = $5' : ''}
       GROUP BY service_name, usage_unit, usage_type
       HAVING SUM(cost) > 0
       ORDER BY SUM(cost) DESC
@@ -1873,8 +1967,6 @@ export const getAnomalies = async (userId, providerId = null, thresholdPercent =
       whereConditions.push(`ab.account_id = $${paramIndex}`)
       params.push(accountId)
       paramIndex++
-    } else {
-      whereConditions.push('ab.account_id IS NULL')
     }
     
     // Calculate variance expression
@@ -2053,7 +2145,7 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
 
 /**
  * Generate cost explanation for a custom date range
- * Compares costs at start date vs end date and generates a narrative
+ * Compares costs at start period vs end period and generates a narrative
  */
 export const generateCustomDateRangeExplanation = async (userId, providerId, startDate, endDate, accountId = null) => {
   const client = await pool.connect()
@@ -2061,81 +2153,159 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
     // Parse dates
     const start = new Date(startDate)
     const end = new Date(endDate)
-    const startMonth = start.getMonth() + 1
-    const startYear = start.getFullYear()
-    const endMonth = end.getMonth() + 1
-    const endYear = end.getFullYear()
     
-    // Get cost data for start period
-    const startCostResult = await client.query(
-      `SELECT current_month_cost, credits, savings
-       FROM cost_data
-       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4
-         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
-      accountId ? [userId, providerId, startMonth, startYear, accountId] : [userId, providerId, startMonth, startYear]
-    )
+    // Calculate period length to determine comparison windows
+    const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24))
     
-    // Get cost data for end period
-    const endCostResult = await client.query(
-      `SELECT current_month_cost, credits, savings
-       FROM cost_data
-       WHERE user_id = $1 AND provider_id = $2 AND month = $3 AND year = $4
-         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
-      accountId ? [userId, providerId, endMonth, endYear, accountId] : [userId, providerId, endMonth, endYear]
-    )
+    // For comparison, use first 25% of period as "start" and last 25% as "end"
+    // Or minimum 3 days each, maximum 14 days each
+    const comparisonWindowDays = Math.max(3, Math.min(14, Math.floor(daysDiff * 0.25)))
     
-    if (startCostResult.rows.length === 0 || endCostResult.rows.length === 0) {
-      return null
+    const startWindowEnd = new Date(start)
+    startWindowEnd.setDate(startWindowEnd.getDate() + comparisonWindowDays)
+    
+    const endWindowStart = new Date(end)
+    endWindowStart.setDate(endWindowStart.getDate() - comparisonWindowDays)
+    
+    // Ensure windows don't overlap
+    if (startWindowEnd >= endWindowStart) {
+      // If range is too short, compare first half vs second half
+      const midPoint = new Date(start.getTime() + (end - start) / 2)
+      startWindowEnd.setTime(midPoint.getTime())
+      endWindowStart.setTime(midPoint.getTime() + 1)
     }
     
-    const startCost = parseFloat(startCostResult.rows[0].current_month_cost) || 0
-    const startCredits = parseFloat(startCostResult.rows[0].credits) || 0
-    const startSavings = parseFloat(startCostResult.rows[0].savings) || 0
-    const startGrossCost = startCost + startCredits + startSavings
+    // Get daily cost data for start period
+    const startCostResult = await client.query(
+      `SELECT 
+         COALESCE(SUM(cost), 0) as total_cost,
+         COUNT(DISTINCT date) as days_count
+       FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2 
+         AND date >= $3::date AND date <= $4::date
+         ${accountId ? 'AND account_id = $5' : ''}`,
+      accountId 
+        ? [userId, providerId, start.toISOString().split('T')[0], startWindowEnd.toISOString().split('T')[0], accountId]
+        : [userId, providerId, start.toISOString().split('T')[0], startWindowEnd.toISOString().split('T')[0]]
+    )
     
-    const endCost = parseFloat(endCostResult.rows[0].current_month_cost) || 0
-    const endCredits = parseFloat(endCostResult.rows[0].credits) || 0
-    const endSavings = parseFloat(endCostResult.rows[0].savings) || 0
-    const endGrossCost = endCost + endCredits + endSavings
+    // Get daily cost data for end period
+    const endCostResult = await client.query(
+      `SELECT 
+         COALESCE(SUM(cost), 0) as total_cost,
+         COUNT(DISTINCT date) as days_count
+       FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2 
+         AND date >= $3::date AND date <= $4::date
+         ${accountId ? 'AND account_id = $5' : ''}`,
+      accountId 
+        ? [userId, providerId, endWindowStart.toISOString().split('T')[0], end.toISOString().split('T')[0], accountId]
+        : [userId, providerId, endWindowStart.toISOString().split('T')[0], end.toISOString().split('T')[0]]
+    )
     
-    const totalChange = endGrossCost - startGrossCost
-    const changePercent = startGrossCost > 0 ? (totalChange / startGrossCost) * 100 : 0
+    // Get total cost for entire range
+    const totalRangeResult = await client.query(
+      `SELECT 
+         COALESCE(SUM(cost), 0) as total_cost,
+         COUNT(DISTINCT date) as days_count
+       FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2 
+         AND date >= $3::date AND date <= $4::date
+         ${accountId ? 'AND account_id = $5' : ''}`,
+      accountId 
+        ? [userId, providerId, start.toISOString().split('T')[0], end.toISOString().split('T')[0], accountId]
+        : [userId, providerId, start.toISOString().split('T')[0], end.toISOString().split('T')[0]]
+    )
+    
+    const startCost = parseFloat(startCostResult.rows[0]?.total_cost) || 0
+    const startDays = parseInt(startCostResult.rows[0]?.days_count) || 0
+    const startAvgDaily = startDays > 0 ? startCost / startDays : 0
+    
+    const endCost = parseFloat(endCostResult.rows[0]?.total_cost) || 0
+    const endDays = parseInt(endCostResult.rows[0]?.days_count) || 0
+    const endAvgDaily = endDays > 0 ? endCost / endDays : 0
+    
+    const totalRangeCost = parseFloat(totalRangeResult.rows[0]?.total_cost) || 0
+    const totalRangeDays = parseInt(totalRangeResult.rows[0]?.days_count) || 0
+    
+    // If no data found, return a helpful message instead of null
+    if (totalRangeDays === 0) {
+      const formatDate = (date) => {
+        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      }
+      return {
+        explanation: `No cost data is available for the period from ${formatDate(start)} to ${formatDate(end)}. This could mean that no costs were incurred during this time, or the data hasn't been synced yet. Try syncing your cloud provider data to get the latest cost information.`,
+        costChange: 0,
+        contributingFactors: [],
+        startDate: startDate,
+        endDate: endDate,
+        startCost: 0,
+        endCost: 0,
+        aiEnhanced: false
+      }
+    }
+    
+    // Calculate change in average daily spending
+    const avgDailyChange = endAvgDaily - startAvgDaily
+    const avgDailyChangePercent = startAvgDaily > 0 ? (avgDailyChange / startAvgDaily) * 100 : (endAvgDaily > 0 ? 100 : 0)
+    
+    // Project the change over the full period
+    const totalChange = avgDailyChange * totalRangeDays
+    const changePercent = avgDailyChangePercent
     
     // Get service-level breakdown for start period
-    const startServiceParams = accountId ? [userId, providerId, startMonth, startYear, accountId] : [userId, providerId, startMonth, startYear]
+    const startServiceParams = accountId 
+      ? [userId, providerId, start.toISOString().split('T')[0], startWindowEnd.toISOString().split('T')[0], accountId]
+      : [userId, providerId, start.toISOString().split('T')[0], startWindowEnd.toISOString().split('T')[0]]
     const startServicesResult = await client.query(
-      `SELECT sc.service_name, sc.cost
-       FROM service_costs sc
-       JOIN cost_data cd ON sc.cost_data_id = cd.id
-       WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.month = $3 AND cd.year = $4
-         ${accountId ? 'AND cd.account_id = $5' : 'AND cd.account_id IS NULL'}
-       ORDER BY sc.cost DESC
-       LIMIT 10`,
+      `SELECT 
+         service_name,
+         COALESCE(SUM(cost), 0) as total_cost,
+         COUNT(DISTINCT date) as days_count
+       FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2 
+         AND date >= $3::date AND date <= $4::date
+         ${accountId ? 'AND account_id = $5' : ''}
+       GROUP BY service_name
+       ORDER BY total_cost DESC
+       LIMIT 20`,
       startServiceParams
     )
     
     // Get service-level breakdown for end period
-    const endServiceParams = accountId ? [userId, providerId, endMonth, endYear, accountId] : [userId, providerId, endMonth, endYear]
+    const endServiceParams = accountId 
+      ? [userId, providerId, endWindowStart.toISOString().split('T')[0], end.toISOString().split('T')[0], accountId]
+      : [userId, providerId, endWindowStart.toISOString().split('T')[0], end.toISOString().split('T')[0]]
     const endServicesResult = await client.query(
-      `SELECT sc.service_name, sc.cost
-       FROM service_costs sc
-       JOIN cost_data cd ON sc.cost_data_id = cd.id
-       WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.month = $3 AND cd.year = $4
-         ${accountId ? 'AND cd.account_id = $5' : 'AND cd.account_id IS NULL'}
-       ORDER BY sc.cost DESC
-       LIMIT 10`,
+      `SELECT 
+         service_name,
+         COALESCE(SUM(cost), 0) as total_cost,
+         COUNT(DISTINCT date) as days_count
+       FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2 
+         AND date >= $3::date AND date <= $4::date
+         ${accountId ? 'AND account_id = $5' : ''}
+       GROUP BY service_name
+       ORDER BY total_cost DESC
+       LIMIT 20`,
       endServiceParams
     )
     
-    // Build service comparison map
+    // Build service comparison map (using average daily rates)
     const startServicesMap = new Map()
     startServicesResult.rows.forEach(row => {
-      startServicesMap.set(row.service_name, parseFloat(row.cost) || 0)
+      const cost = parseFloat(row.total_cost) || 0
+      const days = parseInt(row.days_count) || 1
+      const avgDaily = cost / days
+      startServicesMap.set(row.service_name, avgDaily)
     })
     
     const endServicesMap = new Map()
     endServicesResult.rows.forEach(row => {
-      endServicesMap.set(row.service_name, parseFloat(row.cost) || 0)
+      const cost = parseFloat(row.total_cost) || 0
+      const days = parseInt(row.days_count) || 1
+      const avgDaily = cost / days
+      endServicesMap.set(row.service_name, avgDaily)
     })
     
     // Find services with biggest changes
@@ -2143,17 +2313,21 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
     const allServices = new Set([...startServicesMap.keys(), ...endServicesMap.keys()])
     
     allServices.forEach(serviceName => {
-      const startCost = startServicesMap.get(serviceName) || 0
-      const endCost = endServicesMap.get(serviceName) || 0
-      const change = endCost - startCost
-      const changePercent = startCost > 0 ? (change / startCost) * 100 : (endCost > 0 ? 100 : 0)
+      const startAvgDaily = startServicesMap.get(serviceName) || 0
+      const endAvgDaily = endServicesMap.get(serviceName) || 0
+      const change = endAvgDaily - startAvgDaily
+      const changePercent = startAvgDaily > 0 ? (change / startAvgDaily) * 100 : (endAvgDaily > 0 ? 100 : 0)
+      
+      // Project to full period for display
+      const startProjected = startAvgDaily * totalRangeDays
+      const endProjected = endAvgDaily * totalRangeDays
       
       if (Math.abs(change) > 0.01) { // Only include services with meaningful changes
         serviceChanges.push({
           service: serviceName,
-          startCost,
-          endCost,
-          change,
+          startCost: startProjected,
+          endCost: endProjected,
+          change: endProjected - startProjected,
           changePercent
         })
       }
@@ -2164,10 +2338,10 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
     
     // Build explanation narrative
     const formatDate = (date) => {
-      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     }
     
-    let explanation = `Over the period from ${formatDate(start)} to ${formatDate(end)}, `
+    let explanation = `Over the period from ${formatDate(start)} to ${formatDate(end)} (${totalRangeDays} days), `
     explanation += `your ${providerId.toUpperCase()} cloud spending `
     
     if (totalChange > 0) {
@@ -2180,48 +2354,50 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
       explanation += `remained relatively stable. `
     }
     
-    explanation += `Starting costs were $${startGrossCost.toFixed(2)} `
-    if (startCredits > 0 || startSavings > 0) {
-      explanation += `(before $${(startCredits + startSavings).toFixed(2)} in credits and savings), `
-    }
-    explanation += `and ending costs were $${endGrossCost.toFixed(2)} `
-    if (endCredits > 0 || endSavings > 0) {
-      explanation += `(before $${(endCredits + endSavings).toFixed(2)} in credits and savings). `
-    }
-    explanation += `\n\n`
+    explanation += `Total spending during this period was $${totalRangeCost.toFixed(2)}. `
+    explanation += `At the beginning of the period, your average daily spending was $${startAvgDaily.toFixed(2)}, `
+    explanation += `which ${endAvgDaily > startAvgDaily ? 'increased' : endAvgDaily < startAvgDaily ? 'decreased' : 'remained stable'} `
+    explanation += `to $${endAvgDaily.toFixed(2)} per day by the end of the period. `
     
     // Add service-level insights
     if (serviceChanges.length > 0) {
-      explanation += `**Service Changes:**\n`
-      
-      const topIncrease = serviceChanges.filter(s => s.change > 0).slice(0, 3)
-      const topDecrease = serviceChanges.filter(s => s.change < 0).slice(0, 3)
+      const topIncrease = serviceChanges.filter(s => s.change > 0).slice(0, 5)
+      const topDecrease = serviceChanges.filter(s => s.change < 0).slice(0, 5)
       
       if (topIncrease.length > 0) {
         explanation += `The services with the largest cost increases were: `
-        explanation += topIncrease.map(s => 
-          `${s.service} ($${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)}, +${s.changePercent.toFixed(1)}%)`
+        const top3 = topIncrease.slice(0, 3)
+        explanation += top3.map(s => 
+          `${s.service} (${s.changePercent > 0 ? '+' : ''}${s.changePercent.toFixed(1)}%)`
         ).join(', ')
-        explanation += `. `
+        if (topIncrease.length > 3) {
+          explanation += `, and ${topIncrease.length - 3} other service${topIncrease.length - 3 > 1 ? 's' : ''}. `
+        } else {
+          explanation += `. `
+        }
       }
       
       if (topDecrease.length > 0) {
         explanation += `The services with the largest cost decreases were: `
-        explanation += topDecrease.map(s => 
-          `${s.service} ($${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)}, ${s.changePercent.toFixed(1)}%)`
+        const top3 = topDecrease.slice(0, 3)
+        explanation += top3.map(s => 
+          `${s.service} (${s.changePercent.toFixed(1)}%)`
         ).join(', ')
-        explanation += `. `
+        if (topDecrease.length > 3) {
+          explanation += `, and ${topDecrease.length - 3} other service${topDecrease.length - 3 > 1 ? 's' : ''}. `
+        } else {
+          explanation += `. `
+        }
       }
-      
-      explanation += `\n\n`
     }
     
-    // Add credits summary if applicable
-    if (endCredits > 0 || startCredits > 0) {
-      const creditsChange = endCredits - startCredits
-      if (creditsChange !== 0) {
-        explanation += `Credits usage ${creditsChange > 0 ? 'increased' : 'decreased'} by $${Math.abs(creditsChange).toFixed(2)} `
-        explanation += `during this period (from $${startCredits.toFixed(2)} to $${endCredits.toFixed(2)}). `
+    // Add notable shifts
+    if (serviceChanges.length > 0) {
+      const significantChanges = serviceChanges.filter(s => Math.abs(s.changePercent) > 20)
+      if (significantChanges.length > 0) {
+        explanation += `Notable shifts include ${significantChanges[0].service}, which `
+        explanation += `${significantChanges[0].changePercent > 0 ? 'increased' : 'decreased'} `
+        explanation += `by ${Math.abs(significantChanges[0].changePercent).toFixed(1)}% during this period. `
       }
     }
     
@@ -2232,17 +2408,140 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
       cost: s.endCost
     }))
     
+    // Check if we have a cached explanation
+    const cachedResult = await client.query(
+      `SELECT explanation_text, cost_change, contributing_factors, ai_enhanced
+       FROM cost_explanations_range
+       WHERE user_id = $1 AND provider_id = $2 AND start_date = $3::date AND end_date = $4::date
+         ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      accountId 
+        ? [userId, providerId, startDate, endDate, accountId]
+        : [userId, providerId, startDate, endDate]
+    )
+    
+    if (cachedResult.rows.length > 0) {
+      const cached = cachedResult.rows[0]
+      return {
+        explanation: cached.explanation_text,
+        costChange: parseFloat(cached.cost_change) || 0,
+        contributingFactors: cached.contributing_factors || [],
+        startDate: startDate,
+        endDate: endDate,
+        startCost: startAvgDaily * totalRangeDays,
+        endCost: endAvgDaily * totalRangeDays,
+        aiEnhanced: cached.ai_enhanced || false
+      }
+    }
+    
+    // Enhance explanation with AI if available
+    let enhancedExplanation = explanation
+    let aiEnhanced = false
+    try {
+      // Try to use Anthropic AI if available
+      if (process.env.ANTHROPIC_API_KEY) {
+        const Anthropic = (await import('@anthropic-ai/sdk')).default
+        const anthropicClient = new Anthropic({
+          apiKey: process.env.ANTHROPIC_API_KEY,
+        })
+        
+        const aiPrompt = `You are a cloud cost analyst. Take this cost explanation and make it more engaging, clear, and actionable. Keep all the facts and numbers accurate, but make it easier to understand and more conversational. Add brief insights about what might have caused the changes if relevant.
+
+Original explanation:
+${explanation}
+
+Service changes data:
+${JSON.stringify(serviceChanges.slice(0, 10), null, 2)}
+
+Return only the enhanced explanation text, no additional commentary.`
+        
+        const aiResponse = await anthropicClient.messages.create({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: aiPrompt
+          }]
+        })
+        
+        const aiText = aiResponse.content[0]?.text
+        if (aiText && aiText.trim().length > 0) {
+          enhancedExplanation = aiText.trim()
+          aiEnhanced = true
+        }
+      }
+    } catch (aiError) {
+      console.error('[generateCustomDateRangeExplanation] AI enhancement failed, using base explanation:', aiError)
+      // Continue with base explanation if AI fails
+    }
+    
+    // Save to cache
+    await client.query(
+      `INSERT INTO cost_explanations_range (
+        user_id, account_id, provider_id, start_date, end_date,
+        explanation_text, cost_change, contributing_factors, ai_enhanced, updated_at
+      ) VALUES ($1, $2, $3, $4::date, $5::date, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id, provider_id, start_date, end_date, account_id)
+      DO UPDATE SET
+        explanation_text = EXCLUDED.explanation_text,
+        cost_change = EXCLUDED.cost_change,
+        contributing_factors = EXCLUDED.contributing_factors,
+        ai_enhanced = EXCLUDED.ai_enhanced,
+        updated_at = CURRENT_TIMESTAMP`,
+      [
+        userId, 
+        accountId, 
+        providerId, 
+        startDate, 
+        endDate, 
+        enhancedExplanation, 
+        totalChange, 
+        JSON.stringify(contributingFactors),
+        aiEnhanced
+      ]
+    )
+    
     return {
-      explanation,
+      explanation: enhancedExplanation,
       costChange: totalChange,
       contributingFactors,
       startDate: startDate,
       endDate: endDate,
-      startCost: startGrossCost,
-      endCost: endGrossCost
+      startCost: startAvgDaily * totalRangeDays,
+      endCost: endAvgDaily * totalRangeDays,
+      aiEnhanced
     }
   } catch (error) {
     console.error('[generateCustomDateRangeExplanation] Error:', error)
+    // If there's an error, try to return cached explanation if available
+    try {
+      const cachedResult = await client.query(
+        `SELECT explanation_text, cost_change, contributing_factors
+         FROM cost_explanations_range
+         WHERE user_id = $1 AND provider_id = $2 AND start_date = $3::date AND end_date = $4::date
+           ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}
+         ORDER BY updated_at DESC
+         LIMIT 1`,
+        accountId 
+          ? [userId, providerId, startDate, endDate, accountId]
+          : [userId, providerId, startDate, endDate]
+      )
+      
+      if (cachedResult.rows.length > 0) {
+        const cached = cachedResult.rows[0]
+        return {
+          explanation: cached.explanation_text,
+          costChange: parseFloat(cached.cost_change) || 0,
+          contributingFactors: cached.contributing_factors || [],
+          startDate: startDate,
+          endDate: endDate
+        }
+      }
+    } catch (cacheError) {
+      console.error('[generateCustomDateRangeExplanation] Cache retrieval also failed:', cacheError)
+    }
+    
     throw error
   } finally {
     client.release()
@@ -2343,7 +2642,7 @@ export const getUnitEconomics = async (userId, startDate, endDate, providerId = 
         AND date >= $2::date
         AND date <= $3::date
       ${providerId ? 'AND provider_id = $4' : ''}
-      ${accountId ? `AND account_id = $${providerId ? 5 : 4}` : 'AND account_id IS NULL'}
+      ${accountId ? `AND account_id = $${providerId ? 5 : 4}` : ''}
     `
     
     const costParams = [userId, startDate, endDate]

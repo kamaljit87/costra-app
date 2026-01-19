@@ -78,8 +78,8 @@ export default function CostSummary({ providerId, month, year, accountId, startD
     try {
       let result
       if (isCustomRange && startDate && endDate) {
-        // Regenerate custom date range summary
-        result = await insightsAPI.getCustomDateRangeSummary(providerId, startDate, endDate, accountId)
+        // Regenerate custom date range summary (force regeneration by clearing cache)
+        result = await insightsAPI.getCustomDateRangeSummary(providerId, startDate, endDate, accountId, true)
       } else if (month && year) {
         // Regenerate monthly summary
         result = await insightsAPI.regenerateCostSummary(providerId, month, year, accountId)

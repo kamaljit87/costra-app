@@ -13,7 +13,7 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { signup, demoLogin } = useAuth()
+  const { signup } = useAuth()
   const navigate = useNavigate()
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -54,11 +54,6 @@ export default function SignupPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleDemoLogin = () => {
-    demoLogin()
-    navigate('/dashboard')
   }
 
   return (

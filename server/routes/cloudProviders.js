@@ -9,6 +9,8 @@ import {
   updateCloudProviderStatus,
   updateCloudProviderStatusByAccountId,
   updateCloudProviderAlias,
+  updateCloudProviderCredentials,
+  getCloudProviderCredentialsByAccountId,
 } from '../database.js'
 
 const router = express.Router()
@@ -171,6 +173,67 @@ router.patch('/account/:accountId/alias', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 })
+
+// Get account credentials (for editing)
+router.get('/account/:accountId/credentials', async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const accountId = parseInt(req.params.accountId, 10)
+
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    const account = await getCloudProviderCredentialsByAccountId(userId, accountId)
+
+    if (!account) {
+      return res.status(404).json({ error: 'Cloud provider account not found' })
+    }
+
+    res.json({ 
+      accountId: account.accountId,
+      providerId: account.providerId,
+      providerName: account.providerName,
+      accountAlias: account.accountAlias,
+      credentials: account.credentials
+    })
+  } catch (error) {
+    console.error('Get account credentials error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Update account credentials
+router.patch('/account/:accountId/credentials', 
+  [
+    body('credentials').isObject().withMessage('Credentials must be an object'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() })
+      }
+
+      const userId = req.user.userId
+      const accountId = parseInt(req.params.accountId, 10)
+      const { credentials } = req.body
+
+      if (isNaN(accountId)) {
+        return res.status(400).json({ error: 'Invalid account ID' })
+      }
+
+      await updateCloudProviderCredentials(userId, accountId, credentials)
+
+      res.json({ 
+        message: 'Account credentials updated successfully'
+      })
+    } catch (error) {
+      console.error('Update account credentials error:', error)
+      res.status(500).json({ error: error.message || 'Internal server error' })
+    }
+  }
+)
 
 // Legacy: Toggle provider active status by provider ID
 router.patch('/:providerId/status', async (req, res) => {

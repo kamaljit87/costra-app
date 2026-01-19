@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { login, demoLogin } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -31,11 +31,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleDemoLogin = () => {
-    demoLogin()
-    navigate('/dashboard')
   }
 
   return (

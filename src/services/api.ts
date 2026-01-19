@@ -236,6 +236,21 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
+  // Get account credentials (for editing)
+  getAccountCredentials: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/account/${accountId}/credentials`)
+    return response.json()
+  },
+
+  // Update account credentials
+  updateAccountCredentials: async (accountId: number, credentials: any) => {
+    const response = await apiRequest(`/cloud-providers/account/${accountId}/credentials`, {
+      method: 'PATCH',
+      body: JSON.stringify({ credentials }),
+    })
+    return response.json()
+  },
+
   // Legacy: Update provider status by provider ID
   updateProviderStatus: async (providerId: string, isActive: boolean) => {
     const response = await apiRequest(`/cloud-providers/${providerId}/status`, {
@@ -349,9 +364,10 @@ export const insightsAPI = {
     return response.json()
   },
 
-  getUntaggedResources: async (providerId?: string, limit: number = 50) => {
+  getUntaggedResources: async (providerId?: string, limit: number = 50, accountId?: number) => {
     const params = new URLSearchParams()
     if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
     params.append('limit', limit.toString())
     
     const response = await apiRequest(`/insights/untagged-resources?${params.toString()}`)
@@ -430,11 +446,11 @@ export const insightsAPI = {
     return response.json()
   },
 
-  getCustomDateRangeSummary: async (providerId: string, startDate: string, endDate: string, accountId?: number) => {
+  getCustomDateRangeSummary: async (providerId: string, startDate: string, endDate: string, accountId?: number, forceRegenerate?: boolean) => {
     try {
       const response = await apiRequest(`/insights/cost-summary-range/${providerId}`, {
         method: 'POST',
-        body: JSON.stringify({ startDate, endDate, accountId }),
+        body: JSON.stringify({ startDate, endDate, accountId, forceRegenerate: forceRegenerate || false }),
       })
       
       if (response.status === 404) {

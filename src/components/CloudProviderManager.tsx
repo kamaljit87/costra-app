@@ -39,6 +39,10 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
   const [error, setError] = useState('')
   const [editingAliasId, setEditingAliasId] = useState<number | null>(null)
   const [editingAliasValue, setEditingAliasValue] = useState('')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingAccount, setEditingAccount] = useState<CloudProvider | null>(null)
+  const [editCredentials, setEditCredentials] = useState<{ [key: string]: string }>({})
+  const [isLoadingCredentials, setIsLoadingCredentials] = useState(false)
 
   useEffect(() => {
     loadProviders()
@@ -147,6 +151,55 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
   const handleCancelEditAlias = () => {
     setEditingAliasId(null)
     setEditingAliasValue('')
+  }
+
+  const handleStartEdit = async (account: CloudProvider) => {
+    try {
+      setIsLoadingCredentials(true)
+      setError('')
+      const response = await cloudProvidersAPI.getAccountCredentials(account.accountId)
+      setEditCredentials(response.credentials || {})
+      setEditingAccount(account)
+      setShowEditModal(true)
+    } catch (error: any) {
+      setError(error.message || 'Failed to load account credentials')
+    } finally {
+      setIsLoadingCredentials(false)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingAccount) return
+
+    const requiredFields = getRequiredFields(editingAccount.providerId)
+    const missingFields = requiredFields.filter(field => !editCredentials[field])
+    
+    if (missingFields.length > 0) {
+      setError(`Missing required fields: ${missingFields.join(', ')}`)
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      setError('')
+      await cloudProvidersAPI.updateAccountCredentials(editingAccount.accountId, editCredentials)
+      setShowEditModal(false)
+      setEditingAccount(null)
+      setEditCredentials({})
+      await loadProviders()
+      onProviderChange?.()
+    } catch (error: any) {
+      setError(error.message || 'Failed to update account credentials')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false)
+    setEditingAccount(null)
+    setEditCredentials({})
+    setError('')
   }
 
   const getRequiredFields = (providerId: string): string[] => {
@@ -258,7 +311,11 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                 {accounts.map((provider) => (
                   <div
                     key={provider.accountId}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                    className={`flex items-center justify-between p-4 rounded-lg border ${
+                      provider.isActive 
+                        ? 'bg-gray-50 border-gray-200' 
+                        : 'bg-gray-100 border-gray-300 opacity-75'
+                    }`}
                   >
                     <div className="flex items-center space-x-4">
                       <div 
@@ -319,6 +376,13 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => handleStartEdit(provider)}
+                        className="p-2 text-frozenWater-600 hover:bg-frozenWater-50 rounded-lg transition-colors"
+                        title="Edit account credentials"
+                      >
+                        <Edit2 className="h-5 w-5" />
+                      </button>
                       <button
                         onClick={() => handleToggleStatus(provider.accountId, provider.isActive)}
                         className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${
@@ -479,6 +543,86 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                     className="btn-primary"
                   >
                     {isSubmitting ? 'Adding...' : 'Add Account'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Account Modal */}
+      {showEditModal && editingAccount && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">Edit Account Credentials</h3>
+                <button
+                  onClick={handleCancelEdit}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Account Info */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="flex items-center space-x-3">
+                    <ProviderIcon providerId={editingAccount.providerId} size={32} />
+                    <div>
+                      <div className="font-medium text-gray-900">{editingAccount.accountAlias}</div>
+                      <div className="text-sm text-gray-600">{editingAccount.providerName}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {isLoadingCredentials ? (
+                  <div className="text-center py-8">
+                    <div className="text-gray-600">Loading credentials...</div>
+                  </div>
+                ) : (
+                  <>
+                    <h4 className="font-medium text-gray-900 pt-2">Credentials</h4>
+                    {getRequiredFields(editingAccount.providerId).map((field) => (
+                      <div key={field}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
+                        </label>
+                        <input
+                          type={field.toLowerCase().includes('secret') || field.toLowerCase().includes('key') ? 'password' : 'text'}
+                          value={editCredentials[field] || ''}
+                          onChange={(e) =>
+                            setEditCredentials({ ...editCredentials, [field]: e.target.value })
+                          }
+                          className="input-field"
+                          placeholder={`Enter ${field}`}
+                        />
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    onClick={handleCancelEdit}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={isSubmitting || isLoadingCredentials}
+                    className="btn-primary"
+                  >
+                    {isSubmitting ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>

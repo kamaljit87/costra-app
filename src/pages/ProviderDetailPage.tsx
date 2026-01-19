@@ -10,7 +10,11 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import ProviderCostChart from '../components/ProviderCostChart'
 import CostVsUsage from '../components/CostVsUsage'
 import CostSummary from '../components/CostSummary'
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign } from 'lucide-react'
+import UntaggedResources from '../components/UntaggedResources'
+import CostByDimension from '../components/CostByDimension'
+import AnomalyDetection from '../components/AnomalyDetection'
+import UnitEconomics from '../components/UnitEconomics'
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -36,6 +40,7 @@ export default function ProviderDetailPage() {
   const { showSuccess, showError, showWarning } = useNotification()
   const [providerData, setProviderData] = useState<CostData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [providerAccounts, setProviderAccounts] = useState<any[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('1month')
   const [showCustomFilter, setShowCustomFilter] = useState(false)
   const [customStartDate, setCustomStartDate] = useState('')
@@ -67,6 +72,9 @@ export default function ProviderDetailPage() {
   const [expandedService, setExpandedService] = useState<string | null>(null)
   const [subServices, setSubServices] = useState<any[]>([])
   const [isLoadingSubServices, setIsLoadingSubServices] = useState(false)
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'analytics'>('overview')
 
   // Define sub-service type
   interface SubService {
@@ -85,15 +93,18 @@ export default function ProviderDetailPage() {
         setIsLoading(true)
         let data = await getProviderCostDetails(providerId, isDemoMode)
         
-        // If no cost data found, check if provider is configured
-        if (!data && !isDemoMode) {
+        // Load provider accounts for analytics components
+        if (!isDemoMode) {
           try {
             const providersResponse = await cloudProvidersAPI.getCloudProviders()
-            const configuredProvider = providersResponse.providers?.find(
+            const accounts = providersResponse.providers?.filter(
               (p: any) => p.providerId === providerId && p.isActive
-            )
+            ) || []
+            setProviderAccounts(accounts)
             
-            if (configuredProvider) {
+            // If no cost data found, check if provider is configured
+            if (!data && accounts.length > 0) {
+              const configuredProvider = accounts[0]
               // Create empty cost data structure for configured provider without cost data
               data = {
                 provider: {
@@ -953,44 +964,523 @@ export default function ProviderDetailPage() {
           </div>
         )}
 
-        {/* Cost Summary - Plain-English Explanation */}
-        {!hasNoData && providerId && (() => {
-          // Calculate the most recent month in the selected period
-          const range = selectedPeriod === 'custom' && customStartDate && customEndDate
-            ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
-            : getDateRangeForPeriod(selectedPeriod)
-          
-          // For custom date ranges, pass startDate and endDate
-          // For period-based ranges, use the end month/year
-          const isCustomRange = selectedPeriod === 'custom' && customStartDate && customEndDate
-          
-          if (isCustomRange) {
-            return (
-              <div className="mb-8" key={`cost-summary-custom-${customStartDate}-${customEndDate}`}>
-                <CostSummary
-                  providerId={providerId}
-                  startDate={customStartDate}
-                  endDate={customEndDate}
-                />
+        {/* Tabs Navigation */}
+        {!hasNoData && (
+          <div className="mb-6 border-b border-gray-200">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  ${
+                    activeTab === 'overview'
+                      ? 'border-frozenWater-500 text-frozenWater-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }
+                `}
+              >
+                <div className="flex items-center space-x-2">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span>Overview</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('services')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  ${
+                    activeTab === 'services'
+                      ? 'border-frozenWater-500 text-frozenWater-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }
+                `}
+              >
+                <div className="flex items-center space-x-2">
+                  <Package className="h-4 w-4" />
+                  <span>Services</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  ${
+                    activeTab === 'analytics'
+                      ? 'border-frozenWater-500 text-frozenWater-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }
+                `}
+              >
+                <div className="flex items-center space-x-2">
+                  <TrendingUpIcon className="h-4 w-4" />
+                  <span>Analytics</span>
+                </div>
+              </button>
+            </nav>
+          </div>
+        )}
+
+        {/* Tab Content */}
+        {!hasNoData && (
+          <>
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                {/* Cost Summary - Plain-English Explanation */}
+                {providerId && (() => {
+                  // Calculate the date range for the selected period
+                  const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+                    ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+                    : getDateRangeForPeriod(selectedPeriod)
+                  
+                  // For periods longer than 1 month, use date range
+                  // For 1 month period, use month/year for backward compatibility
+                  const useDateRange = selectedPeriod === 'custom' || 
+                    selectedPeriod === '2months' || 
+                    selectedPeriod === '3months' || 
+                    selectedPeriod === '4months' || 
+                    selectedPeriod === '6months' || 
+                    selectedPeriod === '12months'
+                  
+                  if (useDateRange) {
+                    const startDateStr = range.startDate.toISOString().split('T')[0]
+                    const endDateStr = range.endDate.toISOString().split('T')[0]
+                    
+                    return (
+                      <div key={`cost-summary-range-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
+                        <CostSummary
+                          providerId={providerId}
+                          startDate={startDateStr}
+                          endDate={endDateStr}
+                        />
+                      </div>
+                    )
+                  } else {
+                    // For 1 month period, use month/year
+                    const endDate = range.endDate
+                    const summaryMonth = endDate.getMonth() + 1
+                    const summaryYear = endDate.getFullYear()
+                    
+                    return (
+                      <div key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
+                        <CostSummary
+                          providerId={providerId}
+                          month={summaryMonth}
+                          year={summaryYear}
+                        />
+                      </div>
+                    )
+                  }
+                })()}
+
+                {/* Cost Trend Chart */}
+                <div>
+                  <div className="flex flex-col items-center text-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Cost Trends</h2>
+                    
+                    {/* View Mode Toggle - Centered */}
+                    <div 
+                      className="flex items-center space-x-2 bg-gray-100 rounded-xl p-1"
+                      title="Toggle between daily and monthly view"
+                    >
+                      <button
+                        onClick={() => setViewMode('daily')}
+                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          viewMode === 'daily'
+                            ? 'bg-white text-frozenWater-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                        title="View daily cost breakdown"
+                      >
+                        <LineChart className="h-4 w-4" />
+                        <span>Daily</span>
+                      </button>
+                      <button
+                        onClick={() => setViewMode('monthly')}
+                        className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          viewMode === 'monthly'
+                            ? 'bg-white text-frozenWater-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                        title="View monthly aggregated costs"
+                      >
+                        <BarChart2 className="h-4 w-4" />
+                        <span>Monthly</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Chart Content */}
+                  {isLoadingChartData ? (
+                    <div className="card flex items-center justify-center h-64">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600 mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading chart data...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ProviderCostChart
+                      providerId={providerData.provider.id}
+                      providerName={providerData.provider.name}
+                      data={chartData}
+                      currentMonth={providerData.currentMonth}
+                      lastMonth={providerData.lastMonth}
+                      period={viewMode === 'monthly' ? 'monthly' : selectedPeriod}
+                      isMonthlyView={viewMode === 'monthly'}
+                    />
+                  )}
+                </div>
               </div>
-            )
-          } else {
-            // Get the most recent month in the range
-            const endDate = range.endDate
-            const summaryMonth = endDate.getMonth() + 1
-            const summaryYear = endDate.getFullYear()
-            
-            return (
-              <div className="mb-8" key={`cost-summary-${selectedPeriod}-${summaryMonth}-${summaryYear}`}>
-                <CostSummary
-                  providerId={providerId}
-                  month={summaryMonth}
-                  year={summaryYear}
-                />
+            )}
+
+            {/* Services Tab */}
+            {activeTab === 'services' && (
+              <div className="space-y-8">
+                {/* Service Breakdown */}
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6">Service Breakdown</h2>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-10">
+                    {/* Pie Chart - Service Distribution */}
+                    <div className="card">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">Cost by Service</h3>
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          {getPeriodLabel(selectedPeriod)}
+                        </span>
+                      </div>
+                      {isLoadingServices ? (
+                        <div className="flex items-center justify-center h-64">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                        </div>
+                      ) : serviceCostData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={serviceCostData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius={100}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {serviceCostData.map((_entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-64 text-gray-500">
+                          No services found
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bar Chart - Service Costs */}
+                    <div className="card">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">Service Costs</h3>
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          {getPeriodLabel(selectedPeriod)}
+                        </span>
+                      </div>
+                      {isLoadingServices ? (
+                        <div className="flex items-center justify-center h-64">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                        </div>
+                      ) : serviceCostData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={serviceCostData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis
+                              dataKey="name"
+                              stroke="#6b7280"
+                              fontSize={12}
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
+                            <YAxis
+                              stroke="#6b7280"
+                              fontSize={12}
+                              tickFormatter={(value) => {
+                                const symbol = getCurrencySymbol()
+                                if (value >= 1000000) {
+                                  return `${symbol}${(value / 1000000).toFixed(1)}M`
+                                }
+                                if (value >= 1000) {
+                                  return `${symbol}${(value / 1000).toFixed(1)}k`
+                                }
+                                return `${symbol}${value.toFixed(0)}`
+                              }}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '12px',
+                              }}
+                              formatter={(value: number) => formatCurrency(value)}
+                            />
+                            <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-64 text-gray-500">
+                          No services found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Service Details Table */}
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Service Details</h2>
+                  <div className="card">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        Service Breakdown
+                        {selectedService && (
+                          <span className="text-sm font-normal text-gray-500 ml-2">
+                            (filtered by {selectedService})
+                          </span>
+                        )}
+                      </h3>
+                      <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        {getPeriodLabel(selectedPeriod)}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left py-3 px-4 font-semibold text-gray-900 w-8"></th>
+                            <th className="text-left py-3 px-4 font-semibold text-gray-900">Service</th>
+                            <th className="text-right py-3 px-4 font-semibold text-gray-900">Cost</th>
+                            <th className="text-right py-3 px-4 font-semibold text-gray-900">Change</th>
+                            <th className="text-right py-3 px-4 font-semibold text-gray-900">% of Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredServices.length > 0 ? (
+                            filteredServices.map((service, index) => {
+                              const percentage = effectiveTotal > 0 
+                                ? (service.cost / effectiveTotal) * 100 
+                                : 0
+                              const isExpanded = expandedService === service.name
+                              return (
+                                <React.Fragment key={`service-${index}-${service.name}`}>
+                                  <tr 
+                                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50' : ''}`}
+                                    onClick={() => handleServiceExpand(service.name, service.cost)}
+                                    title="Click to see sub-service breakdown"
+                                  >
+                                    <td className="py-3 px-2 text-center">
+                                      <ChevronDown 
+                                        className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                      />
+                                    </td>
+                                    <td className="py-3 px-4 text-gray-900 font-medium">
+                                      <div className="flex items-center gap-2">
+                                        <Layers className="h-4 w-4 text-gray-400" />
+                                        {service.name}
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-4 text-right font-medium text-gray-900">
+                                      {formatCurrency(service.cost)}
+                                    </td>
+                                    <td className={`py-3 px-4 text-right ${
+                                      (service.change || 0) >= 0 ? 'text-red-600' : 'text-green-600'
+                                    }`}>
+                                      {(service.change || 0) >= 0 ? '+' : ''}{(service.change || 0).toFixed(1)}%
+                                    </td>
+                                    <td className="py-3 px-4 text-right text-gray-500">
+                                      {percentage.toFixed(1)}%
+                                    </td>
+                                  </tr>
+                                  
+                                  {/* Sub-services expandable row */}
+                                  {isExpanded && (
+                                    <tr key={`sub-${index}-${service.name}`}>
+                                      <td colSpan={5} className="bg-gradient-to-b from-blue-50 to-gray-50 p-0">
+                                        <div className="px-8 py-4">
+                                          {isLoadingSubServices ? (
+                                            <div className="flex items-center justify-center py-6">
+                                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                              <span className="ml-3 text-gray-500">Loading sub-service details...</span>
+                                            </div>
+                                          ) : subServices.length > 0 ? (
+                                            <div className="space-y-3">
+                                              <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                                                <BarChart2 className="h-4 w-4" />
+                                                Sub-service Breakdown
+                                              </h4>
+                                              
+                                              {/* Group by category */}
+                                              {(() => {
+                                                const categories = new Map<string, typeof subServices>()
+                                                subServices.forEach(sub => {
+                                                  const cat = sub.category || 'Other'
+                                                  if (!categories.has(cat)) categories.set(cat, [])
+                                                  categories.get(cat)!.push(sub)
+                                                })
+                                                
+                                                return Array.from(categories.entries()).map(([category, subs]) => (
+                                                  <div key={category} className="mb-4">
+                                                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                                      {category}
+                                                    </div>
+                                                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                                      {subs.map((sub: SubService, subIndex: number) => {
+                                                        const subPercentage = service.cost > 0 ? (sub.cost / service.cost) * 100 : 0
+                                                        return (
+                                                          <div 
+                                                            key={`${sub.name}-${subIndex}`}
+                                                            className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
+                                                          >
+                                                            <div className="flex items-center gap-3">
+                                                              <div className="w-2 h-2 rounded-full" style={{ 
+                                                                backgroundColor: getCategoryColor(category) 
+                                                              }}></div>
+                                                              <span className="text-sm text-gray-700">{sub.name}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-6">
+                                                              <div className="w-24">
+                                                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                                  <div 
+                                                                    className="h-full rounded-full transition-all duration-500"
+                                                                    style={{ 
+                                                                      width: `${subPercentage}%`,
+                                                                      backgroundColor: getCategoryColor(category)
+                                                                    }}
+                                                                  ></div>
+                                                                </div>
+                                                              </div>
+                                                              <span className="text-xs text-gray-500 w-12 text-right">
+                                                                {subPercentage.toFixed(1)}%
+                                                              </span>
+                                                              <span className="text-sm font-medium text-gray-900 w-24 text-right">
+                                                                {formatCurrency(sub.cost)}
+                                                              </span>
+                                                            </div>
+                                                          </div>
+                                                        )
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                ))
+                                              })()}
+                                            </div>
+                                          ) : (
+                                            <div className="text-center py-6 text-gray-500">
+                                              <Layers className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                              <p className="text-sm">No detailed sub-service data available</p>
+                                              <p className="text-xs text-gray-400 mt-1">Sub-service breakdown may not be available for all services</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              )
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-gray-500">
+                                No services found {selectedService ? `matching "${selectedService}"` : ''}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )
-          }
-        })()}
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-8">
+                {/* Cost vs Usage Section */}
+                {(() => {
+                  const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+                    ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+                    : getDateRangeForPeriod(selectedPeriod)
+                  
+                  const startDateStr = range.startDate.toISOString().split('T')[0]
+                  const endDateStr = range.endDate.toISOString().split('T')[0]
+                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+                  
+                  // Use key to force re-render when period changes
+                  return (
+                    <div key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
+                      <CostVsUsage
+                        providerId={providerId || undefined}
+                        startDate={startDateStr}
+                        endDate={endDateStr}
+                        accountId={accountId}
+                      />
+                    </div>
+                  )
+                })()}
+
+                {/* Untagged Resources - Provider Specific */}
+                {!isDemoMode && providerId && (
+                  <UntaggedResources 
+                    providerId={providerId} 
+                    accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
+                  />
+                )}
+
+                {/* Cost by Dimension - Provider Specific */}
+                {!isDemoMode && providerId && (
+                  <CostByDimension 
+                    providerId={providerId} 
+                    accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
+                  />
+                )}
+
+                {/* Cost Anomalies - Provider Specific */}
+                {!isDemoMode && providerId && (
+                  <AnomalyDetection 
+                    providerId={providerId} 
+                    thresholdPercent={20}
+                    accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
+                  />
+                )}
+
+                {/* Unit Economics - Provider Specific */}
+                {!isDemoMode && providerId && (() => {
+                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+                  if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
+                    return (
+                      <UnitEconomics 
+                        providerId={providerId} 
+                        accountId={accountId}
+                        startDate={customStartDate}
+                        endDate={customEndDate}
+                      />
+                    )
+                  } else {
+                    return (
+                      <UnitEconomics 
+                        providerId={providerId} 
+                        accountId={accountId}
+                        period={selectedPeriod}
+                      />
+                    )
+                  }
+                })()}
+              </div>
+            )}
+          </>
+        )}
 
         {/* No Data Message */}
         {hasNoData && (
@@ -1004,356 +1494,6 @@ export default function ProviderDetailPage() {
           </div>
         )}
 
-        {/* Cost Trend Chart */}
-        {!hasNoData && (
-            <div className="mb-8">
-            <div className="flex flex-col items-center text-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Cost Trends</h2>
-              
-              {/* View Mode Toggle - Centered */}
-              <div 
-                className="flex items-center space-x-2 bg-gray-100 rounded-xl p-1"
-                title="Toggle between daily and monthly view"
-              >
-                <button
-                  onClick={() => setViewMode('daily')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'daily'
-                      ? 'bg-white text-primary-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                  title="View daily cost breakdown"
-                >
-                  <LineChart className="h-4 w-4" />
-                  <span>Daily</span>
-                </button>
-                <button
-                  onClick={() => setViewMode('monthly')}
-                  className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    viewMode === 'monthly'
-                      ? 'bg-white text-primary-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                  title="View monthly aggregated costs"
-                >
-                  <BarChart2 className="h-4 w-4" />
-                  <span>Monthly</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Chart Content */}
-            {isLoadingChartData ? (
-              <div className="card flex items-center justify-center h-64">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-                  <p className="text-gray-500">Loading chart data...</p>
-                </div>
-              </div>
-            ) : (
-              <ProviderCostChart
-                providerId={providerData.provider.id}
-                providerName={providerData.provider.name}
-                data={chartData}
-                currentMonth={providerData.currentMonth}
-                lastMonth={providerData.lastMonth}
-                period={viewMode === 'monthly' ? 'monthly' : selectedPeriod}
-                isMonthlyView={viewMode === 'monthly'}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Service Breakdown */}
-        {!hasNoData && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Service Breakdown</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl mx-auto mb-10">
-          {/* Pie Chart - Service Distribution */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Cost by Service</h3>
-              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                {getPeriodLabel(selectedPeriod)}
-              </span>
-            </div>
-            {isLoadingServices ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              </div>
-            ) : serviceCostData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={serviceCostData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {serviceCostData.map((_entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-64 text-gray-500">
-                No services found
-              </div>
-            )}
-          </div>
-
-          {/* Bar Chart - Service Costs */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Service Costs</h3>
-              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                {getPeriodLabel(selectedPeriod)}
-              </span>
-            </div>
-            {isLoadingServices ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              </div>
-            ) : serviceCostData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={serviceCostData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis
-                    dataKey="name"
-                    stroke="#6b7280"
-                    fontSize={12}
-                    angle={-45}
-                    textAnchor="end"
-                    height={80}
-                  />
-                  <YAxis
-                    stroke="#6b7280"
-                    fontSize={12}
-                    tickFormatter={(value) => {
-                      const symbol = getCurrencySymbol()
-                      if (value >= 1000000) {
-                        return `${symbol}${(value / 1000000).toFixed(1)}M`
-                      }
-                      if (value >= 1000) {
-                        return `${symbol}${(value / 1000).toFixed(1)}k`
-                      }
-                      return `${symbol}${value.toFixed(0)}`
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'white',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '12px',
-                    }}
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-64 text-gray-500">
-                No services found
-              </div>
-            )}
-          </div>
-            </div>
-          </div>
-        )}
-
-        {/* Cost vs Usage Section */}
-        {!hasNoData && (() => {
-          const range = selectedPeriod === 'custom' && customStartDate && customEndDate
-            ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
-            : getDateRangeForPeriod(selectedPeriod)
-          
-          const startDateStr = range.startDate.toISOString().split('T')[0]
-          const endDateStr = range.endDate.toISOString().split('T')[0]
-          
-          // Use key to force re-render when period changes
-          return (
-            <div className="mb-8" key={`cost-vs-usage-${selectedPeriod}-${startDateStr}-${endDateStr}`}>
-              <CostVsUsage
-                providerId={providerId || undefined}
-                startDate={startDateStr}
-                endDate={endDateStr}
-              />
-            </div>
-          )
-        })()}
-
-        {/* Service Details Table */}
-        {!hasNoData && (
-            <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Service Details</h2>
-            <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">
-                Service Breakdown
-                {selectedService && (
-                  <span className="text-sm font-normal text-gray-500 ml-2">
-                    (filtered by {selectedService})
-                  </span>
-                )}
-              </h3>
-              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                {getPeriodLabel(selectedPeriod)}
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900 w-8"></th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">Service</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-900">Cost</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-900">Change</th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-900">% of Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredServices.length > 0 ? (
-                    filteredServices.map((service, index) => {
-                      const percentage = effectiveTotal > 0 
-                        ? (service.cost / effectiveTotal) * 100 
-                        : 0
-                      const isExpanded = expandedService === service.name
-                      return (
-                        <React.Fragment key={`service-${index}-${service.name}`}>
-                          <tr 
-                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${isExpanded ? 'bg-blue-50' : ''}`}
-                            onClick={() => handleServiceExpand(service.name, service.cost)}
-                            title="Click to see sub-service breakdown"
-                          >
-                            <td className="py-3 px-2 text-center">
-                              <ChevronDown 
-                                className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                              />
-                            </td>
-                            <td className="py-3 px-4 text-gray-900 font-medium">
-                              <div className="flex items-center gap-2">
-                                <Layers className="h-4 w-4 text-gray-400" />
-                                {service.name}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-right font-medium text-gray-900">
-                              {formatCurrency(service.cost)}
-                            </td>
-                            <td className={`py-3 px-4 text-right ${
-                              (service.change || 0) >= 0 ? 'text-red-600' : 'text-green-600'
-                            }`}>
-                              {(service.change || 0) >= 0 ? '+' : ''}{(service.change || 0).toFixed(1)}%
-                            </td>
-                            <td className="py-3 px-4 text-right text-gray-500">
-                              {percentage.toFixed(1)}%
-                            </td>
-                          </tr>
-                          
-                          {/* Sub-services expandable row */}
-                          {isExpanded && (
-                            <tr key={`sub-${index}-${service.name}`}>
-                              <td colSpan={5} className="bg-gradient-to-b from-blue-50 to-gray-50 p-0">
-                                <div className="px-8 py-4">
-                                  {isLoadingSubServices ? (
-                                    <div className="flex items-center justify-center py-6">
-                                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                                      <span className="ml-3 text-gray-500">Loading sub-service details...</span>
-                                    </div>
-                                  ) : subServices.length > 0 ? (
-                                    <div className="space-y-3">
-                                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3">
-                                        <BarChart2 className="h-4 w-4" />
-                                        Sub-service Breakdown
-                                      </h4>
-                                      
-                                      {/* Group by category */}
-                                      {(() => {
-                                        const categories = new Map<string, typeof subServices>()
-                                        subServices.forEach(sub => {
-                                          const cat = sub.category || 'Other'
-                                          if (!categories.has(cat)) categories.set(cat, [])
-                                          categories.get(cat)!.push(sub)
-                                        })
-                                        
-                                        return Array.from(categories.entries()).map(([category, subs]) => (
-                                          <div key={category} className="mb-4">
-                                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                                              {category}
-                                            </div>
-                                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                              {subs.map((sub: SubService, subIndex: number) => {
-                                                const subPercentage = service.cost > 0 ? (sub.cost / service.cost) * 100 : 0
-                                                return (
-                                                  <div 
-                                                    key={`${sub.name}-${subIndex}`}
-                                                    className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
-                                                  >
-                                                    <div className="flex items-center gap-3">
-                                                      <div className="w-2 h-2 rounded-full" style={{ 
-                                                        backgroundColor: getCategoryColor(category) 
-                                                      }}></div>
-                                                      <span className="text-sm text-gray-700">{sub.name}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-6">
-                                                      <div className="w-24">
-                                                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                          <div 
-                                                            className="h-full rounded-full transition-all duration-500"
-                                                            style={{ 
-                                                              width: `${subPercentage}%`,
-                                                              backgroundColor: getCategoryColor(category)
-                                                            }}
-                                                          ></div>
-                                                        </div>
-                                                      </div>
-                                                      <span className="text-xs text-gray-500 w-12 text-right">
-                                                        {subPercentage.toFixed(1)}%
-                                                      </span>
-                                                      <span className="text-sm font-medium text-gray-900 w-24 text-right">
-                                                        {formatCurrency(sub.cost)}
-                                                      </span>
-                                                    </div>
-                                                  </div>
-                                                )
-                                              })}
-                                            </div>
-                                          </div>
-                                        ))
-                                      })()}
-                                    </div>
-                                  ) : (
-                                    <div className="text-center py-6 text-gray-500">
-                                      <Layers className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                      <p className="text-sm">No detailed sub-service data available</p>
-                                      <p className="text-xs text-gray-400 mt-1">Sub-service breakdown may not be available for all services</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-gray-500">
-                        No services found {selectedService ? `matching "${selectedService}"` : ''}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            </div>
-          </div>
-        )}
       </div>
     </Layout>
   )

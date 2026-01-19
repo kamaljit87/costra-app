@@ -10,10 +10,6 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
-import UntaggedResources from '../components/UntaggedResources'
-import AnomalyDetection from '../components/AnomalyDetection'
-import CostByDimension from '../components/CostByDimension'
-import UnitEconomics from '../components/UnitEconomics'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -163,22 +159,6 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Additional Insights - Collapsible or Hidden by Default */}
-            {!isDemoMode && (
-              <div className="space-y-8 mb-12">
-                {/* Untagged Resources - Action Required */}
-                <UntaggedResources />
-
-                {/* Cost Anomalies - Low-Noise Alerts */}
-                <AnomalyDetection thresholdPercent={20} />
-
-                {/* Cost Allocation by Dimension */}
-                <CostByDimension />
-
-                {/* Unit Economics - Cost per Business Metric */}
-                <UnitEconomics period="1month" />
-              </div>
-            )}
 
             {/* Provider Sections with Charts */}
             {(() => {

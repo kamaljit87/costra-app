@@ -54,7 +54,6 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
 
 
   const isActive = (path: string) => location.pathname === path
-  const isProviderActive = (providerId: string) => location.pathname === `/provider/${providerId}`
 
   const toggleProviderExpand = (providerId: string) => {
     setExpandedProviders(prev => {
@@ -69,7 +68,6 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
   }
 
   const groupedAccounts = cloudAccounts
-    .filter(a => a.isActive)
     .reduce((acc, account) => {
       if (!acc[account.providerId]) {
         acc[account.providerId] = []
@@ -146,86 +144,67 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
               
               {Object.entries(groupedAccounts).map(([providerId, accounts]) => (
                 <div key={providerId} className="mt-1">
-                  {accounts.length === 1 ? (
-                    <Link
-                      to={`/provider/${providerId}`}
-                      onClick={onClose}
-                      className={`
-                        flex items-center space-x-3 px-4 py-2.5 rounded-lg
-                        transition-all duration-200 group
-                        ${isProviderActive(providerId)
-                          ? 'bg-frozenWater-600 text-white'
-                          : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
-                        }
-                      `}
+                  <button
+                    onClick={() => toggleProviderExpand(providerId)}
+                    className={`
+                      flex items-center space-x-3 px-4 py-2.5 w-full rounded-lg
+                      transition-all duration-200 group
+                      ${expandedProviders.has(providerId)
+                        ? 'bg-frozenWater-600 text-white'
+                        : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                      }
+                    `}
+                  >
+                    <div 
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10"
                     >
-                      <div 
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10"
-                      >
-                        <ProviderIcon providerId={providerId} size={18} />
-                      </div>
-                      <span className="flex-1 truncate text-sm font-medium">
-                        {accounts[0].accountAlias || accounts[0].providerName}
-                      </span>
-                    </Link>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => toggleProviderExpand(providerId)}
-                        className={`
-                          flex items-center space-x-3 px-4 py-2.5 w-full rounded-lg
-                          transition-all duration-200 group
-                          ${expandedProviders.has(providerId)
-                            ? 'bg-frozenWater-600 text-white'
-                            : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
-                          }
-                        `}
-                      >
-                        <div 
-                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10"
+                      <ProviderIcon providerId={providerId} size={18} />
+                    </div>
+                    <span className="flex-1 text-left text-sm font-medium">
+                      {accounts[0].providerName}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">
+                      {accounts.length}
+                    </span>
+                    {expandedProviders.has(providerId) ? (
+                      <ChevronUp className="h-4 w-4 text-white transition-transform duration-200" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-white transition-transform duration-200" />
+                    )}
+                  </button>
+                  
+                  {expandedProviders.has(providerId) && (
+                    <div className="ml-6 mt-1 space-y-0.5 animate-fade-in">
+                      {accounts.map((account) => (
+                        <Link
+                          key={account.accountId}
+                          to={`/provider/${providerId}?account=${account.accountId}`}
+                          onClick={onClose}
+                          className={`
+                            flex items-center space-x-2 px-4 py-2 rounded-lg text-sm
+                            transition-all duration-200
+                            ${location.search.includes(`account=${account.accountId}`)
+                              ? 'bg-frozenWater-600 text-white'
+                              : account.isActive
+                                ? 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                                : 'text-frozenWater-200/60 hover:text-frozenWater-100 hover:bg-frozenWater-700/40'
+                            }
+                          `}
                         >
-                          <ProviderIcon providerId={providerId} size={18} />
-                        </div>
-                        <span className="flex-1 text-left text-sm font-medium">
-                          {accounts[0].providerName}
-                        </span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">
-                          {accounts.length}
-                        </span>
-                        {expandedProviders.has(providerId) ? (
-                          <ChevronUp className="h-4 w-4 text-white transition-transform duration-200" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-white transition-transform duration-200" />
-                        )}
-                      </button>
-                      
-                      {expandedProviders.has(providerId) && (
-                        <div className="ml-6 mt-1 space-y-0.5 animate-fade-in">
-                          {accounts.map((account) => (
-                            <Link
-                              key={account.accountId}
-                              to={`/provider/${providerId}?account=${account.accountId}`}
-                              onClick={onClose}
-                              className={`
-                                flex items-center space-x-2 px-4 py-2 rounded-lg text-sm
-                                transition-all duration-200
-                                ${location.search.includes(`account=${account.accountId}`)
-                                  ? 'bg-frozenWater-600 text-white'
-                                  : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
-                                }
-                              `}
-                            >
-                              <div 
-                                className="w-2 h-2 rounded-full bg-white"
-                              />
-                              <span className="truncate">
-                                {account.accountAlias || `Account ${account.accountId}`}
-                              </span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                          <div 
+                            className={`w-2 h-2 rounded-full ${
+                              account.isActive ? 'bg-white' : 'bg-white/40'
+                            }`}
+                          />
+                          <span className="truncate flex-1">
+                            {account.accountAlias || `Account ${account.accountId}`}
+                          </span>
+                          {!account.isActive && (
+                            <span className="text-xs text-white/50">(Inactive)</span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}

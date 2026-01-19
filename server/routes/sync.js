@@ -9,6 +9,7 @@ import {
   setCachedCostData,
   updateCloudProviderSyncTime,
   clearUserCache,
+  clearCostExplanationsCache,
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
@@ -32,6 +33,10 @@ router.post('/', async (req, res) => {
     // Clear user cache first to ensure fresh data
     const clearedCount = await clearUserCache(userId)
     console.log(`[Sync] Cleared ${clearedCount} cache entries for user ${userId}`)
+    
+    // Clear cost explanations cache to ensure fresh summaries after sync
+    const clearedExplanations = await clearCostExplanationsCache(userId)
+    console.log(`[Sync] Cleared ${clearedExplanations} cost explanation cache entries for user ${userId}`)
 
     // Get all active provider accounts or specific account
     let accounts = await getUserCloudProviders(userId)
@@ -199,6 +204,10 @@ router.post('/account/:accountId', async (req, res) => {
     const { providerId, providerName, accountAlias, credentials } = accountData
     const accountLabel = accountAlias || `${providerId} (${accountId})`
 
+    // Clear cost explanations cache for this account to ensure fresh summaries
+    await clearCostExplanationsCache(userId, providerId, accountId)
+    console.log(`[Sync] Cleared cost explanation cache for account: ${accountLabel}`)
+
     // Calculate date range - fetch last 365 days for historical data
     const now = new Date()
     const currentMonth = now.getMonth() + 1
@@ -278,6 +287,10 @@ router.post('/:providerId', async (req, res) => {
     if (providerAccounts.length === 0) {
       return res.status(404).json({ error: 'No active accounts found for this provider' })
     }
+
+    // Clear cost explanations cache for this provider to ensure fresh summaries
+    await clearCostExplanationsCache(userId, providerId)
+    console.log(`[Sync] Cleared cost explanation cache for provider: ${providerId}`)
 
     const now = new Date()
     const currentMonth = now.getMonth() + 1

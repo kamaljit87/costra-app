@@ -52,12 +52,13 @@ router.get('/cost-vs-usage', authenticateToken, async (req, res) => {
 router.get('/untagged-resources', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id
-    const { providerId, limit = 50 } = req.query
+    const { providerId, limit = 50, accountId } = req.query
     
     const resources = await getUntaggedResources(
       userId,
       providerId || null,
-      parseInt(limit)
+      parseInt(limit),
+      accountId ? parseInt(accountId) : null
     )
     
     // Calculate total untagged cost
@@ -219,7 +220,7 @@ router.post('/cost-summary-range/:providerId', authenticateToken, async (req, re
   try {
     const userId = req.user.userId || req.user.id
     const { providerId } = req.params
-    const { startDate, endDate, accountId } = req.body
+    const { startDate, endDate, accountId, forceRegenerate } = req.body
     
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'startDate and endDate are required' })
@@ -235,6 +236,24 @@ router.post('/cost-summary-range/:providerId', authenticateToken, async (req, re
     
     if (start > end) {
       return res.status(400).json({ error: 'startDate must be before endDate' })
+    }
+    
+    // If forceRegenerate is true, delete cached explanation first
+    if (forceRegenerate) {
+      const { pool } = await import('../database.js')
+      const client = await pool.connect()
+      try {
+        await client.query(
+          `DELETE FROM cost_explanations_range
+           WHERE user_id = $1 AND provider_id = $2 AND start_date = $3::date AND end_date = $4::date
+             ${accountId ? 'AND account_id = $5' : 'AND account_id IS NULL'}`,
+          accountId 
+            ? [userId, providerId, startDate, endDate, accountId]
+            : [userId, providerId, startDate, endDate]
+        )
+      } finally {
+        client.release()
+      }
     }
     
     const explanation = await generateCustomDateRangeExplanation(

@@ -20,9 +20,10 @@ interface UntaggedResource {
 interface UntaggedResourcesProps {
   providerId?: string
   limit?: number
+  accountId?: number
 }
 
-export default function UntaggedResources({ providerId, limit = 50 }: UntaggedResourcesProps) {
+export default function UntaggedResources({ providerId, limit = 50, accountId }: UntaggedResourcesProps) {
   const { formatCurrency } = useCurrency()
   const [resources, setResources] = useState<UntaggedResource[]>([])
   const [totalCost, setTotalCost] = useState(0)
@@ -34,7 +35,7 @@ export default function UntaggedResources({ providerId, limit = 50 }: UntaggedRe
       setIsLoading(true)
       setError(null)
       try {
-        const result = await insightsAPI.getUntaggedResources(providerId, limit)
+        const result = await insightsAPI.getUntaggedResources(providerId, limit, accountId)
         setResources(result.resources || [])
         setTotalCost(result.totalCost || 0)
       } catch (err: any) {
@@ -46,7 +47,7 @@ export default function UntaggedResources({ providerId, limit = 50 }: UntaggedRe
     }
 
     fetchData()
-  }, [providerId, limit])
+  }, [providerId, limit, accountId])
 
   const formatAge = (days: number | null) => {
     if (!days && days !== 0) return 'Unknown'
