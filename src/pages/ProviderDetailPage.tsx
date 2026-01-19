@@ -14,6 +14,8 @@ import UntaggedResources from '../components/UntaggedResources'
 import CostByDimension from '../components/CostByDimension'
 import AnomalyDetection from '../components/AnomalyDetection'
 import UnitEconomics from '../components/UnitEconomics'
+import CostEfficiencyMetrics from '../components/CostEfficiencyMetrics'
+import RightsizingRecommendations from '../components/RightsizingRecommendations'
 import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
@@ -1544,6 +1546,37 @@ export default function ProviderDetailPage() {
                     )
                   }
                 })()}
+
+                {/* Cost Efficiency Metrics - Provider Specific */}
+                {!isDemoMode && providerId && (() => {
+                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+                  if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
+                    return (
+                      <CostEfficiencyMetrics 
+                        providerId={providerId} 
+                        accountId={accountId}
+                        startDate={customStartDate}
+                        endDate={customEndDate}
+                      />
+                    )
+                  } else {
+                    return (
+                      <CostEfficiencyMetrics 
+                        providerId={providerId} 
+                        accountId={accountId}
+                        period={selectedPeriod}
+                      />
+                    )
+                  }
+                })()}
+
+                {/* Rightsizing Recommendations - Provider Specific */}
+                {!isDemoMode && providerId && (
+                  <RightsizingRecommendations 
+                    providerId={providerId} 
+                    accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
+                  />
+                )}
               </div>
             )}
           </>

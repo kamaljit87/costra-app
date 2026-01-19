@@ -2875,6 +2875,301 @@ export const getUnitEconomics = async (userId, startDate, endDate, providerId = 
 }
 
 /**
+ * Get cost efficiency metrics (cost per unit of usage)
+ */
+export const getCostEfficiencyMetrics = async (userId, startDate, endDate, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Get cost and usage data from service_usage_metrics
+    let query = `
+      SELECT 
+        service_name,
+        usage_unit,
+        usage_type,
+        SUM(cost) as total_cost,
+        SUM(usage_quantity) as total_usage,
+        COUNT(DISTINCT date) as days_with_data
+      FROM service_usage_metrics
+      WHERE user_id = $1
+        AND date >= $2::date
+        AND date <= $3::date
+      ${providerId ? 'AND provider_id = $4' : ''}
+      ${accountId ? `AND account_id = $${providerId ? 5 : 4}` : ''}
+      GROUP BY service_name, usage_unit, usage_type
+      HAVING SUM(cost) > 0 AND SUM(usage_quantity) > 0
+      ORDER BY SUM(cost) DESC
+    `
+    
+    const params = [userId, startDate, endDate]
+    if (providerId) params.push(providerId)
+    if (accountId) params.push(accountId)
+    
+    const result = await client.query(query, params)
+    
+    // Get previous period for trend comparison
+    const prevStartDate = new Date(startDate)
+    const prevEndDate = new Date(endDate)
+    const periodDays = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))
+    prevStartDate.setDate(prevStartDate.getDate() - periodDays)
+    prevEndDate.setDate(prevEndDate.getDate() - periodDays)
+    
+    const prevParams = [userId, prevStartDate.toISOString().split('T')[0], prevEndDate.toISOString().split('T')[0]]
+    if (providerId) prevParams.push(providerId)
+    if (accountId) prevParams.push(accountId)
+    
+    let prevQuery = `
+      SELECT 
+        service_name,
+        usage_unit,
+        usage_type,
+        SUM(cost) as total_cost,
+        SUM(usage_quantity) as total_usage
+      FROM service_usage_metrics
+      WHERE user_id = $1
+        AND date >= $2::date
+        AND date <= $3::date
+      ${providerId ? 'AND provider_id = $4' : ''}
+      ${accountId ? `AND account_id = $${providerId ? 5 : 4}` : ''}
+      GROUP BY service_name, usage_unit, usage_type
+      HAVING SUM(cost) > 0 AND SUM(usage_quantity) > 0
+    `
+    
+    const prevResult = await client.query(prevQuery, prevParams)
+    const prevMetrics = new Map()
+    prevResult.rows.forEach(row => {
+      const key = `${row.service_name}_${row.usage_unit}_${row.usage_type || ''}`
+      const prevCost = parseFloat(row.total_cost) || 0
+      const prevUsage = parseFloat(row.total_usage) || 0
+      prevMetrics.set(key, prevUsage > 0 ? prevCost / prevUsage : null)
+    })
+    
+    // Calculate efficiency metrics
+    const efficiencyMetrics = result.rows.map(row => {
+      const totalCost = parseFloat(row.total_cost) || 0
+      const totalUsage = parseFloat(row.total_usage) || 0
+      const efficiency = totalUsage > 0 ? totalCost / totalUsage : null
+      
+      const key = `${row.service_name}_${row.usage_unit}_${row.usage_type || ''}`
+      const previousEfficiency = prevMetrics.get(key) || null
+      
+      let trend = 'stable'
+      let efficiencyChange = null
+      let efficiencyChangePercent = null
+      
+      if (efficiency !== null && previousEfficiency !== null && previousEfficiency > 0) {
+        efficiencyChange = efficiency - previousEfficiency
+        efficiencyChangePercent = (efficiencyChange / previousEfficiency) * 100
+        
+        if (efficiencyChangePercent < -5) {
+          trend = 'improving'
+        } else if (efficiencyChangePercent > 5) {
+          trend = 'degrading'
+        }
+      }
+      
+      // Determine service type based on usage_unit
+      let serviceType = 'other'
+      const unit = (row.usage_unit || '').toLowerCase()
+      if (unit.includes('gb') || unit.includes('byte')) {
+        serviceType = 'storage'
+      } else if (unit.includes('hour') || unit.includes('second')) {
+        serviceType = 'compute'
+      } else if (unit.includes('request') || unit.includes('call')) {
+        serviceType = 'api'
+      } else if (unit.includes('transaction')) {
+        serviceType = 'transaction'
+      }
+      
+      return {
+        serviceName: row.service_name,
+        serviceType: serviceType,
+        totalCost: totalCost,
+        totalUsage: totalUsage,
+        unit: row.usage_unit || 'unit',
+        efficiency: efficiency,
+        previousEfficiency: previousEfficiency,
+        trend: trend,
+        efficiencyChange: efficiencyChange,
+        efficiencyChangePercent: efficiencyChangePercent,
+        daysWithData: parseInt(row.days_with_data) || 0
+      }
+    })
+    
+    return {
+      efficiencyMetrics,
+      period: { startDate, endDate }
+    }
+  } catch (error) {
+    console.error('[getCostEfficiencyMetrics] Error:', error)
+    return {
+      efficiencyMetrics: [],
+      period: { startDate, endDate }
+    }
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get rightsizing recommendations based on resource utilization
+ */
+export const getRightsizingRecommendations = async (userId, providerId = null, accountId = null) => {
+  const client = await pool.connect()
+  try {
+    // Get resources with cost and usage data
+    let query = `
+      SELECT 
+        r.id,
+        r.resource_id,
+        r.resource_name,
+        r.resource_type,
+        r.service_name,
+        r.region,
+        r.cost,
+        r.usage_quantity,
+        r.usage_unit,
+        r.usage_type,
+        r.last_seen_date
+      FROM resources r
+      WHERE r.user_id = $1
+        AND r.cost > 0
+        AND r.usage_quantity IS NOT NULL
+        AND r.usage_quantity > 0
+      ${providerId ? 'AND r.provider_id = $2' : ''}
+      ${accountId ? `AND r.account_id = $${providerId ? 3 : 2}` : ''}
+      ORDER BY r.cost DESC
+      LIMIT 100
+    `
+    
+    const params = [userId]
+    if (providerId) params.push(providerId)
+    if (accountId) params.push(accountId)
+    
+    const result = await client.query(query, params)
+    
+    const recommendations = []
+    
+    // Analyze each resource for rightsizing opportunities
+    for (const row of result.rows) {
+      const resourceId = row.resource_id
+      const resourceName = row.resource_name || resourceId
+      const resourceType = row.resource_type
+      const serviceName = row.service_name
+      const currentCost = parseFloat(row.cost) || 0
+      const usageQuantity = parseFloat(row.usage_quantity) || 0
+      const usageUnit = row.usage_unit || ''
+      const usageType = row.usage_type || ''
+      
+      // Skip if we don't have enough data
+      if (currentCost <= 0 || usageQuantity <= 0) continue
+      
+      // Determine utilization based on resource type and usage patterns
+      let utilization = null
+      let recommendation = null
+      let priority = 'low'
+      let reason = ''
+      
+      // For compute resources (EC2, Compute Engine, etc.)
+      if (serviceName.toLowerCase().includes('ec2') || 
+          serviceName.toLowerCase().includes('compute') ||
+          resourceType.toLowerCase().includes('instance')) {
+        
+        // Estimate utilization based on usage vs typical capacity
+        // This is a simplified heuristic - in production, you'd use actual metrics
+        // For now, we'll use cost efficiency as a proxy
+        const costPerUnit = currentCost / usageQuantity
+        
+        // If cost per unit is very low relative to typical, might be over-provisioned
+        // If cost per unit is very high, might be under-provisioned
+        // For this implementation, we'll focus on resources with very low usage
+        if (usageQuantity < 100 && currentCost > 10) {
+          // Low usage but high cost suggests over-provisioning
+          utilization = (usageQuantity / 1000) * 100 // Rough estimate
+          if (utilization < 20) {
+            recommendation = 'downsize'
+            priority = 'high'
+            reason = `Low utilization (estimated ${utilization.toFixed(1)}%) suggests this resource may be over-provisioned. Consider downsizing to a smaller instance type.`
+          }
+        }
+      }
+      
+      // For storage resources (S3, EBS, etc.)
+      else if (serviceName.toLowerCase().includes('s3') || 
+               serviceName.toLowerCase().includes('storage') ||
+               serviceName.toLowerCase().includes('ebs') ||
+               usageUnit.toLowerCase().includes('gb')) {
+        
+        // Storage utilization is harder to estimate without capacity data
+        // For now, we'll skip storage resources or use cost efficiency
+        // In production, you'd compare usage vs allocated capacity
+        continue
+      }
+      
+      // For other resources, use cost efficiency heuristic
+      else {
+        // If usage is very low relative to cost, might be over-provisioned
+        const efficiency = usageQuantity / currentCost
+        if (efficiency < 1 && currentCost > 20) {
+          utilization = (efficiency * 100) // Rough estimate
+          if (utilization < 20) {
+            recommendation = 'downsize'
+            priority = 'medium'
+            reason = `Low usage efficiency suggests this resource may be over-provisioned. Review resource sizing.`
+          }
+        }
+      }
+      
+      // Only add recommendation if we have one
+      if (recommendation && utilization !== null) {
+        // Estimate potential savings (assume 30-50% savings for downsizing)
+        const savingsPercent = recommendation === 'downsize' ? 40 : 0
+        const potentialSavings = currentCost * (savingsPercent / 100)
+        
+        recommendations.push({
+          resourceId: resourceId,
+          resourceName: resourceName,
+          serviceName: serviceName,
+          resourceType: resourceType,
+          region: row.region,
+          currentCost: currentCost,
+          utilization: {
+            estimated: utilization,
+            usageQuantity: usageQuantity,
+            usageUnit: usageUnit
+          },
+          recommendation: recommendation,
+          potentialSavings: potentialSavings,
+          savingsPercent: savingsPercent,
+          priority: priority,
+          reason: reason
+        })
+      }
+    }
+    
+    // Sort by potential savings (highest first)
+    recommendations.sort((a, b) => b.potentialSavings - a.potentialSavings)
+    
+    // Calculate total potential savings
+    const totalPotentialSavings = recommendations.reduce((sum, rec) => sum + rec.potentialSavings, 0)
+    
+    return {
+      recommendations: recommendations.slice(0, 20), // Limit to top 20
+      totalPotentialSavings: totalPotentialSavings,
+      recommendationCount: recommendations.length
+    }
+  } catch (error) {
+    console.error('[getRightsizingRecommendations] Error:', error)
+    return {
+      recommendations: [],
+      totalPotentialSavings: 0,
+      recommendationCount: 0
+    }
+  } finally {
+    client.release()
+  }
+}
+
+/**
  * Get cost explanation for a month
  */
 export const getCostExplanation = async (userId, providerId, month, year, accountId = null) => {

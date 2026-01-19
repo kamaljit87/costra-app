@@ -531,4 +531,24 @@ export const insightsAPI = {
     const response = await apiRequest(`/insights/unit-economics?${params.toString()}`)
     return response.json()
   },
+
+  getCostEfficiency: async (startDate: string, endDate: string, providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/cost-efficiency?${params.toString()}`)
+    return response.json()
+  },
+
+  getRightsizingRecommendations: async (providerId?: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    
+    const response = await apiRequest(`/insights/rightsizing-recommendations?${params.toString()}`)
+    return response.json()
+  },
 }

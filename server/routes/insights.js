@@ -12,6 +12,8 @@ import {
   saveBusinessMetric,
   getBusinessMetrics,
   getUnitEconomics,
+  getCostEfficiencyMetrics,
+  getRightsizingRecommendations,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 
@@ -421,6 +423,56 @@ router.get('/unit-economics', authenticateToken, async (req, res) => {
         }
       }
     })
+  }
+})
+
+/**
+ * GET /api/insights/cost-efficiency
+ * Get cost efficiency metrics (cost per unit of usage)
+ */
+router.get('/cost-efficiency', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { startDate, endDate, providerId, accountId } = req.query
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+    
+    const data = await getCostEfficiencyMetrics(
+      userId,
+      startDate,
+      endDate,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ data })
+  } catch (error) {
+    console.error('Cost efficiency error:', error)
+    res.status(500).json({ error: 'Failed to fetch cost efficiency metrics' })
+  }
+})
+
+/**
+ * GET /api/insights/rightsizing-recommendations
+ * Get rightsizing recommendations based on resource utilization
+ */
+router.get('/rightsizing-recommendations', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { providerId, accountId } = req.query
+    
+    const data = await getRightsizingRecommendations(
+      userId,
+      providerId || null,
+      accountId ? parseInt(accountId) : null
+    )
+    
+    res.json({ data })
+  } catch (error) {
+    console.error('Rightsizing recommendations error:', error)
+    res.status(500).json({ error: 'Failed to fetch rightsizing recommendations' })
   }
 })
 
