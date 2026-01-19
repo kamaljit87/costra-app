@@ -19,6 +19,22 @@ import {
   fetchLinodeServiceDetails,
   fetchVultrServiceDetails
 } from '../services/cloudProviderIntegrations.js'
+import { generateCSVReport, generatePDFReport } from '../utils/reportGenerator.js'
+import { 
+  getCostByTeam, 
+  getCostByProduct, 
+  getTeamServiceBreakdown, 
+  getProductServiceBreakdown, 
+  pool,
+  getCostVsUsage,
+  getAnomalies,
+  getCostEfficiencyMetrics,
+  getRightsizingRecommendations,
+  getUnitEconomics,
+  getCostByDimension,
+  getUntaggedResources,
+  generateCustomDateRangeExplanation
+} from '../database.js'
 
 const router = express.Router()
 
@@ -430,5 +446,980 @@ router.get('/:providerId/daily', async (req, res) => {
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
+
+/**
+ * POST /api/cost-data/:providerId/report
+ * Generate comprehensive provider report with all analysis
+ */
+router.post('/:providerId/report', async (req, res) => {
+  // Note: authenticateToken is applied globally via router.use() above
+  try {
+    console.log('[Provider Report] ========== START REPORT GENERATION ==========')
+    console.log('[Provider Report] Timestamp:', new Date().toISOString())
+    console.log('[Provider Report] Provider ID:', req.params.providerId)
+    console.log('[Provider Report] Request body:', JSON.stringify(req.body, null, 2))
+    console.log('[Provider Report] User object exists:', !!req.user)
+    
+    if (!req.user) {
+      console.error('[Provider Report] ERROR: No user object - authentication middleware may have failed')
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+    
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      console.error('[Provider Report] ERROR: User object exists but no ID found')
+      console.error('[Provider Report] User object:', JSON.stringify(req.user, null, 2))
+      return res.status(401).json({ error: 'User ID not found' })
+    }
+    
+    console.log('[Provider Report] Authenticated user ID:', userId)
+    
+    const { providerId } = req.params
+    const { startDate, endDate, format = 'pdf', accountId } = req.body
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate are required' })
+    }
+
+    if (!['json', 'pdf'].includes(format)) {
+      return res.status(400).json({ error: 'format must be json or pdf' })
+    }
+
+    // Get all cost data for the period
+    console.log(`[Provider Report] Generating report for user ${userId}, provider ${providerId}, period: ${startDate} to ${endDate}, accountId: ${accountId || 'all'}`)
+    
+    // First, get daily cost data to calculate total
+    const dailyCostData = await getDailyCostData(userId, providerId, startDate, endDate, accountId).catch((err) => {
+      console.error('[Provider Report] Error fetching daily cost data:', err)
+      return []
+    })
+    
+    const totalDailyCost = dailyCostData.reduce((sum, d) => sum + (parseFloat(d.cost) || 0), 0)
+    console.log(`[Provider Report] Daily cost data: ${dailyCostData.length} days, total: $${totalDailyCost.toFixed(2)}`)
+    
+    // Get services breakdown
+    console.log('[Provider Report] Step 2: Fetching services breakdown...')
+    let servicesResult = []
+    try {
+      servicesResult = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
+      console.log('[Provider Report] Services fetched:', servicesResult.length, 'services')
+    } catch (err) {
+      console.error('[Provider Report] ERROR fetching services:', err.message)
+      console.error('[Provider Report] Error stack:', err.stack)
+      servicesResult = []
+    }
+    
+    // If no services found, try to get from cost_data table for months in the period
+    let fallbackServices = []
+    let fallbackTotal = 0
+    if (servicesResult.length === 0 && totalDailyCost === 0) {
+      console.log('[Provider Report] No daily data found, trying to aggregate from cost_data table')
+      const client = await pool.connect()
+      try {
+        // Get months in the date range
+        const start = new Date(startDate)
+        const end = new Date(endDate)
+        const months = []
+        let current = new Date(start.getFullYear(), start.getMonth(), 1)
+        while (current <= end) {
+          months.push({
+            year: current.getFullYear(),
+            month: current.getMonth() + 1
+          })
+          current.setMonth(current.getMonth() + 1)
+        }
+        
+        // Aggregate cost_data for these months
+        for (const { year, month } of months) {
+          const costDataResult = await client.query(
+            `SELECT cd.id, cd.current_month_cost, cd.account_id
+             FROM cost_data cd
+             WHERE cd.user_id = $1 AND cd.provider_id = $2 AND cd.year = $3 AND cd.month = $4
+             ${accountId ? 'AND cd.account_id = $5' : ''}
+             ORDER BY cd.year DESC, cd.month DESC
+             LIMIT 1`,
+            accountId ? [userId, providerId, year, month, accountId] : [userId, providerId, year, month]
+          )
+          
+          if (costDataResult.rows.length > 0) {
+            const costDataId = costDataResult.rows[0].id
+            const monthCost = parseFloat(costDataResult.rows[0].current_month_cost) || 0
+            fallbackTotal += monthCost
+            
+            // Get services for this month
+            const servicesResult = await client.query(
+              `SELECT service_name, cost
+               FROM service_costs 
+               WHERE cost_data_id = $1
+               ORDER BY cost DESC`,
+              [costDataId]
+            )
+            
+            // Aggregate services
+            servicesResult.rows.forEach(row => {
+              const existing = fallbackServices.find(s => s.name === row.service_name)
+              if (existing) {
+                existing.cost += parseFloat(row.cost) || 0
+              } else {
+                fallbackServices.push({
+                  name: row.service_name,
+                  cost: parseFloat(row.cost) || 0,
+                  change: 0
+                })
+              }
+            })
+          }
+        }
+        console.log(`[Provider Report] Fallback: Found ${fallbackServices.length} services from cost_data, total: $${fallbackTotal.toFixed(2)}`)
+      } catch (err) {
+        console.error('[Provider Report] Error in fallback:', err)
+      } finally {
+        client.release()
+      }
+    }
+    
+    // Use fallback if no daily data
+    const finalServices = servicesResult.length > 0 ? servicesResult : fallbackServices
+    const servicesTotal = finalServices.reduce((sum, s) => sum + (s.cost || 0), 0)
+    
+    // Format services result to match expected structure
+    const services = {
+      services: finalServices.map(s => ({
+        serviceName: s.name,
+        cost: s.cost || 0,
+        resourceCount: 0,
+        change: s.change || 0
+      })),
+      totalCost: servicesTotal || fallbackTotal || totalDailyCost
+    }
+    
+    // Use the highest total available
+    const finalTotalCost = Math.max(totalDailyCost, services.totalCost, fallbackTotal)
+    
+    console.log(`[Provider Report] Found ${services.services.length} services, services total: $${services.totalCost.toFixed(2)}, daily total: $${totalDailyCost.toFixed(2)}, final: $${finalTotalCost.toFixed(2)}`)
+    
+    const [teams, products] = await Promise.all([
+      getCostByTeam(userId, startDate, endDate, providerId, accountId).catch((err) => {
+        console.error('[Provider Report] Error fetching teams:', err)
+        return []
+      }),
+      getCostByProduct(userId, startDate, endDate, providerId, accountId).catch((err) => {
+        console.error('[Provider Report] Error fetching products:', err)
+        return []
+      })
+    ])
+    
+    console.log(`[Provider Report] Found ${teams.length} teams, ${products.length} products`)
+
+    // Get team and product breakdowns
+    const teamBreakdowns = await Promise.all(
+      teams.map(async (team) => {
+        const breakdown = await getTeamServiceBreakdown(userId, team.teamName, startDate, endDate, providerId, accountId).catch(() => [])
+        return { ...team, services: breakdown }
+      })
+    )
+
+    const productBreakdowns = await Promise.all(
+      products.map(async (product) => {
+        const breakdown = await getProductServiceBreakdown(userId, product.productName, startDate, endDate, providerId, accountId).catch(() => [])
+        return { ...product, services: breakdown }
+      })
+    )
+
+    // Fetch all cost analysis data
+    console.log('[Provider Report] Fetching cost analysis data...')
+    // Fetch all cost analysis data (use same userId as above)
+    let costVsUsage, anomalies, efficiencyMetrics, rightsizingRecommendations, unitEconomics, untaggedResources
+    
+    try {
+      const results = await Promise.all([
+        getCostVsUsage(userId, providerId, startDate, endDate, accountId).catch((err) => {
+          console.error('[Provider Report] Error fetching costVsUsage:', err.message)
+          return []
+        }),
+        getAnomalies(userId, providerId, 20, accountId).catch((err) => {
+          console.error('[Provider Report] Error fetching anomalies:', err.message)
+          return []
+        }),
+        getCostEfficiencyMetrics(userId, startDate, endDate, providerId, accountId).catch((err) => {
+          console.error('[Provider Report] Error fetching efficiencyMetrics:', err.message)
+          return []
+        }),
+        getRightsizingRecommendations(userId, providerId, accountId).catch((err) => {
+          console.error('[Provider Report] Error fetching rightsizingRecommendations:', err.message)
+          return []
+        }),
+        getUnitEconomics(userId, startDate, endDate, providerId, accountId).catch((err) => {
+          console.error('[Provider Report] Error fetching unitEconomics:', err.message)
+          return []
+        }),
+        getUntaggedResources(userId, providerId, 50, accountId).catch((err) => {
+          console.error('[Provider Report] Error fetching untaggedResources:', err.message)
+          return []
+        })
+      ])
+      
+      // Ensure all are arrays - some functions might return objects or null
+      costVsUsage = Array.isArray(results[0]) ? results[0] : []
+      anomalies = Array.isArray(results[1]) ? results[1] : []
+      efficiencyMetrics = Array.isArray(results[2]) ? results[2] : []
+      rightsizingRecommendations = Array.isArray(results[3]) ? results[3] : []
+      unitEconomics = Array.isArray(results[4]) ? results[4] : []
+      untaggedResources = Array.isArray(results[5]) ? results[5] : []
+      
+      console.log(`[Provider Report] Analysis data: ${costVsUsage.length} cost vs usage, ${anomalies.length} anomalies, ${efficiencyMetrics.length} efficiency metrics, ${rightsizingRecommendations.length} rightsizing recommendations, ${unitEconomics.length} unit economics, ${untaggedResources.length} untagged resources`)
+      console.log('[Provider Report] Data types verified - all are arrays')
+    } catch (err) {
+      console.error('[Provider Report] Error fetching analysis data:', err)
+      costVsUsage = []
+      anomalies = []
+      efficiencyMetrics = []
+      rightsizingRecommendations = []
+      unitEconomics = []
+      untaggedResources = []
+    }
+
+    // Fetch Cost Summary (AI-generated explanation)
+    console.log('[Provider Report] Fetching cost summary...')
+    let costSummary = null
+    try {
+      costSummary = await generateCustomDateRangeExplanation(userId, providerId, startDate, endDate, accountId)
+      console.log('[Provider Report] Cost summary fetched successfully')
+    } catch (err) {
+      console.error('[Provider Report] Error fetching cost summary:', err)
+      console.error('[Provider Report] Cost summary error stack:', err.stack)
+      // Continue without cost summary - it's optional
+      costSummary = null
+    }
+
+    // Prepare comprehensive report data
+    const reportData = {
+      reportType: 'provider_analysis',
+      summary: {
+        totalCost: finalTotalCost,
+        resourceCount: services.services?.reduce((sum, s) => sum + (s.resourceCount || 0), 0) || 0,
+        serviceCount: services.services?.length || 0,
+        period: { startDate, endDate },
+        providerId,
+        accountId,
+        dailyDataPoints: dailyCostData.length
+      },
+      costData: [
+        // Services
+        ...(Array.isArray(services.services) ? services.services.map(s => ({
+          category: 'Service',
+          name: s.serviceName,
+          cost: s.cost || 0,
+          resourceCount: s.resourceCount || 0,
+          serviceCount: 1
+        })) : []),
+        // Teams
+        ...(Array.isArray(teamBreakdowns) ? teamBreakdowns.map(t => ({
+          category: 'Team',
+          name: t.teamName,
+          cost: t.totalCost || 0,
+          resourceCount: t.resourceCount || 0,
+          serviceCount: t.serviceCount || 0
+        })) : []),
+        // Products
+        ...(Array.isArray(productBreakdowns) ? productBreakdowns.map(p => ({
+          category: 'Product',
+          name: p.productName,
+          cost: p.totalCost || 0,
+          resourceCount: p.resourceCount || 0,
+          serviceCount: p.serviceCount || 0
+        })) : [])
+      ],
+      teams: (teamBreakdowns || []).map(t => ({
+        teamName: t.teamName,
+        totalCost: t.totalCost || 0,
+        resourceCount: t.resourceCount || 0,
+        serviceCount: t.serviceCount || 0,
+        services: (t.services || []).map(s => ({
+          serviceName: s.serviceName,
+          cost: s.cost || 0
+        }))
+      })),
+      products: (productBreakdowns || []).map(p => ({
+        productName: p.productName,
+        totalCost: p.totalCost || 0,
+        resourceCount: p.resourceCount || 0,
+        serviceCount: p.serviceCount || 0,
+        services: (p.services || []).map(s => ({
+          serviceName: s.serviceName,
+          cost: s.cost || 0
+        }))
+      })),
+      services: (services.services || []).map(s => ({
+        serviceName: s.serviceName,
+        cost: s.cost || 0,
+        resourceCount: s.resourceCount || 0,
+        change: s.change || 0
+      })),
+      // Cost Analysis Features - ensure all are serializable
+      costVsUsage: Array.isArray(costVsUsage) ? costVsUsage.map(item => ({
+        serviceName: item.serviceName || null,
+        cost: item.cost || 0,
+        usage: item.usage || 0,
+        usageUnit: item.usageUnit || null,
+        unitCost: item.unitCost || null
+      })) : [],
+      anomalies: Array.isArray(anomalies) ? anomalies.map(anomaly => ({
+        serviceName: anomaly.serviceName || null,
+        currentCost: anomaly.currentCost || 0,
+        baselineCost: anomaly.baselineCost || 0,
+        changePercent: anomaly.changePercent || 0
+      })) : [],
+      efficiencyMetrics: Array.isArray(efficiencyMetrics) ? efficiencyMetrics.map(metric => ({
+        serviceName: metric.serviceName || null,
+        cost: metric.cost || 0,
+        efficiency: metric.efficiency || null,
+        efficiencyUnit: metric.efficiencyUnit || null,
+        trend: metric.trend || null
+      })) : [],
+      rightsizingRecommendations: Array.isArray(rightsizingRecommendations) ? rightsizingRecommendations.map(rec => ({
+        resourceName: rec.resourceName || null,
+        currentSize: rec.currentSize || null,
+        recommendedSize: rec.recommendedSize || null,
+        utilization: rec.utilization || 0,
+        estimatedSavings: rec.estimatedSavings || 0,
+        priority: rec.priority || null
+      })) : [],
+      unitEconomics: Array.isArray(unitEconomics) ? unitEconomics.map(econ => ({
+        metricName: econ.metricName || null,
+        totalCost: econ.totalCost || 0,
+        metricValue: econ.metricValue || 0,
+        unitCost: econ.unitCost || null
+      })) : [],
+      untaggedResources: Array.isArray(untaggedResources) ? untaggedResources.map(resource => ({
+        resourceId: resource.resourceId || null,
+        serviceName: resource.serviceName || null,
+        cost: resource.cost || 0
+      })) : [],
+      costSummary: costSummary ? {
+        explanation: costSummary.explanation || null,
+        costChange: costSummary.costChange || 0,
+        contributingFactors: Array.isArray(costSummary.contributingFactors) ? costSummary.contributingFactors : [],
+        startDate: costSummary.startDate || null,
+        endDate: costSummary.endDate || null,
+        startCost: costSummary.startCost || 0,
+        endCost: costSummary.endCost || 0,
+        aiEnhanced: costSummary.aiEnhanced || false
+      } : null,
+      generatedAt: new Date().toISOString(),
+      options: {
+        reportName: `${providerId.toUpperCase()} Analysis Report`,
+        providerId,
+        accountId
+      }
+    }
+
+    // Generate report file
+    try {
+      if (format === 'json') {
+        console.log('[Provider Report] Generating JSON report...')
+        // Clean up reportData to ensure it's JSON-serializable
+        const cleanReportData = {
+          ...reportData,
+          costSummary: reportData.costSummary ? {
+            explanation: reportData.costSummary.explanation || null,
+            costChange: reportData.costSummary.costChange || 0,
+            contributingFactors: reportData.costSummary.contributingFactors || [],
+            startDate: reportData.costSummary.startDate || null,
+            endDate: reportData.costSummary.endDate || null,
+            startCost: reportData.costSummary.startCost || 0,
+            endCost: reportData.costSummary.endCost || 0,
+            aiEnhanced: reportData.costSummary.aiEnhanced || false
+          } : null
+        }
+        
+        const jsonData = JSON.stringify(cleanReportData, null, 2)
+        res.setHeader('Content-Type', 'application/json')
+        res.setHeader('Content-Disposition', `attachment; filename="${providerId}_analysis_${startDate}_to_${endDate}.json"`)
+        res.send(jsonData)
+        console.log('[Provider Report] JSON report generated successfully')
+      } else {
+        console.log('[Provider Report] Generating PDF report...')
+        const pdfBuffer = await generatePDFReportBuffer(reportData)
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="${providerId}_analysis_${startDate}_to_${endDate}.pdf"`)
+        res.send(pdfBuffer)
+        console.log('[Provider Report] PDF report generated successfully')
+      }
+    } catch (genError) {
+      console.error('[Provider Report] Error generating report file:', genError)
+      console.error('[Provider Report] Error stack:', genError.stack)
+      throw genError
+    }
+  } catch (error) {
+    console.error('[Provider Report] Generate provider report error:', error)
+    console.error('[Provider Report] Error stack:', error.stack)
+    console.error('[Provider Report] Error message:', error.message)
+    res.status(500).json({ 
+      error: 'Failed to generate provider report',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+})
+
+// CSV generation removed - now using JSON format
+// Helper to generate CSV buffer (deprecated - not used)
+async function generateCSVReportBuffer_DEPRECATED(reportData) {
+  const createCsvWriter = (await import('csv-writer')).default.createObjectCsvWriter
+  const fs = await import('fs/promises')
+  const path = await import('path')
+  const os = await import('os')
+  
+  const tempFile = path.join(os.tmpdir(), `report_${Date.now()}.csv`)
+  const csvWriter = createCsvWriter({
+    path: tempFile,
+    header: [
+      { id: 'category', title: 'Category' },
+      { id: 'name', title: 'Name' },
+      { id: 'cost', title: 'Cost ($)' },
+      { id: 'resourceCount', title: 'Resource Count' },
+      { id: 'serviceCount', title: 'Service Count' }
+    ]
+  })
+
+  // Write all data including summary
+  const allRecords = [
+    ...reportData.costData,
+    {
+      category: 'SUMMARY',
+      name: 'Total',
+      cost: reportData.summary.totalCost.toFixed(2),
+      resourceCount: reportData.summary.resourceCount,
+      serviceCount: reportData.summary.serviceCount
+    }
+  ]
+  
+  // Add analysis data as additional rows with different categories
+  if (reportData.costVsUsage && reportData.costVsUsage.length > 0) {
+    allRecords.push(
+      ...reportData.costVsUsage.map(item => ({
+        category: 'COST_VS_USAGE',
+        name: item.serviceName || 'N/A',
+        cost: (item.cost || 0).toFixed(2),
+        resourceCount: item.usage || 0,
+        serviceCount: item.unitCost ? item.unitCost.toFixed(4) : 0
+      }))
+    )
+  }
+  
+  if (reportData.anomalies && reportData.anomalies.length > 0) {
+    allRecords.push(
+      ...reportData.anomalies.map(anomaly => ({
+        category: 'ANOMALY',
+        name: anomaly.serviceName || 'N/A',
+        cost: (anomaly.currentCost || 0).toFixed(2),
+        resourceCount: (anomaly.baselineCost || 0).toFixed(2),
+        serviceCount: (anomaly.changePercent || 0).toFixed(1)
+      }))
+    )
+  }
+  
+  if (reportData.rightsizingRecommendations && reportData.rightsizingRecommendations.length > 0) {
+    allRecords.push(
+      ...reportData.rightsizingRecommendations.map(rec => ({
+        category: 'RIGHTSIZING',
+        name: rec.resourceName || 'N/A',
+        cost: (rec.estimatedSavings || 0).toFixed(2),
+        resourceCount: (rec.utilization || 0).toFixed(1),
+        serviceCount: rec.recommendedSize || 'N/A'
+      }))
+    )
+  }
+  
+  if (reportData.efficiencyMetrics && reportData.efficiencyMetrics.length > 0) {
+    allRecords.push(
+      ...reportData.efficiencyMetrics.map(metric => ({
+        category: 'EFFICIENCY',
+        name: metric.serviceName || 'N/A',
+        cost: (metric.cost || 0).toFixed(2),
+        resourceCount: metric.efficiency ? metric.efficiency.toFixed(4) : 0,
+        serviceCount: metric.efficiencyUnit || 'N/A'
+      }))
+    )
+  }
+  
+  if (reportData.unitEconomics && reportData.unitEconomics.length > 0) {
+    allRecords.push(
+      ...reportData.unitEconomics.map(econ => ({
+        category: 'UNIT_ECONOMICS',
+        name: econ.metricName || 'N/A',
+        cost: (econ.totalCost || 0).toFixed(2),
+        resourceCount: econ.metricValue || 0,
+        serviceCount: econ.unitCost ? econ.unitCost.toFixed(4) : 0
+      }))
+    )
+  }
+  
+  if (reportData.untaggedResources && reportData.untaggedResources.length > 0) {
+    allRecords.push(
+      ...reportData.untaggedResources.map(resource => ({
+        category: 'UNTAGGED',
+        name: resource.resourceId || 'N/A',
+        cost: (resource.cost || 0).toFixed(2),
+        resourceCount: 0,
+        serviceCount: resource.serviceName || 'N/A'
+      }))
+    )
+  }
+  
+  await csvWriter.writeRecords(allRecords)
+  const buffer = await fs.readFile(tempFile)
+  await fs.unlink(tempFile)
+  return buffer
+}
+
+// Helper to generate PDF buffer
+async function generatePDFReportBuffer(reportData) {
+  const PDFDocument = (await import('pdfkit')).default
+  
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 })
+    const chunks = []
+    
+    doc.on('data', (chunk) => chunks.push(chunk))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+    
+    // Header with better styling
+    doc.fontSize(24).font('Helvetica-Bold').text(
+      `${reportData.options.providerId.toUpperCase()} Cost Analysis Report`,
+      { align: 'center' }
+    )
+    doc.moveDown(0.5)
+    doc.fontSize(11).font('Helvetica').fillColor('gray')
+    doc.text(`Period: ${reportData.summary.period.startDate} to ${reportData.summary.period.endDate}`, { align: 'center' })
+    doc.moveDown(1)
+    doc.fillColor('black')
+    
+    // Executive Summary Box
+    doc.rect(50, doc.y, 495, 80).stroke()
+    doc.fontSize(14).font('Helvetica-Bold').text('Executive Summary', 60, doc.y + 10)
+    doc.fontSize(11).font('Helvetica')
+    let summaryY = doc.y + 30
+    doc.text(`Total Cost: $${reportData.summary.totalCost.toFixed(2)}`, 60, summaryY)
+    doc.text(`Total Services: ${reportData.summary.serviceCount}`, 250, summaryY)
+    summaryY += 15
+    doc.text(`Total Resources: ${reportData.summary.resourceCount}`, 60, summaryY)
+    if (reportData.summary.dailyDataPoints !== undefined) {
+      doc.text(`Data Points: ${reportData.summary.dailyDataPoints} days`, 250, summaryY)
+    }
+    doc.y = doc.y + 90
+    doc.moveDown(0.5)
+    
+    // Cost Summary (AI-generated explanation)
+    if (reportData.costSummary && reportData.costSummary.explanation) {
+      doc.addPage()
+      doc.fontSize(16).font('Helvetica-Bold').text('Cost Summary', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(11).font('Helvetica')
+      
+      // Wrap text properly
+      const explanation = reportData.costSummary.explanation
+      const lines = doc.heightOfString(explanation, { width: 495 })
+      if (lines > 20) {
+        // Split into paragraphs if too long
+        const paragraphs = explanation.split('\n').filter(p => p.trim())
+        paragraphs.forEach(para => {
+          if (doc.y > 700) {
+            doc.addPage()
+          }
+          doc.text(para.trim(), { width: 495, align: 'left' })
+          doc.moveDown(0.3)
+        })
+      } else {
+        doc.text(explanation, { width: 495, align: 'left' })
+      }
+      
+      if (reportData.costSummary.costChange !== undefined) {
+        doc.moveDown(0.5)
+        const change = reportData.costSummary.costChange
+        const changeText = change > 0 ? `increased by ${change.toFixed(1)}%` : change < 0 ? `decreased by ${Math.abs(change).toFixed(1)}%` : 'remained stable'
+        doc.font('Helvetica-Bold').text(`Cost ${changeText} compared to previous period.`, { width: 495 })
+        doc.font('Helvetica')
+      }
+      
+      doc.moveDown(1)
+    }
+    
+    // Show message if no data
+    if (reportData.summary.totalCost === 0 && reportData.services.length === 0) {
+      doc.fontSize(14).text('No Cost Data Available', { underline: true })
+      doc.fontSize(11)
+      doc.text('No cost data was found for the selected period.')
+      doc.text('This could mean:')
+      doc.text('• No data has been synced for this period yet')
+      doc.text('• The provider has no costs for this time range')
+      doc.text('• Please sync your cloud provider data to generate reports')
+      doc.moveDown()
+    }
+    
+    // Services breakdown with better formatting
+    if (reportData.services.length > 0) {
+      if (doc.y > 650) {
+        doc.addPage()
+      }
+      doc.fontSize(16).font('Helvetica-Bold').text('Services Breakdown', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10).font('Helvetica-Bold')
+      let y = doc.y
+      // Table header with background
+      doc.rect(50, y - 5, 495, 20).fillAndStroke('gray', 'black')
+      doc.fillColor('white')
+      doc.text('Service Name', 55, y)
+      doc.text('Cost ($)', 380, y, { width: 80, align: 'right' })
+      doc.text('Change %', 470, y, { width: 70, align: 'right' })
+      doc.fillColor('black')
+      y += 25
+      doc.font('Helvetica')
+      
+      // Alternating row colors
+      let rowIndex = 0
+      reportData.services.slice(0, 50).forEach(service => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+          // Redraw header on new page
+          doc.font('Helvetica-Bold')
+          doc.rect(50, y - 5, 495, 20).fillAndStroke('gray', 'black')
+          doc.fillColor('white')
+          doc.text('Service Name', 55, y)
+          doc.text('Cost ($)', 380, y, { width: 80, align: 'right' })
+          doc.text('Change %', 470, y, { width: 70, align: 'right' })
+          doc.fillColor('black')
+          doc.font('Helvetica')
+          y += 25
+        }
+        
+        // Alternating row background
+        if (rowIndex % 2 === 0) {
+          doc.rect(50, y - 3, 495, 14).fillColor('#f5f5f5').fill()
+          doc.fillColor('black')
+        }
+        
+        doc.text(service.serviceName || 'N/A', 55, y, { width: 320 })
+        doc.text(`$${(service.cost || 0).toFixed(2)}`, 380, y, { width: 80, align: 'right' })
+        const change = service.change || 0
+        if (change !== 0) {
+          doc.fillColor(change > 0 ? 'red' : 'green')
+          doc.text(`${change > 0 ? '+' : ''}${change.toFixed(1)}%`, 470, y, { width: 70, align: 'right' })
+          doc.fillColor('black')
+        } else {
+          doc.text('-', 470, y, { width: 70, align: 'right' })
+        }
+        y += 15
+        rowIndex++
+      })
+      doc.moveDown(0.5)
+    }
+    
+    // Teams breakdown
+    if (reportData.teams.length > 0) {
+      doc.fontSize(16).text('Teams Breakdown', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10)
+      let y = doc.y
+      doc.text('Team Name', 50, y)
+      doc.text('Cost ($)', 350, y, { width: 100, align: 'right' })
+      doc.text('Resources', 450, y, { width: 80, align: 'right' })
+      y += 20
+      
+      reportData.teams.slice(0, 30).forEach(team => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+        }
+        doc.text(team.teamName || 'N/A', 50, y, { width: 280 })
+        doc.text(`$${(team.totalCost || 0).toFixed(2)}`, 350, y, { width: 100, align: 'right' })
+        doc.text((team.resourceCount || 0).toString(), 450, y, { width: 80, align: 'right' })
+        y += 15
+      })
+      doc.moveDown()
+    }
+    
+    // Products breakdown
+    if (reportData.products.length > 0) {
+      doc.fontSize(16).text('Products Breakdown', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10)
+      let y = doc.y
+      doc.text('Product Name', 50, y)
+      doc.text('Cost ($)', 350, y, { width: 100, align: 'right' })
+      doc.text('Resources', 450, y, { width: 80, align: 'right' })
+      y += 20
+      
+      reportData.products.slice(0, 30).forEach(product => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+        }
+        doc.text(product.productName || 'N/A', 50, y, { width: 280 })
+        doc.text(`$${(product.totalCost || 0).toFixed(2)}`, 350, y, { width: 100, align: 'right' })
+        doc.text((product.resourceCount || 0).toString(), 450, y, { width: 80, align: 'right' })
+        y += 15
+      })
+      doc.moveDown()
+    }
+
+    // Cost Analysis Sections
+    let y = doc.y
+    
+    // Cost vs Usage Analysis with better formatting
+    if (reportData.costVsUsage && reportData.costVsUsage.length > 0) {
+      if (doc.y > 650) {
+        doc.addPage()
+      }
+      doc.fontSize(16).font('Helvetica-Bold').text('Cost vs Usage Analysis', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10).font('Helvetica-Bold')
+      y = doc.y
+      // Table header
+      doc.rect(50, y - 5, 495, 20).fillAndStroke('gray', 'black')
+      doc.fillColor('white')
+      doc.text('Service', 55, y)
+      doc.text('Cost ($)', 280, y, { width: 80, align: 'right' })
+      doc.text('Usage', 370, y, { width: 100 })
+      doc.text('Unit Cost', 480, y, { width: 65, align: 'right' })
+      doc.fillColor('black')
+      y += 25
+      doc.font('Helvetica')
+      
+      let rowIndex = 0
+      reportData.costVsUsage.slice(0, 30).forEach(item => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+          // Redraw header
+          doc.font('Helvetica-Bold')
+          doc.rect(50, y - 5, 495, 20).fillAndStroke('gray', 'black')
+          doc.fillColor('white')
+          doc.text('Service', 55, y)
+          doc.text('Cost ($)', 280, y, { width: 80, align: 'right' })
+          doc.text('Usage', 370, y, { width: 100 })
+          doc.text('Unit Cost', 480, y, { width: 65, align: 'right' })
+          doc.fillColor('black')
+          doc.font('Helvetica')
+          y += 25
+        }
+        
+        // Alternating row background
+        if (rowIndex % 2 === 0) {
+          doc.rect(50, y - 3, 495, 14).fillColor('#f5f5f5').fill()
+          doc.fillColor('black')
+        }
+        
+        doc.text(item.serviceName || 'N/A', 55, y, { width: 220 })
+        doc.text(`$${(item.cost || 0).toFixed(2)}`, 280, y, { width: 80, align: 'right' })
+        const usageText = item.usage && item.usage > 0 ? `${(item.usage || 0).toFixed(2)} ${item.usageUnit || ''}`.trim() : '-'
+        doc.text(usageText, 370, y, { width: 100 })
+        const unitCost = item.unitCost && item.unitCost > 0 ? `$${item.unitCost.toFixed(4)}` : '-'
+        doc.text(unitCost, 480, y, { width: 65, align: 'right' })
+        y += 15
+        rowIndex++
+      })
+      doc.moveDown(0.5)
+      y = doc.y
+    }
+
+    // Cost Anomalies with better formatting
+    if (reportData.anomalies && reportData.anomalies.length > 0) {
+      if (doc.y > 650) {
+        doc.addPage()
+      }
+      doc.fontSize(16).font('Helvetica-Bold').text('Cost Anomalies Detected', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10).font('Helvetica-Bold')
+      y = doc.y
+      doc.rect(50, y - 5, 495, 20).fillAndStroke('gray', 'black')
+      doc.fillColor('white')
+      doc.text('Service', 55, y)
+      doc.text('Current Cost', 280, y, { width: 90, align: 'right' })
+      doc.text('Baseline', 380, y, { width: 90, align: 'right' })
+      doc.text('Change %', 480, y, { width: 65, align: 'right' })
+      doc.fillColor('black')
+      y += 25
+      doc.font('Helvetica')
+      
+      let rowIndex = 0
+      reportData.anomalies.slice(0, 20).forEach(anomaly => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+          doc.font('Helvetica-Bold')
+          doc.rect(50, y - 5, 495, 20).fillAndStroke('gray', 'black')
+          doc.fillColor('white')
+          doc.text('Service', 55, y)
+          doc.text('Current Cost', 280, y, { width: 90, align: 'right' })
+          doc.text('Baseline', 380, y, { width: 90, align: 'right' })
+          doc.text('Change %', 480, y, { width: 65, align: 'right' })
+          doc.fillColor('black')
+          doc.font('Helvetica')
+          y += 25
+        }
+        
+        if (rowIndex % 2 === 0) {
+          doc.rect(50, y - 3, 495, 14).fillColor('#f5f5f5').fill()
+          doc.fillColor('black')
+        }
+        
+        doc.text(anomaly.serviceName || 'N/A', 55, y, { width: 220 })
+        doc.text(`$${(anomaly.currentCost || 0).toFixed(2)}`, 280, y, { width: 90, align: 'right' })
+        doc.text(`$${(anomaly.baselineCost || 0).toFixed(2)}`, 380, y, { width: 90, align: 'right' })
+        const changeColor = anomaly.changePercent > 0 ? 'red' : 'green'
+        doc.fillColor(changeColor)
+        doc.text(`${anomaly.changePercent > 0 ? '+' : ''}${(anomaly.changePercent || 0).toFixed(1)}%`, 480, y, { width: 65, align: 'right' })
+        doc.fillColor('black')
+        y += 15
+        rowIndex++
+      })
+      doc.moveDown(0.5)
+      y = doc.y
+    }
+
+    // Cost Efficiency Metrics
+    if (reportData.efficiencyMetrics && reportData.efficiencyMetrics.length > 0) {
+      if (y > 650) {
+        doc.addPage()
+        y = 50
+      }
+      doc.fontSize(16).text('Cost Efficiency Metrics', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10)
+      y = doc.y
+      doc.text('Service', 50, y)
+      doc.text('Cost ($)', 200, y, { width: 100, align: 'right' })
+      doc.text('Efficiency', 310, y, { width: 120 })
+      doc.text('Trend', 440, y, { width: 60 })
+      y += 20
+      
+      reportData.efficiencyMetrics.slice(0, 25).forEach(metric => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+        }
+        doc.text(metric.serviceName || 'N/A', 50, y, { width: 140 })
+        doc.text(`$${(metric.cost || 0).toFixed(2)}`, 200, y, { width: 100, align: 'right' })
+        const efficiency = metric.efficiency ? `${metric.efficiency.toFixed(4)} ${metric.efficiencyUnit || ''}` : 'N/A'
+        doc.text(efficiency, 310, y, { width: 120 })
+        const trend = metric.trend === 'improving' ? '↓' : metric.trend === 'degrading' ? '↑' : '→'
+        doc.text(trend, 440, y, { width: 60 })
+        y += 15
+      })
+      doc.moveDown()
+      y = doc.y
+    }
+
+    // Rightsizing Recommendations
+    if (reportData.rightsizingRecommendations && reportData.rightsizingRecommendations.length > 0) {
+      if (y > 650) {
+        doc.addPage()
+        y = 50
+      }
+      doc.fontSize(16).text('Rightsizing Recommendations', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10)
+      y = doc.y
+      doc.text('Resource', 50, y)
+      doc.text('Current Size', 200, y, { width: 100 })
+      doc.text('Utilization', 310, y, { width: 80, align: 'right' })
+      doc.text('Savings', 400, y, { width: 100, align: 'right' })
+      y += 20
+      
+      reportData.rightsizingRecommendations.slice(0, 20).forEach(rec => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+        }
+        doc.text(rec.resourceName || 'N/A', 50, y, { width: 140 })
+        doc.text(rec.currentSize || 'N/A', 200, y, { width: 100 })
+        doc.text(`${(rec.utilization || 0).toFixed(1)}%`, 310, y, { width: 80, align: 'right' })
+        doc.text(`$${(rec.estimatedSavings || 0).toFixed(2)}/mo`, 400, y, { width: 100, align: 'right' })
+        y += 15
+      })
+      doc.moveDown()
+      y = doc.y
+    }
+
+    // Unit Economics
+    if (reportData.unitEconomics && reportData.unitEconomics.length > 0) {
+      if (y > 650) {
+        doc.addPage()
+        y = 50
+      }
+      doc.fontSize(16).text('Unit Economics', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(10)
+      y = doc.y
+      doc.text('Metric', 50, y)
+      doc.text('Cost ($)', 200, y, { width: 100, align: 'right' })
+      doc.text('Value', 310, y, { width: 100, align: 'right' })
+      doc.text('Unit Cost', 420, y, { width: 80, align: 'right' })
+      y += 20
+      
+      reportData.unitEconomics.slice(0, 20).forEach(econ => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+        }
+        doc.text(econ.metricName || 'N/A', 50, y, { width: 140 })
+        doc.text(`$${(econ.totalCost || 0).toFixed(2)}`, 200, y, { width: 100, align: 'right' })
+        doc.text((econ.metricValue || 0).toFixed(0), 310, y, { width: 100, align: 'right' })
+        doc.text(`$${(econ.unitCost || 0).toFixed(4)}`, 420, y, { width: 80, align: 'right' })
+        y += 15
+      })
+      doc.moveDown()
+      y = doc.y
+    }
+
+    // Untagged Resources
+    if (reportData.untaggedResources && reportData.untaggedResources.length > 0) {
+      if (y > 650) {
+        doc.addPage()
+        y = 50
+      }
+      doc.fontSize(16).text('Untagged Resources', { underline: true })
+      doc.moveDown(0.5)
+      doc.fontSize(11)
+      doc.text(`Found ${reportData.untaggedResources.length} untagged resources that may need cost allocation tags.`, 50, doc.y)
+      doc.moveDown(0.5)
+      doc.fontSize(10)
+      y = doc.y
+      doc.text('Resource ID', 50, y)
+      doc.text('Service', 200, y, { width: 120 })
+      doc.text('Cost ($)', 330, y, { width: 100, align: 'right' })
+      y += 20
+      
+      reportData.untaggedResources.slice(0, 25).forEach(resource => {
+        if (y > 700) {
+          doc.addPage()
+          y = 50
+        }
+        doc.text(resource.resourceId || 'N/A', 50, y, { width: 140 })
+        doc.text(resource.serviceName || 'N/A', 200, y, { width: 120 })
+        doc.text(`$${(resource.cost || 0).toFixed(2)}`, 330, y, { width: 100, align: 'right' })
+        y += 15
+      })
+      doc.moveDown()
+    }
+    
+    // Add footer to the last page before ending
+    // Note: We can't easily add footers to all pages with pdfkit without buffering,
+    // so we'll just add it to the last page
+    doc.fontSize(8).font('Helvetica').fillColor('gray')
+    doc.text(
+      `Generated on ${new Date(reportData.generatedAt).toLocaleString()}`,
+      50,
+      doc.page.height - 30,
+      { align: 'center', width: 495 }
+    )
+    doc.fillColor('black')
+    
+    doc.end()
+  })
+}
 
 export default router

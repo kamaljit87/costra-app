@@ -11,7 +11,7 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[#F8FAFC]">
       {/* Sidebar - Always visible on desktop, drawer on mobile */}
       <div className="hidden lg:block">
         <Sidebar isOpen={true} onClose={() => {}} isPermanent={true} />
@@ -26,7 +26,7 @@ export default function Layout({ children }: LayoutProps) {
         <TopNav onMenuClick={() => setSidebarOpen(true)} />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-gray-100">
+        <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
           <div className="min-h-full">
             {children}
           </div>

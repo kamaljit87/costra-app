@@ -18,7 +18,7 @@ import CostEfficiencyMetrics from '../components/CostEfficiencyMetrics'
 import RightsizingRecommendations from '../components/RightsizingRecommendations'
 import ProductCostCard from '../components/ProductCostCard'
 import TeamCostCard from '../components/TeamCostCard'
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users, Download, FileText } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -85,6 +85,8 @@ export default function ProviderDetailPage() {
   const [teams, setTeams] = useState<any[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false)
 
   // Define sub-service type
   interface SubService {
@@ -593,37 +595,99 @@ export default function ProviderDetailPage() {
 
   const chartData = getChartData()
 
+  // Handle download report
+  const handleDownloadReport = async (format: 'pdf' | 'json') => {
+    if (!providerId || !providerData || isDemoMode) {
+      showWarning('Download not available', 'Please sign in to download reports.')
+      return
+    }
+
+    setIsDownloading(true)
+    setShowDownloadMenu(false)
+
+    try {
+      // Get date range for selected period
+      const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+        ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+        : getDateRangeForPeriod(selectedPeriod)
+      
+      const startDate = range.startDate.toISOString().split('T')[0]
+      const endDate = range.endDate.toISOString().split('T')[0]
+      const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+
+      // Call API to generate report
+      const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/cost-data/${providerId}/report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          format,
+          accountId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report')
+      }
+
+      // Download the file
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const periodLabel = selectedPeriod === 'custom' 
+        ? `${customStartDate}_to_${customEndDate}`
+        : getPeriodLabel(selectedPeriod).toLowerCase().replace(/\s+/g, '_')
+      a.download = `${providerData.provider.name}_${periodLabel}_report.${format}`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      showSuccess('Report downloaded', `Your ${format.toUpperCase()} report has been downloaded.`)
+    } catch (error: any) {
+      console.error('Download error:', error)
+      showError('Download failed', error.message || 'Failed to download report. Please try again.')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   return (
     <Layout>
-      <div className="w-full px-6 lg:px-8 py-8">
+      <div className="w-full px-6 lg:px-8 py-6">
         {/* Breadcrumbs */}
         <Breadcrumbs />
 
         {/* Provider Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
               <div 
-                className="w-16 h-16 flex items-center justify-center rounded-xl shadow-sm"
+                className="w-14 h-14 flex items-center justify-center rounded-2xl"
                 style={{ backgroundColor: `${getProviderColor(providerId || '')}15` }}
                 title={`${providerData.provider.name} cloud provider`}
               >
-                <ProviderIcon providerId={providerId || ''} size={40} />
+                <ProviderIcon providerId={providerId || ''} size={32} />
               </div>
               <div>
-                <div className="flex items-center space-x-3 mb-1">
-                  <h1 className="text-3xl font-bold text-gray-900">{providerData.provider.name}</h1>
+                <div className="flex items-center space-x-2.5 mb-0.5">
+                  <h1 className="text-2xl font-bold text-[#0F172A]">{providerData.provider.name}</h1>
                   {showCredits && providerData.credits > 0 && (
                     <span 
-                      className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200"
+                      className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#F0FDF4] text-[#16A34A] border border-[#BBF7D0]"
                       title="This account has credits applied"
                     >
-                      <Gift className="h-3 w-3 mr-1" />
-                      Credits Applied
+                      <Gift className="h-2.5 w-2.5 mr-1" />
+                      Credits
                     </span>
                   )}
                 </div>
-                <p className="text-gray-600">Detailed cost breakdown and analytics</p>
+                <p className="text-xs text-[#64748B]">Detailed cost breakdown and analytics</p>
               </div>
             </div>
             
@@ -635,44 +699,44 @@ export default function ProviderDetailPage() {
                 className="btn-primary flex items-center space-x-2"
                 title="Sync fresh data from cloud provider (clears cache)"
               >
-                <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+                <Cloud className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
               </button>
             )}
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="card" title="Total cost for the current billing month">
-              <div className="text-sm text-gray-500 mb-1">Current Month</div>
-              <div className="text-2xl font-bold text-gray-900">
+          {/* Summary Cards - Compact, Equal Heights */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className="card p-4" title="Total cost for the current billing month">
+              <div className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wide mb-1.5">Current Month</div>
+              <div className="text-xl font-bold text-[#0F172A] mb-1">
                 {formatCurrency(convertAmount(providerData.currentMonth))}
               </div>
               {changePercent !== 0 && (
-                <div className={`text-sm mt-1 flex items-center ${
-                  changePercent >= 0 ? 'text-red-600' : 'text-green-600'
+                <div className={`text-xs mt-1 flex items-center ${
+                  changePercent >= 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'
                 }`}>
                   {changePercent >= 0 ? (
-                    <TrendingUp className="h-3 w-3 mr-1" />
+                    <TrendingUp className="h-3 w-3 mr-0.5" />
                   ) : (
-                    <TrendingDown className="h-3 w-3 mr-1" />
+                    <TrendingDown className="h-3 w-3 mr-0.5" />
                   )}
                   {Math.abs(changePercent).toFixed(1)}% vs last month
                 </div>
               )}
             </div>
 
-            <div className="card" title="Projected cost for the month based on current usage">
-              <div className="text-sm text-gray-500 mb-1">Forecast</div>
-              <div className="text-2xl font-bold text-gray-900">
+            <div className="card p-4" title="Projected cost for the month based on current usage">
+              <div className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wide mb-1.5">Forecast</div>
+              <div className="text-xl font-bold text-[#0F172A]">
                 {formatCurrency(convertAmount(providerData.forecast))}
               </div>
             </div>
 
             {showCredits && (
-              <div className="card bg-green-50 border-green-200" title="Credits applied to this account">
-                <div className="text-sm text-gray-600 mb-1">Credits</div>
-                <div className="text-2xl font-bold text-green-700">
+              <div className="card p-4 bg-[#F0FDF4] border-[#BBF7D0]" title="Credits applied to this account">
+                <div className="text-[10px] font-semibold text-[#16A34A] uppercase tracking-wide mb-1.5">Credits</div>
+                <div className="text-xl font-bold text-[#16A34A]">
                   {formatCurrency(convertAmount(providerData.credits))}
                 </div>
               </div>
@@ -689,8 +753,8 @@ export default function ProviderDetailPage() {
 
         {/* Inline Filter Bar */}
         {!hasNoData && (
-          <div className="mb-6 bg-white rounded-lg border border-gray-200 px-4 py-3">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] px-3 py-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               {/* Period Pills */}
               <div className="flex flex-wrap items-center gap-2">
                 {(['1month', '2months', '3months', '4months', '6months', '12months'] as PeriodType[]).map((period) => (
@@ -825,14 +889,56 @@ export default function ProviderDetailPage() {
                 <span>More Filters</span>
                 <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${showAdvancedFilters ? 'rotate-180' : ''}`} />
               </button>
+
+              {/* Download Report Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                  disabled={isDownloading || isDemoMode}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1 ${
+                    isDownloading || isDemoMode
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-[#22B8A0] text-white hover:bg-[#1ea890]'
+                  }`}
+                  title="Download report for selected period"
+                >
+                  <Download className="h-3 w-3" />
+                  <span>{isDownloading ? 'Generating...' : 'Download Report'}</span>
+                </button>
+
+                {showDownloadMenu && !isDownloading && !isDemoMode && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setShowDownloadMenu(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-20 animate-fade-in">
+                      <button
+                        onClick={() => handleDownloadReport('pdf')}
+                        className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 flex items-center space-x-2 transition-colors"
+                      >
+                        <FileText className="h-4 w-4 text-red-600" />
+                        <span>Download as PDF</span>
+                      </button>
+                      <button
+                        onClick={() => handleDownloadReport('json')}
+                        className="w-full px-4 py-2.5 text-left text-xs hover:bg-gray-50 flex items-center space-x-2 transition-colors border-t border-gray-100"
+                      >
+                        <FileText className="h-4 w-4 text-green-600" />
+                        <span>Download as JSON</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Custom Date Range Input */}
             {showCustomFilter && (
-              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center space-x-4">
-                  <Filter className="h-4 w-4 text-gray-600" />
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="mt-2.5 p-2.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                <div className="flex items-center space-x-3">
+                  <Filter className="h-3.5 w-3.5 text-[#64748B]" />
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
                       <input
@@ -869,8 +975,8 @@ export default function ProviderDetailPage() {
 
             {/* Advanced Filters Panel */}
             {showAdvancedFilters && (
-              <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              <div className="mt-2.5 p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5">
                   {/* Service Search */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1014,85 +1120,85 @@ export default function ProviderDetailPage() {
 
         {/* Tabs Navigation */}
         {!hasNoData && (
-          <div className="mb-6 border-b border-gray-200">
-            <nav className="flex space-x-8">
+          <div className="mb-4 border-b border-[#E2E8F0]">
+            <nav className="flex space-x-6">
               <button
                 onClick={() => setActiveTab('overview')}
                 className={`
-                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'overview'
-                      ? 'border-frozenWater-500 text-frozenWater-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-[#22B8A0] text-[#22B8A0]'
+                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
                   }
                 `}
               >
-                <div className="flex items-center space-x-2">
-                  <LayoutDashboard className="h-4 w-4" />
+                <div className="flex items-center space-x-1.5">
+                  <LayoutDashboard className="h-3.5 w-3.5" />
                   <span>Overview</span>
                 </div>
               </button>
               <button
                 onClick={() => setActiveTab('services')}
                 className={`
-                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'services'
-                      ? 'border-frozenWater-500 text-frozenWater-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-[#22B8A0] text-[#22B8A0]'
+                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
                   }
                 `}
               >
-                <div className="flex items-center space-x-2">
-                  <Package className="h-4 w-4" />
+                <div className="flex items-center space-x-1.5">
+                  <Package className="h-3.5 w-3.5" />
                   <span>Services</span>
                 </div>
               </button>
               <button
                 onClick={() => setActiveTab('analytics')}
                 className={`
-                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'analytics'
-                      ? 'border-frozenWater-500 text-frozenWater-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-[#22B8A0] text-[#22B8A0]'
+                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
                   }
                 `}
               >
-                <div className="flex items-center space-x-2">
-                  <TrendingUpIcon className="h-4 w-4" />
+                <div className="flex items-center space-x-1.5">
+                  <TrendingUpIcon className="h-3.5 w-3.5" />
                   <span>Analytics</span>
                 </div>
               </button>
               <button
                 onClick={() => setActiveTab('products')}
                 className={`
-                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'products'
-                      ? 'border-frozenWater-500 text-frozenWater-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-[#22B8A0] text-[#22B8A0]'
+                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
                   }
                 `}
               >
-                <div className="flex items-center space-x-2">
-                  <Package className="h-4 w-4" />
+                <div className="flex items-center space-x-1.5">
+                  <Package className="h-3.5 w-3.5" />
                   <span>Products</span>
                 </div>
               </button>
               <button
                 onClick={() => setActiveTab('teams')}
                 className={`
-                  py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                  py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'teams'
-                      ? 'border-frozenWater-500 text-frozenWater-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-[#22B8A0] text-[#22B8A0]'
+                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
                   }
                 `}
               >
-                <div className="flex items-center space-x-2">
-                  <Users className="h-4 w-4" />
+                <div className="flex items-center space-x-1.5">
+                  <Users className="h-3.5 w-3.5" />
                   <span>Teams</span>
                 </div>
               </button>
@@ -1105,7 +1211,7 @@ export default function ProviderDetailPage() {
           <>
             {/* Overview Tab */}
             {activeTab === 'overview' && (
-              <div className="space-y-8">
+              <div className="space-y-5">
                 {/* Cost Summary - Plain-English Explanation */}
                 {providerId && (() => {
                   // Calculate the date range for the selected period
@@ -1219,9 +1325,9 @@ export default function ProviderDetailPage() {
                 {/* Service Breakdown */}
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Service Breakdown</h2>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl mx-auto mb-10">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto mb-6">
                     {/* Pie Chart - Service Distribution */}
-                    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+                    <div className="card bg-white border-[#E2E8F0]">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                           <BarChart2 className="h-5 w-5 text-frozenWater-600" />
@@ -1297,7 +1403,7 @@ export default function ProviderDetailPage() {
                     </div>
 
                     {/* Bar Chart - Service Costs */}
-                    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+                    <div className="card bg-white border-[#E2E8F0]">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                           <BarChart2 className="h-5 w-5 text-frozenWater-600" />
@@ -1455,7 +1561,7 @@ export default function ProviderDetailPage() {
                                   {/* Sub-services expandable row */}
                                   {isExpanded && (
                                     <tr key={`sub-${index}-${service.name}`}>
-                                      <td colSpan={5} className="bg-gradient-to-b from-frozenWater-50/70 to-frozenWater-50/30 p-0">
+                                      <td colSpan={5} className="bg-[#F8FAFC] p-0">
                                         <div className="px-8 py-6">
                                           {isLoadingSubServices ? (
                                             <div className="flex items-center justify-center py-6">

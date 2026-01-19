@@ -23,7 +23,10 @@ router.use(authenticateToken)
  */
 router.post('/showback', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' })
+    }
     const { reportName, startDate, endDate, providerId, accountId, teamName, productName, format = 'csv' } = req.body
     
     if (!reportName || !startDate || !endDate) {
@@ -42,6 +45,15 @@ router.post('/showback', async (req, res) => {
       productName
     })
     
+    // Add report options to reportData for generator
+    reportData.options = {
+      reportName,
+      providerId,
+      accountId,
+      teamName,
+      productName
+    }
+    
     // Save report record
     const report = await saveReport(userId, {
       reportType: 'showback',
@@ -53,6 +65,7 @@ router.post('/showback', async (req, res) => {
       teamName,
       productName,
       reportData,
+      fileFormat: format,
       status: 'generating'
     })
     
@@ -85,7 +98,10 @@ router.post('/showback', async (req, res) => {
  */
 router.post('/chargeback', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' })
+    }
     const { reportName, startDate, endDate, providerId, accountId, teamName, productName, format = 'csv' } = req.body
     
     if (!reportName || !startDate || !endDate) {
@@ -104,6 +120,15 @@ router.post('/chargeback', async (req, res) => {
       productName
     })
     
+    // Add report options to reportData for generator
+    reportData.options = {
+      reportName,
+      providerId,
+      accountId,
+      teamName,
+      productName
+    }
+    
     // Save report record
     const report = await saveReport(userId, {
       reportType: 'chargeback',
@@ -115,6 +140,7 @@ router.post('/chargeback', async (req, res) => {
       teamName,
       productName,
       reportData,
+      fileFormat: format,
       status: 'generating'
     })
     
@@ -147,7 +173,10 @@ router.post('/chargeback', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' })
+    }
     const { reportType, limit } = req.query
     
     const reports = await getReports(
@@ -169,7 +198,10 @@ router.get('/', async (req, res) => {
  */
 router.get('/:reportId', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' })
+    }
     const reportId = parseInt(req.params.reportId)
     
     if (isNaN(reportId)) {
@@ -195,7 +227,10 @@ router.get('/:reportId', async (req, res) => {
  */
 router.get('/:reportId/download', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' })
+    }
     const reportId = parseInt(req.params.reportId)
     
     if (isNaN(reportId)) {
@@ -219,7 +254,17 @@ router.get('/:reportId/download', async (req, res) => {
       return res.status(404).json({ error: 'Report file not found' })
     }
     
-    const fileName = `${report.reportName}.${report.fileFormat}`
+    // Determine file extension from fileFormat or extract from filePath
+    const fileExtension = report.fileFormat || path.extname(report.filePath).slice(1) || 'csv'
+    const fileName = `${report.reportName}.${fileExtension}`
+    
+    // Set appropriate content type
+    if (fileExtension === 'pdf') {
+      res.setHeader('Content-Type', 'application/pdf')
+    } else {
+      res.setHeader('Content-Type', 'text/csv')
+    }
+    
     res.download(report.filePath, fileName)
   } catch (error) {
     console.error('Download report error:', error)
@@ -233,7 +278,10 @@ router.get('/:reportId/download', async (req, res) => {
  */
 router.delete('/:reportId', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found' })
+    }
     const reportId = parseInt(req.params.reportId)
     
     if (isNaN(reportId)) {

@@ -109,14 +109,14 @@ export default function TeamCostCard({ team, startDate, endDate, providerId, acc
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="card-modern group">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3 flex-1">
-          <div className="p-2 bg-frozenWater-100 rounded-lg">
-            <Users className="h-5 w-5 text-frozenWater-600" />
+          <div className="p-3 bg-gradient-to-br from-frozenWater-100 to-frozenWater-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+            <Users className="h-6 w-6 text-frozenWater-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">{team.teamName}</h3>
+            <h3 className="text-xl font-bold text-gray-900">{team.teamName}</h3>
             <p className="text-sm text-gray-500">
               {team.resourceCount} resource{team.resourceCount !== 1 ? 's' : ''} • {team.serviceCount} service{team.serviceCount !== 1 ? 's' : ''}
             </p>

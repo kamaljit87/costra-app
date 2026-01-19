@@ -51,7 +51,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (isLoading) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Activity className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
@@ -64,7 +64,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (error) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
@@ -77,7 +77,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (anomalies.length === 0) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
@@ -130,7 +130,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
                     waste, or opportunities for optimization.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
+                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
                     <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
@@ -152,8 +152,8 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
                     </ul>
                   </div>
                   
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                    <h4 className="font-semibold text-yellow-800 mb-2">⚠️ When to Investigate:</h4>
+                  <div className="bg-yellow-50 rounded-2xl p-5 border border-yellow-200/50">
+                    <h4 className="font-semibold text-yellow-800 mb-3">⚠️ When to Investigate:</h4>
                     <p className="text-sm text-yellow-700">
                       Large cost increases might indicate: resource leaks, misconfigurations, or unexpected usage spikes. 
                       Large decreases might indicate: successful optimizations or service shutdowns. Always investigate significant anomalies!
@@ -164,7 +164,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setShowInfoDialog(false)}
-                    className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
+                    className="btn-primary px-6 py-2.5"
                   >
                     Got it
                   </button>
@@ -181,7 +181,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
   const sortedAnomalies = [...anomalies].sort((a, b) => b.variancePercent - a.variancePercent)
 
   return (
-    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+    <div className="card bg-white border-frozenWater-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
@@ -288,9 +288,9 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
       {/* Info Dialog */}
       {showInfoDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in" onClick={() => setShowInfoDialog(false)}>
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-lg w-full mx-4 border border-gray-200/50 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Zap className="h-6 w-6 text-frozenWater-600" />
@@ -311,7 +311,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
                   waste, or opportunities for optimization.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
+                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
                   <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
@@ -333,8 +333,8 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
                   </ul>
                 </div>
                 
-                <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                  <h4 className="font-semibold text-yellow-800 mb-2">⚠️ When to Investigate:</h4>
+                <div className="bg-yellow-50 rounded-2xl p-5 border border-yellow-200/50">
+                  <h4 className="font-semibold text-yellow-800 mb-3">⚠️ When to Investigate:</h4>
                   <p className="text-sm text-yellow-700">
                     Large cost increases might indicate: resource leaks, misconfigurations, or unexpected usage spikes. 
                     Large decreases might indicate: successful optimizations or service shutdowns. Always investigate significant anomalies!

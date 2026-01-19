@@ -92,26 +92,27 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
       {/* Sidebar - Permanent on desktop, drawer on mobile */}
       <aside
         className={`
-          ${isPermanent ? 'relative' : 'fixed'} top-0 left-0 h-full bg-frozenWater-800 z-50
+          ${isPermanent ? 'relative' : 'fixed'} top-0 left-0 h-full bg-[#1F3A5F] z-50
           ${isPermanent ? '' : `transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
           ${isPermanent ? 'lg:block' : 'lg:hidden'}
-          w-64 flex flex-col
-          border-r border-frozenWater-600/30
+          w-72 flex flex-col
+          border-r border-[#1F3A5F]/80
+          shadow-xl
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-frozenWater-600/30 bg-white">
-          <Link to="/dashboard" className="flex items-center space-x-3">
+        <div className="flex items-center justify-between h-20 px-6 border-b border-white/10 bg-[#1F3A5F]">
+          <Link to="/dashboard" className="flex items-center group">
             <img 
               src="/logo.png" 
               alt="Costra" 
-              className="h-16 w-auto"
+              className="h-16 w-auto transition-all duration-200 group-hover:scale-105"
             />
           </Link>
           {!isPermanent && (
             <button
               onClick={onClose}
-              className="lg:hidden text-white/80 hover:text-white transition-colors"
+              className="lg:hidden text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
             >
               ✕
             </button>
@@ -119,22 +120,27 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto dark-scrollbar">
+        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto dark-scrollbar">
           {/* Dashboard */}
           <Link
             to="/dashboard"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-lg
-              transition-all duration-200 group
-                        ${isActive('/dashboard')
-                          ? 'bg-frozenWater-600 text-white'
-                          : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
-                        }
+              flex items-center space-x-3 px-4 py-3 rounded-xl
+              transition-all duration-200 group relative
+              ${isActive('/dashboard')
+                ? 'bg-[#22B8A0] text-white shadow-lg shadow-[#22B8A0]/20'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+              }
             `}
           >
-            <LayoutDashboard className="h-5 w-5" />
-            <span className="font-medium">Dashboard</span>
+            <div className={`${isActive('/dashboard') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <span className="font-semibold text-sm">Dashboard</span>
+            {isActive('/dashboard') && (
+              <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white"></div>
+            )}
           </Link>
 
           {/* Budgets */}
@@ -142,16 +148,21 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
             to="/budgets"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-lg
-              transition-all duration-200 group
+              flex items-center space-x-3 px-4 py-3 rounded-xl
+              transition-all duration-200 group relative
               ${isActive('/budgets')
-                ? 'bg-frozenWater-600 text-white'
-                : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                ? 'bg-[#22B8A0] text-white shadow-lg shadow-[#22B8A0]/20'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
               }
             `}
           >
-            <Wallet className="h-5 w-5" />
-            <span className="font-medium">Budgets</span>
+            <div className={`${isActive('/budgets') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <Wallet className="h-5 w-5" />
+            </div>
+            <span className="font-semibold text-sm">Budgets</span>
+            {isActive('/budgets') && (
+              <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white"></div>
+            )}
           </Link>
 
           {/* Reports */}
@@ -159,84 +170,93 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
             to="/reports"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-lg
-              transition-all duration-200 group
+              flex items-center space-x-3 px-4 py-3 rounded-xl
+              transition-all duration-200 group relative
               ${isActive('/reports')
-                ? 'bg-frozenWater-600 text-white'
-                : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                ? 'bg-[#22B8A0] text-white shadow-lg shadow-[#22B8A0]/20'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
               }
             `}
           >
-            <FileText className="h-5 w-5" />
-            <span className="font-medium">Reports</span>
+            <div className={`${isActive('/reports') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <FileText className="h-5 w-5" />
+            </div>
+            <span className="font-semibold text-sm">Reports</span>
+            {isActive('/reports') && (
+              <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white"></div>
+            )}
           </Link>
 
           {/* Cloud Accounts Section */}
           {!isDemoMode && Object.keys(groupedAccounts).length > 0 && (
-            <div className="pt-6">
-              <div className="px-4 pb-2 text-xs font-semibold text-frozenWater-300 uppercase tracking-wider">
+            <div className="pt-6 mt-6 border-t border-white/10">
+              <div className="px-4 pb-3 text-[10px] font-bold text-white/50 uppercase tracking-widest">
                 Cloud Providers
               </div>
               
               {Object.entries(groupedAccounts).map(([providerId, accounts]) => (
-                <div key={providerId} className="mt-1">
+                <div key={providerId} className="mt-1.5">
                   <button
                     onClick={() => toggleProviderExpand(providerId)}
                     className={`
-                      flex items-center space-x-3 px-4 py-2.5 w-full rounded-lg
+                      flex items-center space-x-3 px-4 py-3 w-full rounded-xl
                       transition-all duration-200 group
                       ${expandedProviders.has(providerId)
-                        ? 'bg-frozenWater-600 text-white'
-                        : 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
+                        ? 'bg-white/15 text-white shadow-md'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
                       }
                     `}
                   >
                     <div 
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10"
+                      className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${
+                        expandedProviders.has(providerId)
+                          ? 'bg-white/20'
+                          : 'bg-white/10 group-hover:bg-white/15'
+                      }`}
                     >
-                      <ProviderIcon providerId={providerId} size={18} />
+                      <ProviderIcon providerId={providerId} size={20} />
                     </div>
-                    <span className="flex-1 text-left text-sm font-medium">
+                    <span className="flex-1 text-left text-sm font-semibold">
                       {accounts[0].providerName}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white">
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/15 text-white">
                       {accounts.length}
                     </span>
                     {expandedProviders.has(providerId) ? (
-                      <ChevronUp className="h-4 w-4 text-white transition-transform duration-200" />
+                      <ChevronUp className="h-4 w-4 text-white/70 transition-transform duration-200" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-white transition-transform duration-200" />
+                      <ChevronDown className="h-4 w-4 text-white/70 transition-transform duration-200" />
                     )}
                   </button>
                   
                   {expandedProviders.has(providerId) && (
-                    <div className="ml-6 mt-1 space-y-0.5 animate-fade-in">
+                    <div className="ml-4 mt-2 space-y-1 animate-fade-in">
                       {accounts.map((account) => (
                         <Link
                           key={account.accountId}
                           to={`/provider/${providerId}?account=${account.accountId}`}
                           onClick={onClose}
                           className={`
-                            flex items-center space-x-2 px-4 py-2 rounded-lg text-sm
+                            flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs
                             transition-all duration-200
                             ${location.search.includes(`account=${account.accountId}`)
-                              ? 'bg-frozenWater-600 text-white'
+                              ? 'bg-[#22B8A0] text-white shadow-md'
                               : account.isActive
-                                ? 'text-frozenWater-100 hover:text-white hover:bg-frozenWater-700/60'
-                                : 'text-frozenWater-200/60 hover:text-frozenWater-100 hover:bg-frozenWater-700/40'
+                                ? 'text-white/90 hover:text-white hover:bg-white/10'
+                                : 'text-white/50 hover:text-white/70 hover:bg-white/5'
                             }
                           `}
                         >
                           <div 
-                            className={`w-2 h-2 rounded-full ${
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${
                               account.isActive ? 'bg-white' : 'bg-white/40'
                             }`}
                           />
-                          <span className="truncate flex-1">
+                          <span className="truncate flex-1 font-medium">
                             {account.accountAlias || `Account ${account.accountId}`}
                           </span>
                           {!account.isActive && (
-                            <span className="text-xs text-white/50">(Inactive)</span>
+                            <span className="text-[10px] text-white/40">Inactive</span>
                           )}
                         </Link>
                       ))}
@@ -249,20 +269,20 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
 
           {/* Demo Mode Placeholder */}
           {isDemoMode && (
-            <div className="pt-6">
-              <div className="px-4 pb-2 text-xs font-semibold text-frozenWater-300 uppercase tracking-wider">
+            <div className="pt-6 mt-6 border-t border-white/10">
+              <div className="px-4 pb-3 text-[10px] font-bold text-white/50 uppercase tracking-widest">
                 Cloud Providers
               </div>
-              <div className="px-4 py-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-white/10 flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
+              <div className="px-4 py-8 text-center">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#22B8A0]/20 flex items-center justify-center">
+                  <Sparkles className="w-7 h-7 text-[#22B8A0]" />
                 </div>
-                <p className="text-xs text-frozenWater-100 mb-3">
+                <p className="text-xs text-white/70 mb-4 font-medium">
                   Connect cloud providers to track costs
                 </p>
                 <Link
                   to="/signup"
-                  className="inline-flex items-center text-xs text-white hover:text-white/80 font-medium transition-colors"
+                  className="inline-flex items-center px-4 py-2 rounded-xl text-xs text-white bg-[#22B8A0] hover:bg-[#1ea890] font-semibold transition-all duration-200 shadow-lg shadow-[#22B8A0]/20"
                 >
                   Get started →
                 </Link>

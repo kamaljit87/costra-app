@@ -15,15 +15,18 @@ export default function ProviderCostCard({ data }: ProviderCostCardProps) {
   const changePercent = lastMonth > 0 ? ((currentMonth - lastMonth) / lastMonth) * 100 : 0
 
   return (
-    <div className="card">
+    <div className="card-modern group">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center mb-2">
             <div 
-              className="w-8 h-8 flex items-center justify-center rounded-lg mr-2"
-              style={{ backgroundColor: `${getProviderColor(data.provider.id)}15` }}
+              className="w-10 h-10 flex items-center justify-center rounded-2xl mr-3 group-hover:scale-110 transition-transform duration-300"
+              style={{ 
+                backgroundColor: `${getProviderColor(data.provider.id)}15`,
+                boxShadow: `0 4px 12px ${getProviderColor(data.provider.id)}20`
+              }}
             >
-              <ProviderIcon providerId={data.provider.id} size={20} />
+              <ProviderIcon providerId={data.provider.id} size={24} />
             </div>
             <h3 className="text-lg font-semibold text-gray-900">{data.provider.name}</h3>
           </div>
@@ -41,7 +44,7 @@ export default function ProviderCostCard({ data }: ProviderCostCardProps) {
         </div>
       </div>
 
-      <div className="space-y-2 pt-4 border-t border-gray-200">
+      <div className="space-y-3 pt-6 border-t border-gray-200/60">
         {data.services.slice(0, 3).map((service) => (
           <div key={service.name} className="flex items-center justify-between text-sm">
             <span className="text-gray-600">{service.name}</span>

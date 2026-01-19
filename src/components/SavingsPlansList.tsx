@@ -34,36 +34,36 @@ export default function SavingsPlansList({ plans }: SavingsPlansListProps) {
 
   if (!plans || plans.length === 0) {
     return (
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Savings Plans</h3>
-        <div className="text-center py-8">
-          <p className="text-gray-600 mb-2">No savings plans found</p>
-          <p className="text-sm text-gray-500">Savings plans will appear here when available</p>
+      <div className="card p-4">
+        <h3 className="text-base font-semibold text-[#0F172A] mb-3">Savings Plans</h3>
+        <div className="text-center py-6">
+          <p className="text-sm text-[#64748B] mb-1">No savings plans found</p>
+          <p className="text-xs text-[#64748B]">Savings plans will appear here when available</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="card">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Savings Plans</h3>
-      <div className="space-y-3">
+    <div className="card p-4">
+      <h3 className="text-base font-semibold text-[#0F172A] mb-3">Savings Plans</h3>
+      <div className="space-y-2">
         {plans.map((plan) => (
-          <div key={plan.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center space-x-3">
+          <div key={plan.id} className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+            <div className="flex items-center space-x-2.5">
               {getStatusIcon(plan.status)}
               <div>
-                <div className="font-medium text-gray-900">{plan.name}</div>
-                <div className="text-sm text-gray-600">{plan.provider}</div>
+                <div className="text-sm font-semibold text-[#0F172A]">{plan.name}</div>
+                <div className="text-xs text-[#64748B]">{plan.provider}</div>
               </div>
             </div>
             <div className="text-right">
-              <div className="font-semibold text-gray-900">{plan.discount}% discount</div>
-              <div className={`text-xs px-2 py-1 rounded-full inline-block mt-1 ${getStatusColor(plan.status)}`}>
+              <div className="text-sm font-bold text-[#0F172A]">{plan.discount}% discount</div>
+              <div className={`text-[10px] px-2 py-0.5 rounded-lg inline-block mt-1 ${getStatusColor(plan.status)}`}>
                 {plan.status}
               </div>
               {plan.expiresAt && (
-                <div className="text-xs text-gray-500 mt-1">Expires {plan.expiresAt}</div>
+                <div className="text-[10px] text-[#64748B] mt-0.5">Expires {plan.expiresAt}</div>
               )}
             </div>
           </div>

@@ -52,7 +52,7 @@ export default function BudgetWidget() {
 
   if (budgets.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+      <div className="bg-white rounded-2xl border border-gray-200/60 p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-frozenWater-600" />
@@ -84,15 +84,15 @@ export default function BudgetWidget() {
   const warningBudgets = budgets.filter(b => b.percentage >= b.alertThreshold && b.percentage < 100)
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-2xl border border-[#E2E8F0] p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Wallet className="h-5 w-5 text-frozenWater-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Budgets</h3>
+          <Wallet className="h-4 w-4 text-[#22B8A0]" />
+          <h3 className="text-base font-semibold text-[#0F172A]">Budgets</h3>
         </div>
         <Link
           to="/budgets"
-          className="text-sm text-frozenWater-600 hover:text-frozenWater-700 font-medium"
+          className="text-xs text-[#22B8A0] hover:text-[#1F3A5F] font-medium"
         >
           View All
         </Link>
@@ -100,14 +100,14 @@ export default function BudgetWidget() {
 
       {/* Alerts Summary */}
       {alerts.length > 0 && (
-        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-            <span className="text-sm font-medium text-yellow-900">
+        <div className="mb-3 bg-[#FEF3C7] border border-[#FDE68A] rounded-xl p-2.5">
+          <div className="flex items-center gap-1.5 mb-1">
+            <AlertTriangle className="h-3.5 w-3.5 text-[#F59E0B]" />
+            <span className="text-xs font-semibold text-[#92400E]">
               {alerts.length} Budget Alert{alerts.length > 1 ? 's' : ''}
             </span>
           </div>
-          <p className="text-xs text-yellow-700">
+          <p className="text-[10px] text-[#78350F]">
             {exceededBudgets.length > 0 && `${exceededBudgets.length} exceeded`}
             {exceededBudgets.length > 0 && warningBudgets.length > 0 && ', '}
             {warningBudgets.length > 0 && `${warningBudgets.length} approaching limit`}
@@ -116,54 +116,54 @@ export default function BudgetWidget() {
       )}
 
       {/* Budget Summary Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{activeBudgets.length}</div>
-          <div className="text-xs text-gray-500">Active</div>
+          <div className="text-xl font-bold text-[#0F172A]">{activeBudgets.length}</div>
+          <div className="text-[10px] text-[#64748B]">Active</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-yellow-600">{warningBudgets.length}</div>
-          <div className="text-xs text-gray-500">Warning</div>
+          <div className="text-xl font-bold text-[#F59E0B]">{warningBudgets.length}</div>
+          <div className="text-[10px] text-[#64748B]">Warning</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-red-600">{exceededBudgets.length}</div>
-          <div className="text-xs text-gray-500">Exceeded</div>
+          <div className="text-xl font-bold text-[#DC2626]">{exceededBudgets.length}</div>
+          <div className="text-[10px] text-[#64748B]">Exceeded</div>
         </div>
       </div>
 
       {/* Top Budgets */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {budgets.slice(0, 3).map((budget) => {
           const progressWidth = Math.min(budget.percentage, 100)
           return (
-            <div key={budget.id} className="border border-gray-200 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-900 truncate">
+            <div key={budget.id} className="border border-[#E2E8F0] rounded-xl p-2.5">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-[#0F172A] truncate">
                   {budget.budgetName}
                 </span>
-                <span className={`text-xs font-medium ${
+                <span className={`text-[10px] font-semibold ${
                   budget.percentage >= 100
-                    ? 'text-red-600'
+                    ? 'text-[#DC2626]'
                     : budget.percentage >= budget.alertThreshold
-                    ? 'text-yellow-600'
-                    : 'text-frozenWater-600'
+                    ? 'text-[#F59E0B]'
+                    : 'text-[#22B8A0]'
                 }`}>
                   {budget.percentage.toFixed(1)}%
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+              <div className="w-full bg-[#E2E8F0] rounded-full h-1.5 mb-1">
                 <div
-                  className={`h-2 rounded-full transition-all ${
+                  className={`h-1.5 rounded-full transition-all ${
                     budget.percentage >= 100
-                      ? 'bg-red-500'
+                      ? 'bg-[#DC2626]'
                       : budget.percentage >= budget.alertThreshold
-                      ? 'bg-yellow-500'
-                      : 'bg-frozenWater-500'
+                      ? 'bg-[#F59E0B]'
+                      : 'bg-[#22B8A0]'
                   }`}
                   style={{ width: `${progressWidth}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-[10px] text-[#64748B]">
                 <span>{convertAmount(budget.currentSpend)}</span>
                 <span>of {convertAmount(budget.budgetAmount)}</span>
               </div>
@@ -175,7 +175,7 @@ export default function BudgetWidget() {
       {budgets.length > 3 && (
         <Link
           to="/budgets"
-          className="mt-4 block text-center text-sm text-frozenWater-600 hover:text-frozenWater-700 font-medium"
+          className="mt-3 block text-center text-xs text-[#22B8A0] hover:text-[#1F3A5F] font-medium"
         >
           View all {budgets.length} budgets →
         </Link>

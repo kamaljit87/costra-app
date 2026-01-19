@@ -109,14 +109,14 @@ export default function ProductCostCard({ product, startDate, endDate, providerI
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="card-modern group">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3 flex-1">
-          <div className="p-2 bg-frozenWater-100 rounded-lg">
-            <Package className="h-5 w-5 text-frozenWater-600" />
+          <div className="p-3 bg-gradient-to-br from-frozenWater-100 to-frozenWater-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+            <Package className="h-6 w-6 text-frozenWater-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">{product.productName}</h3>
+            <h3 className="text-xl font-bold text-gray-900">{product.productName}</h3>
             <p className="text-sm text-gray-500">
               {product.resourceCount} resource{product.resourceCount !== 1 ? 's' : ''} • {product.serviceCount} service{product.serviceCount !== 1 ? 's' : ''}
             </p>
@@ -134,8 +134,8 @@ export default function ProductCostCard({ product, startDate, endDate, providerI
         </button>
       </div>
 
-      <div className="mb-4">
-        <div className="text-3xl font-bold text-gray-900 mb-2">
+      <div className="mb-6">
+        <div className="text-4xl font-bold text-gray-900 mb-3">
           {convertAmount(product.totalCost)}
         </div>
         {isLoadingTrend ? (

@@ -107,7 +107,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
 
   if (isLoading) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Filter className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
@@ -120,7 +120,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
 
   if (error && !hasDimensions) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
@@ -133,7 +133,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
 
   if (!hasDimensions) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
@@ -150,7 +150,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
             <p className="text-sm text-frozenWater-600">View costs grouped by tags (team, product, environment)</p>
           </div>
         </div>
-        <div className="flex items-center justify-center py-12 bg-frozenWater-50 rounded-xl border border-frozenWater-200">
+        <div className="flex items-center justify-center py-12 bg-frozenWater-50 rounded-2xl border border-frozenWater-200">
           <div className="text-center">
             <Tag className="h-10 w-10 text-frozenWater-600 mx-auto mb-3" />
             <p className="text-frozenWater-900 font-medium mb-1">No dimension tags found</p>
@@ -162,9 +162,9 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
 
         {/* Info Dialog */}
         {showInfoDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in" onClick={() => setShowInfoDialog(false)}>
+            <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-lg w-full mx-4 border border-gray-200/50 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+              <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <Tag className="h-6 w-6 text-frozenWater-600" />
@@ -185,37 +185,52 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                     and understanding who or what is responsible for your cloud spending.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
-                    <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
-                        <span>Select a <strong>dimension</strong> (tag key) like "Team", "Product", or "Environment"</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
-                        <span>View costs grouped by <strong>dimension values</strong> (tag values) like "Engineering", "Production", etc.</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
-                        <span>See total cost, percentage of total, and resource counts for each value</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
-                        <span>Expand rows to see service-level breakdowns within each dimension value</span>
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <h4 className="font-semibold text-blue-800 mb-2">💡 Use Cases:</h4>
-                    <ul className="space-y-1 text-sm text-blue-700">
-                      <li>• <strong>Cost Allocation:</strong> See which team or product is spending the most</li>
-                      <li>• <strong>Budget Management:</strong> Track spending by environment (prod, staging, dev)</li>
-                      <li>• <strong>Chargeback:</strong> Allocate costs to different departments or projects</li>
-                      <li>• <strong>Optimization:</strong> Identify high-cost areas by dimension for targeted optimization</li>
-                    </ul>
-                  </div>
+                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200">
+                  <h4 className="font-semibold text-frozenWater-800 mb-3">How It Works:</h4>
+                  <ul className="space-y-2.5 text-sm">
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>Select a <strong className="text-frozenWater-700">dimension</strong> (tag key) like "Team", "Product", or "Environment"</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>View costs grouped by <strong className="text-frozenWater-700">dimension values</strong> (tag values) like "Engineering", "Production", etc.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>See total cost, percentage of total, and resource counts for each value</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>Click rows to expand and see service-level breakdowns within each dimension value</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="bg-blue-50 rounded-2xl p-5 border border-blue-200/50">
+                  <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                    <span className="text-lg">💡</span>
+                    Use Cases:
+                  </h4>
+                  <ul className="space-y-2 text-sm text-blue-700">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Cost Allocation:</strong> See which team or product is spending the most</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Budget Management:</strong> Track spending by environment (prod, staging, dev)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Chargeback:</strong> Allocate costs to different departments or projects</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Optimization:</strong> Identify high-cost areas by dimension for targeted optimization</span>
+                    </li>
+                  </ul>
+                </div>
                   
                   <p className="text-sm text-gray-600">
                     <strong>Note:</strong> This feature requires your cloud resources to be tagged. If you don't see any dimensions, 
@@ -223,14 +238,14 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                   </p>
                 </div>
                 
-                <div className="mt-6 flex justify-end">
-                  <button
-                    onClick={() => setShowInfoDialog(false)}
-                    className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Got it
-                  </button>
-                </div>
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowInfoDialog(false)}
+                  className="btn-primary px-6 py-2.5"
+                >
+                  Got it
+                </button>
+              </div>
               </div>
             </div>
           </div>
@@ -242,7 +257,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
   const totalCost = data.reduce((sum, item) => sum + item.totalCost, 0)
 
   return (
-    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+    <div className="card bg-white border-frozenWater-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
@@ -262,9 +277,9 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
 
       {/* Info Dialog */}
       {showInfoDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in" onClick={() => setShowInfoDialog(false)}>
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-lg w-full mx-4 border border-gray-200/50 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Tag className="h-6 w-6 text-frozenWater-600" />
@@ -285,35 +300,50 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                   and understanding who or what is responsible for your cloud spending.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
-                      <span>Select a <strong>dimension</strong> (tag key) like "Team", "Product", or "Environment"</span>
+                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200">
+                  <h4 className="font-semibold text-frozenWater-800 mb-3">How It Works:</h4>
+                  <ul className="space-y-2.5 text-sm">
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>Select a <strong className="text-frozenWater-700">dimension</strong> (tag key) like "Team", "Product", or "Environment"</span>
                     </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
-                      <span>View costs grouped by <strong>dimension values</strong> (tag values) like "Engineering", "Production", etc.</span>
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>View costs grouped by <strong className="text-frozenWater-700">dimension values</strong> (tag values) like "Engineering", "Production", etc.</span>
                     </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
                       <span>See total cost, percentage of total, and resource counts for each value</span>
                     </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
-                      <span>Expand rows to see service-level breakdowns within each dimension value</span>
+                    <li className="flex items-start gap-3">
+                      <span className="text-frozenWater-500 mt-0.5 text-lg">•</span>
+                      <span>Click rows to expand and see service-level breakdowns within each dimension value</span>
                     </li>
                   </ul>
                 </div>
                 
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <h4 className="font-semibold text-blue-800 mb-2">💡 Use Cases:</h4>
-                  <ul className="space-y-1 text-sm text-blue-700">
-                    <li>• <strong>Cost Allocation:</strong> See which team or product is spending the most</li>
-                    <li>• <strong>Budget Management:</strong> Track spending by environment (prod, staging, dev)</li>
-                    <li>• <strong>Chargeback:</strong> Allocate costs to different departments or projects</li>
-                    <li>• <strong>Optimization:</strong> Identify high-cost areas by dimension for targeted optimization</li>
+                <div className="bg-blue-50 rounded-2xl p-5 border border-blue-200/50">
+                  <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                    <span className="text-lg">💡</span>
+                    Use Cases:
+                  </h4>
+                  <ul className="space-y-2 text-sm text-blue-700">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Cost Allocation:</strong> See which team or product is spending the most</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Budget Management:</strong> Track spending by environment (prod, staging, dev)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Chargeback:</strong> Allocate costs to different departments or projects</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-0.5">•</span>
+                      <span><strong>Optimization:</strong> Identify high-cost areas by dimension for targeted optimization</span>
+                    </li>
                   </ul>
                 </div>
                 
@@ -326,7 +356,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={() => setShowInfoDialog(false)}
-                  className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
+                  className="btn-primary px-6 py-2.5"
                 >
                   Got it
                 </button>
@@ -337,7 +367,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
       )}
 
       {/* Dimension Filter */}
-      <div className="mb-6 p-4 bg-frozenWater-50 rounded-xl border border-frozenWater-200">
+      <div className="mb-6 p-5 bg-frozenWater-50 rounded-2xl border border-frozenWater-200">
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-frozenWater-800 flex items-center gap-2">
             <Filter className="h-4 w-4 text-frozenWater-600" />
@@ -350,7 +380,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
               setSelectedValue(null)
               setExpandedRows(new Set())
             }}
-            className="px-3 py-2 rounded-lg border border-frozenWater-200 text-sm focus:outline-none focus:ring-2 focus:ring-frozenWater-500 focus:border-transparent bg-white text-gray-900"
+            className="px-4 py-2.5 rounded-xl border border-frozenWater-200/60 text-sm focus:outline-none focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 bg-white/90 text-gray-900 transition-all"
           >
             <option value="">Select dimension...</option>
             {dimensionKeys.map(key => (
@@ -368,7 +398,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                   setSelectedValue(e.target.value || null)
                   setExpandedRows(new Set())
                 }}
-                className="px-3 py-2 rounded-lg border border-frozenWater-200 text-sm focus:outline-none focus:ring-2 focus:ring-frozenWater-500 focus:border-transparent bg-white text-gray-900"
+                className="px-4 py-2.5 rounded-xl border border-frozenWater-200/60 text-sm focus:outline-none focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 bg-white/90 text-gray-900 transition-all"
               >
                 <option value="">All values</option>
                 {dimensions[selectedDimension].map(item => (
@@ -441,22 +471,22 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                 return (
                   <React.Fragment key={item.dimensionValue}>
                     <tr 
-                      className="hover:bg-frozenWater-50/50 transition-colors cursor-pointer"
+                      className="hover:bg-frozenWater-50/50 transition-all duration-200 cursor-pointer group"
                       onClick={() => toggleRowExpansion(item.dimensionValue)}
                     >
                       <td className="py-4 px-2 text-center">
                         <ChevronDown 
-                          className={`h-4 w-4 text-frozenWater-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                          className={`h-5 w-5 text-frozenWater-600 transition-all duration-200 group-hover:text-frozenWater-700 ${isExpanded ? 'rotate-180' : ''}`}
                         />
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2">
-                          <Tag className="h-4 w-4 text-frozenWater-500" />
-                          <span className="font-medium text-gray-900">{item.dimensionValue}</span>
+                          <Tag className="h-4 w-4 text-frozenWater-500 group-hover:text-frozenWater-600 transition-colors" />
+                          <span className="font-medium text-gray-900 group-hover:text-frozenWater-700 transition-colors">{item.dimensionValue}</span>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-right">
-                        <div className="font-semibold text-gray-900">{formatCurrency(item.totalCost)}</div>
+                        <div className="font-semibold text-gray-900 group-hover:text-frozenWater-700 transition-colors">{formatCurrency(item.totalCost)}</div>
                       </td>
                       <td className="py-4 px-4 text-right">
                         <div className="text-frozenWater-700 font-medium">{percentage.toFixed(1)}%</div>
@@ -472,7 +502,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                     {/* Expanded Service Breakdown */}
                     {isExpanded && item.services.length > 0 && (
                       <tr>
-                        <td colSpan={6} className="bg-gradient-to-b from-frozenWater-50/70 to-frozenWater-50/30 p-0">
+                        <td colSpan={6} className="bg-frozenWater-50 p-0">
                           <div className="px-8 py-6">
                             <h4 className="text-sm font-semibold text-frozenWater-800 flex items-center gap-2 mb-4">
                               <Layers className="h-4 w-4 text-frozenWater-600" />
@@ -484,7 +514,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
                                 return (
                                   <div
                                     key={service.serviceName}
-                                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-frozenWater-200 shadow-sm hover:shadow-md transition-shadow"
+                                    className="flex items-center justify-between p-4 bg-white rounded-xl border border-frozenWater-200/60 shadow-sm hover:shadow-md hover:border-frozenWater-300/60 transition-all duration-200 cursor-pointer group/item"
                                   >
                                     <div className="flex-1">
                                       <div className="font-medium text-gray-900">{service.serviceName}</div>

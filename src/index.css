@@ -8,7 +8,7 @@
   }
   
   body {
-    @apply bg-surface-50 text-gray-900 antialiased font-sans;
+    @apply bg-[#F8FAFC] text-[#0F172A] antialiased font-sans;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -31,70 +31,110 @@
   }
 
   /* Dark scrollbar for sidebar */
+  .dark-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .dark-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
   .dark-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-sidebar-border;
+    @apply bg-white/20 rounded-full;
   }
 
   .dark-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-500;
+    @apply bg-white/30;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-frozenWater-600 to-frozenWater-500 text-white px-6 py-2.5 rounded-xl font-semibold 
-           hover:from-frozenWater-700 hover:to-frozenWater-600 
-           transition-all duration-300 ease-out
-           focus:outline-none focus:ring-2 focus:ring-frozenWater-500 focus:ring-offset-2
-           shadow-lg shadow-frozenWater-500/25 hover:shadow-xl hover:shadow-frozenWater-500/30
+    @apply bg-[#1F3A5F] 
+           text-white px-6 py-2.5 rounded-xl font-semibold text-sm
+           hover:bg-[#243b53] 
+           transition-all duration-150 ease-out
+           focus:outline-none focus:ring-2 focus:ring-[#1F3A5F]/20 focus:ring-offset-2
+           shadow-sm
+           hover:shadow-md
            active:scale-[0.98];
   }
   
   .btn-secondary {
-    @apply bg-white text-gray-700 px-6 py-2.5 rounded-xl font-semibold 
-           border border-gray-200 
-           hover:bg-gray-50 hover:border-gray-300
-           transition-all duration-200 
-           focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2
+    @apply bg-white text-[#0F172A] px-6 py-2.5 rounded-xl font-semibold text-sm
+           border border-[#E2E8F0] shadow-sm
+           hover:bg-gray-50 hover:border-[#E2E8F0] hover:shadow-md
+           transition-all duration-150 ease-out
+           focus:outline-none focus:ring-2 focus:ring-[#1F3A5F]/10 focus:ring-offset-2
            active:scale-[0.98];
   }
 
   .btn-ghost {
-    @apply text-gray-600 px-4 py-2 rounded-lg font-medium
-           hover:bg-gray-100 hover:text-gray-900
-           transition-all duration-200
-           active:scale-[0.98];
+    @apply text-gray-600 px-5 py-2.5 rounded-xl font-medium text-sm
+           hover:bg-gray-100/80 hover:text-gray-900
+           transition-all duration-200 ease-out
+           active:scale-[0.96];
+  }
+
+  .btn-modern {
+    @apply bg-white text-gray-700 px-6 py-2.5 rounded-2xl font-semibold text-sm
+           border border-gray-200 shadow-sm
+           hover:border-frozenWater-300 hover:shadow-md
+           hover:bg-frozenWater-50
+           transition-all duration-200 ease-out
+           active:scale-[0.97];
   }
   
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-gray-100/50 p-6 lg:p-8
-           transition-all duration-300 ease-out
-           hover:shadow-card-hover;
+    @apply bg-white rounded-xl shadow-sm
+           border border-[#E2E8F0] p-5
+           transition-all duration-150 ease-out
+           hover:shadow-md
+           hover:border-[#E2E8F0];
   }
 
   .card-interactive {
     @apply card cursor-pointer
-           hover:border-frozenWater-200/50 hover:-translate-y-0.5;
+           hover:border-[#22B8A0] hover:shadow-md
+           active:scale-[0.98];
   }
 
   .card-glass {
-    @apply bg-white/80 backdrop-blur-xl rounded-2xl shadow-card border border-white/20 p-6;
+    @apply bg-white rounded-xl 
+           shadow-sm 
+           border border-[#E2E8F0] p-5
+           transition-all duration-150
+           hover:shadow-md;
   }
 
   .card-gradient {
-    @apply bg-gradient-to-br from-white to-surface-100 rounded-2xl shadow-card border border-gray-100/50 p-6;
+    @apply bg-white 
+           rounded-xl shadow-sm 
+           border border-[#E2E8F0] p-5
+           transition-all duration-150
+           hover:shadow-md
+           hover:border-[#E2E8F0];
+  }
+
+  .card-modern {
+    @apply bg-white
+           rounded-xl shadow-sm
+           border border-[#E2E8F0] p-5
+           transition-all duration-150 ease-out
+           hover:shadow-md
+           hover:border-[#E2E8F0];
   }
   
   .input-field {
-    @apply w-full px-4 py-3 bg-surface-50 border border-gray-200 rounded-xl 
-           focus:outline-none focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500 
-           transition-all duration-200
-           placeholder:text-gray-400;
+    @apply w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg 
+           focus:outline-none focus:ring-2 focus:ring-[#1F3A5F]/10 focus:border-[#1F3A5F] 
+           transition-all duration-150
+           placeholder:text-[#64748B] text-[#0F172A];
   }
 
   .input-field-dark {
-    @apply w-full px-4 py-3 bg-sidebar-hover border border-sidebar-border rounded-xl text-white
-           focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 
+    @apply w-full px-5 py-3.5 bg-sidebar-hover border border-sidebar-border/60 rounded-2xl text-white
+           focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500/60 
            transition-all duration-200
            placeholder:text-sidebar-text;
   }
@@ -122,21 +162,31 @@
 
   /* Stats card */
   .stat-card {
-    @apply relative overflow-hidden rounded-2xl p-6 
-           bg-gradient-to-br from-white via-white to-surface-100
-           border border-gray-100/80 shadow-card;
-  }
-
-  .stat-card::before {
-    content: '';
-    @apply absolute top-0 right-0 w-32 h-32 
-           bg-gradient-to-br from-frozenWater-500/5 to-transparent
-           rounded-full -translate-y-1/2 translate-x-1/2;
+    @apply relative overflow-hidden rounded-xl p-5 
+           bg-white
+           border border-[#E2E8F0] 
+           shadow-sm
+           transition-all duration-150 ease-out
+           hover:shadow-md
+           hover:border-[#E2E8F0];
   }
 
   /* Shimmer loading effect */
   .shimmer {
-    @apply animate-shimmer bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%];
+    @apply animate-shimmer bg-gray-200 bg-[length:200%_100%]
+           rounded-2xl;
+  }
+
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded-2xl;
+  }
+
+  .skeleton-card {
+    @apply bg-white rounded-3xl p-6 border border-gray-200 shadow-sm;
+  }
+
+  .skeleton-line {
+    @apply h-4 bg-gray-200 rounded-lg;
   }
 
   /* Glow effects */
@@ -150,28 +200,41 @@
 
   /* Chart container */
   .chart-container {
-    @apply bg-gradient-to-br from-white to-surface-50 rounded-2xl p-6 border border-gray-100/50;
+    @apply bg-white 
+           rounded-xl p-5 
+           border border-[#E2E8F0] 
+           shadow-sm
+           transition-all duration-150
+           hover:shadow-md;
   }
 
   /* Table styles */
   .table-modern {
-    @apply w-full;
+    @apply w-full rounded-2xl overflow-hidden;
   }
 
   .table-modern thead {
-    @apply bg-surface-50;
+    @apply bg-gray-50;
   }
 
   .table-modern th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider;
+    @apply px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider
+           border-b border-gray-200/60;
   }
 
   .table-modern td {
-    @apply px-4 py-4 text-sm;
+    @apply px-6 py-4 text-sm text-gray-700;
   }
 
   .table-modern tbody tr {
-    @apply border-b border-gray-100 last:border-0 transition-colors hover:bg-surface-50;
+    @apply border-b border-gray-100 last:border-0 
+           transition-all duration-200 ease-out
+           hover:bg-frozenWater-50
+           hover:shadow-sm;
+  }
+
+  .table-modern tbody tr:hover td {
+    @apply text-gray-900;
   }
 
   /* Tooltip */
@@ -187,7 +250,7 @@
   }
 
   .progress-bar-fill {
-    @apply h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all duration-500;
+    @apply h-full bg-[#22B8A0] rounded-full transition-all duration-500;
   }
 }
 
@@ -210,13 +273,13 @@
   }
 
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent;
+    @apply text-frozenWater-600;
   }
 
   .bg-gradient-primary {
-    @apply bg-gradient-to-r from-primary-600 to-primary-500;
+    @apply bg-frozenWater-600;
   }  .bg-gradient-accent {
-    @apply bg-gradient-to-r from-accent-500 to-accent-400;
+    @apply bg-frozenWater-500;
   }  .border-gradient {
     border-image: linear-gradient(to right, theme('colors.primary.500'), theme('colors.accent.500')) 1;
   }

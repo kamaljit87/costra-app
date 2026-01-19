@@ -106,24 +106,26 @@ export default function Dashboard() {
 
         {/* Demo Mode Banner */}
         {isDemoMode && (
-          <div className="mb-6 bg-frozenWater-50 border border-frozenWater-200 rounded-xl px-6 py-4 flex items-center space-x-3 animate-fade-in">
-            <div className="w-10 h-10 rounded-xl bg-frozenWater-100 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-frozenWater-600" />
+          <div className="mb-4 bg-[#F0FDFA] border border-[#BBF7D0] rounded-2xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
+            <div className="w-8 h-8 rounded-xl bg-[#CCFBF1] flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-[#22B8A0]" />
             </div>
             <div>
-              <span className="text-frozenWater-700 font-semibold">Demo Mode</span>
-              <span className="text-frozenWater-600 text-sm ml-2">
+              <span className="text-[#0F766E] font-semibold text-sm">Demo Mode</span>
+              <span className="text-[#64748B] text-xs ml-2">
                 You're viewing sample data. Sign up to connect your cloud accounts.
               </span>
             </div>
           </div>
         )}
 
-        {/* Header with Sync */}
-        <div className="flex items-center justify-between mb-12">
+        {/* Header with Sync - Compact */}
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-2xl font-bold text-[#0F172A] mb-0.5">
+              Dashboard
+            </h1>
+            <p className="text-xs text-[#64748B]">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
@@ -131,11 +133,11 @@ export default function Dashboard() {
             <button
               onClick={handleSync}
               disabled={isSyncing}
-              className="bg-frozenWater-600 hover:bg-frozenWater-700 text-white px-6 py-3 rounded-xl font-semibold flex items-center space-x-2 transition-all duration-200 shadow-lg shadow-frozenWater-500/25 hover:shadow-xl hover:shadow-frozenWater-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Sync fresh data from all cloud providers (clears cache)"
             >
-              <Cloud className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+              <Cloud className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
             </button>
           )}
         </div>
@@ -150,7 +152,7 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Total Bill Summary - Centered and Prominent */}
-            <div className="mb-16">
+            <div className="mb-6">
               <TotalBillSummary
                 totalCurrent={totalCurrent}
                 totalLastMonth={totalLastMonth}
@@ -162,7 +164,7 @@ export default function Dashboard() {
 
             {/* Budget Widget */}
             {!isDemoMode && (
-              <div className="mb-8">
+              <div className="mb-5">
                 <BudgetWidget />
               </div>
             )}
@@ -210,9 +212,9 @@ export default function Dashboard() {
               
               if (providersToShow.length > 0) {
                 return (
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">By Provider</h2>
-                    <div className="space-y-6">
+                  <div className="mb-6">
+                    <h2 className="text-xl font-bold text-[#0F172A] mb-4">By Provider</h2>
+                    <div className="space-y-4">
                       {providersToShow.map((data) => {
                         const hasData = data.currentMonth > 0 || data.services.length > 0
                         return (
@@ -290,7 +292,7 @@ export default function Dashboard() {
             })()}
 
             {/* Savings Plans */}
-            <div className="mb-6">
+            <div className="mb-5">
               <SavingsPlansList plans={savingsPlans} />
             </div>
 
@@ -298,7 +300,7 @@ export default function Dashboard() {
             <button
               onClick={handleSync}
               disabled={isSyncing || isDemoMode}
-              className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-br from-frozenWater-500 to-frozenWater-600 text-white rounded-full shadow-2xl shadow-frozenWater-500/40 hover:shadow-3xl hover:shadow-frozenWater-500/50 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
+              className="fixed bottom-8 right-8 w-14 h-14 bg-frozenWater-600 text-white rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
               title="Quick sync"
             >
               <Sparkles className={`h-6 w-6 ${isSyncing ? 'animate-spin' : ''}`} />

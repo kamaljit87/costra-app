@@ -84,7 +84,7 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
   const progressWidth = Math.min(budget.percentage, 100)
 
   return (
-    <div className={`bg-white rounded-lg border-2 ${getStatusColor()} p-6 shadow-sm hover:shadow-md transition-shadow`}>
+    <div className={`bg-white rounded-2xl border ${getStatusColor()} p-6 shadow-sm hover:shadow-md transition-all duration-300`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
@@ -111,7 +111,7 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
                 className="fixed inset-0 z-10" 
                 onClick={() => setIsMenuOpen(false)}
               />
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+              <div className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg border border-gray-200/50 z-20">
                 <button
                   onClick={() => {
                     onEdit(budget)

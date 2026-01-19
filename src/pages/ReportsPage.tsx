@@ -190,7 +190,7 @@ export default function ReportsPage() {
             <FileText className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Reports Not Available in Demo Mode</h2>
             <p className="text-gray-600">
-              Please sign in to generate showback and chargeback reports.
+              Please sign in to create cost visibility and allocation reports.
             </p>
           </div>
         </div>
@@ -210,7 +210,7 @@ export default function ReportsPage() {
             Reports
           </h1>
           <p className="mt-2 text-gray-600">
-            Generate showback and chargeback reports for cost allocation
+            Create cost visibility and allocation reports for teams and products
           </p>
         </div>
 
@@ -221,9 +221,9 @@ export default function ReportsPage() {
             <div className="text-sm text-gray-700">
               <p className="font-medium mb-1">About Reports</p>
               <p>
-                <strong>Showback:</strong> Shows costs to teams/products for visibility (no billing). 
-                <strong>Chargeback:</strong> Allocates costs to teams/products for billing purposes.
-                Reports can be generated as CSV or PDF and include cost breakdowns by team/product/service.
+                <strong>Cost Visibility Report:</strong> Shows how much each team or product spent - for viewing only, no billing involved. 
+                <strong>Cost Allocation Report:</strong> Allocates costs to teams or products for actual billing and accounting.
+                Reports can be generated as CSV or PDF and include detailed cost breakdowns by team, product, and service.
               </p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function ReportsPage() {
 
         {/* Generate Report Form */}
         <div className="mb-8 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Generate New Report</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Create New Report</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Report Type */}
@@ -242,8 +242,8 @@ export default function ReportsPage() {
                 onChange={(e) => setReportType(e.target.value as 'showback' | 'chargeback')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
               >
-                <option value="showback">Showback</option>
-                <option value="chargeback">Chargeback</option>
+                <option value="showback">Cost Visibility Report (View Only)</option>
+                <option value="chargeback">Cost Allocation Report (For Billing)</option>
               </select>
             </div>
 
@@ -425,7 +425,7 @@ export default function ReportsPage() {
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-purple-100 text-purple-800'
                         }`}>
-                          {report.reportType}
+                          {report.reportType === 'showback' ? 'Visibility' : 'Allocation'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -91,7 +91,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
   if (isLoading) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Zap className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
@@ -104,7 +104,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
   if (error) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
@@ -117,7 +117,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
   if (!data || filteredRecommendations.length === 0) {
     return (
-      <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+      <div className="card bg-white border-frozenWater-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
@@ -146,9 +146,9 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
         {/* Info Dialog */}
         {showInfoDialog && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
-              <div className="p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in" onClick={() => setShowInfoDialog(false)}>
+            <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-lg w-full mx-4 border border-gray-200/50" onClick={(e) => e.stopPropagation()}>
+              <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <Zap className="h-6 w-6 text-frozenWater-600" />
@@ -168,7 +168,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                     resource utilization and suggest size adjustments to optimize costs while maintaining performance.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
+                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
                     <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
@@ -186,7 +186,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                     </ul>
                   </div>
                   
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <div className="bg-blue-50 rounded-2xl p-5 border border-blue-200/50">
                     <h4 className="font-semibold text-blue-800 mb-2">💡 Best Practices:</h4>
                     <ul className="space-y-1 text-sm text-blue-700">
                       <li>• Review recommendations carefully before applying changes</li>
@@ -196,7 +196,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                     </ul>
                   </div>
                   
-                  <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                  <div className="bg-yellow-50 rounded-2xl p-5 border border-yellow-200/50">
                     <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Important:</h4>
                     <p className="text-sm text-yellow-700">
                       These recommendations are based on estimated utilization. Always verify actual resource 
@@ -208,7 +208,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                 <div className="mt-6 flex justify-end">
                   <button
                     onClick={() => setShowInfoDialog(false)}
-                    className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
+                    className="btn-primary px-6 py-2.5"
                   >
                     Got it
                   </button>
@@ -222,7 +222,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
   }
 
   return (
-    <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+    <div className="card bg-white border-frozenWater-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
@@ -332,9 +332,9 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
       {/* Info Dialog */}
       {showInfoDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in" onClick={() => setShowInfoDialog(false)}>
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] max-w-lg w-full mx-4 border border-gray-200/50" onClick={(e) => e.stopPropagation()}>
+            <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   <Zap className="h-6 w-6 text-frozenWater-600" />
@@ -354,7 +354,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   resource utilization and suggest size adjustments to optimize costs while maintaining performance.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
+                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
                   <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
@@ -372,7 +372,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   </ul>
                 </div>
                 
-                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <div className="bg-blue-50 rounded-2xl p-5 border border-blue-200/50">
                   <h4 className="font-semibold text-blue-800 mb-2">💡 Best Practices:</h4>
                   <ul className="space-y-1 text-sm text-blue-700">
                     <li>• Review recommendations carefully before applying changes</li>
@@ -382,7 +382,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   </ul>
                 </div>
                 
-                <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                <div className="bg-yellow-50 rounded-2xl p-5 border border-yellow-200/50">
                   <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Important:</h4>
                   <p className="text-sm text-yellow-700">
                     These recommendations are based on estimated utilization. Always verify actual resource 
@@ -394,7 +394,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={() => setShowInfoDialog(false)}
-                  className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
+                  className="btn-primary px-6 py-2.5"
                 >
                   Got it
                 </button>
