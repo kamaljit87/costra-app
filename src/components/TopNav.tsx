@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { cloudProvidersAPI } from '../services/api'
+import { cloudProvidersAPI, costDataAPI } from '../services/api'
 import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 import { 
   Cloud,
@@ -13,7 +13,9 @@ import {
   Bell,
   Menu,
   CreditCard,
-  Bug
+  Bug,
+  X,
+  ArrowRight
 } from 'lucide-react'
 
 interface CloudAccount {
@@ -30,6 +32,16 @@ interface TopNavProps {
   onMenuClick?: () => void
 }
 
+interface SearchResult {
+  type: 'provider' | 'account' | 'service'
+  id: string
+  name: string
+  providerId?: string
+  accountId?: number
+  accountAlias?: string
+  url: string
+}
+
 export default function TopNav({ onMenuClick }: TopNavProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -37,13 +49,19 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isProviderMenuOpen, setIsProviderMenuOpen] = useState(false)
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
+  const [selectedResultIndex, setSelectedResultIndex] = useState(-1)
+  const [allServices, setAllServices] = useState<Array<{ providerId: string; name: string }>>([])
   const userMenuRef = useRef<HTMLDivElement>(null)
   const providerMenuRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!isDemoMode) {
-      loadCloudAccounts()
-    }
+    loadCloudAccounts()
+    loadAllServices()
   }, [isDemoMode])
 
   const loadCloudAccounts = async () => {
@@ -55,6 +73,135 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
     }
   }
 
+  const loadAllServices = async () => {
+    if (isDemoMode) {
+      // Mock services for demo mode
+      const mockServices = [
+        { providerId: 'aws', name: 'EC2 Instances' },
+        { providerId: 'aws', name: 'S3 Storage' },
+        { providerId: 'aws', name: 'RDS Databases' },
+        { providerId: 'aws', name: 'Lambda Functions' },
+        { providerId: 'aws', name: 'CloudFront CDN' },
+        { providerId: 'azure', name: 'Virtual Machines' },
+        { providerId: 'azure', name: 'Blob Storage' },
+        { providerId: 'azure', name: 'SQL Database' },
+        { providerId: 'azure', name: 'Functions' },
+        { providerId: 'azure', name: 'CDN' },
+        { providerId: 'gcp', name: 'Compute Engine' },
+        { providerId: 'gcp', name: 'Cloud Storage' },
+        { providerId: 'gcp', name: 'Cloud SQL' },
+        { providerId: 'gcp', name: 'Cloud Functions' },
+        { providerId: 'gcp', name: 'Cloud CDN' },
+      ]
+      setAllServices(mockServices)
+      return
+    }
+
+    try {
+      const providers = ['aws', 'azure', 'gcp', 'digitalocean', 'ibm', 'linode', 'vultr']
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - 30)
+      
+      const servicesPromises = providers.map(async (providerId) => {
+        try {
+          const response = await costDataAPI.getServicesForDateRange(
+            providerId,
+            startDate.toISOString().split('T')[0],
+            endDate.toISOString().split('T')[0]
+          )
+          const services = response.services || []
+          return services.map((s: any) => ({
+            providerId,
+            name: s.name || s.serviceName
+          }))
+        } catch (error) {
+          return []
+        }
+      })
+      
+      const allServicesData = await Promise.all(servicesPromises)
+      setAllServices(allServicesData.flat())
+    } catch (error) {
+      console.error('Failed to load services for search:', error)
+    }
+  }
+
+  // Search functionality
+  const performSearch = useMemo(() => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      return []
+    }
+
+    const query = searchQuery.toLowerCase().trim()
+    const results: SearchResult[] = []
+
+    // Search providers
+    const providerNames: Record<string, string> = {
+      'aws': 'Amazon Web Services',
+      'azure': 'Microsoft Azure',
+      'gcp': 'Google Cloud Platform',
+      'digitalocean': 'DigitalOcean',
+      'ibm': 'IBM Cloud',
+      'linode': 'Linode',
+      'vultr': 'Vultr'
+    }
+
+    Object.entries(providerNames).forEach(([providerId, providerName]) => {
+      if (providerName.toLowerCase().includes(query) || providerId.toLowerCase().includes(query)) {
+        results.push({
+          type: 'provider',
+          id: providerId,
+          name: providerName,
+          providerId,
+          url: `/provider/${providerId}`
+        })
+      }
+    })
+
+    // Search accounts
+    cloudAccounts.forEach(account => {
+      const accountName = account.accountAlias || account.providerName
+      if (accountName.toLowerCase().includes(query) || 
+          account.providerId.toLowerCase().includes(query)) {
+        const url = cloudAccounts.filter(a => a.providerId === account.providerId).length === 1
+          ? `/provider/${account.providerId}`
+          : `/provider/${account.providerId}?account=${account.accountId}`
+        
+        results.push({
+          type: 'account',
+          id: `account-${account.accountId}`,
+          name: accountName,
+          providerId: account.providerId,
+          accountId: account.accountId,
+          accountAlias: account.accountAlias,
+          url
+        })
+      }
+    })
+
+    // Search services
+    allServices.forEach(service => {
+      if (service.name.toLowerCase().includes(query)) {
+        results.push({
+          type: 'service',
+          id: `service-${service.providerId}-${service.name}`,
+          name: service.name,
+          providerId: service.providerId,
+          url: `/provider/${service.providerId}?service=${encodeURIComponent(service.name)}`
+        })
+      }
+    })
+
+    // Limit results to 10
+    return results.slice(0, 10)
+  }, [searchQuery, cloudAccounts, allServices])
+
+  useEffect(() => {
+    setSearchResults(performSearch)
+    setSelectedResultIndex(-1)
+  }, [performSearch])
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -63,10 +210,52 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       if (providerMenuRef.current && !providerMenuRef.current.contains(event.target as Node)) {
         setIsProviderMenuOpen(false)
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedResultIndex(prev => 
+        prev < searchResults.length - 1 ? prev + 1 : prev
+      )
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedResultIndex(prev => prev > 0 ? prev - 1 : -1)
+    } else if (e.key === 'Enter' && selectedResultIndex >= 0) {
+      e.preventDefault()
+      const result = searchResults[selectedResultIndex]
+      if (result) {
+        navigate(result.url)
+        setSearchQuery('')
+        setIsSearchFocused(false)
+        setSelectedResultIndex(-1)
+      }
+    } else if (e.key === 'Escape') {
+      setIsSearchFocused(false)
+      setSearchQuery('')
+      setSelectedResultIndex(-1)
+    }
+  }
+
+  const handleResultClick = (result: SearchResult) => {
+    navigate(result.url)
+    setSearchQuery('')
+    setIsSearchFocused(false)
+    setSelectedResultIndex(-1)
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setIsSearchFocused(false)
+    setSelectedResultIndex(-1)
+    searchInputRef.current?.focus()
+  }
 
   const handleLogout = () => {
     logout()
@@ -107,14 +296,98 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
           </button>
 
           {/* Search Bar - Prominent */}
-          <div className="flex-1 max-w-2xl mx-4 lg:mx-8">
+          <div className="flex-1 max-w-2xl mx-4 lg:mx-8" ref={searchRef}>
             <div className="relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search..."
-                className="w-full pl-12 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-frozenWater-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                placeholder="Search providers, accounts, services..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onKeyDown={handleSearchKeyDown}
+                className="w-full pl-12 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-frozenWater-500 focus:border-transparent text-gray-900 placeholder-gray-400"
               />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              
+              {/* Search Results Dropdown */}
+              {isSearchFocused && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 max-h-96 overflow-y-auto z-50">
+                  <div className="py-2">
+                    {searchResults.map((result, index) => (
+                      <button
+                        key={result.id}
+                        onClick={() => handleResultClick(result)}
+                        onMouseEnter={() => setSelectedResultIndex(index)}
+                        className={`
+                          w-full px-4 py-3 text-left flex items-center justify-between
+                          transition-colors
+                          ${selectedResultIndex === index 
+                            ? 'bg-frozenWater-50 text-frozenWater-700' 
+                            : 'text-gray-700 hover:bg-gray-50'
+                          }
+                        `}
+                      >
+                        <div className="flex items-center space-x-3 flex-1 min-w-0">
+                          {result.type === 'provider' && (
+                            <div 
+                              className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                              style={{ backgroundColor: `${getProviderColor(result.providerId || '')}15` }}
+                            >
+                              <ProviderIcon providerId={result.providerId || ''} size={16} />
+                            </div>
+                          )}
+                          {result.type === 'account' && (
+                            <div 
+                              className="w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0"
+                              style={{ backgroundColor: `${getProviderColor(result.providerId || '')}15` }}
+                            >
+                              <ProviderIcon providerId={result.providerId || ''} size={16} />
+                            </div>
+                          )}
+                          {result.type === 'service' && (
+                            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 flex-shrink-0">
+                              <Cloud className="h-4 w-4 text-gray-600" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{result.name}</div>
+                            <div className="text-xs text-gray-500 capitalize">
+                              {result.type}
+                              {result.type === 'service' && result.providerId && (
+                                <> • {result.providerId.toUpperCase()}</>
+                              )}
+                              {result.type === 'account' && result.accountAlias && (
+                                <> • {result.accountAlias}</>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* No Results */}
+              {isSearchFocused && searchQuery.length >= 2 && searchResults.length === 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 py-8 z-50">
+                  <div className="text-center">
+                    <Search className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No results found</p>
+                    <p className="text-xs text-gray-400 mt-1">Try searching for providers, accounts, or services</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

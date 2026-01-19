@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
@@ -39,6 +39,7 @@ const getCategoryColor = (category: string): string => {
 
 export default function ProviderDetailPage() {
   const { providerId } = useParams<{ providerId: string }>()
+  const location = useLocation()
   const { isDemoMode } = useAuth()
   const { formatCurrency, convertAmount, getCurrencySymbol } = useCurrency()
   const { showSuccess, showError, showWarning } = useNotification()
@@ -54,8 +55,10 @@ export default function ProviderDetailPage() {
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily')
   const [isSyncing, setIsSyncing] = useState(false)
   
-  // Service filter state
-  const [selectedService, setSelectedService] = useState<string | null>(null)
+  // Service filter state - check URL params for service filter
+  const searchParams = new URLSearchParams(location.search)
+  const serviceFromUrl = searchParams.get('service')
+  const [selectedService, setSelectedService] = useState<string | null>(serviceFromUrl || null)
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false)
   
   // Advanced filter states
@@ -162,6 +165,19 @@ export default function ProviderDetailPage() {
 
     loadData()
   }, [providerId, isDemoMode])
+
+  // Handle service filter from URL parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    const serviceFromUrl = searchParams.get('service')
+    if (serviceFromUrl) {
+      setSelectedService(decodeURIComponent(serviceFromUrl))
+      // Switch to services tab if not already there
+      if (activeTab !== 'services') {
+        setActiveTab('services')
+      }
+    }
+  }, [location.search, activeTab])
 
   // Fetch data when period changes (especially for custom, 4months, 6months, 12months)
   useEffect(() => {
