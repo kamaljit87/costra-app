@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { cloudProvidersAPI, costDataAPI } from '../services/api'
+import { cloudProvidersAPI, costDataAPI, notificationsAPI } from '../services/api'
 import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 import { 
   Cloud,
@@ -17,6 +17,7 @@ import {
   X,
   ArrowRight
 } from 'lucide-react'
+import NotificationDropdown from './NotificationDropdown'
 
 interface CloudAccount {
   id: number
@@ -48,6 +49,8 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const { logout, user, isDemoMode } = useAuth()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isProviderMenuOpen, setIsProviderMenuOpen] = useState(false)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -56,13 +59,31 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const [allServices, setAllServices] = useState<Array<{ providerId: string; name: string }>>([])
   const userMenuRef = useRef<HTMLDivElement>(null)
   const providerMenuRef = useRef<HTMLDivElement>(null)
+  const notificationRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadCloudAccounts()
     loadAllServices()
+    if (!isDemoMode) {
+      loadUnreadNotificationCount()
+      // Poll for new notifications every 60 seconds
+      const interval = setInterval(() => {
+        loadUnreadNotificationCount()
+      }, 60000)
+      return () => clearInterval(interval)
+    }
   }, [isDemoMode])
+
+  const loadUnreadNotificationCount = async () => {
+    try {
+      const response = await notificationsAPI.getUnreadCount()
+      setUnreadNotificationCount(response.count || 0)
+    } catch (error) {
+      console.error('Failed to load notification count:', error)
+    }
+  }
 
   const loadCloudAccounts = async () => {
     try {
@@ -212,6 +233,9 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       }
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsSearchFocused(false)
+      }
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -480,10 +504,31 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
             </div>
 
             {/* Notifications */}
-            <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <div className="relative" ref={notificationRef}>
+              <button
+                onClick={() => {
+                  setIsNotificationOpen(!isNotificationOpen)
+                  if (!isNotificationOpen) {
+                    loadUnreadNotificationCount()
+                  }
+                }}
+                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute top-0 right-0 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-[#DC2626] rounded-full">
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+              <NotificationDropdown
+                isOpen={isNotificationOpen}
+                onClose={() => {
+                  setIsNotificationOpen(false)
+                  loadUnreadNotificationCount()
+                }}
+              />
+            </div>
 
             {/* User Menu */}
             <div className="relative" ref={userMenuRef}>

@@ -381,6 +381,26 @@ export const initDatabase = async () => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_type ON reports(user_id, report_type)`)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(user_id, created_at DESC)`)
 
+      // Notifications table - for user notifications (budgets, anomalies, sync, etc.)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('budget', 'anomaly', 'sync', 'report', 'warning', 'info', 'success')),
+          title TEXT NOT NULL,
+          message TEXT,
+          link TEXT,
+          link_text TEXT,
+          is_read BOOLEAN DEFAULT false,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          read_at TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read, created_at DESC)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(user_id, type, created_at DESC)`)
+
       // Business metrics table - stores business metrics for unit economics (customers, API calls, transactions)
       await client.query(`
         CREATE TABLE IF NOT EXISTS business_metrics (
@@ -3244,12 +3264,51 @@ export const updateBudgetSpend = async (userId, budgetId) => {
     // Check if we should create an alert
     if (percentage >= budget.alertThreshold) {
       const alertType = percentage >= 100 ? 'exceeded' : 'threshold'
-      await client.query(
-        `INSERT INTO budget_alerts (budget_id, alert_type, alert_percentage, created_at)
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-         ON CONFLICT DO NOTHING`,
-        [budgetId, alertType, Math.round(percentage)]
+      
+      // Check if alert already exists for this budget today
+      const existingAlert = await client.query(
+        `SELECT id FROM budget_alerts 
+         WHERE budget_id = $1 
+           AND alert_type = $2 
+           AND DATE(created_at) = CURRENT_DATE`,
+        [budgetId, alertType]
       )
+      
+      if (existingAlert.rows.length === 0) {
+        await client.query(
+          `INSERT INTO budget_alerts (budget_id, alert_type, alert_percentage, created_at)
+           VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          [budgetId, alertType, Math.round(percentage)]
+        )
+        
+        // Create notification
+        const notificationType = percentage >= 100 ? 'warning' : 'budget'
+        const title = percentage >= 100 
+          ? `Budget Exceeded: ${budget.budgetName}`
+          : `Budget Alert: ${budget.budgetName}`
+        const message = percentage >= 100
+          ? `Your budget has been exceeded by $${(currentSpend - budget.budgetAmount).toFixed(2)}`
+          : `Your budget is at ${percentage.toFixed(1)}% of the limit`
+        
+        const link = budget.providerId 
+          ? `/provider/${budget.providerId}?tab=budgets`
+          : '/budgets'
+        
+        await createNotification(userId, {
+          type: notificationType,
+          title,
+          message,
+          link,
+          linkText: 'View Budget',
+          metadata: {
+            budgetId: budget.id,
+            budgetName: budget.budgetName,
+            percentage: Math.round(percentage),
+            currentSpend,
+            budgetAmount: budget.budgetAmount
+          }
+        })
+      }
     }
     
     return {
@@ -4333,6 +4392,172 @@ export const getCostExplanation = async (userId, providerId, month, year, accoun
     }
     
     return null
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================================
+// Notification Operations
+// ============================================================================
+
+/**
+ * Create a notification
+ */
+export const createNotification = async (userId, notification) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO notifications (
+        user_id, type, title, message, link, link_text, metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, created_at`,
+      [
+        userId,
+        notification.type,
+        notification.title,
+        notification.message || null,
+        notification.link || null,
+        notification.linkText || null,
+        notification.metadata ? JSON.stringify(notification.metadata) : null
+      ]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get notifications for a user
+ */
+export const getNotifications = async (userId, options = {}) => {
+  const client = await pool.connect()
+  try {
+    const { unreadOnly = false, limit = 50, offset = 0, type = null } = options
+    
+    let query = `
+      SELECT id, type, title, message, link, link_text, is_read, metadata, created_at, read_at
+      FROM notifications
+      WHERE user_id = $1
+    `
+    const params = [userId]
+    let paramIndex = 2
+    
+    if (unreadOnly) {
+      query += ` AND is_read = false`
+    }
+    
+    if (type) {
+      query += ` AND type = $${paramIndex}`
+      params.push(type)
+      paramIndex++
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+    params.push(limit, offset)
+    
+    const result = await client.query(query, params)
+    
+    return result.rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      link: row.link,
+      linkText: row.link_text,
+      isRead: row.is_read,
+      metadata: row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata) : null,
+      createdAt: row.created_at,
+      readAt: row.read_at
+    }))
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get unread notification count
+ */
+export const getUnreadNotificationCount = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT COUNT(*) as count
+       FROM notifications
+       WHERE user_id = $1 AND is_read = false`,
+      [userId]
+    )
+    return parseInt(result.rows[0].count, 10)
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Mark notification as read
+ */
+export const markNotificationAsRead = async (userId, notificationId) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `UPDATE notifications
+       SET is_read = true, read_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND user_id = $2`,
+      [notificationId, userId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Mark all notifications as read for a user
+ */
+export const markAllNotificationsAsRead = async (userId) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `UPDATE notifications
+       SET is_read = true, read_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND is_read = false`,
+      [userId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Delete a notification
+ */
+export const deleteNotification = async (userId, notificationId) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM notifications
+       WHERE id = $1 AND user_id = $2`,
+      [notificationId, userId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Delete old read notifications (older than specified days)
+ */
+export const deleteOldNotifications = async (userId, daysOld = 30) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM notifications
+       WHERE user_id = $1 
+         AND is_read = true 
+         AND created_at < CURRENT_TIMESTAMP - INTERVAL '${daysOld} days'`,
+      [userId]
+    )
+    return result.rowCount
   } finally {
     client.release()
   }

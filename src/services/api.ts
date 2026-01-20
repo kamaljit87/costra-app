@@ -767,3 +767,58 @@ export const productTeamAPI = {
     return response.json()
   },
 }
+
+// Notifications API
+export const notificationsAPI = {
+  getNotifications: async (options?: { unreadOnly?: boolean; limit?: number; offset?: number; type?: string }) => {
+    const params = new URLSearchParams()
+    if (options?.unreadOnly) params.append('unreadOnly', 'true')
+    if (options?.limit) params.append('limit', options.limit.toString())
+    if (options?.offset) params.append('offset', options.offset.toString())
+    if (options?.type) params.append('type', options.type)
+    
+    const response = await apiRequest(`/notifications?${params.toString()}`)
+    return response.json()
+  },
+
+  getUnreadCount: async () => {
+    const response = await apiRequest('/notifications/count')
+    return response.json()
+  },
+
+  markAsRead: async (notificationId: number) => {
+    const response = await apiRequest(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    })
+    return response.json()
+  },
+
+  markAllAsRead: async () => {
+    const response = await apiRequest('/notifications/read-all', {
+      method: 'PUT',
+    })
+    return response.json()
+  },
+
+  deleteNotification: async (notificationId: number) => {
+    const response = await apiRequest(`/notifications/${notificationId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+
+  createNotification: async (notification: {
+    type: string
+    title: string
+    message?: string
+    link?: string
+    linkText?: string
+    metadata?: any
+  }) => {
+    const response = await apiRequest('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(notification),
+    })
+    return response.json()
+  },
+}

@@ -11,6 +11,7 @@ import {
   clearUserCache,
   clearCostExplanationsCache,
   calculateAnomalyBaseline,
+  createNotification,
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
@@ -154,6 +155,20 @@ router.post('/', async (req, res) => {
         // Update last sync time for this account
         await updateCloudProviderSyncTime(userId, account.id)
 
+        // Create success notification
+        await createNotification(userId, {
+          type: 'sync',
+          title: `Sync Completed: ${accountLabel}`,
+          message: `Successfully synced cost data. Current month: $${costData.currentMonth.toFixed(2)}`,
+          link: `/provider/${account.provider_id}`,
+          linkText: 'View Details',
+          metadata: {
+            accountId: account.id,
+            providerId: account.provider_id,
+            currentMonth: costData.currentMonth
+          }
+        }).catch(err => console.error('[Sync] Failed to create notification:', err))
+
         results.push({
           accountId: account.id,
           accountAlias: account.account_alias,
@@ -166,6 +181,21 @@ router.post('/', async (req, res) => {
         })
       } catch (error) {
         console.error(`Error syncing account ${accountLabel}:`, error)
+        
+        // Create error notification
+        await createNotification(userId, {
+          type: 'warning',
+          title: `Sync Failed: ${accountLabel}`,
+          message: error.message || 'Failed to sync cost data',
+          link: `/provider/${account.provider_id}`,
+          linkText: 'View Details',
+          metadata: {
+            accountId: account.id,
+            providerId: account.provider_id,
+            error: error.message
+          }
+        }).catch(err => console.error('[Sync] Failed to create error notification:', err))
+        
         errors.push({
           accountId: account.id,
           accountAlias: account.account_alias,
