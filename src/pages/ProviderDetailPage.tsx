@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
-import { cloudProvidersAPI, syncAPI, costDataAPI, productTeamAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI, costDataAPI, productTeamAPI, budgetsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import ProviderCostChart from '../components/ProviderCostChart'
@@ -47,6 +47,7 @@ export default function ProviderDetailPage() {
   const [providerData, setProviderData] = useState<CostData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [providerAccounts, setProviderAccounts] = useState<any[]>([])
+  const [providerBudgetCount, setProviderBudgetCount] = useState<number>(0)
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('1month')
   const [showCustomFilter, setShowCustomFilter] = useState(false)
   const [customStartDate, setCustomStartDate] = useState('')
@@ -146,7 +147,21 @@ export default function ProviderDetailPage() {
             console.error('Failed to load configured providers:', error)
           }
         }
-        
+
+        // Load budgets for this provider (for header badge & counts)
+        if (!isDemoMode) {
+          try {
+            const budgetsResponse = await budgetsAPI.getBudgets(providerId)
+            const budgets = budgetsResponse.budgets || []
+            setProviderBudgetCount(budgets.length)
+          } catch (error) {
+            console.error('Failed to load provider budgets:', error)
+            setProviderBudgetCount(0)
+          }
+        } else {
+          setProviderBudgetCount(0)
+        }
+
         setProviderData(data)
         
         // Set default dates for custom filter (last 30 days)
@@ -701,6 +716,15 @@ export default function ProviderDetailPage() {
                     >
                       <Gift className="h-2.5 w-2.5 mr-1" />
                       Credits: {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
+                    </span>
+                  )}
+                  {providerBudgetCount > 0 && (
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
+                      title={`You have ${providerBudgetCount} budget${providerBudgetCount === 1 ? '' : 's'} configured for this provider`}
+                    >
+                      <BarChart2 className="h-2.5 w-2.5 mr-1" />
+                      {providerBudgetCount} budget{providerBudgetCount === 1 ? '' : 's'}
                     </span>
                   )}
                 </div>

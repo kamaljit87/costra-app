@@ -4,13 +4,12 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
-import { cloudProvidersAPI, syncAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI, budgetsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
-import BudgetWidget from '../components/BudgetWidget'
 import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -30,19 +29,31 @@ export default function Dashboard() {
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
   const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([])
+  const [providerBudgetCounts, setProviderBudgetCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
 
   const loadData = async () => {
     try {
-      const [costs, plans, providersResponse] = await Promise.all([
+      const [costs, plans, providersResponse, budgetsResponse] = await Promise.all([
         getCostData(isDemoMode),
         getSavingsPlans(isDemoMode),
         isDemoMode ? Promise.resolve({ providers: [] }) : cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
+        isDemoMode ? Promise.resolve({ budgets: [] }) : budgetsAPI.getBudgets().catch(() => ({ budgets: [] })),
       ])
       setCostData(costs)
       setSavingsPlans(plans)
       setConfiguredProviders(providersResponse.providers || [])
+
+      // Calculate budget counts per provider for dashboard display
+      const budgets = (budgetsResponse as any).budgets || []
+      const counts: Record<string, number> = {}
+      budgets.forEach((b: any) => {
+        if (b.providerId) {
+          counts[b.providerId] = (counts[b.providerId] || 0) + 1
+        }
+      })
+      setProviderBudgetCounts(counts)
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
@@ -193,15 +204,6 @@ export default function Dashboard() {
                 totalSavings={totalSavings}
               />
             </div>
-
-            {/* Budget Widget */}
-            {!isDemoMode && (
-              <div className="mb-5">
-                <BudgetWidget />
-              </div>
-            )}
-
-
             {/* Provider Sections with Charts */}
             {(() => {
               const allProviders = new Map<string, CostData>()
@@ -260,6 +262,7 @@ export default function Dashboard() {
                                 forecast={data.forecast}
                                 credits={data.credits}
                                 savings={data.savings}
+                                budgetCount={providerBudgetCounts[data.provider.id] || 0}
                                 chartData1Month={data.chartData1Month}
                                 chartData2Months={data.chartData2Months}
                                 chartData3Months={data.chartData3Months}

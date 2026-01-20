@@ -19,6 +19,7 @@ interface ProviderSectionProps {
   forecast: number
   credits: number
   savings: number
+  budgetCount?: number
   chartData1Month: CostDataPoint[]
   chartData2Months: CostDataPoint[]
   chartData3Months: CostDataPoint[]
@@ -35,6 +36,7 @@ export default function ProviderSection({
   forecast,
   credits,
   savings,
+  budgetCount = 0,
   chartData1Month: _chartData1Month,
   chartData2Months: _chartData2Months,
   chartData3Months: _chartData3Months,
@@ -90,6 +92,15 @@ export default function ProviderSection({
                 >
                   <Gift className="h-2.5 w-2.5 mr-0.5" />
                   Credits: {formatCurrency(convertAmount(Math.abs(credits || 0)))}
+                </span>
+              )}
+              {budgetCount > 0 && (
+                <span 
+                  className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
+                  title={`You have ${budgetCount} budget${budgetCount === 1 ? '' : 's'} configured for this provider`}
+                >
+                  <Target className="h-2.5 w-2.5 mr-0.5" />
+                  {budgetCount} budget{budgetCount === 1 ? '' : 's'}
                 </span>
               )}
             </div>
