@@ -168,6 +168,15 @@ export const costDataAPI = {
     const response = await apiRequest(`/cost-data/services/${providerId}/${encodedServiceName}/details?startDate=${startDate}&endDate=${endDate}&_t=${timestamp}`)
     return response.json()
   },
+
+  getCreditsDetail: async (providerId: string, startDate: string, endDate: string, accountId?: number) => {
+    const params = new URLSearchParams()
+    params.append('startDate', startDate)
+    params.append('endDate', endDate)
+    if (accountId) params.append('accountId', accountId.toString())
+    const response = await apiRequest(`/cost-data/${providerId}/credits?${params.toString()}`)
+    return response.json()
+  },
 }
 
 // Savings Plans API

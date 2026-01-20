@@ -18,6 +18,7 @@ import CostEfficiencyMetrics from '../components/CostEfficiencyMetrics'
 import RightsizingRecommendations from '../components/RightsizingRecommendations'
 import ProductCostCard from '../components/ProductCostCard'
 import TeamCostCard from '../components/TeamCostCard'
+import CreditsDetail from '../components/CreditsDetail'
 import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users, Download, FileText } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
@@ -1319,6 +1320,27 @@ export default function ProviderDetailPage() {
                       </div>
                     )
                   }
+                })()}
+
+                {/* Detailed Credits Information */}
+                {showCredits && providerId && (() => {
+                  const range = selectedPeriod === 'custom' && customStartDate && customEndDate
+                    ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
+                    : getDateRangeForPeriod(selectedPeriod)
+                  const startDateStr = range.startDate.toISOString().split('T')[0]
+                  const endDateStr = range.endDate.toISOString().split('T')[0]
+                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
+
+                  return (
+                    <CreditsDetail
+                      key={`credits-${providerId}-${startDateStr}-${endDateStr}`}
+                      providerId={providerId}
+                      accountId={accountId}
+                      startDate={startDateStr}
+                      endDate={endDateStr}
+                      isDemoMode={isDemoMode}
+                    />
+                  )
                 })()}
 
                 {/* Cost Trend Chart */}

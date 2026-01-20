@@ -402,20 +402,71 @@ router.put('/:providerId/credits', async (req, res) => {
 // Get credits for a provider
 router.get('/:providerId/credits', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
+    const { startDate, endDate, accountId } = req.query
     const now = new Date()
-    const month = req.query.month ? parseInt(req.query.month) : now.getMonth() + 1
-    const year = req.query.year ? parseInt(req.query.year) : now.getFullYear()
+    
+    // Get date range
+    let start, end
+    if (startDate && endDate) {
+      start = startDate
+      end = endDate
+    } else {
+      // Default to current month
+      const month = req.query.month ? parseInt(req.query.month) : now.getMonth() + 1
+      const year = req.query.year ? parseInt(req.query.year) : now.getFullYear()
+      start = `${year}-${String(month).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month, 0).getDate()
+      end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    }
 
-    const costData = await getCostDataForUser(userId, month, year)
+    // Get cost data to extract credits
+    const costData = await getCostDataForUser(userId, now.getMonth() + 1, now.getFullYear())
     const providerData = costData.find(cost => cost.provider_code === providerId)
 
     if (!providerData) {
-      return res.json({ credits: 0 })
+      return res.json({ 
+        credits: 0,
+        creditsDetail: [],
+        summary: {
+          totalRemaining: 0,
+          totalUsed: 0,
+          activeCredits: 0
+        }
+      })
     }
 
-    res.json({ credits: parseFloat(providerData.credits) || 0 })
+    const totalCredits = Math.abs(parseFloat(providerData.credits) || 0)
+
+    // For detailed credit information, we'll structure it similar to AWS console
+    // Note: AWS Cost Explorer API doesn't provide detailed credit breakdown like the console
+    // This is a simplified version - in production, you'd want to use AWS Billing API or store credit details separately
+    const creditsDetail = []
+    
+    if (totalCredits > 0) {
+      // Create a summary credit entry
+      creditsDetail.push({
+        creditName: 'Applied Credits',
+        amountUsed: totalCredits,
+        creditType: 'Applied',
+        date: end
+      })
+    }
+
+    // Calculate summary
+    const totalUsed = creditsDetail.reduce((sum, c) => sum + (c.amountUsed || 0), 0)
+    const totalRemaining = creditsDetail.reduce((sum, c) => sum + (c.amountRemaining || 0), 0)
+
+    res.json({ 
+      credits: totalCredits,
+      creditsDetail,
+      summary: {
+        totalRemaining,
+        totalUsed,
+        activeCredits: creditsDetail.length
+      }
+    })
   } catch (error) {
     console.error('Get credits error:', error)
     res.status(500).json({ error: 'Internal server error' })
