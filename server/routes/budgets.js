@@ -22,7 +22,10 @@ router.use(authenticateToken)
  */
 router.post('/', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const { budgetName, providerId, accountId, budgetAmount, budgetPeriod, alertThreshold } = req.body
     
     if (!budgetName || !budgetAmount || !budgetPeriod) {
@@ -58,7 +61,10 @@ router.post('/', async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const { providerId, accountId } = req.query
     
     const budgets = await getBudgets(
@@ -96,7 +102,10 @@ router.get('/', async (req, res) => {
  */
 router.get('/:budgetId', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const budgetId = parseInt(req.params.budgetId)
     
     if (isNaN(budgetId)) {
@@ -127,7 +136,10 @@ router.get('/:budgetId', async (req, res) => {
  */
 router.patch('/:budgetId', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const budgetId = parseInt(req.params.budgetId)
     const updateData = req.body
     
@@ -161,7 +173,10 @@ router.patch('/:budgetId', async (req, res) => {
  */
 router.delete('/:budgetId', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const budgetId = parseInt(req.params.budgetId)
     
     if (isNaN(budgetId)) {
@@ -187,7 +202,10 @@ router.delete('/:budgetId', async (req, res) => {
  */
 router.get('/alerts/all', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     
     // Check all budgets for alerts
     const alerts = await checkBudgetAlerts(userId)
@@ -205,7 +223,10 @@ router.get('/alerts/all', async (req, res) => {
  */
 router.get('/alerts/history', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const limit = parseInt(req.query.limit) || 10
     
     const alerts = await getBudgetAlerts(userId, limit)
@@ -223,7 +244,10 @@ router.get('/alerts/history', async (req, res) => {
  */
 router.post('/:budgetId/check', async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
     const budgetId = parseInt(req.params.budgetId)
     
     if (isNaN(budgetId)) {
