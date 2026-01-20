@@ -1837,7 +1837,11 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
   if (accountSummary) {
     // Extract billing totals
     currentMonth = parseFloat(accountSummary.billable_cost || 0)
-    credits = parseFloat(accountSummary.credits?.total || 0)
+    // Credits should always be positive (they reduce cost)
+    credits = Math.abs(parseFloat(accountSummary.credits?.total || 0))
+    if (credits > 0) {
+      console.log(`[IBM Transform] Credits found: $${credits.toFixed(2)}`)
+    }
 
     // Add as a single monthly data point
     const summaryDate = new Date(accountSummary.month || startDate)
