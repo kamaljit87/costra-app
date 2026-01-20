@@ -98,13 +98,35 @@ export default function Dashboard() {
   
   // Calculate credits - ensure they're always positive (credits reduce cost)
   // Credits from API might be negative (AWS returns them as negative), so we use Math.abs
-  // Also ensure we don't count credits twice if they're already in the cost
+  // IMPORTANT: Sum credits from all accounts - each account has its own credits
+  // If there are multiple accounts for the same provider, each account's credits are separate
   const totalCredits = costData.reduce((sum, data) => {
     const creditValue = convertAmount(data.credits || 0)
     // Credits should always be positive - they reduce your bill
     const positiveCredit = Math.abs(creditValue)
     return sum + positiveCredit
   }, 0)
+  
+  // Debug logging to help identify duplicate credits issue
+  if (costData.length > 0 && totalCredits > 0) {
+    const creditsBreakdown = costData
+      .filter(d => d.credits && Math.abs(convertAmount(d.credits || 0)) > 0)
+      .map(d => ({
+        provider: d.provider.name,
+        providerId: d.provider.id,
+        rawCredits: d.credits,
+        converted: convertAmount(d.credits || 0),
+        abs: Math.abs(convertAmount(d.credits || 0))
+      }))
+    
+    console.log('[Dashboard] Credit calculation:', {
+      totalCostDataEntries: costData.length,
+      entriesWithCredits: creditsBreakdown.length,
+      creditsBreakdown,
+      totalCredits,
+      note: 'If totalCredits seems too high, check for duplicate entries or multiple accounts'
+    })
+  }
   
   const totalSavings = costData.reduce((sum, data) => sum + Math.abs(convertAmount(data.savings || 0)), 0)
 
