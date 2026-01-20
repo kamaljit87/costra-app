@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { cloudProvidersAPI } from '../services/api'
-import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check } from 'lucide-react'
+import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check, HelpCircle } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
+import IAMPolicyDialog from './IAMPolicyDialog'
 
 interface CloudProvider {
   id: number
@@ -43,6 +44,7 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
   const [editingAccount, setEditingAccount] = useState<CloudProvider | null>(null)
   const [editCredentials, setEditCredentials] = useState<{ [key: string]: string }>({})
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false)
+  const [showIAMDialog, setShowIAMDialog] = useState(false)
 
   useEffect(() => {
     loadProviders()
@@ -498,7 +500,17 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                       </p>
                     </div>
 
-                    <h4 className="font-medium text-gray-900 pt-2">Credentials</h4>
+                    <div className="flex items-center justify-between pt-2">
+                      <h4 className="font-medium text-gray-900">Credentials</h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowIAMDialog(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:bg-[#F0FDFA] rounded-lg transition-colors"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                        How to set up IAM permissions
+                      </button>
+                    </div>
                     {getRequiredFields(selectedProvider).map((field) => (
                       <div key={field}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -629,6 +641,16 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
             </div>
           </div>
         </div>
+      )}
+
+      {/* IAM Policy Dialog */}
+      {selectedProvider && (
+        <IAMPolicyDialog
+          isOpen={showIAMDialog}
+          onClose={() => setShowIAMDialog(false)}
+          providerId={selectedProvider}
+          providerName={AVAILABLE_PROVIDERS.find(p => p.id === selectedProvider)?.name || selectedProvider}
+        />
       )}
     </div>
   )
