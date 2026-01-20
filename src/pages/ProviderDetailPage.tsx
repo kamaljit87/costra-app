@@ -693,13 +693,13 @@ export default function ProviderDetailPage() {
               <div>
                 <div className="flex items-center space-x-2.5 mb-0.5">
                   <h1 className="text-2xl font-bold text-[#0F172A]">{providerData.provider.name}</h1>
-                  {showCredits && providerData.credits > 0 && (
+                  {showCredits && Math.abs(providerData.credits || 0) > 0 && (
                     <span 
                       className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#F0FDF4] text-[#16A34A] border border-[#BBF7D0]"
-                      title="This account has credits applied"
+                      title={`Credits applied: ${formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}`}
                     >
                       <Gift className="h-2.5 w-2.5 mr-1" />
-                      Credits
+                      Credits: {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
                     </span>
                   )}
                 </div>
@@ -751,20 +751,66 @@ export default function ProviderDetailPage() {
 
             {showCredits && (
               <div className="card p-4 bg-[#F0FDF4] border-[#BBF7D0]" title="Credits applied to this account">
-                <div className="text-[10px] font-semibold text-[#16A34A] uppercase tracking-wide mb-1.5">Credits</div>
-                <div className="text-xl font-bold text-[#16A34A]">
-                  {formatCurrency(convertAmount(providerData.credits))}
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="text-[10px] font-semibold text-[#16A34A] uppercase tracking-wide">Credits Applied</div>
+                  <Gift className="h-3.5 w-3.5 text-[#16A34A]" />
                 </div>
+                <div className="text-xl font-bold text-[#16A34A] mb-1">
+                  {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
+                </div>
+                {Math.abs(providerData.credits || 0) > 0 && (
+                  <div className="text-[10px] text-[#16A34A]/70">
+                    Reduces your total cost
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="card bg-blue-50 border-blue-200" title="Savings from reserved instances and commitment plans">
-              <div className="text-sm text-gray-600 mb-1">Savings</div>
-              <div className="text-2xl font-bold text-blue-700">
-                {formatCurrency(convertAmount(providerData.savings))}
+            <div className="card p-4 bg-[#EFF6FF] border-[#DBEAFE]" title="Savings from reserved instances and commitment plans">
+              <div className="text-[10px] font-semibold text-[#1F3A5F] uppercase tracking-wide mb-1.5">Savings</div>
+              <div className="text-xl font-bold text-[#1F3A5F]">
+                {formatCurrency(convertAmount(providerData.savings || 0))}
               </div>
             </div>
           </div>
+
+          {/* Credit Information Section */}
+          {showCredits && Math.abs(providerData.credits || 0) > 0 && (
+            <div className="card p-4 mb-4 bg-gradient-to-br from-[#F0FDF4] to-[#ECFDF5] border-[#BBF7D0]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-[#16A34A]" />
+                  <h3 className="text-base font-semibold text-[#0F172A]">Credit Information</h3>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <div className="text-xs text-[#64748B] mb-1">Total Credits Applied</div>
+                  <div className="text-lg font-bold text-[#16A34A]">
+                    {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-[#64748B] mb-1">Gross Cost (Before Credits)</div>
+                  <div className="text-lg font-bold text-[#0F172A]">
+                    {formatCurrency(convertAmount(providerData.currentMonth))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-[#64748B] mb-1">Net Cost (After Credits)</div>
+                  <div className="text-lg font-bold text-[#1F3A5F]">
+                    {formatCurrency(convertAmount(Math.max(0, providerData.currentMonth - Math.abs(providerData.credits || 0))))}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-[#BBF7D0]">
+                <p className="text-xs text-[#64748B]">
+                  <span className="font-medium text-[#16A34A]">Credits</span> are promotional credits, refunds, or account credits that reduce your total cost. 
+                  They are automatically applied to your bill and reduce the amount you pay.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Inline Filter Bar */}

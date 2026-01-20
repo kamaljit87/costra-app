@@ -83,10 +83,13 @@ export default function ProviderSection({
           <div>
             <div className="flex items-center space-x-2.5 mb-1">
               <h2 className="text-lg font-bold text-[#0F172A]">{providerName}</h2>
-              {credits > 0 && (
-                <span className="badge-success text-[10px] px-2 py-0.5">
+              {Math.abs(credits || 0) > 0 && (
+                <span 
+                  className="badge-success text-[10px] px-2 py-0.5"
+                  title={`Credits applied: ${formatCurrency(convertAmount(Math.abs(credits || 0)))}`}
+                >
                   <Gift className="h-2.5 w-2.5 mr-0.5" />
-                  Credits
+                  Credits: {formatCurrency(convertAmount(Math.abs(credits || 0)))}
                 </span>
               )}
             </div>

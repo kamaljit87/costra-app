@@ -22,7 +22,10 @@ export default function TotalBillSummary({
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
     : 0
 
-  const netCost = totalCurrent - totalCredits - totalSavings
+  // Ensure credits and savings are positive values
+  const creditsApplied = Math.abs(totalCredits)
+  const savingsApplied = Math.abs(totalSavings)
+  const netCost = totalCurrent - creditsApplied - savingsApplied
 
   const stats = [
     {
@@ -41,11 +44,11 @@ export default function TotalBillSummary({
     },
     {
       label: 'Credits Applied',
-      value: `-${formatCurrency(convertAmount(totalCredits))}`,
+      value: formatCurrency(convertAmount(Math.abs(totalCredits))),
       icon: Gift,
       iconBg: 'bg-[#F0FDFA]',
       iconColor: 'text-[#22B8A0]',
-      valueColor: 'text-[#22B8A0]',
+      valueColor: 'text-[#16A34A]',
     },
     {
       label: 'Net Cost',
