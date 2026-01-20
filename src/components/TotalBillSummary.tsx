@@ -1,5 +1,5 @@
 import { useCurrency } from '../contexts/CurrencyContext'
-import { TrendingUp, TrendingDown, Wallet, Target, Gift, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Target, Zap } from 'lucide-react'
 
 interface TotalBillSummaryProps {
   totalCurrent: number
@@ -22,17 +22,12 @@ export default function TotalBillSummary({
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
     : 0
 
-  // Ensure credits are positive values (they reduce cost)
   // Note: currentMonth from cloud providers already includes credits (as negative values), so it's already the net cost
-  // We display credits separately for visibility, but don't subtract them again from currentMonth
-  // Credits from Dashboard are already positive (Math.abs applied), so we just use them as-is
-  const creditsApplied = totalCredits >= 0 ? totalCredits : Math.abs(totalCredits)
-  
   // Net cost is the currentMonth total, which already has credits and savings applied
-  // We don't subtract credits/savings again because they're already included in currentMonth
   const netCost = totalCurrent
   
-  // Suppress unused variable warning - savings are included in netCost calculation
+  // Suppress unused variable warnings - credits and savings are included in netCost calculation
+  void totalCredits
   void totalSavings
 
   const stats = [
@@ -50,14 +45,6 @@ export default function TotalBillSummary({
       icon: Target,
       iconBg: 'bg-[#F0FDFA]',
       iconColor: 'text-[#22B8A0]',
-    },
-    {
-      label: 'Credits Applied',
-      value: formatCurrency(convertAmount(creditsApplied)),
-      icon: Gift,
-      iconBg: 'bg-[#F0FDFA]',
-      iconColor: 'text-[#22B8A0]',
-      valueColor: 'text-[#16A34A]',
     },
     {
       label: 'Net Cost',
@@ -96,7 +83,7 @@ export default function TotalBillSummary({
       </div>
 
       {/* Stats Grid - Compact, Equal Heights, Horizontal Grouping */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-7xl mx-auto">
         {stats.map((stat, index) => {
           const Icon = stat.icon
           return (
@@ -130,7 +117,7 @@ export default function TotalBillSummary({
                 </div>
                 
                 <div className={`text-2xl font-bold tracking-tight leading-tight ${
-                  stat.highlight ? 'text-white' : stat.valueColor || 'text-[#0F172A]'
+                  stat.highlight ? 'text-white' : 'text-[#0F172A]'
                 }`}>
                   {stat.value}
                 </div>
