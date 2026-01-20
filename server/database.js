@@ -3205,14 +3205,29 @@ export const updateBudgetSpend = async (userId, budgetId) => {
       return null
     }
     
+    // Ensure budget has camelCase properties
+    const budgetData = {
+      id: budget.id,
+      userId: budget.userId || budget.user_id,
+      accountId: budget.accountId || budget.account_id,
+      providerId: budget.providerId || budget.provider_id,
+      budgetName: budget.budgetName || budget.budget_name,
+      budgetAmount: budget.budgetAmount || parseFloat(budget.budget_amount) || 0,
+      budgetPeriod: budget.budgetPeriod || budget.budget_period,
+      alertThreshold: budget.alertThreshold || parseInt(budget.alert_threshold) || 80,
+      currentSpend: budget.currentSpend || parseFloat(budget.current_spend) || 0,
+      status: budget.status,
+      percentage: budget.percentage || 0
+    }
+    
     // Calculate current spend based on budget period
     const now = new Date()
     let startDate, endDate
     
-    if (budget.budgetPeriod === 'monthly') {
+    if (budgetData.budgetPeriod === 'monthly') {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1)
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    } else if (budget.budgetPeriod === 'quarterly') {
+    } else if (budgetData.budgetPeriod === 'quarterly') {
       const quarter = Math.floor(now.getMonth() / 3)
       startDate = new Date(now.getFullYear(), quarter * 3, 1)
       endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0)
@@ -3231,25 +3246,25 @@ export const updateBudgetSpend = async (userId, budgetId) => {
     `
     const costParams = [userId, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]]
     
-    if (budget.providerId) {
+    if (budgetData.providerId) {
       costQuery += ` AND provider_id = $4`
-      costParams.push(budget.providerId)
+      costParams.push(budgetData.providerId)
     }
     
-    if (budget.accountId) {
-      costQuery += ` AND account_id = $${budget.providerId ? 5 : 4}`
-      costParams.push(budget.accountId)
+    if (budgetData.accountId) {
+      costQuery += ` AND account_id = $${budgetData.providerId ? 5 : 4}`
+      costParams.push(budgetData.accountId)
     }
     
     const costResult = await client.query(costQuery, costParams)
     const currentSpend = parseFloat(costResult.rows[0]?.total_cost) || 0
     
     // Calculate percentage and status
-    const percentage = budget.budgetAmount > 0 ? (currentSpend / budget.budgetAmount * 100) : 0
+    const percentage = budgetData.budgetAmount > 0 ? (currentSpend / budgetData.budgetAmount * 100) : 0
     let status = 'active'
     if (percentage >= 100) {
       status = 'exceeded'
-    } else if (percentage >= budget.alertThreshold) {
+    } else if (percentage >= budgetData.alertThreshold) {
       status = 'active' // Keep active but will show alert
     }
     
@@ -3262,7 +3277,7 @@ export const updateBudgetSpend = async (userId, budgetId) => {
     )
     
     // Check if we should create an alert
-    if (percentage >= budget.alertThreshold) {
+    if (percentage >= budgetData.alertThreshold) {
       const alertType = percentage >= 100 ? 'exceeded' : 'threshold'
       
       // Check if alert already exists for this budget today
@@ -3284,35 +3299,41 @@ export const updateBudgetSpend = async (userId, budgetId) => {
         // Create notification
         const notificationType = percentage >= 100 ? 'warning' : 'budget'
         const title = percentage >= 100 
-          ? `Budget Exceeded: ${budget.budgetName}`
-          : `Budget Alert: ${budget.budgetName}`
+          ? `Budget Exceeded: ${budgetData.budgetName}`
+          : `Budget Alert: ${budgetData.budgetName}`
         const message = percentage >= 100
-          ? `Your budget has been exceeded by $${(currentSpend - budget.budgetAmount).toFixed(2)}`
+          ? `Your budget has been exceeded by $${(currentSpend - budgetData.budgetAmount).toFixed(2)}`
           : `Your budget is at ${percentage.toFixed(1)}% of the limit`
         
-        const link = budget.providerId 
-          ? `/provider/${budget.providerId}?tab=budgets`
+        const link = budgetData.providerId 
+          ? `/provider/${budgetData.providerId}`
           : '/budgets'
         
-        await createNotification(userId, {
-          type: notificationType,
-          title,
-          message,
-          link,
-          linkText: 'View Budget',
-          metadata: {
-            budgetId: budget.id,
-            budgetName: budget.budgetName,
-            percentage: Math.round(percentage),
-            currentSpend,
-            budgetAmount: budget.budgetAmount
-          }
-        })
+        try {
+          await createNotification(userId, {
+            type: notificationType,
+            title,
+            message,
+            link,
+            linkText: 'View Budget',
+            metadata: {
+              budgetId: budgetData.id,
+              budgetName: budgetData.budgetName,
+              percentage: Math.round(percentage),
+              currentSpend,
+              budgetAmount: budgetData.budgetAmount
+            }
+          })
+          console.log(`[updateBudgetSpend] Created notification for budget ${budgetData.id}: ${title}`)
+        } catch (notifError) {
+          console.error(`[updateBudgetSpend] Failed to create notification for budget ${budgetData.id}:`, notifError)
+          // Don't fail the budget update if notification fails
+        }
       }
     }
     
     return {
-      ...budget,
+      ...budgetData,
       currentSpend,
       percentage,
       status
