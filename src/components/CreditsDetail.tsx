@@ -60,7 +60,7 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
   }, [providerId, accountId, startDate, endDate, isDemoMode])
 
   const loadCredits = async () => {
-    if (!providerId) return
+    if (!providerId || isDemoMode) return
 
     setIsLoading(true)
     try {
