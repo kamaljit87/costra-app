@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useCurrency } from '../contexts/CurrencyContext'
 import ProviderCostChart from './ProviderCostChart'
-import { ArrowRight, TrendingUp, TrendingDown, Gift, Target, PiggyBank } from 'lucide-react'
+import { ArrowRight, TrendingUp, TrendingDown, Target, PiggyBank } from 'lucide-react'
 import { aggregateToMonthly } from '../services/costService'
 import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 
@@ -17,7 +17,7 @@ interface ProviderSectionProps {
   currentMonth: number
   lastMonth: number
   forecast: number
-  credits: number
+  credits: number // Kept for backward compatibility but not used
   savings: number
   budgetCount?: number
   chartData1Month: CostDataPoint[]
@@ -34,8 +34,8 @@ export default function ProviderSection({
   currentMonth,
   lastMonth,
   forecast,
-  credits,
-  savings,
+  credits: _credits, // Unused but kept for interface compatibility
+  savings: _savings, // Unused but kept for interface compatibility
   budgetCount = 0,
   chartData1Month: _chartData1Month,
   chartData2Months: _chartData2Months,
@@ -85,15 +85,6 @@ export default function ProviderSection({
           <div>
             <div className="flex items-center space-x-2.5 mb-1">
               <h2 className="text-lg font-bold text-[#0F172A]">{providerName}</h2>
-              {Math.abs(credits || 0) > 0 && (
-                <span 
-                  className="badge-success text-[10px] px-2 py-0.5"
-                  title={`Credits applied: ${formatCurrency(convertAmount(Math.abs(credits || 0)))}`}
-                >
-                  <Gift className="h-2.5 w-2.5 mr-0.5" />
-                  Credits: {formatCurrency(convertAmount(Math.abs(credits || 0)))}
-                </span>
-              )}
               {budgetCount > 0 && (
                 <span 
                   className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
@@ -183,22 +174,13 @@ export default function ProviderSection({
             {formatCurrency(convertAmount(forecast))}
           </div>
         </div>
-        <div className="bg-[#F0FDF4] rounded-xl p-3 border border-[#BBF7D0]">
-          <div className="flex items-center space-x-1.5 text-[#16A34A] mb-1">
-            <Gift className="h-3 w-3" />
-            <span className="text-[10px] font-semibold uppercase tracking-wide">Credits</span>
-          </div>
-          <div className="text-sm font-bold text-[#16A34A]">
-            {formatCurrency(convertAmount(credits))}
-          </div>
-        </div>
         <div className="bg-[#EFF6FF] rounded-xl p-3 border border-[#DBEAFE]">
           <div className="flex items-center space-x-1.5 text-[#1F3A5F] mb-1">
             <PiggyBank className="h-3 w-3" />
             <span className="text-[10px] font-semibold uppercase tracking-wide">Savings</span>
           </div>
           <div className="text-sm font-bold text-[#1F3A5F]">
-            {formatCurrency(convertAmount(savings))}
+            {formatCurrency(convertAmount(_savings))}
           </div>
         </div>
       </div>

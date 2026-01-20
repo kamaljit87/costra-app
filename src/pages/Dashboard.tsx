@@ -10,8 +10,9 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
-import { Sparkles, RefreshCw, Cloud } from 'lucide-react'
+import { Sparkles, RefreshCw, Cloud, Plus } from 'lucide-react'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
+import CloudProviderManager from '../components/CloudProviderManager'
 
 interface ConfiguredProvider {
   id: number
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const [providerBudgetCounts, setProviderBudgetCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [showAddProvider, setShowAddProvider] = useState(false)
 
   const loadData = async () => {
     try {
@@ -106,39 +108,6 @@ export default function Dashboard() {
   const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
   const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
   const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
-  
-  // Calculate credits - ensure they're always positive (credits reduce cost)
-  // Credits from API might be negative (AWS returns them as negative), so we use Math.abs
-  // IMPORTANT: Sum credits from all accounts - each account has its own credits
-  // If there are multiple accounts for the same provider, each account's credits are separate
-  const totalCredits = costData.reduce((sum, data) => {
-    const creditValue = convertAmount(data.credits || 0)
-    // Credits should always be positive - they reduce your bill
-    const positiveCredit = Math.abs(creditValue)
-    return sum + positiveCredit
-  }, 0)
-  
-  // Debug logging to help identify duplicate credits issue
-  if (costData.length > 0 && totalCredits > 0) {
-    const creditsBreakdown = costData
-      .filter(d => d.credits && Math.abs(convertAmount(d.credits || 0)) > 0)
-      .map(d => ({
-        provider: d.provider.name,
-        providerId: d.provider.id,
-        rawCredits: d.credits,
-        converted: convertAmount(d.credits || 0),
-        abs: Math.abs(convertAmount(d.credits || 0))
-      }))
-    
-    console.log('[Dashboard] Credit calculation:', {
-      totalCostDataEntries: costData.length,
-      entriesWithCredits: creditsBreakdown.length,
-      creditsBreakdown,
-      totalCredits,
-      note: 'If totalCredits seems too high, check for duplicate entries or multiple accounts'
-    })
-  }
-  
   const totalSavings = costData.reduce((sum, data) => sum + Math.abs(convertAmount(data.savings || 0)), 0)
 
   return (
@@ -162,7 +131,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Header with Sync - Compact */}
+        {/* Header with Sync and Add Provider - Compact */}
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-[#0F172A] mb-0.5">
@@ -173,15 +142,25 @@ export default function Dashboard() {
             </p>
           </div>
           {!isDemoMode && (
-            <button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Sync fresh data from all cloud providers (clears cache)"
-            >
-              <Cloud className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowAddProvider(true)}
+                className="btn-secondary flex items-center space-x-2"
+                title="Add a new cloud provider account"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="text-sm">Add Provider</span>
+              </button>
+              <button
+                onClick={handleSync}
+                disabled={isSyncing}
+                className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Sync fresh data from all cloud providers (clears cache)"
+              >
+                <Cloud className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -200,7 +179,6 @@ export default function Dashboard() {
                 totalCurrent={totalCurrent}
                 totalLastMonth={totalLastMonth}
                 totalForecast={totalForecast}
-                totalCredits={totalCredits}
                 totalSavings={totalSavings}
               />
             </div>
@@ -341,6 +319,21 @@ export default function Dashboard() {
               <Sparkles className={`h-6 w-6 ${isSyncing ? 'animate-spin' : ''}`} />
             </button>
           </>
+        )}
+
+        {/* Add Provider Modal */}
+        {showAddProvider && (
+          <CloudProviderManager 
+            modalMode={true}
+            onProviderChange={() => {
+              loadData()
+              setShowAddProvider(false)
+            }}
+            onClose={() => {
+              setShowAddProvider(false)
+              loadData()
+            }}
+          />
         )}
       </div>
     </Layout>

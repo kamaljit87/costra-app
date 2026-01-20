@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Costra AWS Billing Connection - Grants Costra read-only access to AWS billing and cost data'
+
+Parameters:
+  CostraAccountId:
+    Type: String
+    Description: 'Costra AWS Account ID (provided by Costra)'
+    AllowedPattern: '^[0-9]{12}$'
+    ConstraintDescription: 'Must be a valid 12-digit AWS account ID'
+  
+  ExternalId:
+    Type: String
+    Description: 'External ID for secure cross-account access (provided by Costra)'
+    MinLength: 16
+    MaxLength: 1224
+    NoEcho: true
+  
+  ConnectionName:
+    Type: String
+    Description: 'Name for this connection (for identification)'
+    Default: 'costra-billing-connection'
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only'
+
+Resources:
+  CostraAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'CostraAccessRole-${ConnectionName}'
+      Description: 'Role for Costra to access AWS billing and cost data'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${CostraAccountId}:root'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref ExternalId
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/job-function/Billing
+      Policies:
+        - PolicyName: CostraCostExplorerAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ce:GetCostAndUsage'
+                  - 'ce:GetCostAndUsageWithResources'
+                  - 'ce:GetDimensionValues'
+                  - 'ce:GetReservationCoverage'
+                  - 'ce:GetReservationPurchaseRecommendation'
+                  - 'ce:GetReservationUtilization'
+                  - 'ce:GetRightsizingRecommendation'
+                  - 'ce:GetSavingsPlansCoverage'
+                  - 'ce:GetSavingsPlansPurchaseRecommendation'
+                  - 'ce:GetSavingsPlansUtilization'
+                  - 'ce:GetUsageReport'
+                  - 'ce:ListCostCategoryDefinitions'
+                  - 'ce:DescribeCostCategoryDefinition'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'cur:DescribeReportDefinitions'
+                  - 'cur:PutReportDefinition'
+                  - 'cur:ModifyReportDefinition'
+                  - 'cur:DeleteReportDefinition'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'organizations:DescribeOrganization'
+                  - 'organizations:DescribeAccount'
+                  - 'organizations:DescribeOrganizationalUnit'
+                  - 'organizations:ListAccounts'
+                  - 'organizations:ListOrganizationalUnitsForParent'
+                  - 'organizations:ListParents'
+                  - 'organizations:ListRoots'
+                  - 'organizations:ListTagsForResource'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'cloudwatch:GetMetricData'
+                  - 'cloudwatch:ListMetrics'
+                  - 'cloudwatch:GetMetricStatistics'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'tag:GetResources'
+                  - 'tag:GetTagKeys'
+                  - 'tag:GetTagValues'
+                Resource: '*'
+      Tags:
+        - Key: ManagedBy
+          Value: Costra
+        - Key: Purpose
+          Value: BillingDataAccess
+
+Outputs:
+  RoleArn:
+    Description: 'ARN of the IAM role that Costra will use to access your AWS account'
+    Value: !GetAtt CostraAccessRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleArn'
+  
+  ExternalId:
+    Description: 'External ID used for secure access (save this for reference)'
+    Value: !Ref ExternalId
+    Export:
+      Name: !Sub '${AWS::StackName}-ExternalId'

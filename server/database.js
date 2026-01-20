@@ -469,6 +469,60 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // Add connection metadata columns for automated CloudFormation connections
+      await client.query(`
+        DO $$ 
+        BEGIN
+          -- Add external_id for secure cross-account access
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'external_id'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN external_id TEXT;
+          END IF;
+          
+          -- Add role_arn for IAM role-based connections
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'role_arn'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN role_arn TEXT;
+          END IF;
+          
+          -- Add connection_type (automated/manual, billing/resource)
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'connection_type'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN connection_type TEXT DEFAULT 'manual';
+          END IF;
+          
+          -- Add connection_status (pending/healthy/error)
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'connection_status'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN connection_status TEXT DEFAULT 'pending';
+          END IF;
+          
+          -- Add aws_account_id for AWS connections
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'aws_account_id'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN aws_account_id TEXT;
+          END IF;
+          
+          -- Add last_health_check for connection health monitoring
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'last_health_check'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN last_health_check TIMESTAMP;
+          END IF;
+        END $$;
+      `)
+
       // Add account_id column to daily_cost_data for multi-account support
       await client.query(`
         DO $$ 
@@ -1007,7 +1061,14 @@ export const saveSavingsPlan = async (userId, plan) => {
 }
 
 // Cloud provider credentials operations
-export const addCloudProvider = async (userId, providerId, providerName, credentials, accountAlias = null) => {
+export const addCloudProvider = async (
+  userId,
+  providerId,
+  providerName,
+  credentials,
+  accountAlias = null,
+  connectionMetadata = {}
+) => {
   const client = await pool.connect()
   try {
     const { encrypt } = await import('./services/encryption.js')
@@ -1017,14 +1078,117 @@ export const addCloudProvider = async (userId, providerId, providerName, credent
     // Generate default alias if not provided
     const alias = accountAlias || `${providerName} Account`
 
+    const {
+      externalId = null,
+      roleArn = null,
+      connectionType = 'manual',
+      connectionStatus = 'pending',
+      awsAccountId = null,
+    } = connectionMetadata
+
     const result = await client.query(
       `INSERT INTO cloud_provider_credentials 
-       (user_id, provider_id, provider_name, account_alias, credentials_encrypted, is_active, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       (user_id, provider_id, provider_name, account_alias, credentials_encrypted, is_active, 
+        external_id, role_arn, connection_type, connection_status, aws_account_id, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
        RETURNING id`,
-      [userId, providerId, providerName, alias, encryptedCredentials, true]
+      [
+        userId,
+        providerId,
+        providerName,
+        alias,
+        encryptedCredentials,
+        true,
+        externalId,
+        roleArn,
+        connectionType,
+        connectionStatus,
+        awsAccountId,
+      ]
     )
     return result.rows[0].id
+  } finally {
+    client.release()
+  }
+}
+
+// Add automated AWS connection (pending state, before CloudFormation stack is created)
+export const addAutomatedAWSConnection = async (
+  userId,
+  connectionName,
+  awsAccountId,
+  externalId,
+  connectionType = 'billing'
+) => {
+  const client = await pool.connect()
+  try {
+    // Calculate role ARN (will be created by CloudFormation)
+    const roleName = `CostraAccessRole-${connectionName}`
+    const roleArn = `arn:aws:iam::${awsAccountId}:role/${roleName}`
+
+    const result = await client.query(
+      `INSERT INTO cloud_provider_credentials 
+       (user_id, provider_id, provider_name, account_alias, credentials_encrypted, is_active,
+        external_id, role_arn, connection_type, connection_status, aws_account_id, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+       RETURNING id`,
+      [
+        userId,
+        'aws',
+        'AWS',
+        connectionName,
+        '{}', // Empty credentials for now, will be populated after verification
+        true,
+        externalId,
+        roleArn,
+        `automated-${connectionType}`,
+        'pending',
+        awsAccountId,
+      ]
+    )
+    return {
+      id: result.rows[0].id,
+      roleArn,
+      externalId,
+    }
+  } finally {
+    client.release()
+  }
+}
+
+// Update connection status and credentials after verification
+export const updateAWSConnectionStatus = async (
+  userId,
+  accountId,
+  status,
+  credentials = null
+) => {
+  const client = await pool.connect()
+  try {
+    const updates = ['connection_status = $1', 'last_health_check = CURRENT_TIMESTAMP']
+    const values = [status, accountId, userId]
+    let paramIndex = 3
+
+    if (credentials) {
+      const { encrypt } = await import('./services/encryption.js')
+      const credentialsJson = JSON.stringify(credentials)
+      const encryptedCredentials = encrypt(credentialsJson)
+      updates.push(`credentials_encrypted = $${paramIndex}`)
+      values.push(encryptedCredentials)
+      paramIndex++
+    }
+
+    updates.push('updated_at = CURRENT_TIMESTAMP')
+
+    const result = await client.query(
+      `UPDATE cloud_provider_credentials 
+       SET ${updates.join(', ')}
+       WHERE id = $2 AND user_id = $${paramIndex}
+       RETURNING id, connection_status, last_health_check`,
+      values
+    )
+
+    return result.rows[0] || null
   } finally {
     client.release()
   }
@@ -1034,7 +1198,9 @@ export const getUserCloudProviders = async (userId) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      `SELECT id, provider_id, provider_name, account_alias, is_active, last_sync_at, created_at, updated_at
+      `SELECT id, provider_id, provider_name, account_alias, is_active, last_sync_at, 
+              connection_type, connection_status, aws_account_id, last_health_check,
+              created_at, updated_at
        FROM cloud_provider_credentials
        WHERE user_id = $1
        ORDER BY provider_id, created_at DESC`,
@@ -1051,7 +1217,8 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
   const client = await pool.connect()
   try {
     const result = await client.query(
-      `SELECT id, provider_id, provider_name, account_alias, credentials_encrypted
+      `SELECT id, provider_id, provider_name, account_alias, credentials_encrypted,
+              external_id, role_arn, connection_type, connection_status, aws_account_id, last_health_check
        FROM cloud_provider_credentials
        WHERE user_id = $1 AND id = $2`,
       [userId, accountId]
@@ -1068,6 +1235,12 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
       providerId: result.rows[0].provider_id,
       providerName: result.rows[0].provider_name,
       accountAlias: result.rows[0].account_alias,
+      externalId: result.rows[0].external_id,
+      roleArn: result.rows[0].role_arn,
+      connectionType: result.rows[0].connection_type,
+      connectionStatus: result.rows[0].connection_status,
+      awsAccountId: result.rows[0].aws_account_id,
+      lastHealthCheck: result.rows[0].last_health_check,
       credentials: JSON.parse(decrypted)
     }
   } finally {

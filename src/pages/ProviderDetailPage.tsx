@@ -18,8 +18,7 @@ import CostEfficiencyMetrics from '../components/CostEfficiencyMetrics'
 import RightsizingRecommendations from '../components/RightsizingRecommendations'
 import ProductCostCard from '../components/ProductCostCard'
 import TeamCostCard from '../components/TeamCostCard'
-import CreditsDetail from '../components/CreditsDetail'
-import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, Gift, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users, Download, FileText } from 'lucide-react'
+import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users, Download, FileText } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 
@@ -71,7 +70,6 @@ export default function ProviderDetailPage() {
   const [costChangeFilter, setCostChangeFilter] = useState<'all' | 'increase' | 'decrease'>('all')
   const [sortBy, setSortBy] = useState<'cost' | 'name' | 'change'>('cost')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [showCredits, setShowCredits] = useState(true)
   
   // Period-based services state
   const [periodServices, setPeriodServices] = useState<ServiceCost[]>([])
@@ -709,15 +707,6 @@ export default function ProviderDetailPage() {
               <div>
                 <div className="flex items-center space-x-2.5 mb-0.5">
                   <h1 className="text-2xl font-bold text-[#0F172A]">{providerData.provider.name}</h1>
-                  {showCredits && Math.abs(providerData.credits || 0) > 0 && (
-                    <span 
-                      className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#F0FDF4] text-[#16A34A] border border-[#BBF7D0]"
-                      title={`Credits applied: ${formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}`}
-                    >
-                      <Gift className="h-2.5 w-2.5 mr-1" />
-                      Credits: {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
-                    </span>
-                  )}
                   {providerBudgetCount > 0 && (
                     <span
                       className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
@@ -774,23 +763,6 @@ export default function ProviderDetailPage() {
               </div>
             </div>
 
-            {showCredits && (
-              <div className="card p-4 bg-[#F0FDF4] border-[#BBF7D0]" title="Credits applied to this account">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="text-[10px] font-semibold text-[#16A34A] uppercase tracking-wide">Credits Applied</div>
-                  <Gift className="h-3.5 w-3.5 text-[#16A34A]" />
-                </div>
-                <div className="text-xl font-bold text-[#16A34A] mb-1">
-                  {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
-                </div>
-                {Math.abs(providerData.credits || 0) > 0 && (
-                  <div className="text-[10px] text-[#16A34A]/70">
-                    Reduces your total cost
-                  </div>
-                )}
-              </div>
-            )}
-
             <div className="card p-4 bg-[#EFF6FF] border-[#DBEAFE]" title="Savings from reserved instances and commitment plans">
               <div className="text-[10px] font-semibold text-[#1F3A5F] uppercase tracking-wide mb-1.5">Savings</div>
               <div className="text-xl font-bold text-[#1F3A5F]">
@@ -799,43 +771,6 @@ export default function ProviderDetailPage() {
             </div>
           </div>
 
-          {/* Credit Information Section */}
-          {showCredits && Math.abs(providerData.credits || 0) > 0 && (
-            <div className="card p-4 mb-4 bg-gradient-to-br from-[#F0FDF4] to-[#ECFDF5] border-[#BBF7D0]">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Gift className="h-5 w-5 text-[#16A34A]" />
-                  <h3 className="text-base font-semibold text-[#0F172A]">Credit Information</h3>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <div className="text-xs text-[#64748B] mb-1">Total Credits Applied</div>
-                  <div className="text-lg font-bold text-[#16A34A]">
-                    {formatCurrency(convertAmount(Math.abs(providerData.credits || 0)))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#64748B] mb-1">Gross Cost (Before Credits)</div>
-                  <div className="text-lg font-bold text-[#0F172A]">
-                    {formatCurrency(convertAmount(providerData.currentMonth))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#64748B] mb-1">Net Cost (After Credits)</div>
-                  <div className="text-lg font-bold text-[#1F3A5F]">
-                    {formatCurrency(convertAmount(Math.max(0, providerData.currentMonth - Math.abs(providerData.credits || 0))))}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t border-[#BBF7D0]">
-                <p className="text-xs text-[#64748B]">
-                  <span className="font-medium text-[#16A34A]">Credits</span> are promotional credits, refunds, or account credits that reduce your total cost. 
-                  They are automatically applied to your bill and reduce the amount you pay.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Inline Filter Bar */}
@@ -1138,16 +1073,6 @@ export default function ProviderDetailPage() {
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Display
                     </label>
-                    <label className="flex items-center space-x-2 px-3 py-1.5 rounded-lg border border-gray-200 bg-white cursor-pointer hover:bg-gray-50 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={showCredits}
-                        onChange={(e) => setShowCredits(e.target.checked)}
-                        className="w-3 h-3 text-primary-600 rounded focus:ring-primary-500"
-                      />
-                      <Gift className="h-3 w-3 text-green-600" />
-                      <span className="text-xs text-gray-700">Show Credits</span>
-                    </label>
                   </div>
 
                   {/* Sort Options */}
@@ -1191,7 +1116,6 @@ export default function ProviderDetailPage() {
                       setSortBy('cost')
                       setSortOrder('desc')
                       setSelectedService(null)
-                      setShowCredits(true)
                     }}
                     className="flex items-center space-x-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
                     title="Reset all filters to default"
@@ -1346,26 +1270,6 @@ export default function ProviderDetailPage() {
                   }
                 })()}
 
-                {/* Detailed Credits Information */}
-                {showCredits && providerId && (() => {
-                  const range = selectedPeriod === 'custom' && customStartDate && customEndDate
-                    ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
-                    : getDateRangeForPeriod(selectedPeriod)
-                  const startDateStr = range.startDate.toISOString().split('T')[0]
-                  const endDateStr = range.endDate.toISOString().split('T')[0]
-                  const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
-
-                  return (
-                    <CreditsDetail
-                      key={`credits-${providerId}-${startDateStr}-${endDateStr}`}
-                      providerId={providerId}
-                      accountId={accountId}
-                      startDate={startDateStr}
-                      endDate={endDateStr}
-                      isDemoMode={isDemoMode}
-                    />
-                  )
-                })()}
 
                 {/* Cost Trend Chart */}
                 <div>

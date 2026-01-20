@@ -211,6 +211,29 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
+  // Initiate automated AWS connection (CloudFormation)
+  initiateAutomatedAWSConnection: async (connectionName: string, awsAccountId: string, connectionType: 'billing' | 'resource' = 'billing') => {
+    const response = await apiRequest('/cloud-providers/aws/automated', {
+      method: 'POST',
+      body: JSON.stringify({ connectionName, awsAccountId, connectionType }),
+    })
+    return response.json()
+  },
+
+  // Verify AWS connection after CloudFormation stack is created
+  verifyAWSConnection: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/aws/${accountId}/verify`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  // Health check for AWS connection
+  checkAWSConnectionHealth: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/aws/${accountId}/health`)
+    return response.json()
+  },
+
   // Delete specific account by account ID
   deleteCloudProviderAccount: async (accountId: number) => {
     const response = await apiRequest(`/cloud-providers/account/${accountId}`, {

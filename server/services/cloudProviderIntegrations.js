@@ -62,86 +62,41 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       clientCache.set(cacheKey, client)
     }
 
-    // First, fetch total costs without GroupBy to include support, taxes, etc.
-    // This query returns ALL costs including Support plans, taxes, and credits
-    const totalCommand = new GetCostAndUsageCommand({
-      TimePeriod: {
-        Start: startDate,
-        End: endDate,
-      },
-      Granularity: 'DAILY',
-      Metrics: ['UnblendedCost', 'BlendedCost', 'AmortizedCost'],
-    })
-
-    console.log(`[AWS Fetch] Sending GetCostAndUsage command for totals...`)
-    const totalResponse = await client.send(totalCommand)
-    
-    console.log(`[AWS Fetch] Total response received:`)
-    console.log(`  - ResultsByTime count: ${totalResponse.ResultsByTime?.length || 0}`)
-    if (totalResponse.ResultsByTime?.length > 0) {
-      const firstResult = totalResponse.ResultsByTime[0]
-      console.log(`  - Sample Total: ${JSON.stringify(firstResult.Total)}`)
-    }
-
-    // Fetch credits used in the period
-    const creditsCommand = new GetCostAndUsageCommand({
-      TimePeriod: {
-        Start: startDate,
-        End: endDate,
-      },
-      Granularity: 'MONTHLY',
-      Metrics: ['UnblendedCost'],
-      Filter: {
-        Dimensions: {
-          Key: 'RECORD_TYPE',
-          Values: ['Credit'],
-        },
-      },
-    })
-
-    console.log(`[AWS Fetch] Sending GetCostAndUsage command for credits...`)
-    let creditsUsed = 0
-    try {
-      const creditsResponse = await client.send(creditsCommand)
-      console.log(`[AWS Fetch] Credits response received:`)
-      console.log(`  - ResultsByTime count: ${creditsResponse.ResultsByTime?.length || 0}`)
-      
-      // Credits are returned as negative values, sum them up
-      creditsResponse.ResultsByTime?.forEach((result) => {
-        const amount = parseFloat(result.Total?.UnblendedCost?.Amount || 0)
-        creditsUsed += Math.abs(amount) // Convert negative to positive
-        console.log(`  - Credit amount: ${amount}`)
-      })
-      console.log(`[AWS Fetch] Total credits used in period: $${creditsUsed.toFixed(2)}`)
-    } catch (creditsError) {
-      console.warn('[AWS Fetch] Could not fetch credits:', creditsError.message)
-    }
-
-    // Then fetch with GroupBy to get service breakdown
+    // Fetch costs grouped by SERVICE (excludes taxes, support, etc. by default)
+    // This matches AWS console's "Month-to-date" view which shows service costs only
     const command = new GetCostAndUsageCommand({
       TimePeriod: {
         Start: startDate,
         End: endDate,
       },
       Granularity: 'DAILY',
-      Metrics: ['UnblendedCost', 'BlendedCost'],
+      Metrics: ['UnblendedCost'],
       GroupBy: [
         {
           Type: 'DIMENSION',
           Key: 'SERVICE',
         },
       ],
+      // Filter out Tax, Support, Refund, Credit to match AWS console month-to-date
+      Filter: {
+        Not: {
+          Dimensions: {
+            Key: 'RECORD_TYPE',
+            Values: ['Tax', 'Support', 'Refund', 'Credit'],
+          },
+        },
+      },
     })
 
-    console.log(`[AWS Fetch] Sending GetCostAndUsage command with GroupBy...`)
-    const response = await client.send(command)
+    console.log(`[AWS Fetch] Sending GetCostAndUsage command with SERVICE grouping (excluding Tax/Support/Refund/Credit)...`)
+    const groupedResponse = await client.send(command)
     
     console.log(`[AWS Fetch] Grouped response received:`)
-    console.log(`  - ResultsByTime count: ${response.ResultsByTime?.length || 0}`)
+    console.log(`  - ResultsByTime count: ${groupedResponse.ResultsByTime?.length || 0}`)
     
     // Log sample data for debugging
-    if (response.ResultsByTime?.length > 0) {
-      const firstResult = response.ResultsByTime[0]
+    if (groupedResponse.ResultsByTime?.length > 0) {
+      const firstResult = groupedResponse.ResultsByTime[0]
       console.log(`  - First result date: ${firstResult.TimePeriod?.Start}`)
       console.log(`  - First result Groups count: ${firstResult.Groups?.length || 0}`)
       if (firstResult.Groups?.length > 0) {
@@ -149,7 +104,31 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       }
     }
 
-    return transformAWSCostData(totalResponse, response, startDate, endDate, creditsUsed)
+    // Also fetch totals for daily data (but still exclude Tax/Support/Refund/Credit)
+    const totalCommand = new GetCostAndUsageCommand({
+      TimePeriod: {
+        Start: startDate,
+        End: endDate,
+      },
+      Granularity: 'DAILY',
+      Metrics: ['UnblendedCost'],
+      Filter: {
+        Not: {
+          Dimensions: {
+            Key: 'RECORD_TYPE',
+            Values: ['Tax', 'Support', 'Refund', 'Credit'],
+          },
+        },
+      },
+    })
+
+    console.log(`[AWS Fetch] Sending GetCostAndUsage command for daily totals (excluding Tax/Support/Refund/Credit)...`)
+    const totalResponse = await client.send(totalCommand)
+    
+    console.log(`[AWS Fetch] Total response received:`)
+    console.log(`  - ResultsByTime count: ${totalResponse.ResultsByTime?.length || 0}`)
+
+    return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate)
   } catch (error) {
     console.error('[AWS Fetch] AWS Cost Explorer error:', error)
     console.error('[AWS Fetch] Error code:', error.code)
@@ -160,11 +139,10 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
 
 /**
  * Transform AWS Cost Explorer response to our format
- * @param totalData - Response from query without GroupBy (accurate totals including support, taxes)
+ * @param totalData - Response from query without GroupBy (excludes Tax/Support/Refund/Credit)
  * @param groupedData - Response from query with GroupBy by SERVICE (for service breakdown)
- * @param creditsUsed - Total credits used in the period
  */
-const transformAWSCostData = (totalData, groupedData, startDate, endDate, creditsUsed = 0) => {
+const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
   const totalResultsByTime = totalData.ResultsByTime || []
   const groupedResultsByTime = groupedData.ResultsByTime || []
   
@@ -180,12 +158,10 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
   totalResultsByTime.slice(0, 10).forEach((result, idx) => {
     const date = result.TimePeriod?.Start
     const unblended = result.Total?.UnblendedCost?.Amount
-    const blended = result.Total?.BlendedCost?.Amount
-    const amortized = result.Total?.AmortizedCost?.Amount
-    console.log(`[AWS Transform] Day ${idx}: ${date} - Unblended: $${unblended}, Blended: $${blended}, Amortized: $${amortized}`)
+    console.log(`[AWS Transform] Day ${idx}: ${date} - Unblended: $${unblended}`)
     totalSum += parseFloat(unblended || 0)
   })
-  console.log(`[AWS Transform] First 10 days total (Unblended): $${totalSum.toFixed(2)}`)
+  console.log(`[AWS Transform] First 10 days total (Unblended, excluding Tax/Support): $${totalSum.toFixed(2)}`)
 
   // Create a map of grouped data by date for service breakdown
   const groupedByDate = new Map()
@@ -196,23 +172,19 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
     }
   })
 
-  // Process daily data using totals (more accurate, includes support/taxes)
+  // Process daily data using totals (excludes Tax/Support/Refund/Credit)
+  // This matches AWS console's month-to-date view
   totalResultsByTime.forEach((result) => {
     const date = result.TimePeriod?.Start
     
-    // Use UnblendedCost which most closely matches actual invoice
-    const dailyTotal = parseFloat(
-      result.Total?.UnblendedCost?.Amount || 
-      result.Total?.BlendedCost?.Amount || 
-      result.Total?.AmortizedCost?.Amount ||
-      0
-    )
+    // Use UnblendedCost (already filtered to exclude Tax/Support/Refund/Credit)
+    const dailyTotal = parseFloat(result.Total?.UnblendedCost?.Amount || 0)
     
     // Get service breakdown for this date
     const groups = groupedByDate.get(date) || []
     groups.forEach((group) => {
       const serviceName = group.Keys?.[0] || 'Other'
-      const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || group.Metrics?.BlendedCost?.Amount || 0)
+      const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || 0)
       if (cost > 0) {
         const existing = serviceMap.get(serviceName) || 0
         serviceMap.set(serviceName, existing + cost)
@@ -226,7 +198,7 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
         cost: dailyTotal,
       })
 
-      // Calculate monthly totals
+      // Calculate monthly totals - only count days in the current month
       const resultDate = new Date(date)
       const now = new Date()
       if (resultDate.getMonth() === now.getMonth() && resultDate.getFullYear() === now.getFullYear()) {
@@ -255,21 +227,39 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
   const services = filterOutTaxServices(allServices)
   console.log(`  - Services after tax filter: ${services.length}`)
 
-  // Debug summary for January 2026 credit/spend investigation
-  const netSpend = currentMonth
-  const grossSpend = currentMonth + creditsUsed
+  // Calculate month-to-date more accurately
+  // Sum only days from the 1st of current month to today
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonthNum = now.getMonth() + 1
+  const currentDay = now.getDate()
+  
+  // Recalculate currentMonth from daily data for accuracy
+  let monthToDate = 0
+  dailyData.forEach((day) => {
+    const dayDate = new Date(day.date)
+    if (dayDate.getFullYear() === currentYear && 
+        dayDate.getMonth() === now.getMonth() &&
+        dayDate.getDate() <= currentDay) {
+      monthToDate += day.cost
+    }
+  })
+
   console.log('[AWS Transform] Billing summary for period:')
   console.log(`  - Start date: ${startDate}`)
   console.log(`  - End date:   ${endDate}`)
-  console.log(`  - Net spend (after credits): $${netSpend.toFixed(2)}`)
-  console.log(`  - Credits used (Cost Explorer, RECORD_TYPE=Credit): $${creditsUsed.toFixed(2)}`)
-  console.log(`  - Gross spend (before credits): $${grossSpend.toFixed(2)}`)
+  console.log(`  - Current month (all days): $${currentMonth.toFixed(2)}`)
+  console.log(`  - Month-to-date (Jan 1-${currentDay}): $${monthToDate.toFixed(2)}`)
+  console.log(`  - Last month spend: $${lastMonth.toFixed(2)}`)
+  
+  // Use month-to-date for currentMonth to match AWS console
+  currentMonth = monthToDate
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits: creditsUsed,
+    credits: 0,
     savings: 0,
     services,
     dailyData,
@@ -1122,55 +1112,6 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
     const totalResult = await totalResponse.json()
     console.log(`[Azure Fetch] Total cost rows: ${totalResult.properties?.rows?.length || 0}`)
 
-    // Fetch credits (type: Credit or look for negative costs)
-    let creditsUsed = 0
-    try {
-      const creditsPayload = {
-        type: 'ActualCost',
-        timeframe: 'Custom',
-        timePeriod: {
-          from: startDate,
-          to: endDate,
-        },
-        dataset: {
-          granularity: 'Monthly',
-          aggregation: {
-            totalCost: {
-              name: 'Cost',
-              function: 'Sum',
-            },
-          },
-          filter: {
-            dimensions: {
-              name: 'ChargeType',
-              operator: 'In',
-              values: ['Credit', 'Refund'],
-            },
-          },
-        },
-      }
-
-      const creditsResponse = await fetch(baseUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(creditsPayload),
-      })
-
-      if (creditsResponse.ok) {
-        const creditsResult = await creditsResponse.json()
-        creditsResult.properties?.rows?.forEach((row) => {
-          const amount = parseFloat(row[0] || 0)
-          creditsUsed += Math.abs(amount)
-        })
-        console.log(`[Azure Fetch] Total credits used: $${creditsUsed.toFixed(2)}`)
-      }
-    } catch (creditsError) {
-      console.warn(`[Azure Fetch] Could not fetch credits: ${creditsError.message}`)
-    }
-
     // Fetch with grouping for service breakdown
     const groupedPayload = {
       type: 'ActualCost',
@@ -1214,7 +1155,7 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
     const groupedResult = await groupedResponse.json()
     console.log(`[Azure Fetch] Grouped rows: ${groupedResult.properties?.rows?.length || 0}`)
 
-    return transformAzureCostData(totalResult, groupedResult, startDate, endDate, creditsUsed)
+    return transformAzureCostData(totalResult, groupedResult, startDate, endDate)
   } catch (error) {
     console.error('[Azure Fetch] Azure Cost Management error:', error)
     throw new Error(`Azure API Error: ${error.message}`)
@@ -1255,9 +1196,8 @@ const getAzureAccessToken = async (tenantId, clientId, clientSecret) => {
  * Transform Azure Cost Management response to our format
  * @param totalData - Response from query without grouping (accurate totals)
  * @param groupedData - Response from query with ServiceName grouping
- * @param creditsUsed - Total credits used in the period
  */
-const transformAzureCostData = (totalData, groupedData, startDate, endDate, creditsUsed = 0) => {
+const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
   const totalRows = totalData.properties?.rows || []
   const totalColumns = totalData.properties?.columns || []
   const groupedRows = groupedData.properties?.rows || []
@@ -1334,13 +1274,12 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate, cred
   console.log(`  - Current month total: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month total: $${lastMonth.toFixed(2)}`)
   console.log(`  - Services found: ${allServices.length}, after tax filter: ${services.length}`)
-  console.log(`  - Credits: $${creditsUsed.toFixed(2)}`)
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits: creditsUsed,
+    credits: 0,
     savings: 0,
     services,
     dailyData,
@@ -1531,7 +1470,6 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
   const serviceMap = new Map()
   let currentMonth = 0
   let lastMonth = 0
-  let totalCredits = 0
 
   const now = new Date()
 
@@ -1539,7 +1477,6 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
     const date = row.f[0]?.v
     const serviceName = row.f[1]?.v || 'Other'
     const cost = parseFloat(row.f[2]?.v || 0)
-    const credits = parseFloat(row.f[3]?.v || 0)
 
     if (date) {
       // Aggregate daily costs
@@ -1557,8 +1494,6 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
       } else {
         lastMonth += cost
       }
-
-      totalCredits += Math.abs(credits)
     }
   })
 
@@ -1577,13 +1512,12 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
   console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
-  console.log(`  - Credits: $${totalCredits.toFixed(2)}`)
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits: totalCredits,
+    credits: 0,
     savings: 0,
     services,
     dailyData,
@@ -1615,28 +1549,6 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
     const invoicesData = await invoicesResponse.json()
     console.log(`[DO Fetch] Found ${invoicesData.invoices?.length || 0} invoices`)
 
-    // Fetch balance (includes credits)
-    let credits = 0
-    try {
-      console.log(`[DO Fetch] Fetching balance...`)
-      const balanceResponse = await fetch('https://api.digitalocean.com/v2/customers/my/balance', {
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (balanceResponse.ok) {
-        const balanceData = await balanceResponse.json()
-        // DigitalOcean balance includes account_balance (credits) and month_to_date_usage
-        credits = Math.abs(parseFloat(balanceData.account_balance || 0))
-        console.log(`[DO Fetch] Account balance (credits): $${credits.toFixed(2)}`)
-        console.log(`[DO Fetch] Month-to-date usage: $${balanceData.month_to_date_usage || 0}`)
-      }
-    } catch (balanceError) {
-      console.warn(`[DO Fetch] Could not fetch balance: ${balanceError.message}`)
-    }
-
     // Fetch billing history for more detailed breakdown
     let billingHistory = []
     try {
@@ -1657,7 +1569,7 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
       console.warn(`[DO Fetch] Could not fetch billing history: ${historyError.message}`)
     }
 
-    return transformDigitalOceanCostData(invoicesData, billingHistory, credits, startDate, endDate)
+    return transformDigitalOceanCostData(invoicesData, billingHistory, startDate, endDate)
   } catch (error) {
     console.error('[DO Fetch] DigitalOcean API error:', error)
     throw new Error(`DigitalOcean API Error: ${error.message}`)
@@ -1667,13 +1579,12 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
 /**
  * Transform DigitalOcean response to our format
  */
-const transformDigitalOceanCostData = (invoicesData, billingHistory, creditsBalance, startDate, endDate) => {
+const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, endDate) => {
   const invoices = invoicesData.invoices || []
   const dailyData = []
   const serviceMap = new Map()
   let currentMonth = 0
   let lastMonth = 0
-  let creditsUsed = 0
 
   const now = new Date()
   const start = new Date(startDate)
@@ -1708,13 +1619,6 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, creditsBala
     }
   })
 
-  // Process billing history for credits used
-  billingHistory.forEach((entry) => {
-    if (entry.type === 'Credit' || entry.type === 'credit') {
-      creditsUsed += Math.abs(parseFloat(entry.amount || 0))
-    }
-  })
-
   // If no service breakdown, create a default one
   if (serviceMap.size === 0 && (currentMonth > 0 || lastMonth > 0)) {
     serviceMap.set('DigitalOcean Services', currentMonth + lastMonth)
@@ -1731,14 +1635,12 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, creditsBala
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
   console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
-  console.log(`  - Credits used: $${creditsUsed.toFixed(2)}`)
-  console.log(`  - Credits balance: $${creditsBalance.toFixed(2)}`)
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits: creditsUsed > 0 ? creditsUsed : creditsBalance,
+    credits: 0,
     savings: 0,
     services,
     dailyData,
@@ -1839,7 +1741,6 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
   const serviceMap = new Map()
   let currentMonth = 0
   let lastMonth = 0
-  let credits = 0
 
   const now = new Date()
 
@@ -1847,11 +1748,6 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
   if (accountSummary) {
     // Extract billing totals
     currentMonth = parseFloat(accountSummary.billable_cost || 0)
-    // Credits should always be positive (they reduce cost)
-    credits = Math.abs(parseFloat(accountSummary.credits?.total || 0))
-    if (credits > 0) {
-      console.log(`[IBM Transform] Credits found: $${credits.toFixed(2)}`)
-    }
 
     // Add as a single monthly data point
     const summaryDate = new Date(accountSummary.month || startDate)
@@ -1897,14 +1793,13 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
 
   console.log(`[IBM Transform] Processed data:`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Credits: $${credits.toFixed(2)}`)
   console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits,
+    credits: 0,
     savings: 0,
     services,
     dailyData,
@@ -1967,35 +1862,7 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
       console.warn(`[Linode Fetch] Could not fetch current invoice items: ${itemsError.message}`)
     }
 
-    // Fetch payments for credits info
-    console.log(`[Linode Fetch] Fetching payments...`)
-    let payments = []
-    let creditsBalance = 0
-    try {
-      const paymentsResponse = await fetch('https://api.linode.com/v4/account/payments?page_size=100', { headers })
-      if (paymentsResponse.ok) {
-        const paymentsData = await paymentsResponse.json()
-        payments = paymentsData.data || []
-        console.log(`[Linode Fetch] Found ${payments.length} payments`)
-      }
-    } catch (paymentsError) {
-      console.warn(`[Linode Fetch] Could not fetch payments: ${paymentsError.message}`)
-    }
-
-    // Check for promotional credits in account
-    if (accountData.active_promotions) {
-      accountData.active_promotions.forEach((promo) => {
-        creditsBalance += parseFloat(promo.credit_remaining || 0)
-      })
-      console.log(`[Linode Fetch] Promotional credits: $${creditsBalance.toFixed(2)}`)
-    }
-
-    // Account balance can be negative (credits)
-    if (accountData.balance && accountData.balance < 0) {
-      creditsBalance += Math.abs(accountData.balance)
-    }
-
-    return transformLinodeCostData(accountData, invoices, currentInvoiceItems, creditsBalance, startDate, endDate)
+    return transformLinodeCostData(accountData, invoices, currentInvoiceItems, startDate, endDate)
   } catch (error) {
     console.error('[Linode Fetch] Linode API error:', error)
     throw new Error(`Linode API Error: ${error.message}`)
@@ -2005,7 +1872,7 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
 /**
  * Transform Linode response to our format
  */
-const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, creditsBalance, startDate, endDate) => {
+const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, startDate, endDate) => {
   const dailyData = []
   const serviceMap = new Map()
   let currentMonth = 0
@@ -2072,14 +1939,13 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, cre
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Credits: $${creditsBalance.toFixed(2)}`)
   console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits: creditsBalance,
+    credits: 0,
     savings: 0,
     services,
     dailyData,
@@ -2141,13 +2007,7 @@ export const fetchVultrCostData = async (credentials, startDate, endDate) => {
       console.log(`[Vultr Fetch] Found ${invoices.length} invoices`)
     }
 
-    // Credits are typically shown as negative balance
-    let credits = 0
-    if (account.balance && account.balance < 0) {
-      credits = Math.abs(account.balance)
-    }
-
-    return transformVultrCostData(account, billingHistory, invoices, credits, startDate, endDate)
+    return transformVultrCostData(account, billingHistory, invoices, startDate, endDate)
   } catch (error) {
     console.error('[Vultr Fetch] Vultr API error:', error)
     throw new Error(`Vultr API Error: ${error.message}`)
@@ -2157,7 +2017,7 @@ export const fetchVultrCostData = async (credentials, startDate, endDate) => {
 /**
  * Transform Vultr response to our format
  */
-const transformVultrCostData = (account, billingHistory, invoices, creditsBalance, startDate, endDate) => {
+const transformVultrCostData = (account, billingHistory, invoices, startDate, endDate) => {
   const dailyData = []
   const serviceMap = new Map()
   let currentMonth = 0
@@ -2234,14 +2094,13 @@ const transformVultrCostData = (account, billingHistory, invoices, creditsBalanc
   console.log(`  - Daily data points: ${dailyData.length}`)
   console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
   console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Credits: $${creditsBalance.toFixed(2)}`)
   console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
 
   return {
     currentMonth,
     lastMonth,
     forecast: currentMonth * 1.1,
-    credits: creditsBalance,
+    credits: 0,
     savings: 0,
     services,
     dailyData,

@@ -12,11 +12,17 @@ interface CloudProvider {
   accountAlias: string
   isActive: boolean
   lastSyncAt: string | null
+  connectionType?: string
+  connectionStatus?: 'pending' | 'healthy' | 'error'
+  awsAccountId?: string
+  lastHealthCheck?: string | null
   createdAt: string
 }
 
 interface CloudProviderManagerProps {
   onProviderChange?: () => void
+  modalMode?: boolean // If true, only show the add provider form in a modal
+  onClose?: () => void // Callback when modal should close
 }
 
 const AVAILABLE_PROVIDERS = [
@@ -29,7 +35,7 @@ const AVAILABLE_PROVIDERS = [
   { id: 'ibm', name: 'IBM Cloud' },
 ]
 
-export default function CloudProviderManager({ onProviderChange }: CloudProviderManagerProps) {
+export default function CloudProviderManager({ onProviderChange, modalMode = false, onClose }: CloudProviderManagerProps) {
   const [providers, setProviders] = useState<CloudProvider[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -45,10 +51,25 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
   const [editCredentials, setEditCredentials] = useState<{ [key: string]: string }>({})
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false)
   const [showIAMDialog, setShowIAMDialog] = useState(false)
+  const [awsConnectionType, setAwsConnectionType] = useState<'simple' | 'advanced' | 'automated'>('simple')
+  const [automatedConnectionData, setAutomatedConnectionData] = useState<{
+    connectionId?: number
+    quickCreateUrl?: string
+    externalId?: string
+    roleArn?: string
+  } | null>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
 
   useEffect(() => {
     loadProviders()
   }, [])
+
+  // Auto-open add modal in modal mode
+  useEffect(() => {
+    if (modalMode && !showAddModal) {
+      setShowAddModal(true)
+    }
+  }, [modalMode, showAddModal])
 
   const loadProviders = async () => {
     try {
@@ -72,6 +93,43 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
     const provider = AVAILABLE_PROVIDERS.find(p => p.id === selectedProvider)
     if (!provider) {
       setError('Invalid provider selected')
+      return
+    }
+
+    // Handle automated AWS connection differently
+    if (selectedProvider === 'aws' && awsConnectionType === 'automated') {
+      if (!accountAlias) {
+        setError('Connection name is required')
+        return
+      }
+      
+      // AWS Account ID is required for automated connection
+      const awsAccountId = credentials['awsAccountId']
+      if (!awsAccountId || !/^\d{12}$/.test(awsAccountId)) {
+        setError('Valid AWS Account ID (12 digits) is required')
+        return
+      }
+
+      try {
+        setIsSubmitting(true)
+        setError('')
+        const result = await cloudProvidersAPI.initiateAutomatedAWSConnection(
+          accountAlias,
+          awsAccountId,
+          'billing'
+        )
+        setAutomatedConnectionData({
+          connectionId: result.connectionId,
+          quickCreateUrl: result.quickCreateUrl,
+          externalId: result.externalId,
+          roleArn: result.roleArn,
+        })
+        // Don't close modal yet - user needs to complete CloudFormation
+      } catch (error: any) {
+        setError(error.message || 'Failed to initiate automated connection')
+      } finally {
+        setIsSubmitting(false)
+      }
       return
     }
 
@@ -99,10 +157,37 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
       setCredentials({})
       await loadProviders()
       onProviderChange?.()
+      if (modalMode && onClose) {
+        onClose()
+      }
     } catch (error: any) {
       setError(error.message || 'Failed to add cloud provider')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleVerifyConnection = async () => {
+    if (!automatedConnectionData?.connectionId) {
+      setError('Connection ID not found')
+      return
+    }
+
+    try {
+      setIsVerifying(true)
+      setError('')
+      await cloudProvidersAPI.verifyAWSConnection(automatedConnectionData.connectionId)
+      setShowAddModal(false)
+      setSelectedProvider('')
+      setAccountAlias('')
+      setCredentials({})
+      setAutomatedConnectionData(null)
+      await loadProviders()
+      onProviderChange?.()
+    } catch (error: any) {
+      setError(error.message || 'Failed to verify connection')
+    } finally {
+      setIsVerifying(false)
     }
   }
 
@@ -207,7 +292,12 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
   const getRequiredFields = (providerId: string): string[] => {
     switch (providerId) {
       case 'aws':
-        return ['accessKeyId', 'secretAccessKey', 'region']
+        // Return different fields based on connection type
+        if (awsConnectionType === 'simple') {
+          return ['accessKeyId', 'secretAccessKey', 'region']
+        } else {
+          return ['roleArn', 's3BucketName', 'curReportName', 'region']
+        }
       case 'azure':
         return ['subscriptionId', 'clientId', 'clientSecret', 'tenantId']
       case 'gcp':
@@ -358,6 +448,19 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                             <span className="font-medium text-gray-900">
                               {provider.accountAlias}
                             </span>
+                            {provider.connectionType?.startsWith('automated') && (
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                provider.connectionStatus === 'healthy'
+                                  ? 'bg-green-100 text-green-700'
+                                  : provider.connectionStatus === 'error'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {provider.connectionStatus === 'healthy' ? '✓ Connected' :
+                                 provider.connectionStatus === 'error' ? '✗ Error' :
+                                 '⏳ Pending'}
+                              </span>
+                            )}
                             <button
                               onClick={() => handleStartEditAlias(provider.accountId, provider.accountAlias)}
                               className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
@@ -366,6 +469,11 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                               <Edit2 className="h-3 w-3" />
                             </button>
                           </div>
+                        )}
+                        {provider.awsAccountId && (
+                          <p className="text-xs text-gray-500">
+                            AWS Account: {provider.awsAccountId}
+                          </p>
                         )}
                         <div className="text-sm text-gray-600">
                           {provider.providerId.toUpperCase()}
@@ -423,7 +531,7 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
 
       {/* Add Provider Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className={modalMode ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" : ""}>
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -434,7 +542,12 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                     setSelectedProvider('')
                     setAccountAlias('')
                     setCredentials({})
+                    setAwsConnectionType('simple')
+                    setAutomatedConnectionData(null)
                     setError('')
+                    if (modalMode) {
+                      onClose?.()
+                    }
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -500,33 +613,187 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2">
-                      <h4 className="font-medium text-gray-900">Credentials</h4>
-                      <button
-                        type="button"
-                        onClick={() => setShowIAMDialog(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:bg-[#F0FDFA] rounded-lg transition-colors"
-                      >
-                        <HelpCircle className="h-4 w-4" />
-                        How to set up IAM permissions
-                      </button>
-                    </div>
-                    {getRequiredFields(selectedProvider).map((field) => (
-                      <div key={field}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}
+                    {/* AWS Connection Type Selector */}
+                    {selectedProvider === 'aws' && (
+                      <div className="pt-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Connection Type
                         </label>
-                        <input
-                          type={field.toLowerCase().includes('secret') || field.toLowerCase().includes('key') ? 'password' : 'text'}
-                          value={credentials[field] || ''}
-                          onChange={(e) =>
-                            setCredentials({ ...credentials, [field]: e.target.value })
-                          }
-                          className="input-field"
-                          placeholder={`Enter ${field}`}
-                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAwsConnectionType('simple')
+                              setCredentials({})
+                              setAutomatedConnectionData(null)
+                            }}
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                              awsConnectionType === 'simple'
+                                ? 'bg-[#F0FDFA] border-[#22B8A0] text-[#22B8A0]'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            Simple (API Keys)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAwsConnectionType('advanced')
+                              setCredentials({})
+                              setAutomatedConnectionData(null)
+                            }}
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                              awsConnectionType === 'advanced'
+                                ? 'bg-[#EFF6FF] border-[#1F3A5F] text-[#1F3A5F]'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            Advanced (CUR + Role)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAwsConnectionType('automated')
+                              setCredentials({})
+                              setAutomatedConnectionData(null)
+                            }}
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                              awsConnectionType === 'automated'
+                                ? 'bg-[#FEF3C7] border-[#F59E0B] text-[#F59E0B]'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            Automated ⚡
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {awsConnectionType === 'simple'
+                            ? 'Use Cost Explorer API - quick setup, no S3 bucket needed'
+                            : awsConnectionType === 'advanced'
+                            ? 'Use Cost & Usage Reports - more detailed data, requires CUR setup'
+                            : 'CloudFormation automated setup - recommended, one-click connection'}
+                        </p>
                       </div>
-                    ))}
+                    )}
+
+                    {/* Automated Connection Flow */}
+                    {selectedProvider === 'aws' && awsConnectionType === 'automated' && automatedConnectionData ? (
+                      <div className="space-y-4 pt-4 border-t border-gray-200">
+                        <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-xl p-4">
+                          <h4 className="font-semibold text-[#92400E] mb-2">✅ Connection Initiated</h4>
+                          <p className="text-sm text-[#92400E] mb-4">
+                            Your CloudFormation stack is ready to be created. Follow these steps:
+                          </p>
+                          <ol className="text-sm text-[#92400E] space-y-2 list-decimal list-inside mb-4">
+                            <li>Click the button below to open AWS CloudFormation Console</li>
+                            <li>Review the stack parameters (they are pre-filled)</li>
+                            <li>Scroll to the bottom, check the two capability checkboxes</li>
+                            <li>Click "Create stack"</li>
+                            <li>Wait for stack creation to complete (~2-5 minutes)</li>
+                            <li>Return here and click "Verify Connection"</li>
+                          </ol>
+                          <div className="space-y-2">
+                            <a
+                              href={automatedConnectionData.quickCreateUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block w-full px-4 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-[#D97706] transition-colors text-center font-medium"
+                            >
+                              Open AWS CloudFormation Console →
+                            </a>
+                            <button
+                              onClick={handleVerifyConnection}
+                              disabled={isVerifying}
+                              className="w-full px-4 py-2 bg-[#22B8A0] text-white rounded-lg hover:bg-[#1F9A8A] transition-colors font-medium disabled:opacity-50"
+                            >
+                              {isVerifying ? 'Verifying...' : 'Verify Connection'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between pt-2">
+                          <h4 className="font-medium text-gray-900">Credentials</h4>
+                          <button
+                            type="button"
+                            onClick={() => setShowIAMDialog(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:bg-[#F0FDFA] rounded-lg transition-colors"
+                          >
+                            <HelpCircle className="h-4 w-4" />
+                            How to set up IAM permissions
+                          </button>
+                        </div>
+                        {selectedProvider === 'aws' && awsConnectionType === 'automated' ? (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              AWS Account ID <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={credentials['awsAccountId'] || ''}
+                              onChange={(e) => setCredentials({ ...credentials, awsAccountId: e.target.value })}
+                              className="input-field"
+                              placeholder="123456789012"
+                              pattern="[0-9]{12}"
+                              maxLength={12}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Your 12-digit AWS Account ID (found in AWS Console top-right corner)
+                            </p>
+                          </div>
+                        ) : (
+                          getRequiredFields(selectedProvider).map((field) => {
+                            const getFieldLabel = (f: string) => {
+                        const labels: Record<string, string> = {
+                          accessKeyId: 'Access Key ID',
+                          secretAccessKey: 'Secret Access Key',
+                          roleArn: 'Cross-Account Role ARN',
+                          s3BucketName: 'S3 Billing Bucket Name',
+                          curReportName: 'Cost & Usage Report Name',
+                          region: 'AWS Region',
+                        }
+                        return labels[f] || f.charAt(0).toUpperCase() + f.slice(1).replace(/([A-Z])/g, ' $1')
+                      }
+                      const getFieldPlaceholder = (f: string) => {
+                        const placeholders: Record<string, string> = {
+                          accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
+                          secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                          roleArn: 'arn:aws:iam::123456789012:role/CostraReadOnlyRole',
+                          s3BucketName: 'your-company-billing',
+                          curReportName: 'cloud-billing',
+                          region: 'us-east-1',
+                        }
+                        return placeholders[f] || `Enter ${getFieldLabel(f)}`
+                      }
+                      return (
+                        <div key={field}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {getFieldLabel(field)}
+                            {field === 'roleArn' && (
+                              <span className="text-xs text-gray-500 ml-1">(from Step 2)</span>
+                            )}
+                            {field === 's3BucketName' && (
+                              <span className="text-xs text-gray-500 ml-1">(from Step 1)</span>
+                            )}
+                            {field === 'curReportName' && (
+                              <span className="text-xs text-gray-500 ml-1">(from Step 1)</span>
+                            )}
+                          </label>
+                          <input
+                            type={field.toLowerCase().includes('secret') || field.toLowerCase().includes('key') && !field.toLowerCase().includes('arn') ? 'password' : 'text'}
+                            value={credentials[field] || ''}
+                            onChange={(e) =>
+                              setCredentials({ ...credentials, [field]: e.target.value })
+                            }
+                            className="input-field"
+                            placeholder={getFieldPlaceholder(field)}
+                          />
+                        </div>
+                      )
+                    }))}
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -543,19 +810,23 @@ export default function CloudProviderManager({ onProviderChange }: CloudProvider
                       setSelectedProvider('')
                       setAccountAlias('')
                       setCredentials({})
+                      setAwsConnectionType('simple')
+                      setAutomatedConnectionData(null)
                       setError('')
                     }}
                     className="btn-secondary"
                   >
                     Cancel
                   </button>
-                  <button
-                    onClick={handleAddProvider}
-                    disabled={isSubmitting || !selectedProvider}
-                    className="btn-primary"
-                  >
-                    {isSubmitting ? 'Adding...' : 'Add Account'}
-                  </button>
+                  {!automatedConnectionData && (
+                    <button
+                      onClick={handleAddProvider}
+                      disabled={isSubmitting || !selectedProvider}
+                      className="btn-primary"
+                    >
+                      {isSubmitting ? 'Adding...' : 'Add Account'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
