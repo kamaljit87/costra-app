@@ -21,34 +21,39 @@ export default function TotalBillSummary({
   const changePercent = totalLastMonth > 0
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
     : 0
-
-  // Note: currentMonth from cloud providers already includes credits (as negative values), so it's already the net cost
-  // Net cost is the currentMonth total, which already has credits and savings applied
-  const netCost = totalCurrent
   
-  // Suppress unused variable warnings - credits and savings are included in netCost calculation
-  void totalCredits
+  // Billing model:
+  // - currentMonth from providers already includes credits as negative line items → this is the NET spend
+  // - credits are fetched separately and stored as positive values
+  // So:
+  //   grossSpend (before credits) = netSpend + credits
+  //   netSpend (after credits)   = totalCurrent
+  const netSpend = totalCurrent
+  const grossSpend = totalCurrent + totalCredits
+
+  // totalSavings and totalForecast are surfaced in other components; suppress unused warnings
+  void totalForecast
   void totalSavings
 
   const stats = [
     {
-      label: 'Current Month (Net)',
-      value: formatCurrency(convertAmount(totalCurrent)),
+      label: 'Total Spend (Gross)',
+      value: formatCurrency(convertAmount(grossSpend)),
       icon: Wallet,
       iconBg: 'bg-[#F0FDFA]',
       iconColor: 'text-[#22B8A0]',
-      tooltip: 'Net cost after credits and savings are applied',
+      tooltip: 'Total cloud spend before any credits are applied',
     },
     {
-      label: 'Forecast',
-      value: formatCurrency(convertAmount(totalForecast)),
+      label: 'Credits Applied',
+      value: formatCurrency(convertAmount(totalCredits)),
       icon: Target,
       iconBg: 'bg-[#F0FDFA]',
       iconColor: 'text-[#22B8A0]',
     },
     {
-      label: 'Net Cost',
-      value: formatCurrency(convertAmount(netCost)),
+      label: 'Net Spend (After Credits)',
+      value: formatCurrency(convertAmount(netSpend)),
       icon: Zap,
       iconBg: 'bg-white/20',
       iconColor: 'text-white',
