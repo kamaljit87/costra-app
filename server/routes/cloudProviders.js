@@ -14,6 +14,7 @@ import {
   createNotification,
   addAutomatedAWSConnection,
   updateAWSConnectionStatus,
+  pool,
 } from '../database.js'
 import {
   generateExternalId,
@@ -337,28 +338,68 @@ router.post('/aws/automated',
       const userId = req.user.userId || req.user.id
       const { connectionName, awsAccountId, connectionType = 'billing' } = req.body
 
+      // Sanitize connection name for CloudFormation and IAM role names
+      // This ensures the stack name and role name are valid (no spaces, lowercase, etc.)
+      const { sanitizeConnectionName } = await import('../services/awsConnectionService.js')
+      const sanitizedConnectionName = sanitizeConnectionName(connectionName)
+
       // Generate external ID for secure access
       const externalId = generateExternalId()
 
-      // Create pending connection record
+      // Create pending connection record (store sanitized name for CloudFormation)
       const connection = await addAutomatedAWSConnection(
         userId,
-        connectionName,
+        sanitizedConnectionName, // Use sanitized name for consistency
         awsAccountId,
         externalId,
         connectionType
       )
 
       // Generate CloudFormation Quick Create URL
-      // In production, host the template in a public S3 bucket or GitHub
-      const templateUrl = process.env.CLOUDFORMATION_TEMPLATE_URL || 
-        'https://raw.githubusercontent.com/your-org/costra/main/cloudformation/aws-billing-connection.yml'
+      // The template must be hosted at a publicly accessible HTTPS URL
+      // Options: S3 bucket with public read, GitHub raw content (public repo), or any public HTTPS URL
+      const templateUrl = process.env.CLOUDFORMATION_TEMPLATE_URL
+      
+      if (!templateUrl) {
+        return res.status(400).json({ 
+          error: 'CloudFormation template URL not configured',
+          message: 'The CloudFormation template URL must be configured to use automated connections.',
+          details: 'Please set CLOUDFORMATION_TEMPLATE_URL environment variable in server/.env. The template must be hosted at a publicly accessible HTTPS URL.',
+          options: [
+            {
+              name: 'S3 Bucket (Recommended)',
+              steps: [
+                '1. Upload cloudformation/aws-billing-connection.yml to an S3 bucket',
+                '2. Make it publicly readable (put-object-acl --acl public-read)',
+                '3. Use URL: https://your-bucket.s3.amazonaws.com/aws-billing-connection.yml'
+              ]
+            },
+            {
+              name: 'GitHub (Public Repo)',
+              steps: [
+                '1. Push template to a public GitHub repository',
+                '2. Use raw content URL: https://raw.githubusercontent.com/org/repo/main/cloudformation/aws-billing-connection.yml'
+              ]
+            },
+            {
+              name: 'Alternative',
+              steps: [
+                'Use "Simple (API Keys)" or "Advanced (CUR + Role)" connection methods instead',
+                'These do not require a CloudFormation template URL'
+              ]
+            }
+          ],
+          templateLocation: 'cloudformation/aws-billing-connection.yml',
+          documentation: 'See CLOUDFORMATION_SETUP.md for detailed instructions'
+        })
+      }
       
       const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID || '061190967865' // Example, replace with your account ID
       
+      // Use sanitized connection name for CloudFormation (already sanitized above)
       const quickCreateUrl = generateCloudFormationQuickCreateUrl(
         templateUrl,
-        connectionName,
+        sanitizedConnectionName, // Use sanitized name for CloudFormation stack and parameters
         costraAccountId,
         externalId,
         awsAccountId
@@ -367,6 +408,8 @@ router.post('/aws/automated',
       res.json({
         message: 'Automated connection initiated',
         connectionId: connection.id,
+        connectionName: sanitizedConnectionName, // Return sanitized name
+        originalConnectionName: connectionName, // Also return original for display
         quickCreateUrl,
         externalId, // For reference, user can copy if needed
         roleArn: connection.roleArn,
@@ -390,7 +433,18 @@ router.post('/aws/automated',
 router.post('/aws/:accountId/verify', async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    const accountId = parseInt(req.params.accountId, 10)
+    const accountIdParam = req.params.accountId
+    
+    // Validate accountId is a valid integer (not an encrypted string)
+    if (!accountIdParam || accountIdParam.length > 20 || !/^\d+$/.test(accountIdParam)) {
+      console.error('[AWS Connection] Invalid accountId format:', accountIdParam)
+      return res.status(400).json({ 
+        error: 'Invalid account ID format',
+        details: 'Account ID must be a numeric value. Please refresh the page and try again.'
+      })
+    }
+    
+    const accountId = parseInt(accountIdParam, 10)
 
     if (isNaN(accountId)) {
       return res.status(400).json({ error: 'Invalid account ID' })
@@ -407,14 +461,50 @@ router.post('/aws/:accountId/verify', async (req, res) => {
     const roleArn = credentials.roleArn || account.roleArn
     const externalId = credentials.externalId || account.externalId
 
-    if (!roleArn || !externalId) {
+    console.log('[AWS Connection] Verification request:', {
+      accountId,
+      roleArn,
+      hasExternalId: !!externalId,
+      connectionType: account.connectionType,
+    })
+
+    if (!roleArn) {
       return res.status(400).json({ 
-        error: 'Connection metadata missing. Please ensure CloudFormation stack was created successfully.' 
+        error: 'Role ARN is missing. Please ensure CloudFormation stack was created successfully and the stack outputs contain the RoleArn.',
+        details: 'The CloudFormation stack should have created an IAM role. Please verify the stack completed successfully.'
       })
     }
 
-    // Verify connection
-    const verification = await verifyAWSConnection(roleArn, externalId)
+    if (!externalId) {
+      return res.status(400).json({ 
+        error: 'External ID is missing. Please ensure the connection was initiated correctly.',
+        details: 'The external ID should have been generated when you clicked "Add Account".'
+      })
+    }
+
+    // For automated connections, skip actual role assumption test (server doesn't have AWS credentials)
+    // Just validate the format - the role will be tested during the first cost sync
+    const isAutomatedConnection = account.connectionType?.startsWith('automated')
+    const verification = await verifyAWSConnection(roleArn, externalId, 'us-east-1', isAutomatedConnection)
+    
+    // If role ARN was fixed (e.g., had spaces), update it in the database
+    if (verification.fixedRoleArn && verification.fixedRoleArn !== roleArn) {
+      console.log('[AWS Connection] Updating role ARN in database from:', roleArn, 'to:', verification.fixedRoleArn)
+      const client = await pool.connect()
+      try {
+        await client.query(
+          `UPDATE cloud_provider_credentials 
+           SET role_arn = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2 AND user_id = $3`,
+          [verification.fixedRoleArn, accountId, userId]
+        )
+        roleArn = verification.fixedRoleArn // Use the fixed ARN for the rest of the function
+      } catch (updateError) {
+        console.error('[AWS Connection] Failed to update role ARN:', updateError)
+      } finally {
+        client.release()
+      }
+    }
 
     if (verification.success) {
       // Update connection status and store temporary credentials
@@ -444,9 +534,12 @@ router.post('/aws/:accountId/verify', async (req, res) => {
       }
 
       res.json({
-        message: 'Connection verified successfully',
+        message: verification.skipActualTest 
+          ? 'Connection format validated. The role will be tested during the first cost sync.'
+          : 'Connection verified successfully',
         status: 'healthy',
         roleArn,
+        skipActualTest: verification.skipActualTest || false,
       })
     } else {
       // Update status to error

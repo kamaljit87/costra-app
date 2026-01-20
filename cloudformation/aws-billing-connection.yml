@@ -1,7 +1,36 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Costra AWS Billing Connection - Grants Costra read-only access to AWS billing and cost data'
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Connection Information
+      Parameters:
+      - ConnectionName
+      - CostraAccountId
+    - Label:
+        default: Security
+      Parameters:
+      - ExternalId
+    ParameterLabels:
+      ConnectionName:
+        default: 'Connection Name (descriptive alias for this AWS account)'
+      CostraAccountId:
+        default: 'Costra AWS Account ID'
+      ExternalId:
+        default: 'External ID (for secure cross-account access)'
+
 Parameters:
+  ConnectionName:
+    Type: String
+    Description: 'Descriptive name for this connection (used to identify your account in Costra)'
+    Default: 'costra-billing-connection'
+    AllowedPattern: '^[a-z0-9-]+$'
+    ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only (3-64 characters)'
+    MinLength: 3
+    MaxLength: 64
+  
   CostraAccountId:
     Type: String
     Description: 'Costra AWS Account ID (provided by Costra)'
@@ -14,24 +43,26 @@ Parameters:
     MinLength: 16
     MaxLength: 1224
     NoEcho: true
-  
-  ConnectionName:
-    Type: String
-    Description: 'Name for this connection (for identification)'
-    Default: 'costra-billing-connection'
-    AllowedPattern: '^[a-z0-9-]+$'
-    ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only'
+    AllowedPattern: '^[a-zA-Z0-9+/=._-]+$'
+    ConstraintDescription: 'External ID must contain only alphanumeric characters and safe special characters'
+
+Conditions:
+  HasConnectionName: !Not [!Equals [!Ref ConnectionName, '']]
 
 Resources:
   CostraAccessRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'CostraAccessRole-${ConnectionName}'
-      Description: 'Role for Costra to access AWS billing and cost data'
+      RoleName: !If
+        - HasConnectionName
+        - !Sub 'CostraAccessRole-${ConnectionName}'
+        - !Sub 'CostraAccessRole-${AWS::StackName}'
+      Description: !Sub 'Role for Costra to access AWS billing and cost data for ${ConnectionName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          - Sid: AllowCostraAssumeRole
+            Effect: Allow
             Principal:
               AWS: !Sub 'arn:aws:iam::${CostraAccountId}:root'
             Action: 'sts:AssumeRole'
@@ -45,7 +76,8 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow
+              - Sid: CostExplorerAccess
+                Effect: Allow
                 Action:
                   - 'ce:GetCostAndUsage'
                   - 'ce:GetCostAndUsageWithResources'
@@ -61,14 +93,16 @@ Resources:
                   - 'ce:ListCostCategoryDefinitions'
                   - 'ce:DescribeCostCategoryDefinition'
                 Resource: '*'
-              - Effect: Allow
+              - Sid: CostAndUsageReportsAccess
+                Effect: Allow
                 Action:
                   - 'cur:DescribeReportDefinitions'
                   - 'cur:PutReportDefinition'
                   - 'cur:ModifyReportDefinition'
                   - 'cur:DeleteReportDefinition'
                 Resource: '*'
-              - Effect: Allow
+              - Sid: OrganizationsAccess
+                Effect: Allow
                 Action:
                   - 'organizations:DescribeOrganization'
                   - 'organizations:DescribeAccount'
@@ -79,23 +113,35 @@ Resources:
                   - 'organizations:ListRoots'
                   - 'organizations:ListTagsForResource'
                 Resource: '*'
-              - Effect: Allow
+              - Sid: CloudWatchMetricsAccess
+                Effect: Allow
                 Action:
                   - 'cloudwatch:GetMetricData'
                   - 'cloudwatch:ListMetrics'
                   - 'cloudwatch:GetMetricStatistics'
                 Resource: '*'
-              - Effect: Allow
+              - Sid: TaggingAccess
+                Effect: Allow
                 Action:
                   - 'tag:GetResources'
                   - 'tag:GetTagKeys'
                   - 'tag:GetTagValues'
                 Resource: '*'
+      MaxSessionDuration: 3600
       Tags:
         - Key: ManagedBy
           Value: Costra
         - Key: Purpose
           Value: BillingDataAccess
+        - Key: ConnectionName
+          Value: !If
+            - HasConnectionName
+            - !Ref ConnectionName
+            - !Ref AWS::StackName
+        - Key: CreatedBy
+          Value: CloudFormation
+        - Key: CostraAccountId
+          Value: !Ref CostraAccountId
 
 Outputs:
   RoleArn:
@@ -109,3 +155,30 @@ Outputs:
     Value: !Ref ExternalId
     Export:
       Name: !Sub '${AWS::StackName}-ExternalId'
+  
+  ConnectionName:
+    Description: 'Name of this connection'
+    Value: !If
+      - HasConnectionName
+      - !Ref ConnectionName
+      - !Ref AWS::StackName
+    Export:
+      Name: !Sub '${AWS::StackName}-ConnectionName'
+  
+  AccountId:
+    Description: 'AWS Account ID where this stack is deployed'
+    Value: !Ref AWS::AccountId
+    Export:
+      Name: !Sub '${AWS::StackName}-AccountId'
+  
+  StackName:
+    Description: 'CloudFormation stack name'
+    Value: !Ref AWS::StackName
+    Export:
+      Name: !Sub '${AWS::StackName}-StackName'
+  
+  Region:
+    Description: 'AWS Region where this stack is deployed'
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Sub '${AWS::StackName}-Region'

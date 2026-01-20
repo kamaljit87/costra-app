@@ -222,6 +222,28 @@ export default function Dashboard() {
               
               const providersToShow = Array.from(allProviders.values())
               
+              // Show empty state if no providers exist
+              if (providersToShow.length === 0 && !isDemoMode) {
+                return (
+                  <div className="flex flex-col items-center justify-center py-16 px-4">
+                    <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
+                      <Cloud className="h-12 w-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Cloud Providers Connected</h3>
+                    <p className="text-gray-600 text-center max-w-md mb-6">
+                      Connect your cloud provider accounts to start tracking costs and managing your cloud spending.
+                    </p>
+                    <button
+                      onClick={() => setShowAddProvider(true)}
+                      className="btn-primary flex items-center space-x-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Your First Provider</span>
+                    </button>
+                  </div>
+                )
+              }
+              
               if (providersToShow.length > 0) {
                 return (
                   <div className="mb-6">

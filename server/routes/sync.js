@@ -76,17 +76,106 @@ router.post('/', async (req, res) => {
         // Get decrypted credentials using account ID
         const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
         
-        if (!accountData || !accountData.credentials) {
-          console.log(`[Sync] No credentials found for account: ${accountLabel}`)
+        if (!accountData) {
+          console.log(`[Sync] No account data found for account: ${accountLabel}`)
           errors.push({
             accountId: account.id,
             accountAlias: account.account_alias,
             providerId: account.provider_id,
-            error: 'Credentials not found',
+            error: 'Account not found',
           })
           continue
         }
-        console.log(`[Sync] Got credentials for account: ${accountLabel}`)
+        
+        // Handle automated AWS connections (role-based)
+        let credentialsToUse = accountData.credentials || {}
+        if (account.provider_id === 'aws' && accountData.connectionType?.startsWith('automated')) {
+          console.log(`[Sync] Automated AWS connection detected for account: ${accountLabel}`)
+          
+          if (!accountData.roleArn || !accountData.externalId) {
+            console.log(`[Sync] Missing roleArn or externalId for automated connection: ${accountLabel}`)
+            errors.push({
+              accountId: account.id,
+              accountAlias: account.account_alias,
+              providerId: account.provider_id,
+              error: 'Automated connection missing role ARN or external ID',
+            })
+            continue
+          }
+          
+          try {
+            // Assume the role to get temporary credentials
+            // Note: The server needs AWS credentials (from environment variables, IAM instance profile, etc.)
+            // to assume the role in the user's account
+            const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+            
+            // Check if we have AWS credentials available
+            // AWS SDK will automatically check: environment variables, IAM instance profile, etc.
+            const stsClient = new STSClient({ 
+              region: 'us-east-1',
+              // Don't specify credentials - let SDK use default credential chain
+            })
+            
+            const assumeRoleCommand = new AssumeRoleCommand({
+              RoleArn: accountData.roleArn,
+              RoleSessionName: `costra-sync-${account.id}-${Date.now()}`,
+              ExternalId: accountData.externalId,
+              DurationSeconds: 3600, // 1 hour
+            })
+            
+            console.log(`[Sync] Assuming role for automated connection: ${accountLabel}`)
+            console.log(`[Sync] Role ARN: ${accountData.roleArn}`)
+            const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
+            
+            if (!assumeRoleResponse.Credentials) {
+              throw new Error('Failed to assume role: No credentials returned')
+            }
+            
+            // Use temporary credentials from role assumption
+            credentialsToUse = {
+              accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
+              secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
+              sessionToken: assumeRoleResponse.Credentials.SessionToken,
+              region: 'us-east-1',
+            }
+            
+            console.log(`[Sync] Successfully assumed role for account: ${accountLabel}`)
+          } catch (assumeError) {
+            console.error(`[Sync] Failed to assume role for automated connection: ${accountLabel}`, assumeError)
+            
+            // Provide helpful error message
+            let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
+            if (assumeError.message?.includes('Could not load credentials') || 
+                assumeError.code === 'CredentialsError') {
+              errorMessage = `Server AWS credentials not configured. The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials.`
+            } else if (assumeError.code === 'AccessDenied') {
+              errorMessage = `Access denied when assuming role. Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra's AWS account has permission to assume the role.`
+            } else if (assumeError.code === 'InvalidClientTokenId') {
+              errorMessage = `Invalid AWS credentials. Please check that the server's AWS credentials are valid and have permission to assume roles.`
+            }
+            
+            errors.push({
+              accountId: account.id,
+              accountAlias: account.account_alias,
+              providerId: account.provider_id,
+              error: errorMessage,
+            })
+            continue
+          }
+        } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 || 
+                   !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
+          // For non-automated connections, validate credentials exist
+          console.log(`[Sync] No valid credentials found for account: ${accountLabel}`)
+          errors.push({
+            accountId: account.id,
+            accountAlias: account.account_alias,
+            providerId: account.provider_id,
+            error: 'Credentials not found or invalid',
+          })
+          continue
+        }
+        
+        console.log(`[Sync] Using credentials for account: ${accountLabel} (connection type: ${accountData.connectionType || 'manual'})`)
 
         // Check cache first (unless force refresh is requested)
         // Use account ID in cache key to support multiple accounts
@@ -101,10 +190,10 @@ router.post('/', async (req, res) => {
             console.log(`[Sync] Force refresh requested for account: ${accountLabel}`)
           }
           console.log(`[Sync] Fetching fresh data for account: ${accountLabel}`)
-          // Fetch cost data from provider API
+          // Fetch cost data from provider API using the appropriate credentials
           costData = await fetchProviderCostData(
             account.provider_id,
-            accountData.credentials,
+            credentialsToUse,
             startDate,
             endDate
           )
@@ -232,12 +321,91 @@ router.post('/account/:accountId', async (req, res) => {
     // Get account credentials
     const accountData = await getCloudProviderCredentialsByAccountId(userId, accountId)
 
-    if (!accountData || !accountData.credentials) {
-      return res.status(404).json({ error: 'Account credentials not found' })
+    if (!accountData) {
+      return res.status(404).json({ error: 'Account not found' })
     }
 
-    const { providerId, providerName, accountAlias, credentials } = accountData
+    const { providerId, providerName, accountAlias } = accountData
     const accountLabel = accountAlias || `${providerId} (${accountId})`
+    
+    // Handle automated AWS connections (role-based)
+    let credentialsToUse = accountData.credentials || {}
+    if (providerId === 'aws' && accountData.connectionType?.startsWith('automated')) {
+      console.log(`[Sync Account] Automated AWS connection detected for account: ${accountLabel}`)
+      
+      if (!accountData.roleArn || !accountData.externalId) {
+        return res.status(400).json({ 
+          error: 'Automated connection missing role ARN or external ID',
+          details: 'Please verify the connection was set up correctly.'
+        })
+      }
+      
+      try {
+        // Assume the role to get temporary credentials
+        // Note: The server needs AWS credentials (from environment variables, IAM instance profile, etc.)
+        // to assume the role in the user's account
+        const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+        
+        // Check if we have AWS credentials available
+        // AWS SDK will automatically check: environment variables, IAM instance profile, etc.
+        const stsClient = new STSClient({ 
+          region: 'us-east-1',
+          // Don't specify credentials - let SDK use default credential chain
+        })
+        
+        const assumeRoleCommand = new AssumeRoleCommand({
+          RoleArn: accountData.roleArn,
+          RoleSessionName: `costra-sync-${accountId}-${Date.now()}`,
+          ExternalId: accountData.externalId,
+          DurationSeconds: 3600, // 1 hour
+        })
+        
+        console.log(`[Sync Account] Assuming role for automated connection: ${accountLabel}`)
+        console.log(`[Sync Account] Role ARN: ${accountData.roleArn}`)
+        const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
+        
+        if (!assumeRoleResponse.Credentials) {
+          throw new Error('Failed to assume role: No credentials returned')
+        }
+        
+        // Use temporary credentials from role assumption
+        credentialsToUse = {
+          accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
+          secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
+          sessionToken: assumeRoleResponse.Credentials.SessionToken,
+          region: 'us-east-1',
+        }
+        
+        console.log(`[Sync Account] Successfully assumed role for account: ${accountLabel}`)
+      } catch (assumeError) {
+        console.error(`[Sync Account] Failed to assume role for automated connection: ${accountLabel}`, assumeError)
+        
+        // Provide helpful error message
+        let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
+        let errorDetails = ''
+        
+        if (assumeError.message?.includes('Could not load credentials') || 
+            assumeError.code === 'CredentialsError') {
+          errorMessage = 'Server AWS credentials not configured'
+          errorDetails = 'The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials in the server/.env file or as environment variables.'
+        } else if (assumeError.code === 'AccessDenied') {
+          errorMessage = 'Access denied when assuming role'
+          errorDetails = 'Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra\'s AWS account has permission to assume the role.'
+        } else if (assumeError.code === 'InvalidClientTokenId') {
+          errorMessage = 'Invalid AWS credentials'
+          errorDetails = 'Please check that the server\'s AWS credentials are valid and have permission to assume roles.'
+        }
+        
+        return res.status(500).json({ 
+          error: errorMessage,
+          details: errorDetails || assumeError.message || assumeError.code || 'Unknown error'
+        })
+      }
+    } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 || 
+               !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
+      // For non-automated connections, validate credentials exist
+      return res.status(404).json({ error: 'Account credentials not found or invalid' })
+    }
 
     // Clear cost explanations cache for this account to ensure fresh summaries
     await clearCostExplanationsCache(userId, providerId, accountId)
@@ -254,8 +422,8 @@ router.post('/account/:accountId', async (req, res) => {
     let costData = await getCachedCostData(userId, providerId, cacheKey)
     
     if (!costData) {
-      // Fetch cost data from provider API
-      costData = await fetchProviderCostData(providerId, credentials, startDate, endDate)
+      // Fetch cost data from provider API using the appropriate credentials
+      costData = await fetchProviderCostData(providerId, credentialsToUse, startDate, endDate)
       
       // Cache the result for 60 minutes
       await setCachedCostData(userId, providerId, cacheKey, costData, 60)

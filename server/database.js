@@ -869,12 +869,28 @@ export const getServiceCostsForDateRange = async (userId, providerId, startDate,
 export const getCostDataForUser = async (userId, month, year) => {
   const client = await pool.connect()
   try {
+    // Only return cost data for providers that still exist in cloud_provider_credentials
+    // This ensures deleted providers don't show stale data
+    // Use INNER JOIN to filter out orphaned cost_data records
     const result = await client.query(
-      `SELECT cd.*, cp.provider_name, cp.icon, cp.provider_id as provider_code
+      `SELECT DISTINCT ON (cd.provider_id, COALESCE(cd.account_id, 0))
+         cd.*, 
+         cpc.provider_name, 
+         cpc.provider_id as provider_code,
+         cpc.account_alias
        FROM cost_data cd
-       JOIN cloud_providers cp ON cd.provider_id = cp.provider_id AND cd.user_id = cp.user_id
+       INNER JOIN cloud_provider_credentials cpc 
+         ON cd.user_id = cpc.user_id 
+         AND cd.provider_id = cpc.provider_id
+         AND (
+           cd.account_id = cpc.id 
+           OR (cd.account_id IS NULL AND cpc.id = (
+             SELECT MIN(id) FROM cloud_provider_credentials 
+             WHERE user_id = cd.user_id AND provider_id = cd.provider_id
+           ))
+         )
        WHERE cd.user_id = $1 AND cd.month = $2 AND cd.year = $3
-       ORDER BY cd.current_month_cost DESC`,
+       ORDER BY cd.provider_id, COALESCE(cd.account_id, 0), cd.current_month_cost DESC`,
       [userId, month, year]
     )
 
@@ -1123,8 +1139,16 @@ export const addAutomatedAWSConnection = async (
   const client = await pool.connect()
   try {
     // Calculate role ARN (will be created by CloudFormation)
-    const roleName = `CostraAccessRole-${connectionName}`
+    // Import sanitization function to ensure consistency
+    const { sanitizeConnectionNameForRole } = await import('./services/awsConnectionService.js')
+    const sanitizedConnectionName = sanitizeConnectionNameForRole(connectionName)
+    const roleName = `CostraAccessRole-${sanitizedConnectionName}`
     const roleArn = `arn:aws:iam::${awsAccountId}:role/${roleName}`
+
+    // Encrypt empty credentials object for automated connections
+    const { encrypt } = await import('./services/encryption.js')
+    const emptyCredentials = JSON.stringify({})
+    const encryptedCredentials = encrypt(emptyCredentials)
 
     const result = await client.query(
       `INSERT INTO cloud_provider_credentials 
@@ -1137,7 +1161,7 @@ export const addAutomatedAWSConnection = async (
         'aws',
         'AWS',
         connectionName,
-        '{}', // Empty credentials for now, will be populated after verification
+        encryptedCredentials, // Properly encrypted empty credentials
         true,
         externalId,
         roleArn,
@@ -1166,7 +1190,7 @@ export const updateAWSConnectionStatus = async (
   const client = await pool.connect()
   try {
     const updates = ['connection_status = $1', 'last_health_check = CURRENT_TIMESTAMP']
-    const values = [status, accountId, userId]
+    const values = [status, accountId] // Start with status and accountId
     let paramIndex = 3
 
     if (credentials) {
@@ -1179,11 +1203,15 @@ export const updateAWSConnectionStatus = async (
     }
 
     updates.push('updated_at = CURRENT_TIMESTAMP')
+    
+    // Add userId as the last parameter
+    values.push(userId)
+    const userIdParamIndex = paramIndex
 
     const result = await client.query(
       `UPDATE cloud_provider_credentials 
        SET ${updates.join(', ')}
-       WHERE id = $2 AND user_id = $${paramIndex}
+       WHERE id = $2 AND user_id = $${userIdParamIndex}
        RETURNING id, connection_status, last_health_check`,
       values
     )
@@ -1229,7 +1257,23 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
     }
     
     const { decrypt } = await import('./services/encryption.js')
-    const decrypted = decrypt(result.rows[0].credentials_encrypted)
+    
+    // Handle empty or invalid encrypted credentials (e.g., for automated connections)
+    let credentials = {}
+    if (result.rows[0].credentials_encrypted && 
+        result.rows[0].credentials_encrypted.trim() !== '' && 
+        result.rows[0].credentials_encrypted !== '{}') {
+      try {
+        const decrypted = decrypt(result.rows[0].credentials_encrypted)
+        credentials = JSON.parse(decrypted)
+      } catch (decryptError) {
+        console.warn(`[getCloudProviderCredentialsByAccountId] Failed to decrypt credentials for account ${accountId}:`, decryptError.message)
+        // For automated connections, credentials might be empty - that's okay
+        // We'll return empty credentials and let the connection metadata (roleArn, externalId) be used instead
+        credentials = {}
+      }
+    }
+    
     return {
       accountId: result.rows[0].id,
       providerId: result.rows[0].provider_id,
@@ -1241,7 +1285,7 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
       connectionStatus: result.rows[0].connection_status,
       awsAccountId: result.rows[0].aws_account_id,
       lastHealthCheck: result.rows[0].last_health_check,
-      credentials: JSON.parse(decrypted)
+      credentials
     }
   } finally {
     client.release()
@@ -1305,12 +1349,80 @@ export const getCloudProviderAccountsByType = async (userId, providerId) => {
 export const deleteCloudProviderByAccountId = async (userId, accountId) => {
   const client = await pool.connect()
   try {
+    // First, get the provider_id before deletion for cleanup
+    const accountResult = await client.query(
+      `SELECT provider_id FROM cloud_provider_credentials
+       WHERE user_id = $1 AND id = $2`,
+      [userId, accountId]
+    )
+    
+    if (accountResult.rows.length === 0) {
+      return false
+    }
+    
+    const providerId = accountResult.rows[0].provider_id
+    
+    // Delete all cost data associated with this account
+    // Note: cost_data and daily_cost_data have ON DELETE CASCADE from account_id,
+    // but we'll explicitly delete to ensure cleanup and clear cache
+    
+    // Delete cost_data entries for this account
+    await client.query(
+      `DELETE FROM cost_data
+       WHERE user_id = $1 AND account_id = $2`,
+      [userId, accountId]
+    )
+    
+    // Delete daily_cost_data entries for this account
+    await client.query(
+      `DELETE FROM daily_cost_data
+       WHERE user_id = $1 AND account_id = $2`,
+      [userId, accountId]
+    )
+    
+    // Delete cost_data_cache entries for this account
+    await client.query(
+      `DELETE FROM cost_data_cache
+       WHERE user_id = $1 AND account_id = $2`,
+      [userId, accountId]
+    )
+    
+    // Delete cost explanations for this account
+    await client.query(
+      `DELETE FROM cost_explanations
+       WHERE user_id = $1 AND account_id = $2`,
+      [userId, accountId]
+    )
+    
+    await client.query(
+      `DELETE FROM cost_explanations_range
+       WHERE user_id = $1 AND account_id = $2`,
+      [userId, accountId]
+    )
+    
+    // Delete service_usage_metrics for this account
+    await client.query(
+      `DELETE FROM service_usage_metrics
+       WHERE user_id = $1 AND account_id = $2`,
+      [userId, accountId]
+    )
+    
+    // Delete budgets for this account
+    await client.query(
+      `DELETE FROM budgets
+       WHERE user_id = $1 AND provider_id = $2 AND account_id = $3`,
+      [userId, providerId, accountId]
+    )
+    
+    // Finally, delete the cloud provider credentials
+    // This will cascade delete any remaining foreign key references
     const result = await client.query(
       `DELETE FROM cloud_provider_credentials
        WHERE user_id = $1 AND id = $2
        RETURNING id`,
       [userId, accountId]
     )
+    
     return result.rows.length > 0
   } finally {
     client.release()
@@ -1321,12 +1433,77 @@ export const deleteCloudProviderByAccountId = async (userId, accountId) => {
 export const deleteCloudProvider = async (userId, providerId) => {
   const client = await pool.connect()
   try {
+    // Get all account IDs for this provider before deletion
+    const accountsResult = await client.query(
+      `SELECT id FROM cloud_provider_credentials
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    if (accountsResult.rows.length === 0) {
+      return false
+    }
+    
+    const accountIds = accountsResult.rows.map(row => row.id)
+    
+    // Delete all cost data associated with this provider
+    // Delete cost_data entries (both with and without account_id for legacy support)
+    await client.query(
+      `DELETE FROM cost_data
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    // Delete daily_cost_data entries
+    await client.query(
+      `DELETE FROM daily_cost_data
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    // Delete cost_data_cache entries
+    await client.query(
+      `DELETE FROM cost_data_cache
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    // Delete cost explanations
+    await client.query(
+      `DELETE FROM cost_explanations
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    await client.query(
+      `DELETE FROM cost_explanations_range
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    // Delete service_usage_metrics
+    await client.query(
+      `DELETE FROM service_usage_metrics
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    // Delete budgets for this provider
+    await client.query(
+      `DELETE FROM budgets
+       WHERE user_id = $1 AND provider_id = $2`,
+      [userId, providerId]
+    )
+    
+    // Finally, delete the cloud provider credentials
+    // This will cascade delete any remaining foreign key references
     const result = await client.query(
       `DELETE FROM cloud_provider_credentials
        WHERE user_id = $1 AND provider_id = $2
        RETURNING id`,
       [userId, providerId]
     )
+    
     return result.rows.length > 0
   } finally {
     client.release()
@@ -1499,6 +1676,7 @@ export const saveBulkDailyCostData = async (userId, providerId, dailyData, accou
 }
 
 // Get daily cost data - supports both account_id (for multi-account) and legacy provider_id
+// Only returns data for accounts that still exist (prevents stale data from deleted providers)
 export const getDailyCostData = async (userId, providerId, startDate, endDate, accountId = null) => {
   const client = await pool.connect()
   try {
@@ -1510,21 +1688,31 @@ export const getDailyCostData = async (userId, providerId, startDate, endDate, a
     
     let result
     if (accountId) {
-      // Query by specific account
+      // Query by specific account - ensure account still exists
       result = await client.query(
-        `SELECT date, cost
-         FROM daily_cost_data
-         WHERE user_id = $1 AND account_id = $2 AND date >= $3::date AND date <= $4::date
-         ORDER BY date ASC`,
+        `SELECT dcd.date, dcd.cost
+         FROM daily_cost_data dcd
+         INNER JOIN cloud_provider_credentials cpc 
+           ON dcd.user_id = cpc.user_id 
+           AND dcd.account_id = cpc.id
+         WHERE dcd.user_id = $1 AND dcd.account_id = $2 AND dcd.date >= $3::date AND dcd.date <= $4::date
+         ORDER BY dcd.date ASC`,
         [userId, accountId, startDateStr, endDateStr]
       )
     } else {
-      // Legacy query by provider_id
+      // Legacy query by provider_id - ensure at least one account for this provider exists
       result = await client.query(
-        `SELECT date, cost
-         FROM daily_cost_data
-         WHERE user_id = $1 AND provider_id = $2 AND date >= $3::date AND date <= $4::date
-         ORDER BY date ASC`,
+        `SELECT dcd.date, dcd.cost
+         FROM daily_cost_data dcd
+         INNER JOIN cloud_provider_credentials cpc 
+           ON dcd.user_id = cpc.user_id 
+           AND dcd.provider_id = cpc.provider_id
+           AND (dcd.account_id = cpc.id OR (dcd.account_id IS NULL AND cpc.id = (
+             SELECT MIN(id) FROM cloud_provider_credentials 
+             WHERE user_id = dcd.user_id AND provider_id = dcd.provider_id
+           )))
+         WHERE dcd.user_id = $1 AND dcd.provider_id = $2 AND dcd.date >= $3::date AND dcd.date <= $4::date
+         ORDER BY dcd.date ASC`,
         [userId, providerId, startDateStr, endDateStr]
       )
     }

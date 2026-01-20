@@ -39,26 +39,40 @@ const filterOutTaxServices = (services) => {
  * AWS Cost Explorer API Integration using official SDK
  */
 export const fetchAWSCostData = async (credentials, startDate, endDate) => {
-  const { accessKeyId, secretAccessKey, region = 'us-east-1' } = credentials
+  const { accessKeyId, secretAccessKey, sessionToken, region = 'us-east-1' } = credentials
 
   console.log(`[AWS Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
   console.log(`[AWS Fetch] Using region: ${region}`)
   console.log(`[AWS Fetch] Access Key ID (last 4): ...${accessKeyId?.slice(-4) || 'MISSING'}`)
+  console.log(`[AWS Fetch] Has session token: ${!!sessionToken}`)
+
+  // Validate credentials
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('AWS credentials are missing: accessKeyId and secretAccessKey are required')
+  }
 
   try {
     // Create or reuse Cost Explorer client
-    const cacheKey = `aws-${accessKeyId}-${region}`
+    // Include sessionToken in cache key for temporary credentials (role assumption)
+    const cacheKey = `aws-${accessKeyId}-${region}-${sessionToken ? 'temp' : 'perm'}`
     let client = clientCache.get(cacheKey)
     
     if (!client) {
       console.log(`[AWS Fetch] Creating new Cost Explorer client`)
-      client = new CostExplorerClient({
+      const clientConfig = {
         region,
         credentials: {
           accessKeyId,
           secretAccessKey,
         },
-      })
+      }
+      
+      // Add session token if present (for temporary credentials from role assumption)
+      if (sessionToken) {
+        clientConfig.credentials.sessionToken = sessionToken
+      }
+      
+      client = new CostExplorerClient(clientConfig)
       clientCache.set(cacheKey, client)
     }
 

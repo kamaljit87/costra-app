@@ -110,23 +110,96 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         return
       }
 
+      // Sanitize connection name for CloudFormation
+      // CloudFormation stack names must:
+      //   - Start with a letter (a-z, A-Z)
+      //   - Contain only alphanumeric characters and hyphens
+      //   - Not start or end with a hyphen
+      //   - Be 1-128 characters long
+      const sanitizeForCloudFormation = (name: string) => {
+        let sanitized = name
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, '-') // Replace invalid chars with hyphens
+          .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+          .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+        
+        // Ensure it starts with a letter (CloudFormation requirement)
+        if (sanitized && /^[0-9]/.test(sanitized)) {
+          sanitized = `costra-${sanitized}`
+        }
+        
+        sanitized = sanitized.substring(0, 50) || 'costra-connection' // Limit length
+        
+        // Final check: ensure it starts with a letter
+        if (!/^[a-z]/.test(sanitized)) {
+          sanitized = `costra-${sanitized}`
+        }
+        
+        return sanitized
+      }
+      
+      const sanitizedAlias = sanitizeForCloudFormation(accountAlias)
+      
+      // Warn user if name was changed
+      if (sanitizedAlias !== accountAlias.toLowerCase().replace(/\s+/g, '-')) {
+        console.log(`[CloudProviderManager] Connection name sanitized: "${accountAlias}" -> "${sanitizedAlias}"`)
+      }
+
       try {
         setIsSubmitting(true)
         setError('')
         const result = await cloudProvidersAPI.initiateAutomatedAWSConnection(
-          accountAlias,
+          sanitizedAlias, // Use sanitized name for CloudFormation
           awsAccountId,
           'billing'
         )
-        setAutomatedConnectionData({
+        // Validate connectionId is a number before storing
+        // Log the full response for debugging
+        console.log('[CloudProviderManager] Initiate response:', {
           connectionId: result.connectionId,
+          connectionIdType: typeof result.connectionId,
+          hasQuickCreateUrl: !!result.quickCreateUrl,
+          hasExternalId: !!result.externalId,
+          hasRoleArn: !!result.roleArn,
+        })
+        
+        // Check if connectionId looks like an encrypted string (contains colons)
+        const connectionIdStr = String(result.connectionId)
+        if (connectionIdStr.includes(':')) {
+          console.error('[CloudProviderManager] connectionId appears to be encrypted credentials:', connectionIdStr.substring(0, 50) + '...')
+          setError('Invalid response from server: connection ID is corrupted. Please refresh and try again.')
+          return
+        }
+        
+        const connectionId = typeof result.connectionId === 'number' 
+          ? result.connectionId 
+          : parseInt(connectionIdStr, 10)
+        
+        if (isNaN(connectionId) || connectionId <= 0) {
+          console.error('[CloudProviderManager] Invalid connectionId received:', result.connectionId, 'Type:', typeof result.connectionId)
+          setError('Invalid connection ID received from server. Please refresh and try again.')
+          return
+        }
+        
+        console.log('[CloudProviderManager] Storing connectionId:', connectionId)
+        setAutomatedConnectionData({
+          connectionId,
           quickCreateUrl: result.quickCreateUrl,
           externalId: result.externalId,
           roleArn: result.roleArn,
         })
         // Don't close modal yet - user needs to complete CloudFormation
       } catch (error: any) {
-        setError(error.message || 'Failed to initiate automated connection')
+        // Handle template URL configuration error
+        if (error.message?.includes('CloudFormation template URL not configured') || error.error === 'CloudFormation template URL not configured') {
+          setError(
+            'CloudFormation template URL not configured. ' +
+            'Please contact your administrator to set up the template URL. ' +
+            'The template must be hosted at a publicly accessible HTTPS URL (S3 bucket or GitHub).'
+          )
+        } else {
+          setError(error.message || error.error || 'Failed to initiate automated connection')
+        }
       } finally {
         setIsSubmitting(false)
       }
@@ -173,33 +246,82 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       return
     }
 
-    try {
-      setIsVerifying(true)
-      setError('')
-      await cloudProvidersAPI.verifyAWSConnection(automatedConnectionData.connectionId)
-      setShowAddModal(false)
-      setSelectedProvider('')
-      setAccountAlias('')
-      setCredentials({})
+    // Log the connectionId before validation
+    const connectionIdValue = automatedConnectionData.connectionId
+    const connectionIdValueStr = String(connectionIdValue)
+    console.log('[CloudProviderManager] Verify connection - connectionId:', {
+      value: connectionIdValue,
+      type: typeof connectionIdValue,
+      isString: typeof connectionIdValue === 'string',
+      length: connectionIdValueStr.length,
+      looksEncrypted: connectionIdValueStr.includes(':'),
+    })
+
+    // Check if connectionId looks like an encrypted string (contains colons)
+    const connectionIdStr = String(automatedConnectionData.connectionId)
+    if (connectionIdStr.includes(':')) {
+      console.error('[CloudProviderManager] connectionId appears to be encrypted credentials. Clearing state.')
+      setError('Connection ID is corrupted. Please refresh the page and create a new connection.')
       setAutomatedConnectionData(null)
-      await loadProviders()
-      onProviderChange?.()
-    } catch (error: any) {
-      setError(error.message || 'Failed to verify connection')
-    } finally {
-      setIsVerifying(false)
+      return
     }
+
+    // Validate connectionId is a number before making API call
+    const connectionId = typeof automatedConnectionData.connectionId === 'number'
+      ? automatedConnectionData.connectionId
+      : parseInt(String(automatedConnectionData.connectionId), 10)
+    
+    if (isNaN(connectionId) || connectionId <= 0) {
+      console.error('[CloudProviderManager] Invalid connectionId after parsing:', {
+        original: automatedConnectionData.connectionId,
+        parsed: connectionId,
+        type: typeof automatedConnectionData.connectionId,
+      })
+      setError('Invalid connection ID. Please refresh the page and try again.')
+      return
+    }
+
+    console.log('[CloudProviderManager] Calling verifyAWSConnection with accountId:', connectionId)
+      try {
+        setIsVerifying(true)
+        setError('')
+        const result = await cloudProvidersAPI.verifyAWSConnection(connectionId)
+        // Show success message
+        if (result.skipActualTest) {
+          // For automated connections, we can't test from server, but format is validated
+          setError('') // Clear any errors
+          // Still close modal and refresh - connection is ready
+        }
+        setShowAddModal(false)
+        setSelectedProvider('')
+        setAccountAlias('')
+        setCredentials({})
+        setAutomatedConnectionData(null)
+        await loadProviders()
+        onProviderChange?.()
+      } catch (error: any) {
+        setError(error.message || error.error || 'Failed to verify connection')
+      } finally {
+        setIsVerifying(false)
+      }
   }
 
   const handleDeleteProvider = async (accountId: number, accountAlias: string) => {
-    if (!confirm(`Are you sure you want to remove "${accountAlias}"? This will delete all associated credentials and data.`)) {
+    if (!confirm(`Are you sure you want to remove "${accountAlias}"? This will permanently delete all associated credentials, cost data, and historical records.`)) {
       return
     }
 
     try {
       await cloudProvidersAPI.deleteCloudProviderAccount(accountId)
+      // Clear local state immediately
+      setProviders(prev => prev.filter(p => p.accountId !== accountId))
       await loadProviders()
+      // Trigger full data refresh in parent components
       onProviderChange?.()
+      // Force a page reload to clear any cached cost data
+      if (window.location.pathname === '/') {
+        window.location.reload()
+      }
     } catch (error: any) {
       setError(error.message || 'Failed to delete cloud provider account')
     }
@@ -599,7 +721,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                     {/* Account Alias */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Account Name (optional)
+                        Account Name {selectedProvider === 'aws' && awsConnectionType === 'automated' && <span className="text-red-500">*</span>}
+                        {selectedProvider !== 'aws' || awsConnectionType !== 'automated' ? ' (optional)' : ''}
                       </label>
                       <input
                         type="text"
@@ -609,7 +732,13 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                         placeholder={`e.g., Production, Development, ${AVAILABLE_PROVIDERS.find(p => p.id === selectedProvider)?.name} Main`}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Give this account a recognizable name to differentiate it from other accounts
+                        {selectedProvider === 'aws' && awsConnectionType === 'automated' ? (
+                          <>
+                            <strong>Required for automated connections.</strong> The name will be automatically converted to lowercase with hyphens for CloudFormation compatibility (e.g., "My Account" → "my-account").
+                          </>
+                        ) : (
+                          'Give this account a recognizable name to differentiate it from other accounts'
+                        )}
                       </p>
                     </div>
 
