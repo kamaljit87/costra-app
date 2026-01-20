@@ -41,6 +41,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
     budgetPeriod: budget?.budgetPeriod || 'monthly',
     alertThreshold: budget?.alertThreshold || 80,
   })
+  const [createInCloudProvider, setCreateInCloudProvider] = useState(false)
 
   useEffect(() => {
     loadProviders()
@@ -70,8 +71,13 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
           ...formData,
           accountId: formData.accountId || undefined,
           providerId: formData.providerId || undefined,
+          createInCloudProvider: createInCloudProvider && formData.providerId ? true : false,
         })
-        showSuccess('Budget created successfully')
+        showSuccess(
+          createInCloudProvider && formData.providerId
+            ? 'Budget created successfully in app and cloud provider'
+            : 'Budget created successfully'
+        )
       }
       onSuccess()
       onClose()
@@ -209,6 +215,27 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
               Receive alerts when spending reaches this percentage of the budget
             </p>
           </div>
+
+          {/* Create in Cloud Provider */}
+          {!budget?.id && formData.providerId && formData.accountId && (
+            <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+              <input
+                type="checkbox"
+                id="createInCloudProvider"
+                checked={createInCloudProvider}
+                onChange={(e) => setCreateInCloudProvider(e.target.checked)}
+                className="mt-1 h-4 w-4 text-frozenWater-600 focus:ring-frozenWater-500 border-gray-300 rounded"
+              />
+              <div className="flex-1">
+                <label htmlFor="createInCloudProvider" className="block text-sm font-medium text-gray-900 cursor-pointer">
+                  Also create budget in {formData.providerId.toUpperCase()}
+                </label>
+                <p className="mt-1 text-xs text-gray-600">
+                  This will create the budget directly in your cloud provider account, enabling native budget alerts and management.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4">

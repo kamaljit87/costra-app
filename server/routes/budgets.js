@@ -26,7 +26,7 @@ router.post('/', async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: 'User ID not found in token' })
     }
-    const { budgetName, providerId, accountId, budgetAmount, budgetPeriod, alertThreshold } = req.body
+    const { budgetName, providerId, accountId, budgetAmount, budgetPeriod, alertThreshold, createInCloudProvider } = req.body
     
     if (!budgetName || !budgetAmount || !budgetPeriod) {
       return res.status(400).json({ error: 'budgetName, budgetAmount, and budgetPeriod are required' })
@@ -45,10 +45,42 @@ router.post('/', async (req, res) => {
       alertThreshold: alertThreshold ? parseInt(alertThreshold) : 80
     })
     
+    // Create budget in cloud provider if requested
+    if (createInCloudProvider && providerId && accountId) {
+      try {
+        const { createCloudProviderBudget } = await import('../services/cloudProviderBudgets.js')
+        const accountCredentials = await getCloudProviderCredentialsByAccountId(userId, parseInt(accountId))
+        
+        if (accountCredentials && accountCredentials.credentials) {
+          await createCloudProviderBudget(
+            providerId,
+            accountCredentials.credentials,
+            {
+              budgetName,
+              budgetAmount: parseFloat(budgetAmount),
+              budgetPeriod,
+              alertThreshold: alertThreshold ? parseInt(alertThreshold) : 80
+            }
+          )
+          console.log(`[Budget] Created budget in cloud provider: ${providerId}`)
+        } else {
+          console.warn(`[Budget] Could not find credentials for account ${accountId}, skipping cloud provider budget creation`)
+        }
+      } catch (cloudError) {
+        console.error(`[Budget] Failed to create budget in cloud provider ${providerId}:`, cloudError)
+        // Don't fail the entire request if cloud provider budget creation fails
+        // The budget is still created in the app
+      }
+    }
+    
     // Update spend immediately
     await updateBudgetSpend(userId, budget.id)
     
-    res.status(201).json({ budget, message: 'Budget created successfully' })
+    const message = createInCloudProvider && providerId && accountId
+      ? 'Budget created successfully in app and cloud provider'
+      : 'Budget created successfully'
+    
+    res.status(201).json({ budget, message })
   } catch (error) {
     console.error('Create budget error:', error)
     res.status(500).json({ error: 'Failed to create budget' })

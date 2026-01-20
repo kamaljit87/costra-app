@@ -571,6 +571,7 @@ export const budgetsAPI = {
     budgetAmount: number
     budgetPeriod: 'monthly' | 'quarterly' | 'yearly'
     alertThreshold?: number
+    createInCloudProvider?: boolean
   }) => {
     const response = await apiRequest('/budgets', {
       method: 'POST',

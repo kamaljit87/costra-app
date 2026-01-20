@@ -13,6 +13,7 @@
     "pm2:delete": "pm2 delete costra-backend"
   },
   "dependencies": {
+    "@aws-sdk/client-budgets": "^3.971.0",
     "@aws-sdk/client-cost-explorer": "^3.967.0",
     "@aws-sdk/client-ec2": "^3.967.0",
     "@azure/arm-costmanagement": "^1.0.0-beta.1",
