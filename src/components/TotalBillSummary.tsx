@@ -22,18 +22,27 @@ export default function TotalBillSummary({
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
     : 0
 
-  // Ensure credits and savings are positive values
-  const creditsApplied = Math.abs(totalCredits)
-  const savingsApplied = Math.abs(totalSavings)
-  const netCost = totalCurrent - creditsApplied - savingsApplied
+  // Ensure credits are positive values (they reduce cost)
+  // Note: currentMonth from cloud providers already includes credits (as negative values), so it's already the net cost
+  // We display credits separately for visibility, but don't subtract them again from currentMonth
+  // Credits from Dashboard are already positive (Math.abs applied), so we just use them as-is
+  const creditsApplied = totalCredits >= 0 ? totalCredits : Math.abs(totalCredits)
+  
+  // Net cost is the currentMonth total, which already has credits and savings applied
+  // We don't subtract credits/savings again because they're already included in currentMonth
+  const netCost = totalCurrent
+  
+  // Suppress unused variable warning - savings are included in netCost calculation
+  void totalSavings
 
   const stats = [
     {
-      label: 'Current Month',
+      label: 'Current Month (Net)',
       value: formatCurrency(convertAmount(totalCurrent)),
       icon: Wallet,
       iconBg: 'bg-[#F0FDFA]',
       iconColor: 'text-[#22B8A0]',
+      tooltip: 'Net cost after credits and savings are applied',
     },
     {
       label: 'Forecast',
@@ -44,7 +53,7 @@ export default function TotalBillSummary({
     },
     {
       label: 'Credits Applied',
-      value: formatCurrency(convertAmount(Math.abs(totalCredits))),
+      value: formatCurrency(convertAmount(creditsApplied)),
       icon: Gift,
       iconBg: 'bg-[#F0FDFA]',
       iconColor: 'text-[#22B8A0]',

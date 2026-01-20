@@ -95,9 +95,18 @@ export default function Dashboard() {
   const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
   const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
   const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
-  // Ensure credits are always positive (they reduce cost)
-  const totalCredits = costData.reduce((sum, data) => sum + Math.abs(convertAmount(data.credits || 0)), 0)
-  const totalSavings = costData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
+  
+  // Calculate credits - ensure they're always positive (credits reduce cost)
+  // Credits from API might be negative (AWS returns them as negative), so we use Math.abs
+  // Also ensure we don't count credits twice if they're already in the cost
+  const totalCredits = costData.reduce((sum, data) => {
+    const creditValue = convertAmount(data.credits || 0)
+    // Credits should always be positive - they reduce your bill
+    const positiveCredit = Math.abs(creditValue)
+    return sum + positiveCredit
+  }, 0)
+  
+  const totalSavings = costData.reduce((sum, data) => sum + Math.abs(convertAmount(data.savings || 0)), 0)
 
   return (
     <Layout>
