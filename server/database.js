@@ -4324,6 +4324,14 @@ export const getReport = async (userId, reportId) => {
 export const updateReportStatus = async (userId, reportId, status, filePath = null) => {
   const client = await pool.connect()
   try {
+    // Get report details before updating (for notifications)
+    const reportResult = await client.query(
+      `SELECT report_name, report_type, file_format FROM reports WHERE id = $1 AND user_id = $2`,
+      [reportId, userId]
+    )
+    
+    const report = reportResult.rows[0]
+    
     const updates = [`status = $1`]
     const params = [status]
     let paramIndex = 2

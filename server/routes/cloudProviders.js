@@ -11,6 +11,7 @@ import {
   updateCloudProviderAlias,
   updateCloudProviderCredentials,
   getCloudProviderCredentialsByAccountId,
+  createNotification,
 } from '../database.js'
 
 const router = express.Router()
@@ -63,6 +64,19 @@ router.post('/',
 
       const accountId = await addCloudProvider(userId, providerId, providerName, credentials, accountAlias)
 
+      // Create notification for provider addition
+      try {
+        await createNotification(userId, {
+          type: 'success',
+          title: 'Cloud Provider Added',
+          message: `${providerName} account "${accountAlias || providerName}" has been added successfully. You can now sync cost data.`,
+          link: '/settings',
+          linkText: 'View Settings'
+        })
+      } catch (notifError) {
+        console.error('[CloudProviders] Failed to create notification:', notifError)
+      }
+
       res.json({ 
         message: 'Cloud provider account added successfully',
         provider: {
@@ -89,10 +103,27 @@ router.delete('/account/:accountId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 
+    // Get account info before deletion for notification
+    const account = await getCloudProviderCredentialsByAccountId(userId, accountId)
+    const accountLabel = account?.accountAlias || account?.providerName || 'Cloud Provider Account'
+
     const deleted = await deleteCloudProviderByAccountId(userId, accountId)
 
     if (!deleted) {
       return res.status(404).json({ error: 'Cloud provider account not found' })
+    }
+
+    // Create notification for provider deletion
+    try {
+      await createNotification(userId, {
+        type: 'info',
+        title: 'Cloud Provider Removed',
+        message: `${accountLabel} has been removed from your account`,
+        link: '/settings',
+        linkText: 'View Settings'
+      })
+    } catch (notifError) {
+      console.error('[CloudProviders] Failed to create notification:', notifError)
     }
 
     res.json({ message: 'Cloud provider account deleted successfully' })
@@ -223,7 +254,24 @@ router.patch('/account/:accountId/credentials',
         return res.status(400).json({ error: 'Invalid account ID' })
       }
 
+      // Get account info for notification
+      const account = await getCloudProviderCredentialsByAccountId(userId, accountId)
+      const accountLabel = account?.accountAlias || account?.providerName || 'Cloud Provider Account'
+
       await updateCloudProviderCredentials(userId, accountId, credentials)
+
+      // Create notification for credentials update
+      try {
+        await createNotification(userId, {
+          type: 'info',
+          title: 'Credentials Updated',
+          message: `Credentials for ${accountLabel} have been updated successfully`,
+          link: '/settings',
+          linkText: 'View Settings'
+        })
+      } catch (notifError) {
+        console.error('[CloudProviders] Failed to create notification:', notifError)
+      }
 
       res.json({ 
         message: 'Account credentials updated successfully'

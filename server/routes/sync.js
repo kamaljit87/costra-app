@@ -450,6 +450,39 @@ async function calculateBaselinesForServices(userId, providerId, accountId, cost
     }
 
     console.log(`[Baseline Calculation] Completed: ${calculated} baselines calculated, ${errors} errors`)
+    
+    // Check for significant anomalies after baseline calculation
+    // Only notify for very significant anomalies (>50% variance) to avoid notification spam
+    try {
+      const { getAnomalies } = await import('../database.js')
+      const significantAnomalies = await getAnomalies(userId, providerId, 50, accountId) // 50% threshold
+      
+      if (significantAnomalies.length > 0) {
+        // Get the most significant anomaly
+        const topAnomaly = significantAnomalies[0]
+        const variancePercent = topAnomaly.variancePercent || 0
+        
+        if (variancePercent >= 50) {
+          await createNotification(userId, {
+            type: 'anomaly',
+            title: `Cost Anomaly Detected: ${topAnomaly.serviceName}`,
+            message: `${topAnomaly.serviceName} costs are ${variancePercent.toFixed(1)}% ${topAnomaly.isIncrease ? 'higher' : 'lower'} than the 30-day baseline`,
+            link: providerId ? `/provider/${providerId}?tab=analytics` : '/dashboard',
+            linkText: 'View Anomalies',
+            metadata: {
+              providerId,
+              accountId,
+              serviceName: topAnomaly.serviceName,
+              variancePercent,
+              isIncrease: topAnomaly.isIncrease
+            }
+          }).catch(err => console.error('[Sync] Failed to create anomaly notification:', err))
+        }
+      }
+    } catch (anomalyCheckError) {
+      // Don't fail sync if anomaly check fails
+      console.error(`[Baseline Calculation] Error checking anomalies:`, anomalyCheckError.message)
+    }
   } catch (error) {
     // Don't fail sync if baseline calculation fails
     console.error(`[Baseline Calculation] Error calculating baselines:`, error.message)

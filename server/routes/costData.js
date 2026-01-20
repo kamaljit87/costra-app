@@ -9,6 +9,7 @@ import {
   getDailyCostData,
   getServiceCostsForDateRange,
   getCloudProviderCredentials,
+  createNotification,
 } from '../database.js'
 import { 
   fetchAWSServiceDetails, 
@@ -369,6 +370,20 @@ router.put('/preferences/currency', async (req, res) => {
     }
 
     await updateUserCurrency(userId, currency)
+    
+    // Create notification for currency change
+    try {
+      await createNotification(userId, {
+        type: 'info',
+        title: 'Currency Preference Updated',
+        message: `Your default currency has been changed to ${currency}`,
+        link: '/settings',
+        linkText: 'View Settings'
+      })
+    } catch (notifError) {
+      console.error('[CostData] Failed to create notification:', notifError)
+    }
+    
     res.json({ message: 'Currency preference updated' })
   } catch (error) {
     console.error('Update currency error:', error)

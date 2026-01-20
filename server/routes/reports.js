@@ -7,6 +7,7 @@ import {
   getReport,
   updateReportStatus,
   deleteReport,
+  createNotification,
 } from '../database.js'
 import { generateCSVReport, generatePDFReport } from '../utils/reportGenerator.js'
 import path from 'path'
@@ -71,12 +72,50 @@ router.post('/showback', async (req, res) => {
     
     // Generate file asynchronously
     generateReportFile(report.id, reportData, format, userId)
-      .then(filePath => {
-        updateReportStatus(userId, report.id, 'completed', filePath)
+      .then(async (filePath) => {
+        await updateReportStatus(userId, report.id, 'completed', filePath)
+        
+        // Create notification for successful report generation
+        try {
+          await createNotification(userId, {
+            type: 'success',
+            title: 'Report Generated',
+            message: `Your Cost Visibility report "${reportName}" is ready for download`,
+            link: '/reports',
+            linkText: 'View Reports',
+            metadata: {
+              reportId: report.id,
+              reportName,
+              reportType: 'showback',
+              format
+            }
+          })
+        } catch (notifError) {
+          console.error('[Reports] Failed to create notification:', notifError)
+        }
       })
-      .catch(error => {
+      .catch(async (error) => {
         console.error('Report generation error:', error)
-        updateReportStatus(userId, report.id, 'failed')
+        await updateReportStatus(userId, report.id, 'failed')
+        
+        // Create notification for failed report generation
+        try {
+          await createNotification(userId, {
+            type: 'warning',
+            title: 'Report Generation Failed',
+            message: `Failed to generate Cost Visibility report "${reportName}". Please try again.`,
+            link: '/reports',
+            linkText: 'View Reports',
+            metadata: {
+              reportId: report.id,
+              reportName,
+              reportType: 'showback',
+              error: error.message
+            }
+          })
+        } catch (notifError) {
+          console.error('[Reports] Failed to create notification:', notifError)
+        }
       })
     
     res.status(201).json({ 
@@ -146,12 +185,50 @@ router.post('/chargeback', async (req, res) => {
     
     // Generate file asynchronously
     generateReportFile(report.id, reportData, format, userId)
-      .then(filePath => {
-        updateReportStatus(userId, report.id, 'completed', filePath)
+      .then(async (filePath) => {
+        await updateReportStatus(userId, report.id, 'completed', filePath)
+        
+        // Create notification for successful report generation
+        try {
+          await createNotification(userId, {
+            type: 'success',
+            title: 'Report Generated',
+            message: `Your Cost Allocation report "${reportName}" is ready for download`,
+            link: '/reports',
+            linkText: 'View Reports',
+            metadata: {
+              reportId: report.id,
+              reportName,
+              reportType: 'chargeback',
+              format
+            }
+          })
+        } catch (notifError) {
+          console.error('[Reports] Failed to create notification:', notifError)
+        }
       })
-      .catch(error => {
+      .catch(async (error) => {
         console.error('Report generation error:', error)
-        updateReportStatus(userId, report.id, 'failed')
+        await updateReportStatus(userId, report.id, 'failed')
+        
+        // Create notification for failed report generation
+        try {
+          await createNotification(userId, {
+            type: 'warning',
+            title: 'Report Generation Failed',
+            message: `Failed to generate Cost Allocation report "${reportName}". Please try again.`,
+            link: '/reports',
+            linkText: 'View Reports',
+            metadata: {
+              reportId: report.id,
+              reportName,
+              reportType: 'chargeback',
+              error: error.message
+            }
+          })
+        } catch (notifError) {
+          console.error('[Reports] Failed to create notification:', notifError)
+        }
       })
     
     res.status(201).json({ 

@@ -7,7 +7,8 @@ import {
   updateUserProfile, 
   updateUserAvatar, 
   updateUserPassword,
-  getUserByEmail 
+  getUserByEmail,
+  createNotification
 } from '../database.js'
 import multer from 'multer'
 import path from 'path'
@@ -105,6 +106,19 @@ router.put('/',
 
       const updatedUser = await updateUserProfile(req.user.userId, { name, email })
       
+      // Create notification for profile update
+      try {
+        await createNotification(req.user.userId, {
+          type: 'info',
+          title: 'Profile Updated',
+          message: 'Your profile information has been updated successfully',
+          link: '/settings',
+          linkText: 'View Settings'
+        })
+      } catch (notifError) {
+        console.error('[Profile] Failed to create notification:', notifError)
+      }
+      
       res.json({
         message: 'Profile updated successfully',
         user: {
@@ -144,6 +158,19 @@ router.post('/avatar',
       const avatarUrl = `/api/uploads/avatars/${req.file.filename}`
       
       await updateUserAvatar(req.user.userId, avatarUrl)
+
+      // Create notification for avatar upload
+      try {
+        await createNotification(req.user.userId, {
+          type: 'success',
+          title: 'Avatar Updated',
+          message: 'Your profile picture has been updated successfully',
+          link: '/settings',
+          linkText: 'View Settings'
+        })
+      } catch (notifError) {
+        console.error('[Profile] Failed to create notification:', notifError)
+      }
 
       res.json({
         message: 'Avatar uploaded successfully',
@@ -225,6 +252,19 @@ router.put('/password',
       
       // Update password
       await updateUserPassword(req.user.userId, newPasswordHash)
+
+      // Create notification for password change
+      try {
+        await createNotification(req.user.userId, {
+          type: 'success',
+          title: 'Password Changed',
+          message: 'Your password has been changed successfully. If you did not make this change, please contact support immediately.',
+          link: '/settings',
+          linkText: 'View Settings'
+        })
+      } catch (notifError) {
+        console.error('[Profile] Failed to create notification:', notifError)
+      }
 
       res.json({ message: 'Password changed successfully' })
     } catch (error) {
