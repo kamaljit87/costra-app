@@ -311,11 +311,31 @@ export const getDateRangeForPeriod = (period: PeriodType, customStartDate?: stri
   const startDate = new Date()
 
   if (period === 'custom' && customStartDate && customEndDate) {
-    startDate.setTime(new Date(customStartDate).getTime())
-    startDate.setHours(0, 0, 0, 0)
-    endDate.setTime(new Date(customEndDate).getTime())
-    endDate.setHours(23, 59, 59, 999)
-    return { startDate, endDate }
+    const parsedStart = new Date(customStartDate)
+    const parsedEnd = new Date(customEndDate)
+
+    // If the user (or a bug) produces an invalid or out-of-range year like 0000-12-31,
+    // clamp to a sane default (last 12 months) instead of sending bad dates to the backend.
+    const isValidDate = (d: Date) => !isNaN(d.getTime())
+    const isReasonableYear = (d: Date) => d.getFullYear() >= 1970 && d.getFullYear() <= 2100
+
+    if (isValidDate(parsedStart) && isValidDate(parsedEnd) && isReasonableYear(parsedStart) && isReasonableYear(parsedEnd)) {
+      startDate.setTime(parsedStart.getTime())
+      startDate.setHours(0, 0, 0, 0)
+      endDate.setTime(parsedEnd.getTime())
+      endDate.setHours(23, 59, 59, 999)
+      return { startDate, endDate }
+    } else {
+      console.warn('[getDateRangeForPeriod] Invalid or out-of-range custom dates provided:', {
+        period,
+        customStartDate,
+        customEndDate,
+      })
+      // Fallback: clamp to last 12 months to avoid backend date/time errors
+      startDate.setDate(startDate.getDate() - 365)
+      startDate.setHours(0, 0, 0, 0)
+      return { startDate, endDate }
+    }
   }
 
   switch (period) {

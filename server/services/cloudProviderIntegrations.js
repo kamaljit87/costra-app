@@ -255,6 +255,16 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, credit
   const services = filterOutTaxServices(allServices)
   console.log(`  - Services after tax filter: ${services.length}`)
 
+  // Debug summary for January 2026 credit/spend investigation
+  const netSpend = currentMonth
+  const grossSpend = currentMonth + creditsUsed
+  console.log('[AWS Transform] Billing summary for period:')
+  console.log(`  - Start date: ${startDate}`)
+  console.log(`  - End date:   ${endDate}`)
+  console.log(`  - Net spend (after credits): $${netSpend.toFixed(2)}`)
+  console.log(`  - Credits used (Cost Explorer, RECORD_TYPE=Credit): $${creditsUsed.toFixed(2)}`)
+  console.log(`  - Gross spend (before credits): $${grossSpend.toFixed(2)}`)
+
   return {
     currentMonth,
     lastMonth,
