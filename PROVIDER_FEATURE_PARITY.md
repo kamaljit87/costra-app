@@ -217,4 +217,29 @@ The architecture ensures that:
 - Data is stored in a provider-agnostic format
 - Reports and analysis work for any provider or combination of providers
 
-Last Updated: 2026-01-19
+## Recent Improvements Synced (2026-01-20)
+
+### Credit Handling Improvements
+- ✅ **Consistent Credit Calculation**: All providers now use `Math.abs()` to ensure credits are always positive
+- ✅ **Credit Logging**: All providers log credits for debugging and transparency
+- ✅ **Credit Display**: Credits are displayed consistently across all providers on detail pages
+- ✅ **Credit Information**: Detailed credit information component works for all providers
+- ✅ **Credit Calculation Fix**: Fixed issue where credits were being double-counted or incorrectly calculated
+
+### Provider-Specific Credit Implementation
+- **AWS**: Fetches credits using Cost Explorer API with RECORD_TYPE='Credit' filter
+- **Azure**: Fetches credits using Cost Management API with ChargeType='Credit' or 'Refund'
+- **GCP**: Extracts credits from BigQuery billing export or billing API
+- **DigitalOcean**: Fetches credits from account balance API
+- **IBM Cloud**: Extracts credits from account summary API
+- **Linode**: Calculates credits from promotional credits and negative account balance
+- **Vultr**: Extracts credits from negative account balance
+
+All providers now follow the same pattern:
+1. Fetch credits from provider-specific APIs
+2. Convert to positive values using `Math.abs()`
+3. Log credits for debugging
+4. Return in common data format
+5. Display consistently in UI
+
+Last Updated: 2026-01-20
