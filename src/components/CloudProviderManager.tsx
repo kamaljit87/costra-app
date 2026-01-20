@@ -417,8 +417,12 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         // Return different fields based on connection type
         if (awsConnectionType === 'simple') {
           return ['accessKeyId', 'secretAccessKey', 'region']
+        } else if (awsConnectionType === 'advanced') {
+          // CUR support is coming soon - return empty for now
+          return []
         } else {
-          return ['roleArn', 's3BucketName', 'curReportName', 'region']
+          // automated
+          return []
         }
       case 'azure':
         return ['subscriptionId', 'clientId', 'clientSecret', 'tenantId']
@@ -767,16 +771,20 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           <button
                             type="button"
                             onClick={() => {
-                              setAwsConnectionType('advanced')
-                              setCredentials({})
-                              setAutomatedConnectionData(null)
+                              // Show notice that CUR is coming soon
+                              alert('CUR (Cost & Usage Reports) support is coming soon! For now, please use "Simple (API Keys)" or "Automated (CloudFormation)" connection methods.')
+                              // Don't actually switch to advanced
+                              // setAwsConnectionType('advanced')
+                              // setCredentials({})
+                              // setAutomatedConnectionData(null)
                             }}
-                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                              awsConnectionType === 'advanced'
-                                ? 'bg-[#EFF6FF] border-[#1F3A5F] text-[#1F3A5F]'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                            }`}
+                            className="px-4 py-2 rounded-lg border-2 border-gray-300 bg-gray-50 text-gray-500 cursor-not-allowed opacity-60 relative"
+                            disabled
+                            title="CUR support coming soon"
                           >
+                            <span className="absolute -top-2 -right-2 bg-[#F59E0B] text-white text-xs px-2 py-0.5 rounded-full font-medium">
+                              Coming Soon
+                            </span>
                             Advanced (CUR + Role)
                           </button>
                           <button
@@ -799,7 +807,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           {awsConnectionType === 'simple'
                             ? 'Use Cost Explorer API - quick setup, no S3 bucket needed'
                             : awsConnectionType === 'advanced'
-                            ? 'Use Cost & Usage Reports - more detailed data, requires CUR setup'
+                            ? '🚧 Coming Soon: Cost & Usage Reports support - use Simple or Automated for now'
                             : 'CloudFormation automated setup - recommended, one-click connection'}
                         </p>
                       </div>
@@ -872,7 +880,53 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             </p>
                           </div>
                         ) : (
-                          getRequiredFields(selectedProvider).map((field) => {
+                          <>
+                            {/* Show message if CUR is selected (coming soon) */}
+                            {selectedProvider === 'aws' && awsConnectionType === 'advanced' && (
+                              <div className="col-span-2 bg-[#FEF3C7] border-2 border-[#F59E0B] rounded-xl p-4 mb-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 mt-0.5">
+                                    <svg className="w-5 h-5 text-[#F59E0B]" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-semibold text-[#92400E] mb-1">🚧 CUR Support Coming Soon</p>
+                                    <p className="text-sm text-[#92400E] mb-3">
+                                      Cost & Usage Reports (CUR) support is currently under development. 
+                                      Please use <strong>"Simple (API Keys)"</strong> or <strong>"Automated (CloudFormation)"</strong> connection methods for now.
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAwsConnectionType('simple')
+                                          setCredentials({})
+                                          setError('')
+                                        }}
+                                        className="px-4 py-2 bg-[#22B8A0] text-white rounded-lg hover:bg-[#1ea088] transition-colors text-sm font-medium"
+                                      >
+                                        Switch to Simple (API Keys)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setAwsConnectionType('automated')
+                                          setCredentials({})
+                                          setAutomatedConnectionData(null)
+                                          setError('')
+                                        }}
+                                        className="px-4 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-[#D97706] transition-colors text-sm font-medium"
+                                      >
+                                        Switch to Automated
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {getRequiredFields(selectedProvider).map((field) => {
                             const getFieldLabel = (f: string) => {
                         const labels: Record<string, string> = {
                           accessKeyId: 'Access Key ID',
@@ -920,7 +974,9 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           />
                         </div>
                       )
-                    }))}
+                    })}
+                          </>
+                        )}
                       </>
                     )}
                   </div>

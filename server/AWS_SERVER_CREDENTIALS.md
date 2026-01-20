@@ -27,7 +27,7 @@ AWS_REGION=us-east-1
 
 **Note**: These are credentials for Costra's AWS account, not customer accounts.
 
-### Option 2: IAM Instance Profile (Recommended for Production)
+### Option 2: IAM Instance Profile (AWS EC2 Only)
 
 If running on AWS EC2, use an IAM instance profile:
 
@@ -48,6 +48,8 @@ The IAM role should have a policy like:
   ]
 }
 ```
+
+**Note**: For non-AWS hosting (Linode, DigitalOcean, etc.), use Option 1 (Environment Variables).
 
 ### Option 3: AWS Credentials File
 
