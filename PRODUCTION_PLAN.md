@@ -207,30 +207,53 @@
 - ❌ **Frontend fallback to mock data** - hides real data issues from users
 - ⚠️ Different providers return different data formats - no standardization
 
+#### 10. UI/UX & Responsive Design ⚠️ **CRITICAL**
+- ❌ **Layout breaks on mobile/tablet** - components overflow, text truncates incorrectly
+- ❌ **Inconsistent responsive breakpoints** - only `lg:` used, missing `sm:`, `md:`, `xl:`, `2xl:`
+- ❌ **Grid layouts not responsive** - provider cards, dashboard widgets break on small screens
+- ❌ **Sidebar not optimized for mobile** - drawer implementation may have issues
+- ❌ **Top navigation breaks on mobile** - search bar, user menu may overflow
+- ❌ **Tables not responsive** - horizontal scroll on mobile, no mobile-friendly table design
+- ❌ **Charts not responsive** - Recharts may not adapt to container size properly
+- ❌ **Modals/dialogs not mobile-friendly** - may overflow viewport, buttons cut off
+- ❌ **Form inputs not optimized** - may be too small on mobile, keyboard issues
+- ❌ **Typography not responsive** - font sizes don't scale properly
+- ❌ **Spacing inconsistencies** - padding/margins not adjusted for screen sizes
+- ❌ **Touch targets too small** - buttons/icons below 44x44px minimum
+- ❌ **No dark mode support** - only light theme available
+- ❌ **Visual hierarchy issues** - colors, shadows, spacing don't match modern SaaS standards
+- ❌ **Loading states inconsistent** - different loading patterns across components
+- ❌ **Error states not user-friendly** - generic error messages, no recovery actions
+- ❌ **Empty states missing** - no helpful messages when no data
+- ❌ **Provider card grid not sleek** - doesn't match CloudZero-style modern grid
+- ❌ **No smooth transitions** - abrupt state changes, no micro-interactions
+- ❌ **Accessibility issues** - missing ARIA labels, keyboard navigation gaps
+- ❌ **Print styles missing** - reports may not print correctly
+
 ### 🟡 Important Improvements (Post-Launch)
 
-#### 10. Feature Completeness
+#### 11. Feature Completeness
 - ⚠️ CUR (Cost & Usage Reports) support marked as "Coming Soon"
 - ⚠️ Email notifications not implemented
 - ⚠️ Payment/subscription system not implemented
 - ⚠️ Multi-tenant organization support missing
 - ⚠️ User roles and permissions not implemented
 
-#### 11. Code Quality
+#### 12. Code Quality
 - ⚠️ Inconsistent error handling patterns
 - ⚠️ Some duplicate code
 - ⚠️ Missing TypeScript types in some areas
 - ❌ No code formatting standards (Prettier)
 - ❌ No pre-commit hooks
 
-#### 12. Configuration
+#### 13. Configuration
 - ⚠️ Environment variables partially validated (JWT_SECRET only)
 - ❌ No comprehensive configuration validation
 - ❌ Missing production environment checks
 
 ---
 
-## 📅 7-Day Production Readiness Plan
+## 📅 9-Day Production Readiness Plan
 
 ### Day 1: Error Handling & Logging
 **Priority:** Critical  
@@ -421,7 +444,144 @@
 
 ---
 
-### Day 4: Database & Performance
+### Day 4: UI/UX & Responsive Design Overhaul
+**Priority:** Critical  
+**Story Points:** 13  
+**Estimated Time:** 10-12 hours
+
+#### Tasks:
+1. **Fix responsive breakpoints across all components**
+   - Audit all components for responsive classes
+   - Add missing breakpoints: `sm:`, `md:`, `xl:`, `2xl:`
+   - Test on multiple screen sizes (320px, 768px, 1024px, 1440px, 1920px)
+   - Fix layout breaking issues:
+     - Dashboard grid (2-3-4 columns based on screen size)
+     - Provider cards grid (1-2-3-4 columns)
+     - Tables (horizontal scroll on mobile, stacked on tablet)
+     - Charts (responsive width, readable on mobile)
+
+2. **Redesign provider integration cards (CloudZero-style)**
+   - Create modern card grid layout:
+     - Square cards with provider logos
+     - Hover effects with subtle shadows
+     - "New" and "Beta" badges
+     - "Coming Soon" disabled state
+     - Smooth transitions
+   - Implement responsive grid:
+     - Mobile: 2 columns
+     - Tablet: 3 columns
+     - Desktop: 4-5 columns
+   - Add loading skeletons
+   - Add empty states
+
+3. **Fix mobile navigation and sidebar**
+   - Optimize sidebar drawer:
+     - Smooth slide-in animation
+     - Backdrop blur effect
+     - Close on outside click
+     - Prevent body scroll when open
+   - Fix top navigation:
+     - Collapsible search on mobile
+     - Stack user menu items vertically
+     - Touch-friendly dropdowns
+   - Add hamburger menu with animation
+
+4. **Make tables responsive**
+   - Implement mobile-friendly table design:
+     - Stack rows on mobile (< 768px)
+     - Horizontal scroll with sticky header on tablet
+     - Full table on desktop
+   - Add table pagination
+   - Add table filters/search
+   - Improve table styling (modern borders, hover states)
+
+5. **Fix charts and visualizations**
+   - Make Recharts responsive:
+     - Use `ResponsiveContainer` wrapper
+     - Adjust font sizes for mobile
+     - Hide non-essential labels on small screens
+     - Add touch interactions for mobile
+   - Fix chart tooltips (position correctly on mobile)
+   - Add loading states for charts
+   - Add empty state when no data
+
+6. **Improve modals and dialogs**
+   - Make modals mobile-friendly:
+     - Full-screen on mobile (< 768px)
+     - Centered with max-width on desktop
+     - Prevent body scroll when open
+     - Close button always visible
+   - Add smooth open/close animations
+   - Fix form inputs in modals (proper sizing)
+   - Add keyboard navigation (ESC to close)
+
+7. **Enhance typography and spacing**
+   - Implement responsive typography:
+     - Use `clamp()` for fluid font sizes
+     - Scale headings appropriately
+     - Improve line-height for readability
+   - Fix spacing system:
+     - Consistent padding/margins
+     - Responsive spacing (smaller on mobile)
+     - Use Tailwind spacing scale consistently
+
+8. **Improve touch targets and accessibility**
+   - Ensure all interactive elements are ≥ 44x44px
+   - Add proper ARIA labels
+   - Improve keyboard navigation
+   - Add focus indicators
+   - Test with screen readers
+
+9. **Add loading and error states**
+   - Create consistent loading components:
+     - Skeleton loaders
+     - Spinner components
+     - Progress indicators
+   - Improve error states:
+     - User-friendly error messages
+     - Recovery actions (retry buttons)
+     - Error illustrations/icons
+   - Add empty states:
+     - No data illustrations
+     - Helpful messages
+     - Call-to-action buttons
+
+10. **Polish visual design**
+    - Improve color contrast (WCAG AA compliance)
+    - Add subtle shadows and borders
+    - Improve hover states
+    - Add micro-interactions (button press, card hover)
+    - Consistent border-radius across components
+    - Improve icon sizing and alignment
+
+**Files to Modify:**
+- `src/components/Layout.tsx` - Fix responsive layout
+- `src/components/Sidebar.tsx` - Mobile drawer improvements
+- `src/components/TopNav.tsx` - Mobile navigation
+- `src/components/CloudProviderManager.tsx` - Modern card grid
+- `src/pages/Dashboard.tsx` - Responsive grid layout
+- `src/pages/ProviderDetailPage.tsx` - Responsive charts and tables
+- All table components - Responsive table design
+- All chart components - Responsive charts
+- All modal/dialog components - Mobile-friendly modals
+- `src/index.css` - Responsive typography and spacing
+- `tailwind.config.js` - Add custom responsive utilities
+
+**Acceptance Criteria:**
+- ✅ All components work on mobile (320px+), tablet (768px+), desktop (1024px+)
+- ✅ No horizontal scrolling on any screen size
+- ✅ Provider cards match CloudZero-style modern grid
+- ✅ Tables are mobile-friendly (stacked or scrollable)
+- ✅ Charts are fully responsive and readable
+- ✅ Modals work perfectly on mobile
+- ✅ Touch targets are ≥ 44x44px
+- ✅ WCAG AA contrast compliance
+- ✅ Smooth animations and transitions
+- ✅ Consistent loading/error/empty states
+
+---
+
+### Day 5: Database & Performance
 **Priority:** High  
 **Story Points:** 8  
 **Estimated Time:** 6-8 hours
@@ -486,7 +646,7 @@
 
 ---
 
-### Day 5: Testing Infrastructure
+### Day 6: Testing Infrastructure
 **Priority:** High  
 **Story Points:** 13  
 **Estimated Time:** 8-10 hours
@@ -552,7 +712,7 @@
 
 ---
 
-### Day 6: Monitoring & Health Checks
+### Day 7: Monitoring & Health Checks
 **Priority:** High  
 **Story Points:** 8  
 **Estimated Time:** 6-8 hours
@@ -612,7 +772,7 @@
 
 ---
 
-### Day 7: Documentation & Configuration
+### Day 8: Documentation & Configuration
 **Priority:** Medium  
 **Story Points:** 5  
 **Estimated Time:** 4-6 hours
@@ -678,7 +838,7 @@
 
 ---
 
-### Day 8: Final Testing & Production Readiness
+### Day 9: Final Testing & Production Readiness
 **Priority:** Critical  
 **Story Points:** 13  
 **Estimated Time:** 8-10 hours
@@ -705,6 +865,17 @@
      - **Test with missing/null data from APIs**
      - **Verify currency conversion accuracy**
      - **Test multiple account aggregation**
+   - Test UI/UX and responsive design:
+     - **Test on mobile (320px, 375px, 414px)**
+     - **Test on tablet (768px, 1024px)**
+     - **Test on desktop (1280px, 1440px, 1920px, 4K)**
+     - **Verify provider cards grid works on all sizes**
+     - **Verify tables are mobile-friendly**
+     - **Verify charts are responsive**
+     - **Verify modals work on mobile**
+     - **Test touch interactions**
+     - **Test keyboard navigation**
+     - **Test with screen readers (accessibility)**
    - Test error scenarios:
      - Invalid credentials
      - Network failures (verify retry works)
@@ -782,19 +953,20 @@
 
 ## 📊 Summary
 
-### Total Story Points: 73
-### Estimated Duration: 8 days (with 1-2 developers)
-### Estimated Total Time: 58-74 hours
+### Total Story Points: 86
+### Estimated Duration: 9 days (with 1-2 developers)
+### Estimated Total Time: 68-86 hours
 
 ### Critical Path:
 1. **Day 1: Error Handling & Logging** (blocks monitoring)
 2. **Day 2: Security Hardening** (blocks production)
 3. **Day 3: Cloud Integration & Data Accuracy** (blocks user trust) ⚠️ **NEW**
-4. **Day 4: Database & Performance** (blocks scalability)
-5. **Day 5: Testing Infrastructure** (blocks confidence)
-6. **Day 6: Monitoring & Health Checks** (blocks observability)
-7. **Day 7: Documentation & Configuration** (blocks operations)
-8. **Day 8: Final Testing & Production Readiness** (blocks launch)
+4. **Day 4: UI/UX & Responsive Design** (blocks user adoption) ⚠️ **NEW**
+5. **Day 5: Database & Performance** (blocks scalability)
+6. **Day 6: Testing Infrastructure** (blocks confidence)
+7. **Day 7: Monitoring & Health Checks** (blocks observability)
+8. **Day 8: Documentation & Configuration** (blocks operations)
+9. **Day 9: Final Testing & Production Readiness** (blocks launch)
 
 ### Risk Mitigation:
 - Start with critical items (Days 1-2)
@@ -817,6 +989,10 @@
 - ✅ **Cloud integration retry logic working (95%+ success rate)**
 - ✅ **Data accuracy validated (no fallback calculations)**
 - ✅ **All cost data verified before display**
+- ✅ **UI works perfectly on all screen sizes (320px - 4K)**
+- ✅ **Provider cards match modern SaaS design standards**
+- ✅ **WCAG AA accessibility compliance**
+- ✅ **Smooth animations and micro-interactions**
 
 ---
 
@@ -838,9 +1014,12 @@
 ## 📝 Notes
 
 - **Current State**: Application is feature-complete but needs production hardening
-- **Priority**: Focus on Days 1-3 first (critical security, logging, and data accuracy)
+- **Priority**: Focus on Days 1-4 first (critical security, logging, data accuracy, and UI/UX)
 - **Cloud Integration**: Day 3 is critical - users are reporting incorrect data display
 - **Data Accuracy**: Remove all fallback calculations - only show real data from APIs
+- **UI/UX**: Day 4 is critical - UI breaks on mobile and doesn't match modern SaaS standards
+- **Design Reference**: Use CloudZero's UI as inspiration for provider cards and overall layout
+- **Responsive Testing**: Test on real devices (iPhone, iPad, Android, various desktop sizes)
 - **Testing**: Can start writing tests in parallel with other work
 - **Monitoring**: Can use free tiers (Sentry free tier, Prometheus self-hosted)
 - **Database**: Consider managed PostgreSQL (AWS RDS, DigitalOcean) for production
