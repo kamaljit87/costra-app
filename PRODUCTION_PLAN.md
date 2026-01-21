@@ -190,23 +190,40 @@
 - ❌ No deployment runbook
 - ❌ No incident response plan
 
+#### 9. Cloud Integration & Data Accuracy ⚠️ **CRITICAL**
+- ❌ **No retry logic** for API failures (single attempt, fails immediately)
+- ❌ **Fallback calculations** using guesses instead of real data:
+  - `lastMonth: costData.lastMonth || costData.currentMonth * 0.95` (5% guess)
+  - `forecast: costData.forecast || costData.currentMonth * 1.1` (10% guess)
+- ❌ **No data validation** from API responses (accepts any data structure)
+- ❌ **No error recovery** - if API fails, data is lost or shows incorrect values
+- ❌ **Cache may serve stale data** - no cache invalidation strategy
+- ❌ **Missing data handling** - empty responses treated as $0 instead of showing error
+- ❌ **Service cost calculations use proportions** - may be inaccurate for custom date ranges
+- ❌ **No validation before saving** - invalid data can be stored in database
+- ❌ **Timezone issues** - date calculations may be off due to timezone mismatches
+- ❌ **Currency conversion rounding errors** - may accumulate over multiple conversions
+- ❌ **Multiple account aggregation** - may double-count or miss accounts
+- ❌ **Frontend fallback to mock data** - hides real data issues from users
+- ⚠️ Different providers return different data formats - no standardization
+
 ### 🟡 Important Improvements (Post-Launch)
 
-#### 9. Feature Completeness
+#### 10. Feature Completeness
 - ⚠️ CUR (Cost & Usage Reports) support marked as "Coming Soon"
 - ⚠️ Email notifications not implemented
 - ⚠️ Payment/subscription system not implemented
 - ⚠️ Multi-tenant organization support missing
 - ⚠️ User roles and permissions not implemented
 
-#### 10. Code Quality
+#### 11. Code Quality
 - ⚠️ Inconsistent error handling patterns
 - ⚠️ Some duplicate code
 - ⚠️ Missing TypeScript types in some areas
 - ❌ No code formatting standards (Prettier)
 - ❌ No pre-commit hooks
 
-#### 11. Configuration
+#### 12. Configuration
 - ⚠️ Environment variables partially validated (JWT_SECRET only)
 - ❌ No comprehensive configuration validation
 - ❌ Missing production environment checks
@@ -338,7 +355,73 @@
 
 ---
 
-### Day 3: Database & Performance
+### Day 3: Cloud Integration & Data Accuracy Fixes
+**Priority:** Critical  
+**Story Points:** 10  
+**Estimated Time:** 8-10 hours
+
+#### Tasks:
+1. **Add retry logic for cloud provider APIs**
+   - Implement exponential backoff retry (3 attempts)
+   - Add circuit breaker pattern for failing providers
+   - Handle rate limiting errors gracefully
+   - Add timeout configuration (30 seconds per API call)
+   - Log retry attempts and failures
+
+2. **Fix data accuracy issues**
+   - Remove fallback calculations (lastMonth, forecast guesses)
+   - Fetch actual historical data for lastMonth
+   - Calculate forecast based on trends, not fixed percentage
+   - Validate API response structure before processing
+   - Add data type validation (numbers, dates, strings)
+   - Handle missing/null data properly (show "N/A" not $0)
+
+3. **Improve data validation**
+   - Validate cost data before saving to database:
+     - Ensure numbers are positive (or handle negatives for credits)
+     - Validate date ranges
+     - Check for reasonable values (flag outliers)
+   - Add data sanitization (trim strings, normalize dates)
+   - Validate service names and costs
+   - Add checksums or validation flags for data integrity
+
+4. **Fix service cost calculations**
+   - Replace proportional calculations with actual service costs
+   - Fetch service-level data for custom date ranges
+   - Aggregate service costs correctly across accounts
+   - Handle missing service data gracefully
+
+5. **Improve error handling for cloud APIs**
+   - Map provider-specific errors to user-friendly messages
+   - Handle authentication failures separately
+   - Handle rate limiting (429 errors) with retry
+   - Handle network timeouts
+   - Store partial data if available (don't lose everything on error)
+
+6. **Fix cache invalidation**
+   - Invalidate cache on sync completion
+   - Add cache versioning
+   - Set appropriate TTLs per data type
+   - Clear stale cache entries automatically
+
+**Files to Modify:**
+- `server/services/cloudProviderIntegrations.js` - Add retry logic, validation
+- `server/routes/sync.js` - Remove fallback calculations, improve error handling
+- `server/database.js` - Add data validation before saving
+- `server/utils/retry.js` - Create new retry utility
+- `server/utils/dataValidator.js` - Create new data validation utility
+
+**Acceptance Criteria:**
+- ✅ All API calls have retry logic with exponential backoff
+- ✅ No fallback calculations (all data is real)
+- ✅ All data validated before saving
+- ✅ Service costs calculated accurately for all date ranges
+- ✅ Cache properly invalidated on sync
+- ✅ Error messages are user-friendly and actionable
+
+---
+
+### Day 4: Database & Performance
 **Priority:** High  
 **Story Points:** 8  
 **Estimated Time:** 6-8 hours
@@ -403,7 +486,7 @@
 
 ---
 
-### Day 4: Testing Infrastructure
+### Day 5: Testing Infrastructure
 **Priority:** High  
 **Story Points:** 13  
 **Estimated Time:** 8-10 hours
@@ -469,7 +552,7 @@
 
 ---
 
-### Day 5: Monitoring & Health Checks
+### Day 6: Monitoring & Health Checks
 **Priority:** High  
 **Story Points:** 8  
 **Estimated Time:** 6-8 hours
@@ -529,7 +612,7 @@
 
 ---
 
-### Day 6: Documentation & Configuration
+### Day 7: Documentation & Configuration
 **Priority:** Medium  
 **Story Points:** 5  
 **Estimated Time:** 4-6 hours
@@ -595,7 +678,7 @@
 
 ---
 
-### Day 7: Final Testing & Production Readiness
+### Day 8: Final Testing & Production Readiness
 **Priority:** Critical  
 **Story Points:** 13  
 **Estimated Time:** 8-10 hours
@@ -614,14 +697,26 @@
      - Manual sync
      - Account-specific sync
      - Error handling during sync
+     - **Retry logic on API failures**
+     - **Data validation before saving**
+   - Test data accuracy:
+     - **Verify no fallback calculations (lastMonth, forecast)**
+     - **Verify service costs are accurate for all date ranges**
+     - **Test with missing/null data from APIs**
+     - **Verify currency conversion accuracy**
+     - **Test multiple account aggregation**
    - Test error scenarios:
      - Invalid credentials
-     - Network failures
+     - Network failures (verify retry works)
+     - API rate limiting (verify backoff)
      - Database errors
+     - Empty API responses
    - Test edge cases:
      - Empty accounts
      - Large datasets
      - Concurrent syncs
+     - **Timezone edge cases**
+     - **Cache invalidation**
 
 2. **Load testing**
    ```bash
@@ -687,18 +782,19 @@
 
 ## 📊 Summary
 
-### Total Story Points: 63
-### Estimated Duration: 7 days (with 1-2 developers)
-### Estimated Total Time: 48-64 hours
+### Total Story Points: 73
+### Estimated Duration: 8 days (with 1-2 developers)
+### Estimated Total Time: 58-74 hours
 
 ### Critical Path:
 1. **Day 1: Error Handling & Logging** (blocks monitoring)
 2. **Day 2: Security Hardening** (blocks production)
-3. **Day 3: Database & Performance** (blocks scalability)
-4. **Day 4: Testing Infrastructure** (blocks confidence)
-5. **Day 5: Monitoring & Health Checks** (blocks observability)
-6. **Day 6: Documentation & Configuration** (blocks operations)
-7. **Day 7: Final Testing & Production Readiness** (blocks launch)
+3. **Day 3: Cloud Integration & Data Accuracy** (blocks user trust) ⚠️ **NEW**
+4. **Day 4: Database & Performance** (blocks scalability)
+5. **Day 5: Testing Infrastructure** (blocks confidence)
+6. **Day 6: Monitoring & Health Checks** (blocks observability)
+7. **Day 7: Documentation & Configuration** (blocks operations)
+8. **Day 8: Final Testing & Production Readiness** (blocks launch)
 
 ### Risk Mitigation:
 - Start with critical items (Days 1-2)
@@ -718,6 +814,9 @@
 - ✅ Structured logging in place
 - ✅ Rate limiting configured
 - ✅ Health checks passing
+- ✅ **Cloud integration retry logic working (95%+ success rate)**
+- ✅ **Data accuracy validated (no fallback calculations)**
+- ✅ **All cost data verified before display**
 
 ---
 
@@ -739,10 +838,13 @@
 ## 📝 Notes
 
 - **Current State**: Application is feature-complete but needs production hardening
-- **Priority**: Focus on Days 1-2 first (critical security and logging)
+- **Priority**: Focus on Days 1-3 first (critical security, logging, and data accuracy)
+- **Cloud Integration**: Day 3 is critical - users are reporting incorrect data display
+- **Data Accuracy**: Remove all fallback calculations - only show real data from APIs
 - **Testing**: Can start writing tests in parallel with other work
 - **Monitoring**: Can use free tiers (Sentry free tier, Prometheus self-hosted)
 - **Database**: Consider managed PostgreSQL (AWS RDS, DigitalOcean) for production
+- **Retry Logic**: Essential for cloud APIs - many failures are transient network issues
 
 ---
 
