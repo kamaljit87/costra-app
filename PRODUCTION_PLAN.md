@@ -202,12 +202,25 @@
 - ❌ **Service cost calculations use proportions** - may be inaccurate for custom date ranges
 - ❌ **No validation before saving** - invalid data can be stored in database
 - ❌ **Timezone issues** - date calculations may be off due to timezone mismatches
-- ❌ **Currency conversion rounding errors** - may accumulate over multiple conversions
 - ❌ **Multiple account aggregation** - may double-count or miss accounts
 - ❌ **Frontend fallback to mock data** - hides real data issues from users
 - ⚠️ Different providers return different data formats - no standardization
 
-#### 10. UI/UX & Responsive Design ⚠️ **CRITICAL**
+#### 10. Currency Conversion ⚠️ **CRITICAL**
+- ❌ **Exchange rate direction may be incorrect** - API returns rates with USD base (1 USD = X EUR), but conversion logic may misinterpret
+- ❌ **No currency stored with costs** - All costs stored as USD in database, but providers may return costs in different currencies (AWS EUR region, Azure GBP, etc.)
+- ❌ **No historical exchange rates** - Uses current rates for all historical costs, causing inaccurate conversions for past months
+- ❌ **Rounding errors accumulate** - Multiple conversions (USD → EUR → USD) lose precision
+- ❌ **No currency validation** - Doesn't verify if exchange rates are valid before conversion
+- ❌ **Incorrect conversion formula** - `convertAmount()` may use wrong formula: `amount / exchangeRates[fromCurrency]` assumes rates are "1 currency = X USD", but API returns "1 USD = X currency"
+- ❌ **No currency metadata** - Costs don't track original currency from provider, making accurate conversion impossible
+- ❌ **Frontend-only conversion** - All conversion happens client-side, no server-side validation
+- ❌ **No fallback for failed rate fetch** - If exchange rate API fails, uses stale/incorrect rates
+- ❌ **Rate refresh issues** - Rates refresh every hour, but cached costs may use old rates
+- ❌ **No currency conversion testing** - No tests to verify conversion accuracy
+- ❌ **Provider currency mismatch** - AWS/Azure/GCP may return costs in non-USD currencies, incorrectly treated as USD
+
+#### 11. UI/UX & Responsive Design ⚠️ **CRITICAL**
 - ❌ **Layout breaks on mobile/tablet** - components overflow, text truncates incorrectly
 - ❌ **Inconsistent responsive breakpoints** - only `lg:` used, missing `sm:`, `md:`, `xl:`, `2xl:`
 - ❌ **Grid layouts not responsive** - provider cards, dashboard widgets break on small screens
@@ -413,8 +426,8 @@
 
 ### Day 3: Cloud Integration & Data Accuracy Fixes
 **Priority:** Critical  
-**Story Points:** 10  
-**Estimated Time:** 8-10 hours
+**Story Points:** 15  
+**Estimated Time:** 12-14 hours
 
 #### Tasks:
 1. **Add retry logic for cloud provider APIs**
@@ -460,12 +473,31 @@
    - Set appropriate TTLs per data type
    - Clear stale cache entries automatically
 
+7. **Fix currency conversion issues**
+   - Verify exchange rate API format (USD base: 1 USD = X EUR)
+   - Fix conversion formula in `CurrencyContext.tsx`:
+     - Current: `amount / exchangeRates[fromCurrency]` (may be wrong)
+     - Should convert correctly: EUR → USD → Target currency
+   - Add currency field to cost_data table to store original currency
+   - Store provider currency when saving costs (detect from API response)
+   - Implement historical exchange rate storage (store rates with costs)
+   - Add server-side currency conversion endpoint for validation
+   - Fix rounding errors (use proper decimal precision)
+   - Add currency conversion tests (verify accuracy)
+   - Handle failed exchange rate fetches gracefully (use last known rate)
+   - Validate exchange rates before use (check for 0, negative, or unreasonable values)
+   - Add currency metadata to all cost responses
+
 **Files to Modify:**
-- `server/services/cloudProviderIntegrations.js` - Add retry logic, validation
-- `server/routes/sync.js` - Remove fallback calculations, improve error handling
-- `server/database.js` - Add data validation before saving
+- `server/services/cloudProviderIntegrations.js` - Add retry logic, validation, currency detection
+- `server/routes/sync.js` - Remove fallback calculations, improve error handling, store currency
+- `server/database.js` - Add currency column to cost_data, add data validation before saving
 - `server/utils/retry.js` - Create new retry utility
 - `server/utils/dataValidator.js` - Create new data validation utility
+- `src/contexts/CurrencyContext.tsx` - Fix conversion formula, add validation
+- `src/services/currencyService.ts` - Add historical rate storage, validation
+- `server/routes/costData.js` - Add currency to responses, server-side conversion endpoint
+- `server/database.js` - Migration to add currency column, historical rates table
 
 **Acceptance Criteria:**
 - ✅ All API calls have retry logic with exponential backoff
@@ -474,6 +506,10 @@
 - ✅ Service costs calculated accurately for all date ranges
 - ✅ Cache properly invalidated on sync
 - ✅ Error messages are user-friendly and actionable
+- ✅ Currency conversion formula verified and fixed
+- ✅ Costs stored with original currency from provider
+- ✅ Historical costs use historical exchange rates
+- ✅ Currency conversion accuracy tested and verified
 
 ---
 
@@ -986,9 +1022,9 @@
 
 ## 📊 Summary
 
-### Total Story Points: 86
+### Total Story Points: 91
 ### Estimated Duration: 9 days (with 1-2 developers)
-### Estimated Total Time: 68-86 hours
+### Estimated Total Time: 72-90 hours
 
 ### Critical Path:
 1. **Day 1: Error Handling & Logging** (blocks monitoring)
