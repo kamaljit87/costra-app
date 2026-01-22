@@ -15,6 +15,7 @@ import {
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -30,15 +31,15 @@ router.post('/', async (req, res) => {
     const userId = req.user.userId
     const { accountId } = req.body // Optional: sync specific account
 
-    console.log(`[Sync] Starting sync for user ${userId}, account: ${accountId || 'ALL'}`)
+    logger.info('Starting sync', { requestId: req.requestId, userId, accountId: accountId || 'ALL' })
 
     // Clear user cache first to ensure fresh data
     const clearedCount = await clearUserCache(userId)
-    console.log(`[Sync] Cleared ${clearedCount} cache entries for user ${userId}`)
+    logger.debug('Cleared cache entries', { requestId: req.requestId, userId, clearedCount })
     
     // Clear cost explanations cache to ensure fresh summaries after sync
     const clearedExplanations = await clearCostExplanationsCache(userId)
-    console.log(`[Sync] Cleared ${clearedExplanations} cost explanation cache entries for user ${userId}`)
+    logger.debug('Cleared cost explanation cache', { requestId: req.requestId, userId, clearedExplanations })
 
     // Get all active provider accounts or specific account
     let accounts = await getUserCloudProviders(userId)
@@ -48,7 +49,7 @@ router.post('/', async (req, res) => {
       accounts = accounts.filter(a => a.id === parseInt(accountId, 10))
     }
 
-    console.log(`[Sync] Found ${accounts.length} account(s) to sync`)
+    logger.info('Found accounts to sync', { requestId: req.requestId, userId, accountCount: accounts.length })
 
     const results = []
     const errors = []
@@ -60,16 +61,16 @@ router.post('/', async (req, res) => {
 
     // Fetch 365 days of data for full year historical tracking
     const { startDate, endDate } = getDateRange(365)
-    console.log(`[Sync] Date range: ${startDate} to ${endDate}`)
+    logger.debug('Sync date range', { requestId: req.requestId, userId, startDate, endDate })
 
     for (const account of accounts) {
       const accountLabel = account.account_alias || `${account.provider_id} (${account.id})`
-      console.log(`[Sync] Processing account: ${accountLabel}`)
+      logger.info('Processing account', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
       
       try {
         // Skip if account is not active
         if (account.is_active === false) {
-          console.log(`[Sync] Skipping inactive account: ${accountLabel}`)
+          logger.debug('Skipping inactive account', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           continue
         }
 
@@ -77,7 +78,7 @@ router.post('/', async (req, res) => {
         const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
         
         if (!accountData) {
-          console.log(`[Sync] No account data found for account: ${accountLabel}`)
+          logger.warn('No account data found', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           errors.push({
             accountId: account.id,
             accountAlias: account.account_alias,
@@ -90,10 +91,10 @@ router.post('/', async (req, res) => {
         // Handle automated AWS connections (role-based)
         let credentialsToUse = accountData.credentials || {}
         if (account.provider_id === 'aws' && accountData.connectionType?.startsWith('automated')) {
-          console.log(`[Sync] Automated AWS connection detected for account: ${accountLabel}`)
+          logger.info('Automated AWS connection detected', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           
           if (!accountData.roleArn || !accountData.externalId) {
-            console.log(`[Sync] Missing roleArn or externalId for automated connection: ${accountLabel}`)
+            logger.warn('Missing roleArn or externalId for automated connection', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
             errors.push({
               accountId: account.id,
               accountAlias: account.account_alias,
@@ -123,8 +124,7 @@ router.post('/', async (req, res) => {
               DurationSeconds: 3600, // 1 hour
             })
             
-            console.log(`[Sync] Assuming role for automated connection: ${accountLabel}`)
-            console.log(`[Sync] Role ARN: ${accountData.roleArn}`)
+            logger.info('Assuming role for automated connection', { requestId: req.requestId, userId, accountId: account.id, accountLabel, roleArn: accountData.roleArn })
             const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
             
             if (!assumeRoleResponse.Credentials) {
@@ -139,9 +139,9 @@ router.post('/', async (req, res) => {
               region: 'us-east-1',
             }
             
-            console.log(`[Sync] Successfully assumed role for account: ${accountLabel}`)
+            logger.info('Successfully assumed role', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           } catch (assumeError) {
-            console.error(`[Sync] Failed to assume role for automated connection: ${accountLabel}`, assumeError)
+            logger.error('Failed to assume role for automated connection', { requestId: req.requestId, userId, accountId: account.id, accountLabel, error: assumeError.message, stack: assumeError.stack, code: assumeError.code })
             
             // Provide helpful error message
             let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
@@ -165,7 +165,7 @@ router.post('/', async (req, res) => {
         } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 || 
                    !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
           // For non-automated connections, validate credentials exist
-          console.log(`[Sync] No valid credentials found for account: ${accountLabel}`)
+          logger.warn('No valid credentials found', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           errors.push({
             accountId: account.id,
             accountAlias: account.account_alias,
@@ -175,7 +175,7 @@ router.post('/', async (req, res) => {
           continue
         }
         
-        console.log(`[Sync] Using credentials for account: ${accountLabel} (connection type: ${accountData.connectionType || 'manual'})`)
+        logger.debug('Using credentials for account', { requestId: req.requestId, userId, accountId: account.id, accountLabel, connectionType: accountData.connectionType || 'manual' })
 
         // Check cache first (unless force refresh is requested)
         // Use account ID in cache key to support multiple accounts
@@ -184,12 +184,12 @@ router.post('/', async (req, res) => {
         let costData = forceRefresh ? null : await getCachedCostData(userId, account.provider_id, cacheKey)
         
         if (costData && !forceRefresh) {
-          console.log(`[Sync] Using cached data for account: ${accountLabel}`)
+          logger.debug('Using cached data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
         } else {
           if (forceRefresh) {
-            console.log(`[Sync] Force refresh requested for account: ${accountLabel}`)
+            logger.debug('Force refresh requested', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           }
-          console.log(`[Sync] Fetching fresh data for account: ${accountLabel}`)
+          logger.info('Fetching fresh data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
           // Fetch cost data from provider API using the appropriate credentials
           costData = await fetchProviderCostData(
             account.provider_id,
@@ -198,18 +198,23 @@ router.post('/', async (req, res) => {
             endDate
           )
           
-          console.log(`[Sync] Fetched data for ${accountLabel}:`)
-          console.log(`  - currentMonth: $${costData.currentMonth?.toFixed(2) || 0}`)
-          console.log(`  - lastMonth: $${costData.lastMonth?.toFixed(2) || 0}`)
-          console.log(`  - dailyData points: ${costData.dailyData?.length || 0}`)
-          console.log(`  - services: ${costData.services?.length || 0}`)
+          logger.info('Fetched data for account', {
+            requestId: req.requestId,
+            userId,
+            accountId: account.id,
+            accountLabel,
+            currentMonth: costData.currentMonth?.toFixed(2) || 0,
+            lastMonth: costData.lastMonth?.toFixed(2) || 0,
+            dailyDataPoints: costData.dailyData?.length || 0,
+            servicesCount: costData.services?.length || 0,
+          })
           
           // Cache the result for 60 minutes
           await setCachedCostData(userId, account.provider_id, cacheKey, costData, 60)
         }
 
         // Save monthly cost data to database
-        console.log(`[Sync] Saving monthly cost data for account: ${accountLabel}`)
+        logger.debug('Saving monthly cost data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
         await saveCostData(
           userId,
           account.provider_id,
@@ -231,15 +236,15 @@ router.post('/', async (req, res) => {
 
         // Save daily cost data for historical tracking (include account ID)
         if (costData.dailyData && costData.dailyData.length > 0) {
-          console.log(`[Sync] Saving ${costData.dailyData.length} daily data points for account: ${accountLabel}`)
+          logger.debug('Saving daily data points', { requestId: req.requestId, userId, accountId: account.id, accountLabel, dailyDataCount: costData.dailyData.length })
           await saveBulkDailyCostData(userId, account.provider_id, costData.dailyData, account.id)
         } else {
-          console.log(`[Sync] No daily data to save for account: ${accountLabel}`)
+          logger.debug('No daily data to save', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
         }
 
         // Calculate anomaly baselines for all services (async, non-blocking)
         calculateBaselinesForServices(userId, account.provider_id, account.id, costData)
-          .catch(err => console.error(`[Sync] Baseline calculation failed for ${accountLabel}:`, err.message))
+          .catch(err => logger.error('Baseline calculation failed', { requestId: req.requestId, userId, accountId: account.id, accountLabel, error: err.message, stack: err.stack }))
 
         // Update last sync time for this account
         await updateCloudProviderSyncTime(userId, account.id)
@@ -256,7 +261,7 @@ router.post('/', async (req, res) => {
             providerId: account.provider_id,
             currentMonth: costData.currentMonth
           }
-        }).catch(err => console.error('[Sync] Failed to create notification:', err))
+        }).catch(err => logger.error('Failed to create notification', { requestId: req.requestId, userId, error: err.message, stack: err.stack }))
 
         results.push({
           accountId: account.id,
@@ -269,7 +274,7 @@ router.post('/', async (req, res) => {
           },
         })
       } catch (error) {
-        console.error(`Error syncing account ${accountLabel}:`, error)
+        logger.error('Error syncing account', { requestId: req.requestId, userId, accountId: account.id, accountLabel, error: error.message, stack: error.stack })
         
         // Create error notification
         await createNotification(userId, {
@@ -283,7 +288,7 @@ router.post('/', async (req, res) => {
             providerId: account.provider_id,
             error: error.message
           }
-        }).catch(err => console.error('[Sync] Failed to create error notification:', err))
+        }).catch(err => logger.error('Failed to create error notification', { requestId: req.requestId, userId, error: err.message, stack: err.stack }))
         
         errors.push({
           accountId: account.id,
@@ -300,7 +305,7 @@ router.post('/', async (req, res) => {
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error) {
-    console.error('Sync error:', error)
+    logger.error('Sync error', { requestId: req.requestId, userId: req.user?.userId, error: error.message, stack: error.stack })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -331,7 +336,7 @@ router.post('/account/:accountId', async (req, res) => {
     // Handle automated AWS connections (role-based)
     let credentialsToUse = accountData.credentials || {}
     if (providerId === 'aws' && accountData.connectionType?.startsWith('automated')) {
-      console.log(`[Sync Account] Automated AWS connection detected for account: ${accountLabel}`)
+      logger.info('Automated AWS connection detected (account sync)', { requestId: req.requestId, userId, accountId, accountLabel })
       
       if (!accountData.roleArn || !accountData.externalId) {
         return res.status(400).json({ 
@@ -360,8 +365,7 @@ router.post('/account/:accountId', async (req, res) => {
           DurationSeconds: 3600, // 1 hour
         })
         
-        console.log(`[Sync Account] Assuming role for automated connection: ${accountLabel}`)
-        console.log(`[Sync Account] Role ARN: ${accountData.roleArn}`)
+        logger.info('Assuming role for automated connection (account sync)', { requestId: req.requestId, userId, accountId, accountLabel, roleArn: accountData.roleArn })
         const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
         
         if (!assumeRoleResponse.Credentials) {
@@ -376,9 +380,9 @@ router.post('/account/:accountId', async (req, res) => {
           region: 'us-east-1',
         }
         
-        console.log(`[Sync Account] Successfully assumed role for account: ${accountLabel}`)
+        logger.info('Successfully assumed role (account sync)', { requestId: req.requestId, userId, accountId, accountLabel })
       } catch (assumeError) {
-        console.error(`[Sync Account] Failed to assume role for automated connection: ${accountLabel}`, assumeError)
+        logger.error('Failed to assume role for automated connection (account sync)', { requestId: req.requestId, userId, accountId, accountLabel, error: assumeError.message, stack: assumeError.stack, code: assumeError.code })
         
         // Provide helpful error message
         let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
@@ -409,7 +413,7 @@ router.post('/account/:accountId', async (req, res) => {
 
     // Clear cost explanations cache for this account to ensure fresh summaries
     await clearCostExplanationsCache(userId, providerId, accountId)
-    console.log(`[Sync] Cleared cost explanation cache for account: ${accountLabel}`)
+    logger.debug('Cleared cost explanation cache for account', { requestId: req.requestId, userId, accountId, accountLabel })
 
     // Calculate date range - fetch last 365 days for historical data
     const now = new Date()
@@ -456,7 +460,7 @@ router.post('/account/:accountId', async (req, res) => {
 
     // Calculate anomaly baselines for all services (async, non-blocking)
     calculateBaselinesForServices(userId, providerId, accountId, costData)
-      .catch(err => console.error(`[Sync] Baseline calculation failed for account ${accountId}:`, err.message))
+      .catch(err => logger.error('Baseline calculation failed for account', { requestId: req.requestId, userId, accountId, error: err.message, stack: err.stack }))
 
     // Update last sync time for this account
     await updateCloudProviderSyncTime(userId, accountId)
@@ -473,7 +477,7 @@ router.post('/account/:accountId', async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Sync account error:', error)
+    logger.error('Sync account error', { requestId: req.requestId, userId, accountId, error: error.message, stack: error.stack })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
@@ -497,7 +501,7 @@ router.post('/:providerId', async (req, res) => {
 
     // Clear cost explanations cache for this provider to ensure fresh summaries
     await clearCostExplanationsCache(userId, providerId)
-    console.log(`[Sync] Cleared cost explanation cache for provider: ${providerId}`)
+    logger.debug('Cleared cost explanation cache for provider', { requestId: req.requestId, userId, providerId })
 
     const now = new Date()
     const currentMonth = now.getMonth() + 1
@@ -545,7 +549,7 @@ router.post('/:providerId', async (req, res) => {
 
         // Calculate anomaly baselines for all services (async, non-blocking)
         calculateBaselinesForServices(userId, providerId, account.id, costData)
-          .catch(err => console.error(`[Sync] Baseline calculation failed for account ${account.id}:`, err.message))
+          .catch(err => logger.error('Baseline calculation failed for account (provider sync)', { requestId: req.requestId, userId, accountId: account.id, providerId, error: err.message, stack: err.stack }))
 
         await updateCloudProviderSyncTime(userId, account.id)
 
@@ -567,7 +571,7 @@ router.post('/:providerId', async (req, res) => {
       errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error) {
-    console.error('Sync provider error:', error)
+    logger.error('Sync provider error', { requestId: req.requestId, userId, providerId, error: error.message, stack: error.stack })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
@@ -580,7 +584,7 @@ async function calculateBaselinesForServices(userId, providerId, accountId, cost
     // Get unique services from cost data
     const services = costData.services || []
     if (services.length === 0) {
-      console.log(`[Baseline Calculation] No services found for ${providerId}, skipping baseline calculation`)
+      logger.debug('No services found for baseline calculation', { userId, providerId, accountId })
       return
     }
 
@@ -593,7 +597,7 @@ async function calculateBaselinesForServices(userId, providerId, accountId, cost
       datesToCalculate.push(date.toISOString().split('T')[0])
     }
 
-    console.log(`[Baseline Calculation] Calculating baselines for ${services.length} services, ${datesToCalculate.length} dates`)
+    logger.debug('Calculating baselines', { userId, providerId, accountId, servicesCount: services.length, datesCount: datesToCalculate.length })
 
     // Calculate baselines for each service and date combination
     let calculated = 0
@@ -610,14 +614,14 @@ async function calculateBaselinesForServices(userId, providerId, accountId, cost
         } catch (err) {
           // Log but don't fail - baseline calculation is best effort
           if (errors === 0) { // Only log first error to avoid spam
-            console.error(`[Baseline Calculation] Error calculating baseline for ${serviceName} on ${date}:`, err.message)
+            logger.error('Error calculating baseline', { userId, providerId, accountId, serviceName, date, error: err.message, stack: err.stack })
           }
           errors++
         }
       }
     }
 
-    console.log(`[Baseline Calculation] Completed: ${calculated} baselines calculated, ${errors} errors`)
+    logger.info('Baseline calculation completed', { userId, providerId, accountId, calculated, errors })
     
     // Check for significant anomalies after baseline calculation
     // Only notify for very significant anomalies (>50% variance) to avoid notification spam
@@ -644,16 +648,16 @@ async function calculateBaselinesForServices(userId, providerId, accountId, cost
               variancePercent,
               isIncrease: topAnomaly.isIncrease
             }
-          }).catch(err => console.error('[Sync] Failed to create anomaly notification:', err))
+          }).catch(err => logger.error('Failed to create anomaly notification', { userId, error: err.message, stack: err.stack }))
         }
       }
     } catch (anomalyCheckError) {
       // Don't fail sync if anomaly check fails
-      console.error(`[Baseline Calculation] Error checking anomalies:`, anomalyCheckError.message)
+      logger.error('Error checking anomalies', { userId, providerId, accountId, error: anomalyCheckError.message, stack: anomalyCheckError.stack })
     }
   } catch (error) {
     // Don't fail sync if baseline calculation fails
-    console.error(`[Baseline Calculation] Error calculating baselines:`, error.message)
+    logger.error('Error calculating baselines', { userId, providerId, accountId, error: error.message, stack: error.stack })
   }
 }
 

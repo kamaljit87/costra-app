@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { body, validationResult } from 'express-validator'
 import { createUser, getUserByEmail, getUserById } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -58,7 +59,13 @@ router.post('/signup',
         },
       })
     } catch (error) {
-      console.error('Signup error:', error)
+      logger.error('Signup error', {
+        requestId: req.requestId,
+        email: req.body.email,
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+      })
       // Provide more specific error messages
       if (error.code === '23505') { // PostgreSQL unique constraint violation
         return res.status(400).json({ error: 'User with this email already exists' })
@@ -91,7 +98,12 @@ router.post('/login',
       try {
         user = await getUserByEmail(email)
       } catch (dbError) {
-        console.error('Database error in login:', dbError)
+        logger.error('Database error in login', {
+          requestId: req.requestId,
+          email: req.body.email,
+          error: dbError.message,
+          stack: dbError.stack,
+        })
         return res.status(500).json({ error: 'Database connection error. Please try again later.' })
       }
       
@@ -123,8 +135,12 @@ router.post('/login',
         },
       })
     } catch (error) {
-      console.error('Login error:', error)
-      console.error('Login error stack:', error.stack)
+      logger.error('Login error', {
+        requestId: req.requestId,
+        email: req.body.email,
+        error: error.message,
+        stack: error.stack,
+      })
       // Provide more specific error messages
       if (error.message && error.message.includes('database')) {
         return res.status(500).json({ error: 'Database error. Please check your database connection.' })
@@ -154,8 +170,12 @@ router.get('/me', authenticateToken, async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Get user error:', error)
-    console.error('Get user error stack:', error.stack)
+    logger.error('Get user error', {
+      requestId: req.requestId,
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack,
+    })
     // Return error but don't crash - let frontend handle gracefully
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
@@ -192,7 +212,12 @@ router.post('/refresh', authenticateToken, async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Refresh token error:', error)
+    logger.error('Refresh token error', {
+      requestId: req.requestId,
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack,
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })

@@ -1,5 +1,6 @@
 import pkg from 'pg'
 const { Pool } = pkg
+import logger from './utils/logger.js'
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
@@ -17,11 +18,11 @@ const pool = new Pool({
 
 // Test connection
 pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database')
+  logger.info('Connected to PostgreSQL database')
 })
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err)
+  logger.error('Unexpected error on idle client', { error: err.message, stack: err.stack })
   process.exit(-1)
 })
 
@@ -634,12 +635,12 @@ export const initDatabase = async () => {
         ON cost_data_cache(expires_at)
       `)
 
-      console.log('Database schema initialized successfully')
+      logger.info('Database schema initialized successfully')
     } finally {
       client.release()
     }
   } catch (error) {
-    console.error('Error initializing database:', error)
+    logger.error('Error initializing database', { error: error.message, stack: error.stack })
     throw error
   }
 }
@@ -748,7 +749,7 @@ export const getUserById = async (id) => {
     )
     return result.rows[0] || null
   } catch (error) {
-    console.error('getUserById error:', error)
+    logger.error('getUserById error', { userId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -773,7 +774,7 @@ export const getUserPreferences = async (userId) => {
     )
     return insertResult.rows[0]
   } catch (error) {
-    console.error('getUserPreferences error:', error)
+    logger.error('getUserPreferences error', { userId, error: error.message, stack: error.stack })
     // Return default preferences if table doesn't exist or other error
     return { user_id: userId, currency: 'USD' }
   } finally {
@@ -811,7 +812,7 @@ export const getServiceCostsForDateRange = async (userId, providerId, startDate,
     
     const periodTotalCost = parseFloat(dailyTotalResult.rows[0]?.total_cost) || 0
     
-    console.log(`[getServiceCostsForDateRange] Period total cost: $${periodTotalCost.toFixed(2)}`)
+    logger.debug('Period total cost calculated', { userId, providerId, startDate, endDate, periodTotalCost: periodTotalCost.toFixed(2) })
     
     // Step 2: Get the latest month's service breakdown to use as proportions
     const latestCostDataResult = await client.query(
@@ -1267,7 +1268,7 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
         const decrypted = decrypt(result.rows[0].credentials_encrypted)
         credentials = JSON.parse(decrypted)
       } catch (decryptError) {
-        console.warn(`[getCloudProviderCredentialsByAccountId] Failed to decrypt credentials for account ${accountId}:`, decryptError.message)
+        logger.warn('Failed to decrypt credentials', { userId, accountId, error: decryptError.message })
         // For automated connections, credentials might be empty - that's okay
         // We'll return empty credentials and let the connection metadata (roleArn, externalId) be used instead
         credentials = {}
@@ -1620,7 +1621,7 @@ export const saveDailyCostData = async (userId, providerId, date, cost, accountI
 export const saveBulkDailyCostData = async (userId, providerId, dailyData, accountId = null) => {
   const client = await pool.connect()
   try {
-    console.log(`[saveBulkDailyCostData] Saving ${dailyData.length} data points for user ${userId}, provider ${providerId}, account ${accountId}`)
+    logger.info('Saving bulk daily cost data', { userId, providerId, accountId, dataPointsCount: dailyData.length })
     
     await client.query('BEGIN')
     
@@ -1664,10 +1665,10 @@ export const saveBulkDailyCostData = async (userId, providerId, dailyData, accou
         savedCount++
       }
       await client.query('COMMIT')
-      console.log(`[saveBulkDailyCostData] Successfully saved ${savedCount} data points`)
+      logger.info('Successfully saved bulk daily cost data', { userId, providerId, accountId, savedCount })
     } catch (error) {
       await client.query('ROLLBACK')
-      console.error('[saveBulkDailyCostData] Error saving data:', error)
+      logger.error('Error saving bulk daily cost data', { userId, providerId, accountId, error: error.message, stack: error.stack })
       throw error
     }
   } finally {
@@ -1684,7 +1685,7 @@ export const getDailyCostData = async (userId, providerId, startDate, endDate, a
     const startDateStr = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0]
     const endDateStr = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0]
     
-    console.log(`[getDailyCostData] Querying: user_id=${userId}, provider_id=${providerId}, account_id=${accountId}, startDate=${startDateStr}, endDate=${endDateStr}`)
+    logger.debug('Querying daily cost data', { userId, providerId, accountId, startDate: startDateStr, endDate: endDateStr })
     
     let result
     if (accountId) {
@@ -1717,7 +1718,7 @@ export const getDailyCostData = async (userId, providerId, startDate, endDate, a
       )
     }
     
-    console.log(`[getDailyCostData] Found ${result.rows.length} rows`)
+    logger.debug('Daily cost data query result', { userId, providerId, accountId, rowCount: result.rows.length })
     
     const mappedData = result.rows.map(row => {
       // Handle both Date objects and strings
@@ -1738,7 +1739,7 @@ export const getDailyCostData = async (userId, providerId, startDate, endDate, a
     
     return mappedData
   } catch (error) {
-    console.error('[getDailyCostData] Error:', error)
+    logger.error('getDailyCostData error', { userId, providerId, accountId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -1802,7 +1803,7 @@ export const clearUserCache = async (userId) => {
       'DELETE FROM cost_data_cache WHERE user_id = $1',
       [userId]
     )
-    console.log(`[clearUserCache] Cleared ${result.rowCount} cache entries for user ${userId}`)
+    logger.debug('Cleared user cache', { userId, clearedCount: result.rowCount })
     return result.rowCount
   } finally {
     client.release()
@@ -1851,7 +1852,7 @@ export const clearCostExplanationsCache = async (userId, providerId = null, acco
     const result2 = await client.query(rangeQuery, rangeParams)
     
     const totalCleared = result1.rowCount + result2.rowCount
-    console.log(`[clearCostExplanationsCache] Cleared ${totalCleared} explanation cache entries for user ${userId}${providerId ? `, provider ${providerId}` : ''}${accountId ? `, account ${accountId}` : ''}`)
+    logger.debug('Cleared cost explanations cache', { userId, providerId, accountId, totalCleared })
     return totalCleared
   } finally {
     client.release()
@@ -2049,7 +2050,7 @@ export const getAvailableDimensions = async (userId, providerId = null, accountI
     
     return dimensions
   } catch (error) {
-    console.error('[getAvailableDimensions] Error:', error)
+    logger.error('getAvailableDimensions error', { userId, providerId, error: error.message, stack: error.stack })
     return {}
   } finally {
     client.release()
@@ -2141,7 +2142,7 @@ export const getCostByDimension = async (userId, dimensionKey, dimensionValue = 
     
     return breakdowns
   } catch (error) {
-    console.error('[getCostByDimension] Error:', error)
+    logger.error('getCostByDimension error', { userId, providerId, dimension, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -2201,7 +2202,7 @@ export const getUntaggedResources = async (userId, providerId = null, limit = 50
         Math.floor((new Date() - new Date(row.first_seen_date)) / (1000 * 60 * 60 * 24)) : null
     }))
   } catch (error) {
-    console.error('[getUntaggedResources] Error:', error)
+    logger.error('getUntaggedResources error', { userId, providerId, error: error.message, stack: error.stack })
     // Return empty array if table doesn't exist or query fails
     return []
   } finally {
@@ -2346,7 +2347,7 @@ export const getCostVsUsage = async (userId, providerId, startDate, endDate, acc
       daysWithData: 0
     }))
   } catch (error) {
-    console.error('[getCostVsUsage] Error:', error)
+    logger.error('getCostVsUsage error', { userId, providerId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -2391,7 +2392,7 @@ export const calculateAnomalyBaseline = async (userId, providerId, serviceName, 
       serviceCostData = usageResult.rows
     } catch (err) {
       // If service_usage_metrics doesn't have data, use daily_cost_data
-      console.log(`[calculateAnomalyBaseline] No usage metrics for ${serviceName}, using daily costs`)
+      logger.debug('No usage metrics, using daily costs', { userId, providerId, accountId, serviceName })
     }
     
     // Calculate baseline (average daily cost over 30 days)
@@ -2498,7 +2499,7 @@ export const getAnomalies = async (userId, providerId = null, thresholdPercent =
       }
     })
   } catch (error) {
-    console.error('[getAnomalies] Database error:', error)
+    logger.error('getAnomalies database error', { userId, providerId, accountId, error: error.message, stack: error.stack })
     // Return empty array if table doesn't exist or query fails
     return []
   } finally {
@@ -3081,7 +3082,7 @@ Return only the enhanced explanation text with all the specific details, numbers
         }
       }
     } catch (aiError) {
-      console.error('[generateCustomDateRangeExplanation] AI enhancement failed, using base explanation:', aiError)
+      logger.warn('AI enhancement failed, using base explanation', { userId, providerId, error: aiError.message, stack: aiError.stack })
       // Continue with base explanation if AI fails
     }
     
@@ -3122,7 +3123,7 @@ Return only the enhanced explanation text with all the specific details, numbers
       aiEnhanced
     }
   } catch (error) {
-    console.error('[generateCustomDateRangeExplanation] Error:', error)
+    logger.error('generateCustomDateRangeExplanation error', { userId, providerId, startDate, endDate, error: error.message, stack: error.stack })
     // If there's an error, try to return cached explanation if available
     try {
       const cachedResult = await client.query(
@@ -3148,7 +3149,7 @@ Return only the enhanced explanation text with all the specific details, numbers
         }
       }
     } catch (cacheError) {
-      console.error('[generateCustomDateRangeExplanation] Cache retrieval also failed:', cacheError)
+      logger.error('Cache retrieval also failed', { userId, providerId, error: cacheError.message, stack: cacheError.stack })
     }
     
     throw error
@@ -3308,7 +3309,7 @@ export const getUnitEconomics = async (userId, startDate, endDate, providerId = 
       period: { startDate, endDate }
     }
   } catch (error) {
-    console.error('[getUnitEconomics] Error:', error)
+    logger.error('getUnitEconomics error', { userId, providerId, error: error.message, stack: error.stack })
     return {
       totalCost: 0,
       unitEconomics: [],
@@ -3342,7 +3343,7 @@ export const createBudget = async (userId, budgetData) => {
     
     return result.rows[0]
   } catch (error) {
-    console.error('[createBudget] Error:', error)
+    logger.error('createBudget error', { userId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -3400,7 +3401,7 @@ export const getBudgets = async (userId, providerId = null, accountId = null) =>
       updatedAt: row.updated_at
     }))
   } catch (error) {
-    console.error('[getBudgets] Error:', error)
+    logger.error('getBudgets error', { userId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -3446,7 +3447,7 @@ export const getBudget = async (userId, budgetId) => {
       updatedAt: row.updated_at
     }
   } catch (error) {
-    console.error('[getBudget] Error:', error)
+    logger.error('getBudget error', { userId, budgetId, error: error.message, stack: error.stack })
     return null
   } finally {
     client.release()
@@ -3525,7 +3526,7 @@ export const updateBudget = async (userId, budgetId, budgetData) => {
       updatedAt: row.updated_at
     }
   } catch (error) {
-    console.error('[updateBudget] Error:', error)
+    logger.error('updateBudget error', { userId, budgetId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -3547,7 +3548,7 @@ export const deleteBudget = async (userId, budgetId) => {
     
     return result.rows.length > 0
   } catch (error) {
-    console.error('[deleteBudget] Error:', error)
+    logger.error('deleteBudget error', { userId, budgetId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -3685,9 +3686,9 @@ export const updateBudgetSpend = async (userId, budgetId) => {
               budgetAmount: budgetData.budgetAmount
             }
           })
-          console.log(`[updateBudgetSpend] Created notification for budget ${budgetData.id}: ${title}`)
+          logger.debug('Created budget notification', { userId, budgetId: budgetData.id, title })
         } catch (notifError) {
-          console.error(`[updateBudgetSpend] Failed to create notification for budget ${budgetData.id}:`, notifError)
+          logger.error('Failed to create budget notification', { userId, budgetId: budgetData.id, error: notifError.message, stack: notifError.stack })
           // Don't fail the budget update if notification fails
         }
       }
@@ -3700,7 +3701,7 @@ export const updateBudgetSpend = async (userId, budgetId) => {
       status
     }
   } catch (error) {
-    console.error('[updateBudgetSpend] Error:', error)
+    logger.error('updateBudgetSpend error', { userId, budgetId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -3745,7 +3746,7 @@ export const checkBudgetAlerts = async (userId) => {
     
     return alerts
   } catch (error) {
-    console.error('[checkBudgetAlerts] Error:', error)
+    logger.error('checkBudgetAlerts error', { userId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -3789,7 +3790,7 @@ export const getBudgetAlerts = async (userId, limit = 10) => {
       createdAt: row.created_at
     }))
   } catch (error) {
-    console.error('[getBudgetAlerts] Error:', error)
+    logger.error('getBudgetAlerts error', { userId, budgetId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -3922,7 +3923,7 @@ export const getCostEfficiencyMetrics = async (userId, startDate, endDate, provi
       period: { startDate, endDate }
     }
   } catch (error) {
-    console.error('[getCostEfficiencyMetrics] Error:', error)
+    logger.error('getCostEfficiencyMetrics error', { userId, providerId, error: error.message, stack: error.stack })
     return {
       efficiencyMetrics: [],
       period: { startDate, endDate }
@@ -4080,7 +4081,7 @@ export const getRightsizingRecommendations = async (userId, providerId = null, a
       recommendationCount: recommendations.length
     }
   } catch (error) {
-    console.error('[getRightsizingRecommendations] Error:', error)
+    logger.error('getRightsizingRecommendations error', { userId, providerId, error: error.message, stack: error.stack })
     return {
       recommendations: [],
       totalPotentialSavings: 0,
@@ -4146,7 +4147,7 @@ export const getCostByProduct = async (userId, startDate, endDate, providerId = 
       services: row.services ? row.services.split(', ') : []
     }))
   } catch (error) {
-    console.error('[getCostByProduct] Error:', error)
+    logger.error('getCostByProduct error', { userId, providerId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4204,7 +4205,7 @@ export const getCostByTeam = async (userId, startDate, endDate, providerId = nul
       services: row.services ? row.services.split(', ') : []
     }))
   } catch (error) {
-    console.error('[getCostByTeam] Error:', error)
+    logger.error('getCostByTeam error', { userId, providerId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4259,7 +4260,7 @@ export const getProductCostTrends = async (userId, productName, startDate, endDa
       resourceCount: parseInt(row.resource_count) || 0
     }))
   } catch (error) {
-    console.error('[getProductCostTrends] Error:', error)
+    logger.error('getProductCostTrends error', { userId, providerId, productName, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4314,7 +4315,7 @@ export const getTeamCostTrends = async (userId, teamName, startDate, endDate, pr
       resourceCount: parseInt(row.resource_count) || 0
     }))
   } catch (error) {
-    console.error('[getTeamCostTrends] Error:', error)
+    logger.error('getTeamCostTrends error', { userId, providerId, teamName, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4369,7 +4370,7 @@ export const getProductServiceBreakdown = async (userId, productName, startDate,
       resourceCount: parseInt(row.resource_count) || 0
     }))
   } catch (error) {
-    console.error('[getProductServiceBreakdown] Error:', error)
+    logger.error('getProductServiceBreakdown error', { userId, providerId, productName, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4424,7 +4425,7 @@ export const getTeamServiceBreakdown = async (userId, teamName, startDate, endDa
       resourceCount: parseInt(row.resource_count) || 0
     }))
   } catch (error) {
-    console.error('[getTeamServiceBreakdown] Error:', error)
+    logger.error('getTeamServiceBreakdown error', { userId, providerId, teamName, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4518,7 +4519,7 @@ export const generateReportData = async (userId, reportType, startDate, endDate,
       options
     }
   } catch (error) {
-    console.error('[generateReportData] Error:', error)
+    logger.error('generateReportData error', { userId, providerId, reportType, startDate, endDate, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -4579,7 +4580,7 @@ export const saveReport = async (userId, reportData) => {
       completedAt: result.rows[0].completed_at
     }
   } catch (error) {
-    console.error('[saveReport] Error:', error)
+    logger.error('saveReport error', { userId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -4629,7 +4630,7 @@ export const getReports = async (userId, reportType = null, limit = 50) => {
       completedAt: row.completed_at
     }))
   } catch (error) {
-    console.error('[getReports] Error:', error)
+    logger.error('getReports error', { userId, error: error.message, stack: error.stack })
     return []
   } finally {
     client.release()
@@ -4672,7 +4673,7 @@ export const getReport = async (userId, reportId) => {
       completedAt: row.completed_at
     }
   } catch (error) {
-    console.error('[getReport] Error:', error)
+    logger.error('getReport error', { userId, reportId, error: error.message, stack: error.stack })
     return null
   } finally {
     client.release()
@@ -4729,7 +4730,7 @@ export const updateReportStatus = async (userId, reportId, status, filePath = nu
       completedAt: row.completed_at
     }
   } catch (error) {
-    console.error('[updateReportStatus] Error:', error)
+    logger.error('updateReportStatus error', { userId, reportId, status, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -4751,7 +4752,7 @@ export const deleteReport = async (userId, reportId) => {
     
     return result.rows.length > 0
   } catch (error) {
-    console.error('[deleteReport] Error:', error)
+    logger.error('deleteReport error', { userId, reportId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -4956,7 +4957,7 @@ export const deleteOldNotifications = async (userId, daysOld = 30) => {
 // Close database connection pool
 export const closeDatabase = async () => {
   await pool.end()
-  console.log('Database connection pool closed')
+  logger.info('Database connection pool closed')
 }
 
 // Export pool for use in other modules

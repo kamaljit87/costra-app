@@ -4,6 +4,7 @@
  */
 
 import { CostExplorerClient, GetCostAndUsageCommand } from '@aws-sdk/client-cost-explorer'
+import logger from '../utils/logger.js'
 
 // Cache for provider clients to avoid recreating them
 const clientCache = new Map()
@@ -41,10 +42,7 @@ const filterOutTaxServices = (services) => {
 export const fetchAWSCostData = async (credentials, startDate, endDate) => {
   const { accessKeyId, secretAccessKey, sessionToken, region = 'us-east-1' } = credentials
 
-  console.log(`[AWS Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
-  console.log(`[AWS Fetch] Using region: ${region}`)
-  console.log(`[AWS Fetch] Access Key ID (last 4): ...${accessKeyId?.slice(-4) || 'MISSING'}`)
-  console.log(`[AWS Fetch] Has session token: ${!!sessionToken}`)
+  logger.debug('Starting AWS fetch', { startDate, endDate, region, accessKeyIdLast4: accessKeyId?.slice(-4) || 'MISSING', hasSessionToken: !!sessionToken })
 
   // Validate credentials
   if (!accessKeyId || !secretAccessKey) {
@@ -58,7 +56,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     let client = clientCache.get(cacheKey)
     
     if (!client) {
-      console.log(`[AWS Fetch] Creating new Cost Explorer client`)
+      logger.debug('Creating new Cost Explorer client', { region })
       const clientConfig = {
         region,
         credentials: {
@@ -102,20 +100,19 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       },
     })
 
-    console.log(`[AWS Fetch] Sending GetCostAndUsage command with SERVICE grouping (excluding Tax/Support/Refund/Credit)...`)
+    logger.debug('Sending GetCostAndUsage command with SERVICE grouping', { startDate, endDate })
     const groupedResponse = await client.send(command)
     
-    console.log(`[AWS Fetch] Grouped response received:`)
-    console.log(`  - ResultsByTime count: ${groupedResponse.ResultsByTime?.length || 0}`)
+    logger.debug('Grouped response received', { resultsByTimeCount: groupedResponse.ResultsByTime?.length || 0 })
     
     // Log sample data for debugging
     if (groupedResponse.ResultsByTime?.length > 0) {
       const firstResult = groupedResponse.ResultsByTime[0]
-      console.log(`  - First result date: ${firstResult.TimePeriod?.Start}`)
-      console.log(`  - First result Groups count: ${firstResult.Groups?.length || 0}`)
-      if (firstResult.Groups?.length > 0) {
-        console.log(`  - Sample group: ${JSON.stringify(firstResult.Groups[0])}`)
-      }
+      logger.debug('First result details', { 
+        firstResultDate: firstResult.TimePeriod?.Start, 
+        groupsCount: firstResult.Groups?.length || 0,
+        sampleGroup: firstResult.Groups?.[0] 
+      })
     }
 
     // Also fetch totals for daily data (but still exclude Tax/Support/Refund/Credit)
@@ -136,17 +133,14 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       },
     })
 
-    console.log(`[AWS Fetch] Sending GetCostAndUsage command for daily totals (excluding Tax/Support/Refund/Credit)...`)
+    logger.debug('Sending GetCostAndUsage command for daily totals', { startDate, endDate })
     const totalResponse = await client.send(totalCommand)
     
-    console.log(`[AWS Fetch] Total response received:`)
-    console.log(`  - ResultsByTime count: ${totalResponse.ResultsByTime?.length || 0}`)
+    logger.debug('Total response received', { resultsByTimeCount: totalResponse.ResultsByTime?.length || 0 })
 
     return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate)
   } catch (error) {
-    console.error('[AWS Fetch] AWS Cost Explorer error:', error)
-    console.error('[AWS Fetch] Error code:', error.code)
-    console.error('[AWS Fetch] Error name:', error.name)
+    logger.error('AWS Cost Explorer error', { error: error.message, code: error.code, name: error.name, stack: error.stack })
     throw new Error(`AWS API Error: ${error.message}`)
   }
 }
@@ -165,17 +159,17 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
   let currentMonth = 0
   let lastMonth = 0
 
-  console.log(`[AWS Transform] Processing ${totalResultsByTime.length} total time periods, ${groupedResultsByTime.length} grouped periods`)
+  logger.debug('Processing AWS data', { totalPeriods: totalResultsByTime.length, groupedPeriods: groupedResultsByTime.length })
 
   // Log first few totals to debug what AWS is returning
   let totalSum = 0
   totalResultsByTime.slice(0, 10).forEach((result, idx) => {
     const date = result.TimePeriod?.Start
     const unblended = result.Total?.UnblendedCost?.Amount
-    console.log(`[AWS Transform] Day ${idx}: ${date} - Unblended: $${unblended}`)
+    logger.debug('Processing day', { dayIndex: idx, date, unblendedCost: unblended.toFixed(2) })
     totalSum += parseFloat(unblended || 0)
   })
-  console.log(`[AWS Transform] First 10 days total (Unblended, excluding Tax/Support): $${totalSum.toFixed(2)}`)
+  logger.debug('First 10 days total calculated', { totalSum: totalSum.toFixed(2) })
 
   // Create a map of grouped data by date for service breakdown
   const groupedByDate = new Map()
@@ -223,11 +217,12 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
     }
   })
 
-  console.log(`[AWS Transform] Processed data:`)
-  console.log(`  - Daily data points: ${dailyData.length}`)
-  console.log(`  - Current month total: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Last month total: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services found: ${serviceMap.size}`)
+  logger.info('AWS data processed', { 
+    dailyDataPoints: dailyData.length, 
+    currentMonth: currentMonth.toFixed(2), 
+    lastMonth: lastMonth.toFixed(2), 
+    servicesFound: serviceMap.size 
+  })
 
   // Convert service map to array and filter out tax entries
   const allServices = Array.from(serviceMap.entries())
@@ -239,7 +234,7 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
     .sort((a, b) => b.cost - a.cost)
 
   const services = filterOutTaxServices(allServices)
-  console.log(`  - Services after tax filter: ${services.length}`)
+  logger.debug('Services after tax filter', { servicesCount: services.length })
 
   // Calculate month-to-date more accurately
   // Sum only days from the 1st of current month to today
@@ -259,9 +254,7 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
     }
   })
 
-  console.log('[AWS Transform] Billing summary for period:')
-  console.log(`  - Start date: ${startDate}`)
-  console.log(`  - End date:   ${endDate}`)
+  logger.debug('Billing summary for period', { startDate, endDate })
   console.log(`  - Current month (all days): $${currentMonth.toFixed(2)}`)
   console.log(`  - Month-to-date (Jan 1-${currentDay}): $${monthToDate.toFixed(2)}`)
   console.log(`  - Last month spend: $${lastMonth.toFixed(2)}`)
