@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 import {
   createBudget,
   getBudgets,
@@ -63,12 +64,18 @@ router.post('/', async (req, res) => {
               alertThreshold: alertThreshold ? parseInt(alertThreshold) : 80
             }
           )
-          console.log(`[Budget] Created budget in cloud provider: ${providerId}`)
+          logger.info('Budget: Created budget in cloud provider', { providerId, accountId, budgetId: budget.id })
         } else {
-          console.warn(`[Budget] Could not find credentials for account ${accountId}, skipping cloud provider budget creation`)
+          logger.warn('Budget: Could not find credentials for account, skipping cloud provider budget creation', { accountId })
         }
       } catch (cloudError) {
-        console.error(`[Budget] Failed to create budget in cloud provider ${providerId}:`, cloudError)
+        logger.error('Budget: Failed to create budget in cloud provider', { 
+          providerId, 
+          accountId, 
+          budgetId: budget.id, 
+          error: cloudError.message, 
+          stack: cloudError.stack 
+        })
         // Don't fail the entire request if cloud provider budget creation fails
         // The budget is still created in the app
       }
@@ -83,7 +90,14 @@ router.post('/', async (req, res) => {
     
     res.status(201).json({ budget, message })
   } catch (error) {
-    console.error('Create budget error:', error)
+    logger.error('Create budget error', { 
+      userId, 
+      budgetName, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to create budget' })
   }
 })
@@ -110,7 +124,11 @@ router.get('/', async (req, res) => {
     for (const budget of budgets) {
       if (budget.status !== 'paused') {
         await updateBudgetSpend(userId, budget.id).catch(err => {
-          console.error(`Failed to update spend for budget ${budget.id}:`, err)
+          logger.error('Failed to update spend for budget', { 
+            userId, 
+            budgetId: budget.id, 
+            error: err.message 
+          })
         })
       }
     }
@@ -124,7 +142,11 @@ router.get('/', async (req, res) => {
     
     res.json({ budgets: updatedBudgets })
   } catch (error) {
-    console.error('Get budgets error:', error)
+    logger.error('Get budgets error', { 
+      userId: req.user?.userId || req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch budgets' })
   }
 })
@@ -158,7 +180,12 @@ router.get('/:budgetId', async (req, res) => {
     
     res.json({ budget })
   } catch (error) {
-    console.error('Get budget error:', error)
+    logger.error('Get budget error', { 
+      userId: req.user?.userId || req.user?.id, 
+      budgetId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch budget' })
   }
 })
@@ -195,7 +222,12 @@ router.patch('/:budgetId', async (req, res) => {
       res.json({ budget, message: 'Budget updated successfully' })
     }
   } catch (error) {
-    console.error('Update budget error:', error)
+    logger.error('Update budget error', { 
+      userId: req.user?.userId || req.user?.id, 
+      budgetId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to update budget' })
   }
 })
@@ -224,7 +256,12 @@ router.delete('/:budgetId', async (req, res) => {
     
     res.json({ message: 'Budget deleted successfully' })
   } catch (error) {
-    console.error('Delete budget error:', error)
+    logger.error('Delete budget error', { 
+      userId: req.user?.userId || req.user?.id, 
+      budgetId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to delete budget' })
   }
 })
@@ -245,7 +282,12 @@ router.get('/alerts/all', async (req, res) => {
     
     res.json({ alerts })
   } catch (error) {
-    console.error('Get budget alerts error:', error)
+    logger.error('Get budget alerts error', { 
+      userId: req.user?.userId || req.user?.id, 
+      budgetId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch budget alerts' })
   }
 })
@@ -266,7 +308,12 @@ router.get('/alerts/history', async (req, res) => {
     
     res.json({ alerts })
   } catch (error) {
-    console.error('Get budget alert history error:', error)
+    logger.error('Get budget alert history error', { 
+      userId: req.user?.userId || req.user?.id, 
+      budgetId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch budget alert history' })
   }
 })
@@ -302,7 +349,12 @@ router.post('/:budgetId/check', async (req, res) => {
       percentage: budget.percentage 
     })
   } catch (error) {
-    console.error('Check budget error:', error)
+    logger.error('Check budget error', { 
+      userId: req.user?.userId || req.user?.id, 
+      budgetId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to check budget' })
   }
 })

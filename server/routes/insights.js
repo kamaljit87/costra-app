@@ -22,6 +22,7 @@ import {
   getTeamServiceBreakdown,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -48,7 +49,15 @@ router.get('/cost-vs-usage', authenticateToken, async (req, res) => {
     
     res.json({ data })
   } catch (error) {
-    console.error('Cost vs usage error:', error)
+    logger.error('Cost vs usage error', { 
+      userId: req.user?.id, 
+      providerId, 
+      startDate, 
+      endDate, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch cost vs usage data' })
   }
 })
@@ -81,7 +90,14 @@ router.get('/untagged-resources', authenticateToken, async (req, res) => {
         : 'All resources are tagged'
     })
   } catch (error) {
-    console.error('Untagged resources error:', error)
+    logger.error('Untagged resources error', { 
+      userId: req.user?.id, 
+      providerId, 
+      limit, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch untagged resources' })
   }
 })
@@ -108,7 +124,14 @@ router.get('/anomalies', authenticateToken, async (req, res) => {
       thresholdPercent: parseFloat(thresholdPercent)
     })
   } catch (error) {
-    console.error('Anomalies error:', error)
+    logger.error('Anomalies error', { 
+      userId: req.user?.id, 
+      providerId, 
+      limit, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     // Return empty array instead of 500 error if table doesn't exist
     res.json({
       anomalies: [],
@@ -143,7 +166,13 @@ router.post('/anomalies/calculate', authenticateToken, async (req, res) => {
     
     res.json({ baseline })
   } catch (error) {
-    console.error('Anomaly baseline calculation error:', error)
+    logger.error('Anomaly baseline calculation error', { 
+      userId: req.user?.id, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to calculate anomaly baseline' })
   }
 })
@@ -185,7 +214,13 @@ router.get('/cost-summary/:providerId/:month/:year', authenticateToken, async (r
     // Return the full explanation object (includes explanation, costChange, contributingFactors)
     res.json(explanation)
   } catch (error) {
-    console.error('Cost summary error:', error)
+    logger.error('Cost summary error', { 
+      userId: req.user?.id, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to generate cost summary' })
   }
 })
@@ -215,7 +250,13 @@ router.post('/cost-summary/:providerId/:month/:year/regenerate', authenticateTok
     // Return the full explanation object (includes explanation, costChange, contributingFactors)
     res.json(explanation)
   } catch (error) {
-    console.error('Cost summary regeneration error:', error)
+    logger.error('Cost summary regeneration error', { 
+      userId: req.user?.id, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to regenerate cost summary' })
   }
 })
@@ -278,7 +319,15 @@ router.post('/cost-summary-range/:providerId', authenticateToken, async (req, re
     
     res.json(explanation)
   } catch (error) {
-    console.error('Custom date range summary error:', error)
+    logger.error('Custom date range summary error', { 
+      userId: req.user?.id, 
+      providerId, 
+      startDate, 
+      endDate, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to generate cost summary for date range' })
   }
 })
@@ -300,7 +349,11 @@ router.get('/dimensions', authenticateToken, async (req, res) => {
     
     res.json({ dimensions })
   } catch (error) {
-    console.error('Get dimensions error:', error)
+    logger.error('Get dimensions error', { 
+      userId: req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     // Return empty object if table doesn't exist
     res.json({ dimensions: {} })
   }
@@ -329,7 +382,16 @@ router.get('/cost-by-dimension', authenticateToken, async (req, res) => {
     
     res.json({ data })
   } catch (error) {
-    console.error('Cost by dimension error:', error)
+    logger.error('Cost by dimension error', { 
+      userId: req.user?.id, 
+      dimension, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch cost by dimension' })
   }
 })
@@ -360,7 +422,14 @@ router.post('/business-metrics', authenticateToken, async (req, res) => {
     
     res.json({ id: metricId, message: 'Business metric saved successfully' })
   } catch (error) {
-    console.error('Save business metric error:', error)
+    logger.error('Save business metric error', { 
+      userId: req.user?.id, 
+      metricName, 
+      metricValue, 
+      date, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to save business metric' })
   }
 })
@@ -389,7 +458,13 @@ router.get('/business-metrics', authenticateToken, async (req, res) => {
     
     res.json({ metrics })
   } catch (error) {
-    console.error('Get business metrics error:', error)
+    logger.error('Get business metrics error', { 
+      userId: req.user?.id, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch business metrics' })
   }
 })
@@ -417,7 +492,15 @@ router.get('/unit-economics', authenticateToken, async (req, res) => {
     
     res.json({ data })
   } catch (error) {
-    console.error('Unit economics error:', error)
+    logger.error('Unit economics error', { 
+      userId: req.user?.id, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     // Return empty data if table doesn't exist
     res.json({ 
       data: {
@@ -455,7 +538,15 @@ router.get('/cost-efficiency', authenticateToken, async (req, res) => {
     
     res.json({ data })
   } catch (error) {
-    console.error('Cost efficiency error:', error)
+    logger.error('Cost efficiency error', { 
+      userId: req.user?.id, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch cost efficiency metrics' })
   }
 })
@@ -477,7 +568,13 @@ router.get('/rightsizing-recommendations', authenticateToken, async (req, res) =
     
     res.json({ data })
   } catch (error) {
-    console.error('Rightsizing recommendations error:', error)
+    logger.error('Rightsizing recommendations error', { 
+      userId: req.user?.id, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch rightsizing recommendations' })
   }
 })
@@ -505,7 +602,15 @@ router.get('/cost-by-product', authenticateToken, async (req, res) => {
     
     res.json({ products })
   } catch (error) {
-    console.error('Cost by product error:', error)
+    logger.error('Cost by product error', { 
+      userId: req.user?.id, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.json({ products: [] })
   }
 })
@@ -533,7 +638,15 @@ router.get('/cost-by-team', authenticateToken, async (req, res) => {
     
     res.json({ teams })
   } catch (error) {
-    console.error('Cost by team error:', error)
+    logger.error('Cost by team error', { 
+      userId: req.user?.id, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.json({ teams: [] })
   }
 })
@@ -563,7 +676,16 @@ router.get('/product/:productName/trends', authenticateToken, async (req, res) =
     
     res.json({ trends })
   } catch (error) {
-    console.error('Product trends error:', error)
+    logger.error('Product trends error', { 
+      userId: req.user?.id, 
+      productName, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.json({ trends: [] })
   }
 })
@@ -593,7 +715,16 @@ router.get('/team/:teamName/trends', authenticateToken, async (req, res) => {
     
     res.json({ trends })
   } catch (error) {
-    console.error('Team trends error:', error)
+    logger.error('Team trends error', { 
+      userId: req.user?.id, 
+      teamName, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.json({ trends: [] })
   }
 })
@@ -623,7 +754,16 @@ router.get('/product/:productName/services', authenticateToken, async (req, res)
     
     res.json({ services })
   } catch (error) {
-    console.error('Product service breakdown error:', error)
+    logger.error('Product service breakdown error', { 
+      userId: req.user?.id, 
+      productName, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.json({ services: [] })
   }
 })
@@ -653,7 +793,16 @@ router.get('/team/:teamName/services', authenticateToken, async (req, res) => {
     
     res.json({ services })
   } catch (error) {
-    console.error('Team service breakdown error:', error)
+    logger.error('Team service breakdown error', { 
+      userId: req.user?.id, 
+      teamName, 
+      startDate, 
+      endDate, 
+      providerId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.json({ services: [] })
   }
 })

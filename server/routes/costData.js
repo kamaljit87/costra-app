@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 import {
   getCostDataForUser,
   saveCostData,
@@ -80,7 +81,11 @@ router.get('/', async (req, res) => {
 
     res.json({ costData: formattedData })
   } catch (error) {
-    console.error('Get cost data error:', error)
+    logger.error('Get cost data error', { 
+      userId: req.user?.userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -103,7 +108,12 @@ router.post('/', async (req, res) => {
 
     res.json({ message: 'Cost data saved successfully' })
   } catch (error) {
-    console.error('Save cost data error:', error)
+    logger.error('Save cost data error', { 
+      userId: req.user?.userId, 
+      providerId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -119,7 +129,7 @@ router.get('/services/:providerId', async (req, res) => {
       return res.status(400).json({ error: 'startDate and endDate are required' })
     }
 
-    console.log(`[Services API] Fetching services for user ${userId}, provider ${providerId}, range: ${startDate} to ${endDate}`)
+    logger.debug('Services API: Fetching services', { userId, providerId, startDate, endDate })
 
     const allServices = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
     
@@ -133,7 +143,11 @@ router.get('/services/:providerId', async (req, res) => {
     // Calculate total for the response (excluding tax)
     const totalCost = services.reduce((sum, s) => sum + s.cost, 0)
 
-    console.log(`[Services API] Found ${services.length} services (filtered from ${allServices.length}), total: $${totalCost.toFixed(2)}`)
+    logger.debug('Services API: Found services', { 
+      servicesCount: services.length, 
+      allServicesCount: allServices.length, 
+      totalCost: totalCost.toFixed(2) 
+    })
 
     // Include metadata to help frontend detect changes
     res.json({ 
@@ -143,7 +157,14 @@ router.get('/services/:providerId', async (req, res) => {
       timestamp: Date.now()
     })
   } catch (error) {
-    console.error('Get services error:', error)
+    logger.error('Get services error', { 
+      userId, 
+      providerId, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -160,7 +181,12 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
     }
 
     const decodedServiceName = decodeURIComponent(serviceName)
-    console.log(`[Service Details API] Fetching details for ${decodedServiceName} (${providerId})`)
+    logger.debug('Service Details API: Fetching details', { 
+      serviceName: decodedServiceName, 
+      providerId, 
+      startDate, 
+      endDate 
+    })
 
     // Skip tax - it doesn't have sub-services
     if (decodedServiceName.toLowerCase() === 'tax') {
@@ -190,7 +216,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const awsResult = await fetchAWSServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = awsResult.subServices || []
         } catch (err) {
-          console.error('[AWS Service Details] API failed, using simulated data:', err.message)
+          logger.warn('AWS Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -200,7 +229,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const azureResult = await fetchAzureServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = azureResult.subServices || []
         } catch (err) {
-          console.error('[Azure Service Details] API failed, using simulated data:', err.message)
+          logger.warn('Azure Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -211,7 +243,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const gcpResult = await fetchGCPServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = gcpResult.subServices || []
         } catch (err) {
-          console.error('[GCP Service Details] API failed, using simulated data:', err.message)
+          logger.warn('GCP Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -222,7 +257,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const doResult = await fetchDigitalOceanServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = doResult.subServices || []
         } catch (err) {
-          console.error('[DO Service Details] API failed, using simulated data:', err.message)
+          logger.warn('DO Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -233,7 +271,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const ibmResult = await fetchIBMServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = ibmResult.subServices || []
         } catch (err) {
-          console.error('[IBM Service Details] API failed, using simulated data:', err.message)
+          logger.warn('IBM Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -244,7 +285,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const linodeResult = await fetchLinodeServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = linodeResult.subServices || []
         } catch (err) {
-          console.error('[Linode Service Details] API failed, using simulated data:', err.message)
+          logger.warn('Linode Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -254,7 +298,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
           const vultrResult = await fetchVultrServiceDetails(credentials, decodedServiceName, startDate, endDate)
           subServices = vultrResult.subServices || []
         } catch (err) {
-          console.error('[Vultr Service Details] API failed, using simulated data:', err.message)
+          logger.warn('Vultr Service Details: API failed, using simulated data', { 
+            serviceName: decodedServiceName, 
+            error: err.message 
+          })
           subServices = await getSimulatedSubServices(decodedServiceName, providerId)
         }
         break
@@ -264,7 +311,11 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
         subServices = await getSimulatedSubServices(decodedServiceName, providerId)
     }
 
-    console.log(`[Service Details API] Found ${subServices.length} sub-services`)
+    logger.debug('Service Details API: Found sub-services', { 
+      serviceName: decodedServiceName, 
+      providerId, 
+      count: subServices.length 
+    })
 
     res.json({
       serviceName: decodedServiceName,
@@ -274,7 +325,15 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
       timestamp: Date.now()
     })
   } catch (error) {
-    console.error('Get service details error:', error)
+    logger.error('Get service details error', { 
+      userId, 
+      providerId, 
+      serviceName: decodedServiceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
@@ -348,7 +407,11 @@ router.get('/preferences', async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Get preferences error:', error)
+    logger.error('Get preferences error', { 
+      userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     // Return default preferences instead of 500 error
     res.json({ 
       preferences: {
@@ -381,12 +444,21 @@ router.put('/preferences/currency', async (req, res) => {
         linkText: 'View Settings'
       })
     } catch (notifError) {
-      console.error('[CostData] Failed to create notification:', notifError)
+      logger.error('CostData: Failed to create notification', { 
+        userId, 
+        currency, 
+        error: notifError.message 
+      })
     }
     
     res.json({ message: 'Currency preference updated' })
   } catch (error) {
-    console.error('Update currency error:', error)
+    logger.error('Update currency error', { 
+      userId, 
+      currency, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -409,7 +481,15 @@ router.put('/:providerId/credits', async (req, res) => {
     await updateProviderCredits(userId, providerId, month, year, credits)
     res.json({ message: 'Credits updated successfully', credits })
   } catch (error) {
-    console.error('Update credits error:', error)
+    logger.error('Update credits error', { 
+      userId, 
+      providerId, 
+      month, 
+      year, 
+      credits, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -483,7 +563,14 @@ router.get('/:providerId/credits', async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Get credits error:', error)
+    logger.error('Get credits error', { 
+      userId, 
+      providerId, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -499,16 +586,26 @@ router.get('/:providerId/daily', async (req, res) => {
       return res.status(400).json({ error: 'startDate and endDate query parameters are required' })
     }
 
-    console.log(`[Daily Cost Data] Fetching data for user ${userId}, provider ${providerId}, range: ${startDate} to ${endDate}`)
+    logger.debug('Daily Cost Data: Fetching data', { userId, providerId, startDate, endDate })
     
     const dailyData = await getDailyCostData(userId, providerId, startDate, endDate)
     
-    console.log(`[Daily Cost Data] Found ${dailyData.length} data points`)
+    logger.debug('Daily Cost Data: Found data points', { 
+      userId, 
+      providerId, 
+      count: dailyData.length 
+    })
     
     res.json({ dailyData })
   } catch (error) {
-    console.error('Get daily cost data error:', error)
-    console.error('Error stack:', error.stack)
+    logger.error('Get daily cost data error', { 
+      userId, 
+      providerId, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
@@ -520,25 +617,26 @@ router.get('/:providerId/daily', async (req, res) => {
 router.post('/:providerId/report', async (req, res) => {
   // Note: authenticateToken is applied globally via router.use() above
   try {
-    console.log('[Provider Report] ========== START REPORT GENERATION ==========')
-    console.log('[Provider Report] Timestamp:', new Date().toISOString())
-    console.log('[Provider Report] Provider ID:', req.params.providerId)
-    console.log('[Provider Report] Request body:', JSON.stringify(req.body, null, 2))
-    console.log('[Provider Report] User object exists:', !!req.user)
+    logger.info('Provider Report: Starting report generation', {
+      providerId: req.params.providerId,
+      timestamp: new Date().toISOString(),
+      hasUser: !!req.user
+    })
     
     if (!req.user) {
-      console.error('[Provider Report] ERROR: No user object - authentication middleware may have failed')
+      logger.error('Provider Report: No user object - authentication middleware may have failed')
       return res.status(401).json({ error: 'Authentication required' })
     }
     
     const userId = req.user.userId || req.user.id
     if (!userId) {
-      console.error('[Provider Report] ERROR: User object exists but no ID found')
-      console.error('[Provider Report] User object:', JSON.stringify(req.user, null, 2))
+      logger.error('Provider Report: User object exists but no ID found', { 
+        userObject: req.user 
+      })
       return res.status(401).json({ error: 'User ID not found' })
     }
     
-    console.log('[Provider Report] Authenticated user ID:', userId)
+    logger.debug('Provider Report: Authenticated user', { userId })
     
     const { providerId } = req.params
     const { startDate, endDate, format = 'pdf', accountId } = req.body
@@ -552,26 +650,47 @@ router.post('/:providerId/report', async (req, res) => {
     }
 
     // Get all cost data for the period
-    console.log(`[Provider Report] Generating report for user ${userId}, provider ${providerId}, period: ${startDate} to ${endDate}, accountId: ${accountId || 'all'}`)
+    logger.debug('Provider Report: Generating report', { 
+      userId, 
+      providerId, 
+      startDate, 
+      endDate, 
+      accountId: accountId || 'all' 
+    })
     
     // First, get daily cost data to calculate total
     const dailyCostData = await getDailyCostData(userId, providerId, startDate, endDate, accountId).catch((err) => {
-      console.error('[Provider Report] Error fetching daily cost data:', err)
+      logger.error('Provider Report: Error fetching daily cost data', { 
+        userId, 
+        providerId, 
+        startDate, 
+        endDate, 
+        error: err.message 
+      })
       return []
     })
     
     const totalDailyCost = dailyCostData.reduce((sum, d) => sum + (parseFloat(d.cost) || 0), 0)
-    console.log(`[Provider Report] Daily cost data: ${dailyCostData.length} days, total: $${totalDailyCost.toFixed(2)}`)
+    logger.debug('Provider Report: Daily cost data retrieved', { 
+      days: dailyCostData.length, 
+      total: totalDailyCost.toFixed(2) 
+    })
     
     // Get services breakdown
-    console.log('[Provider Report] Step 2: Fetching services breakdown...')
+    logger.debug('Provider Report: Fetching services breakdown')
     let servicesResult = []
     try {
       servicesResult = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
-      console.log('[Provider Report] Services fetched:', servicesResult.length, 'services')
+      logger.debug('Provider Report: Services fetched', { count: servicesResult.length })
     } catch (err) {
-      console.error('[Provider Report] ERROR fetching services:', err.message)
-      console.error('[Provider Report] Error stack:', err.stack)
+      logger.error('Provider Report: Error fetching services', { 
+        userId, 
+        providerId, 
+        startDate, 
+        endDate, 
+        error: err.message, 
+        stack: err.stack 
+      })
       servicesResult = []
     }
     
@@ -579,7 +698,7 @@ router.post('/:providerId/report', async (req, res) => {
     let fallbackServices = []
     let fallbackTotal = 0
     if (servicesResult.length === 0 && totalDailyCost === 0) {
-      console.log('[Provider Report] No daily data found, trying to aggregate from cost_data table')
+      logger.debug('Provider Report: No daily data found, trying to aggregate from cost_data table')
       const client = await pool.connect()
       try {
         // Get months in the date range
@@ -636,9 +755,16 @@ router.post('/:providerId/report', async (req, res) => {
             })
           }
         }
-        console.log(`[Provider Report] Fallback: Found ${fallbackServices.length} services from cost_data, total: $${fallbackTotal.toFixed(2)}`)
+        logger.debug('Provider Report: Fallback services found', { 
+          count: fallbackServices.length, 
+          total: fallbackTotal.toFixed(2) 
+        })
       } catch (err) {
-        console.error('[Provider Report] Error in fallback:', err)
+        logger.error('Provider Report: Error in fallback', { 
+          userId, 
+          providerId, 
+          error: err.message 
+        })
       } finally {
         client.release()
       }
@@ -662,20 +788,36 @@ router.post('/:providerId/report', async (req, res) => {
     // Use the highest total available
     const finalTotalCost = Math.max(totalDailyCost, services.totalCost, fallbackTotal)
     
-    console.log(`[Provider Report] Found ${services.services.length} services, services total: $${services.totalCost.toFixed(2)}, daily total: $${totalDailyCost.toFixed(2)}, final: $${finalTotalCost.toFixed(2)}`)
+    logger.info('Provider Report: Cost totals calculated', {
+      servicesCount: services.services.length,
+      servicesTotal: services.totalCost.toFixed(2),
+      dailyTotal: totalDailyCost.toFixed(2),
+      finalTotal: finalTotalCost.toFixed(2)
+    })
     
     const [teams, products] = await Promise.all([
       getCostByTeam(userId, startDate, endDate, providerId, accountId).catch((err) => {
-        console.error('[Provider Report] Error fetching teams:', err)
+        logger.error('Provider Report: Error fetching teams', { 
+          userId, 
+          providerId, 
+          error: err.message 
+        })
         return []
       }),
       getCostByProduct(userId, startDate, endDate, providerId, accountId).catch((err) => {
-        console.error('[Provider Report] Error fetching products:', err)
+        logger.error('Provider Report: Error fetching products', { 
+          userId, 
+          providerId, 
+          error: err.message 
+        })
         return []
       })
     ])
     
-    console.log(`[Provider Report] Found ${teams.length} teams, ${products.length} products`)
+    logger.debug('Provider Report: Teams and products fetched', { 
+      teamsCount: teams.length, 
+      productsCount: products.length 
+    })
 
     // Get team and product breakdowns
     const teamBreakdowns = await Promise.all(
@@ -693,34 +835,58 @@ router.post('/:providerId/report', async (req, res) => {
     )
 
     // Fetch all cost analysis data
-    console.log('[Provider Report] Fetching cost analysis data...')
+    logger.debug('Provider Report: Fetching cost analysis data')
     // Fetch all cost analysis data (use same userId as above)
     let costVsUsage, anomalies, efficiencyMetrics, rightsizingRecommendations, unitEconomics, untaggedResources
     
     try {
       const results = await Promise.all([
         getCostVsUsage(userId, providerId, startDate, endDate, accountId).catch((err) => {
-          console.error('[Provider Report] Error fetching costVsUsage:', err.message)
+          logger.error('Provider Report: Error fetching costVsUsage', { 
+            userId, 
+            providerId, 
+            error: err.message 
+          })
           return []
         }),
         getAnomalies(userId, providerId, 20, accountId).catch((err) => {
-          console.error('[Provider Report] Error fetching anomalies:', err.message)
+          logger.error('Provider Report: Error fetching anomalies', { 
+            userId, 
+            providerId, 
+            error: err.message 
+          })
           return []
         }),
         getCostEfficiencyMetrics(userId, startDate, endDate, providerId, accountId).catch((err) => {
-          console.error('[Provider Report] Error fetching efficiencyMetrics:', err.message)
+          logger.error('Provider Report: Error fetching efficiencyMetrics', { 
+            userId, 
+            providerId, 
+            error: err.message 
+          })
           return []
         }),
         getRightsizingRecommendations(userId, providerId, accountId).catch((err) => {
-          console.error('[Provider Report] Error fetching rightsizingRecommendations:', err.message)
+          logger.error('Provider Report: Error fetching rightsizingRecommendations', { 
+            userId, 
+            providerId, 
+            error: err.message 
+          })
           return []
         }),
         getUnitEconomics(userId, startDate, endDate, providerId, accountId).catch((err) => {
-          console.error('[Provider Report] Error fetching unitEconomics:', err.message)
+          logger.error('Provider Report: Error fetching unitEconomics', { 
+            userId, 
+            providerId, 
+            error: err.message 
+          })
           return []
         }),
         getUntaggedResources(userId, providerId, 50, accountId).catch((err) => {
-          console.error('[Provider Report] Error fetching untaggedResources:', err.message)
+          logger.error('Provider Report: Error fetching untaggedResources', { 
+            userId, 
+            providerId, 
+            error: err.message 
+          })
           return []
         })
       ])
@@ -733,10 +899,21 @@ router.post('/:providerId/report', async (req, res) => {
       unitEconomics = Array.isArray(results[4]) ? results[4] : []
       untaggedResources = Array.isArray(results[5]) ? results[5] : []
       
-      console.log(`[Provider Report] Analysis data: ${costVsUsage.length} cost vs usage, ${anomalies.length} anomalies, ${efficiencyMetrics.length} efficiency metrics, ${rightsizingRecommendations.length} rightsizing recommendations, ${unitEconomics.length} unit economics, ${untaggedResources.length} untagged resources`)
-      console.log('[Provider Report] Data types verified - all are arrays')
+      logger.debug('Provider Report: Analysis data fetched', {
+        costVsUsage: costVsUsage.length,
+        anomalies: anomalies.length,
+        efficiencyMetrics: efficiencyMetrics.length,
+        rightsizingRecommendations: rightsizingRecommendations.length,
+        unitEconomics: unitEconomics.length,
+        untaggedResources: untaggedResources.length
+      })
     } catch (err) {
-      console.error('[Provider Report] Error fetching analysis data:', err)
+      logger.error('Provider Report: Error fetching analysis data', { 
+        userId, 
+        providerId, 
+        error: err.message, 
+        stack: err.stack 
+      })
       costVsUsage = []
       anomalies = []
       efficiencyMetrics = []
@@ -746,14 +923,20 @@ router.post('/:providerId/report', async (req, res) => {
     }
 
     // Fetch Cost Summary (AI-generated explanation)
-    console.log('[Provider Report] Fetching cost summary...')
+    logger.debug('Provider Report: Fetching cost summary')
     let costSummary = null
     try {
       costSummary = await generateCustomDateRangeExplanation(userId, providerId, startDate, endDate, accountId)
-      console.log('[Provider Report] Cost summary fetched successfully')
+      logger.debug('Provider Report: Cost summary fetched successfully')
     } catch (err) {
-      console.error('[Provider Report] Error fetching cost summary:', err)
-      console.error('[Provider Report] Cost summary error stack:', err.stack)
+      logger.error('Provider Report: Error fetching cost summary', { 
+        userId, 
+        providerId, 
+        startDate, 
+        endDate, 
+        error: err.message, 
+        stack: err.stack 
+      })
       // Continue without cost summary - it's optional
       costSummary = null
     }
@@ -883,7 +1066,7 @@ router.post('/:providerId/report', async (req, res) => {
     // Generate report file
     try {
       if (format === 'json') {
-        console.log('[Provider Report] Generating JSON report...')
+        logger.debug('Provider Report: Generating JSON report')
         // Clean up reportData to ensure it's JSON-serializable
         const cleanReportData = {
           ...reportData,
@@ -903,24 +1086,39 @@ router.post('/:providerId/report', async (req, res) => {
         res.setHeader('Content-Type', 'application/json')
         res.setHeader('Content-Disposition', `attachment; filename="${providerId}_analysis_${startDate}_to_${endDate}.json"`)
         res.send(jsonData)
-        console.log('[Provider Report] JSON report generated successfully')
+        logger.info('Provider Report: JSON report generated successfully', { 
+          providerId, 
+          startDate, 
+          endDate 
+        })
       } else {
-        console.log('[Provider Report] Generating PDF report...')
+        logger.debug('Provider Report: Generating PDF report')
         const pdfBuffer = await generatePDFReportBuffer(reportData)
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="${providerId}_analysis_${startDate}_to_${endDate}.pdf"`)
         res.send(pdfBuffer)
-        console.log('[Provider Report] PDF report generated successfully')
+        logger.info('Provider Report: PDF report generated successfully', { 
+          providerId, 
+          startDate, 
+          endDate 
+        })
       }
     } catch (genError) {
-      console.error('[Provider Report] Error generating report file:', genError)
-      console.error('[Provider Report] Error stack:', genError.stack)
+      logger.error('Provider Report: Error generating report file', { 
+        providerId, 
+        format, 
+        error: genError.message, 
+        stack: genError.stack 
+      })
       throw genError
     }
   } catch (error) {
-    console.error('[Provider Report] Generate provider report error:', error)
-    console.error('[Provider Report] Error stack:', error.stack)
-    console.error('[Provider Report] Error message:', error.message)
+    logger.error('Provider Report: Generate provider report error', { 
+      providerId: req.params.providerId, 
+      userId: req.user?.userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ 
       error: 'Failed to generate provider report',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined

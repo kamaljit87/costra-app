@@ -1,6 +1,7 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { createOrUpdateGoogleUser, getUserByGoogleId } from '../database.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -37,7 +38,12 @@ router.post('/callback', async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Google auth error:', error)
+    logger.error('Google auth error', { 
+      googleId: req.body?.googleId, 
+      email: req.body?.email, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })

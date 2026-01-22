@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts'
 import { CostExplorerClient, GetCostAndUsageCommand } from '@aws-sdk/client-cost-explorer'
+import logger from '../utils/logger.js'
 
 /**
  * Generate a secure external ID for cross-account IAM role assumption
@@ -96,7 +97,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
   try {
     // Validate role ARN is provided
     if (!roleArn || typeof roleArn !== 'string') {
-      console.error('[AWS Connection] Role ARN is missing or invalid:', roleArn)
+      logger.error('AWS Connection: Role ARN is missing or invalid', { roleArn })
       return {
         success: false,
         message: 'Role ARN is missing or invalid. Please ensure CloudFormation stack was created successfully.',
@@ -107,9 +108,9 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
     // Fix role ARN if it contains invalid characters (e.g., spaces)
     let fixedRoleArn = roleArn
     if (roleArn.includes(' ')) {
-      console.warn('[AWS Connection] Role ARN contains spaces, attempting to fix:', roleArn)
+      logger.warn('AWS Connection: Role ARN contains spaces, attempting to fix', { roleArn })
       fixedRoleArn = fixRoleArn(roleArn)
-      console.log('[AWS Connection] Fixed role ARN:', fixedRoleArn)
+      logger.info('AWS Connection: Fixed role ARN', { fixedRoleArn })
     }
 
     // Validate role ARN format (more lenient pattern to handle various role name formats)
@@ -117,7 +118,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
     // Pattern allows for role paths: arn:aws:iam::ACCOUNT:role/path/to/role-name
     const roleArnPattern = /^arn:aws:iam::\d{12}:role(\/[a-zA-Z0-9+=,.@_-]+)+$/
     if (!roleArnPattern.test(fixedRoleArn)) {
-      console.error('[AWS Connection] Invalid role ARN format (even after fix attempt):', fixedRoleArn)
+      logger.error('AWS Connection: Invalid role ARN format (even after fix attempt)', { fixedRoleArn })
       return {
         success: false,
         message: `Invalid role ARN format: ${roleArn}. Expected format: arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME. Role names cannot contain spaces.`,
@@ -129,7 +130,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
 
     // Use fixed role ARN if it was corrected
     if (fixedRoleArn !== roleArn) {
-      console.log('[AWS Connection] Using fixed role ARN:', fixedRoleArn)
+      logger.info('AWS Connection: Using fixed role ARN', { fixedRoleArn })
       roleArn = fixedRoleArn
     }
 
@@ -146,7 +147,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
     // because we don't have AWS credentials. We'll just validate the format
     // and mark it as verified. The actual connection will be tested during the first sync.
     if (skipActualTest) {
-      console.log('[AWS Connection] Skipping actual role assumption test (automated connection)')
+      logger.debug('AWS Connection: Skipping actual role assumption test (automated connection)')
       return {
         success: true,
         message: 'Connection format validated. Role will be tested during first cost sync.',
@@ -213,7 +214,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
       // If we can't assume the role (no credentials on server), that's okay for automated connections
       // The role will be tested when we actually use it for cost syncing
       if (credentialError.message?.includes('credentials') || credentialError.code === 'CredentialsError') {
-        console.log('[AWS Connection] Cannot test role assumption from server (no credentials). Connection will be tested during first sync.')
+        logger.debug('AWS Connection: Cannot test role assumption from server (no credentials). Connection will be tested during first sync.')
         return {
           success: true,
           message: 'Connection format validated. Role will be tested during first cost sync.',
@@ -223,7 +224,12 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
       throw credentialError
     }
   } catch (error) {
-    console.error('[AWS Connection] Verification failed:', error)
+    logger.error('AWS Connection: Verification failed', { 
+      roleArn, 
+      region, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return {
       success: false,
       message: error.message || 'Connection verification failed',

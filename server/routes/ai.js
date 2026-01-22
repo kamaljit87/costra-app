@@ -2,6 +2,7 @@ import express from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { authenticateToken } from '../middleware/auth.js'
 import { getCostDataForUser, getDailyCostData, getServiceCostsForDateRange } from '../database.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -53,7 +54,10 @@ router.post('/chat', async (req, res) => {
       { role: 'user', content: message }
     ]
 
-    console.log(`[AI Chat] Processing query from user ${userId}: "${message.substring(0, 50)}..."`)
+    logger.debug('AI Chat: Processing query', { 
+      userId, 
+      messagePreview: message.substring(0, 50) 
+    })
 
     // Call Claude API
     const response = await client.messages.create({
@@ -65,7 +69,7 @@ router.post('/chat', async (req, res) => {
 
     const aiResponse = response.content[0]?.text || 'I apologize, but I was unable to generate a response.'
 
-    console.log(`[AI Chat] Response generated successfully`)
+    logger.debug('AI Chat: Response generated successfully', { userId })
 
     res.json({
       response: aiResponse,
@@ -76,7 +80,12 @@ router.post('/chat', async (req, res) => {
     })
 
   } catch (error) {
-    console.error('[AI Chat] Error:', error)
+    logger.error('AI Chat: Error', { 
+      userId: req.user?.userId, 
+      error: error.message, 
+      status: error.status, 
+      stack: error.stack 
+    })
     
     if (error.status === 401) {
       return res.status(503).json({ error: 'Invalid AI API key' })
@@ -128,13 +137,22 @@ Return ONLY a valid JSON array, no other text.`
         insights = JSON.parse(jsonMatch[0])
       }
     } catch (parseError) {
-      console.error('[AI Insights] Failed to parse insights:', parseError)
+      logger.error('AI Insights: Failed to parse insights', { 
+        userId, 
+        error: parseError.message, 
+        stack: parseError.stack 
+      })
     }
 
     res.json({ insights })
 
   } catch (error) {
-    console.error('[AI Insights] Error:', error)
+    logger.error('AI Insights: Error', { 
+      userId, 
+      providerId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to generate insights' })
   }
 })
@@ -182,13 +200,22 @@ Return ONLY a valid JSON array of anomalies, no other text. If no anomalies are 
         anomalies = JSON.parse(jsonMatch[0])
       }
     } catch (parseError) {
-      console.error('[AI Anomalies] Failed to parse anomalies:', parseError)
+      logger.error('AI Anomalies: Failed to parse anomalies', { 
+        userId, 
+        error: parseError.message, 
+        stack: parseError.stack 
+      })
     }
 
     res.json({ anomalies })
 
   } catch (error) {
-    console.error('[AI Anomalies] Error:', error)
+    logger.error('AI Anomalies: Error', { 
+      userId, 
+      providerId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to detect anomalies' })
   }
 })
@@ -279,7 +306,12 @@ async function gatherCostContext(userId) {
     }
 
   } catch (error) {
-    console.error('[AI Context] Error gathering cost context:', error)
+    logger.error('AI Context: Error gathering cost context', { 
+      userId, 
+      providerId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return { hasData: false, error: error.message }
   }
 }

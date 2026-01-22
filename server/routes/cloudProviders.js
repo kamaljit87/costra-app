@@ -1,6 +1,7 @@
 import express from 'express'
 import { body, validationResult } from 'express-validator'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 import {
   addCloudProvider,
   getUserCloudProviders,
@@ -54,7 +55,11 @@ router.get('/', async (req, res) => {
 
     res.json({ providers: formattedProviders })
   } catch (error) {
-    console.error('Get cloud providers error:', error)
+    logger.error('Get cloud providers error', { 
+      userId: req.user?.userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -88,7 +93,10 @@ router.post('/',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        console.error('[CloudProviders] Failed to create notification:', notifError)
+        logger.error('CloudProviders: Failed to create notification', { 
+          userId, 
+          error: notifError.message 
+        })
       }
 
       res.json({ 
@@ -101,7 +109,13 @@ router.post('/',
         }
       })
     } catch (error) {
-      console.error('Add cloud provider error:', error)
+      logger.error('Add cloud provider error', { 
+        userId, 
+        providerId, 
+        providerName, 
+        error: error.message, 
+        stack: error.stack 
+      })
       res.status(500).json({ error: error.message || 'Internal server error' })
     }
   }
@@ -137,12 +151,20 @@ router.delete('/account/:accountId', async (req, res) => {
         linkText: 'View Settings'
       })
     } catch (notifError) {
-      console.error('[CloudProviders] Failed to create notification:', notifError)
+      logger.error('CloudProviders: Failed to create notification', { 
+        userId, 
+        error: notifError.message 
+      })
     }
 
     res.json({ message: 'Cloud provider account deleted successfully' })
   } catch (error) {
-    console.error('Delete cloud provider account error:', error)
+    logger.error('Delete cloud provider account error', { 
+      userId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -161,7 +183,12 @@ router.delete('/:providerId', async (req, res) => {
 
     res.json({ message: 'Cloud provider deleted successfully' })
   } catch (error) {
-    console.error('Delete cloud provider error:', error)
+    logger.error('Delete cloud provider error', { 
+      userId, 
+      providerId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -187,7 +214,13 @@ router.patch('/account/:accountId/status', async (req, res) => {
       message: `Cloud provider account ${isActive ? 'activated' : 'deactivated'} successfully` 
     })
   } catch (error) {
-    console.error('Update cloud provider account status error:', error)
+    logger.error('Update cloud provider account status error', { 
+      userId, 
+      accountId, 
+      isActive, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -214,7 +247,13 @@ router.patch('/account/:accountId/alias', async (req, res) => {
       accountAlias
     })
   } catch (error) {
-    console.error('Update account alias error:', error)
+    logger.error('Update account alias error', { 
+      userId, 
+      accountId, 
+      accountAlias, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -243,7 +282,12 @@ router.get('/account/:accountId/credentials', async (req, res) => {
       credentials: account.credentials
     })
   } catch (error) {
-    console.error('Get account credentials error:', error)
+    logger.error('Get account credentials error', { 
+      userId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -284,14 +328,22 @@ router.patch('/account/:accountId/credentials',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        console.error('[CloudProviders] Failed to create notification:', notifError)
+        logger.error('CloudProviders: Failed to create notification', { 
+          userId, 
+          error: notifError.message 
+        })
       }
 
       res.json({ 
         message: 'Account credentials updated successfully'
       })
     } catch (error) {
-      console.error('Update account credentials error:', error)
+      logger.error('Update account credentials error', { 
+        userId, 
+        accountId, 
+        error: error.message, 
+        stack: error.stack 
+      })
       res.status(500).json({ error: error.message || 'Internal server error' })
     }
   }
@@ -314,7 +366,13 @@ router.patch('/:providerId/status', async (req, res) => {
       message: `Cloud provider ${isActive ? 'activated' : 'deactivated'} successfully` 
     })
   } catch (error) {
-    console.error('Update cloud provider status error:', error)
+    logger.error('Update cloud provider status error', { 
+      userId, 
+      providerId, 
+      isActive, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -423,7 +481,14 @@ router.post('/aws/automated',
         },
       })
     } catch (error) {
-      console.error('Initiate automated AWS connection error:', error)
+      logger.error('Initiate automated AWS connection error', { 
+        userId, 
+        connectionName, 
+        awsAccountId, 
+        connectionType, 
+        error: error.message, 
+        stack: error.stack 
+      })
       res.status(500).json({ error: error.message || 'Internal server error' })
     }
   }
@@ -437,7 +502,10 @@ router.post('/aws/:accountId/verify', async (req, res) => {
     
     // Validate accountId is a valid integer (not an encrypted string)
     if (!accountIdParam || accountIdParam.length > 20 || !/^\d+$/.test(accountIdParam)) {
-      console.error('[AWS Connection] Invalid accountId format:', accountIdParam)
+      logger.error('AWS Connection: Invalid accountId format', { 
+        userId, 
+        accountIdParam 
+      })
       return res.status(400).json({ 
         error: 'Invalid account ID format',
         details: 'Account ID must be a numeric value. Please refresh the page and try again.'
@@ -461,7 +529,7 @@ router.post('/aws/:accountId/verify', async (req, res) => {
     const roleArn = credentials.roleArn || account.roleArn
     const externalId = credentials.externalId || account.externalId
 
-    console.log('[AWS Connection] Verification request:', {
+    logger.debug('AWS Connection: Verification request', {
       accountId,
       roleArn,
       hasExternalId: !!externalId,
@@ -489,7 +557,11 @@ router.post('/aws/:accountId/verify', async (req, res) => {
     
     // If role ARN was fixed (e.g., had spaces), update it in the database
     if (verification.fixedRoleArn && verification.fixedRoleArn !== roleArn) {
-      console.log('[AWS Connection] Updating role ARN in database from:', roleArn, 'to:', verification.fixedRoleArn)
+      logger.info('AWS Connection: Updating role ARN in database', {
+        accountId,
+        oldRoleArn: roleArn,
+        newRoleArn: verification.fixedRoleArn
+      })
       const client = await pool.connect()
       try {
         await client.query(
@@ -500,7 +572,10 @@ router.post('/aws/:accountId/verify', async (req, res) => {
         )
         roleArn = verification.fixedRoleArn // Use the fixed ARN for the rest of the function
       } catch (updateError) {
-        console.error('[AWS Connection] Failed to update role ARN:', updateError)
+        logger.error('AWS Connection: Failed to update role ARN', { 
+          accountId, 
+          error: updateError.message 
+        })
       } finally {
         client.release()
       }
@@ -530,7 +605,10 @@ router.post('/aws/:accountId/verify', async (req, res) => {
           linkText: 'View Settings',
         })
       } catch (notifError) {
-        console.error('[AWS Connection] Failed to create notification:', notifError)
+        logger.error('AWS Connection: Failed to create notification', { 
+          userId, 
+          error: notifError.message 
+        })
       }
 
       res.json({
@@ -552,7 +630,12 @@ router.post('/aws/:accountId/verify', async (req, res) => {
       })
     }
   } catch (error) {
-    console.error('Verify AWS connection error:', error)
+    logger.error('Verify AWS connection error', { 
+      userId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })
@@ -593,7 +676,12 @@ router.get('/aws/:accountId/health', async (req, res) => {
 
     res.json(health)
   } catch (error) {
-    console.error('AWS connection health check error:', error)
+    logger.error('AWS connection health check error', { 
+      userId, 
+      accountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 })

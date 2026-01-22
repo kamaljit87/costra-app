@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 import {
   generateReportData,
   saveReport,
@@ -91,11 +92,19 @@ router.post('/showback', async (req, res) => {
             }
           })
         } catch (notifError) {
-          console.error('[Reports] Failed to create notification:', notifError)
+          logger.error('Reports: Failed to create notification', { 
+            userId, 
+            error: notifError.message 
+          })
         }
       })
       .catch(async (error) => {
-        console.error('Report generation error:', error)
+        logger.error('Report generation error', { 
+          userId, 
+          reportId: report.id, 
+          error: error.message, 
+          stack: error.stack 
+        })
         await updateReportStatus(userId, report.id, 'failed')
         
         // Create notification for failed report generation
@@ -114,7 +123,10 @@ router.post('/showback', async (req, res) => {
             }
           })
         } catch (notifError) {
-          console.error('[Reports] Failed to create notification:', notifError)
+          logger.error('Reports: Failed to create notification', { 
+            userId, 
+            error: notifError.message 
+          })
         }
       })
     
@@ -126,7 +138,11 @@ router.post('/showback', async (req, res) => {
       message: 'Report generation started'
     })
   } catch (error) {
-    console.error('Generate showback report error:', error)
+    logger.error('Generate showback report error', { 
+      userId: req.user?.userId || req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to generate showback report' })
   }
 })
@@ -204,11 +220,19 @@ router.post('/chargeback', async (req, res) => {
             }
           })
         } catch (notifError) {
-          console.error('[Reports] Failed to create notification:', notifError)
+          logger.error('Reports: Failed to create notification', { 
+            userId, 
+            error: notifError.message 
+          })
         }
       })
       .catch(async (error) => {
-        console.error('Report generation error:', error)
+        logger.error('Report generation error', { 
+          userId, 
+          reportId: report.id, 
+          error: error.message, 
+          stack: error.stack 
+        })
         await updateReportStatus(userId, report.id, 'failed')
         
         // Create notification for failed report generation
@@ -227,7 +251,10 @@ router.post('/chargeback', async (req, res) => {
             }
           })
         } catch (notifError) {
-          console.error('[Reports] Failed to create notification:', notifError)
+          logger.error('Reports: Failed to create notification', { 
+            userId, 
+            error: notifError.message 
+          })
         }
       })
     
@@ -239,7 +266,11 @@ router.post('/chargeback', async (req, res) => {
       message: 'Report generation started'
     })
   } catch (error) {
-    console.error('Generate chargeback report error:', error)
+    logger.error('Generate chargeback report error', { 
+      userId: req.user?.userId || req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to generate chargeback report' })
   }
 })
@@ -264,7 +295,11 @@ router.get('/', async (req, res) => {
     
     res.json({ reports })
   } catch (error) {
-    console.error('Get reports error:', error)
+    logger.error('Get reports error', { 
+      userId: req.user?.userId || req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch reports' })
   }
 })
@@ -293,7 +328,12 @@ router.get('/:reportId', async (req, res) => {
     
     res.json({ report })
   } catch (error) {
-    console.error('Get report error:', error)
+    logger.error('Get report error', { 
+      userId: req.user?.userId || req.user?.id, 
+      reportId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch report' })
   }
 })
@@ -344,7 +384,12 @@ router.get('/:reportId/download', async (req, res) => {
     
     res.download(report.filePath, fileName)
   } catch (error) {
-    console.error('Download report error:', error)
+    logger.error('Download report error', { 
+      userId: req.user?.userId || req.user?.id, 
+      reportId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to download report' })
   }
 })
@@ -371,7 +416,12 @@ router.delete('/:reportId', async (req, res) => {
       try {
         await fs.unlink(report.filePath)
       } catch (error) {
-        console.error('Failed to delete report file:', error)
+        logger.error('Failed to delete report file', { 
+          userId, 
+          reportId, 
+          filePath, 
+          error: error.message 
+        })
       }
     }
     
@@ -383,7 +433,12 @@ router.delete('/:reportId', async (req, res) => {
     
     res.json({ message: 'Report deleted successfully' })
   } catch (error) {
-    console.error('Delete report error:', error)
+    logger.error('Delete report error', { 
+      userId: req.user?.userId || req.user?.id, 
+      reportId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to delete report' })
   }
 })
@@ -396,7 +451,11 @@ async function generateReportFile(reportId, reportData, format, userId) {
   try {
     await fs.mkdir(reportsDir, { recursive: true })
   } catch (error) {
-    console.error('Failed to create reports directory:', error)
+    logger.error('Failed to create reports directory', { 
+      reportsDir, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw error
   }
   

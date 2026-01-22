@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 import {
   createNotification,
   getNotifications,
@@ -33,7 +34,11 @@ router.get('/', async (req, res) => {
 
     res.json({ notifications })
   } catch (error) {
-    console.error('[Notifications] Error fetching notifications:', error)
+    logger.error('Notifications: Error fetching notifications', { 
+      userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch notifications' })
   }
 })
@@ -48,7 +53,11 @@ router.get('/count', async (req, res) => {
     const count = await getUnreadNotificationCount(userId)
     res.json({ count })
   } catch (error) {
-    console.error('[Notifications] Error fetching notification count:', error)
+    logger.error('Notifications: Error fetching notification count', { 
+      userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to fetch notification count' })
   }
 })
@@ -77,7 +86,11 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({ notification })
   } catch (error) {
-    console.error('[Notifications] Error creating notification:', error)
+    logger.error('Notifications: Error creating notification', { 
+      userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to create notification' })
   }
 })
@@ -98,7 +111,12 @@ router.put('/:id/read', async (req, res) => {
     await markNotificationAsRead(userId, notificationId)
     res.json({ success: true })
   } catch (error) {
-    console.error('[Notifications] Error marking notification as read:', error)
+    logger.error('Notifications: Error marking notification as read', { 
+      userId, 
+      notificationId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to mark notification as read' })
   }
 })
@@ -113,7 +131,11 @@ router.put('/read-all', async (req, res) => {
     await markAllNotificationsAsRead(userId)
     res.json({ success: true })
   } catch (error) {
-    console.error('[Notifications] Error marking all notifications as read:', error)
+    logger.error('Notifications: Error marking all notifications as read', { 
+      userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to mark all notifications as read' })
   }
 })
@@ -134,7 +156,12 @@ router.delete('/:id', async (req, res) => {
     await deleteNotification(userId, notificationId)
     res.json({ success: true })
   } catch (error) {
-    console.error('[Notifications] Error deleting notification:', error)
+    logger.error('Notifications: Error deleting notification', { 
+      userId, 
+      notificationId: req.params.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to delete notification' })
   }
 })
@@ -151,7 +178,12 @@ router.delete('/old', async (req, res) => {
     const deletedCount = await deleteOldNotifications(userId, daysOld)
     res.json({ deletedCount })
   } catch (error) {
-    console.error('[Notifications] Error deleting old notifications:', error)
+    logger.error('Notifications: Error deleting old notifications', { 
+      userId, 
+      daysOld, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to delete old notifications' })
   }
 })

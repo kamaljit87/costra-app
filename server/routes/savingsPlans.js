@@ -1,6 +1,7 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
 import { getSavingsPlansForUser, saveSavingsPlan } from '../database.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -25,7 +26,11 @@ router.get('/', async (req, res) => {
 
     res.json({ savingsPlans: formattedPlans })
   } catch (error) {
-    console.error('Get savings plans error:', error)
+    logger.error('Get savings plans error', { 
+      userId: req.user?.userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
@@ -50,7 +55,11 @@ router.post('/', async (req, res) => {
 
     res.json({ message: 'Savings plan saved successfully' })
   } catch (error) {
-    console.error('Save savings plan error:', error)
+    logger.error('Save savings plan error', { 
+      userId: req.user?.userId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

@@ -2,6 +2,7 @@ import express from 'express'
 import bcrypt from 'bcryptjs'
 import { body, validationResult } from 'express-validator'
 import { authenticateToken } from '../middleware/auth.js'
+import logger from '../utils/logger.js'
 import { 
   getUserById, 
   updateUserProfile, 
@@ -72,7 +73,11 @@ router.get('/', authenticateToken, async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Get profile error:', error)
+    logger.error('Get profile error', { 
+      userId: req.user?.userId || req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to get profile' })
   }
 })
@@ -116,7 +121,10 @@ router.put('/',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        console.error('[Profile] Failed to create notification:', notifError)
+        logger.error('Profile: Failed to create notification', { 
+          userId, 
+          error: notifError.message 
+        })
       }
       
       res.json({
@@ -129,7 +137,11 @@ router.put('/',
         },
       })
     } catch (error) {
-      console.error('Update profile error:', error)
+      logger.error('Update profile error', { 
+        userId, 
+        error: error.message, 
+        stack: error.stack 
+      })
       res.status(500).json({ error: 'Failed to update profile' })
     }
   }
@@ -169,7 +181,10 @@ router.post('/avatar',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        console.error('[Profile] Failed to create notification:', notifError)
+        logger.error('Profile: Failed to create notification', { 
+          userId, 
+          error: notifError.message 
+        })
       }
 
       res.json({
@@ -177,7 +192,11 @@ router.post('/avatar',
         avatarUrl,
       })
     } catch (error) {
-      console.error('Upload avatar error:', error)
+      logger.error('Upload avatar error', { 
+        userId, 
+        error: error.message, 
+        stack: error.stack 
+      })
       // Clean up uploaded file on error
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path)
@@ -204,7 +223,11 @@ router.delete('/avatar', authenticateToken, async (req, res) => {
 
     res.json({ message: 'Avatar removed successfully' })
   } catch (error) {
-    console.error('Remove avatar error:', error)
+    logger.error('Remove avatar error', { 
+      userId: req.user?.userId || req.user?.id, 
+      error: error.message, 
+      stack: error.stack 
+    })
     res.status(500).json({ error: 'Failed to remove avatar' })
   }
 })
@@ -263,12 +286,19 @@ router.put('/password',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        console.error('[Profile] Failed to create notification:', notifError)
+        logger.error('Profile: Failed to create notification', { 
+          userId, 
+          error: notifError.message 
+        })
       }
 
       res.json({ message: 'Password changed successfully' })
     } catch (error) {
-      console.error('Change password error:', error)
+      logger.error('Change password error', { 
+        userId, 
+        error: error.message, 
+        stack: error.stack 
+      })
       res.status(500).json({ error: 'Failed to change password' })
     }
   }

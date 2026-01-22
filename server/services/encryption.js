@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import logger from '../utils/logger.js'
 
 // Get encryption key from environment or use a default (change in production!)
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.scryptSync('costra-default-key-change-in-production', 'salt', 32)
@@ -48,7 +49,10 @@ export const decrypt = (encryptedData) => {
     
     return decrypted
   } catch (error) {
-    console.error('Decryption error:', error)
+    logger.error('Decryption error', { 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error('Failed to decrypt data')
   }
 }

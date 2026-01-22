@@ -254,10 +254,14 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
     }
   })
 
-  logger.debug('Billing summary for period', { startDate, endDate })
-  console.log(`  - Current month (all days): $${currentMonth.toFixed(2)}`)
-  console.log(`  - Month-to-date (Jan 1-${currentDay}): $${monthToDate.toFixed(2)}`)
-  console.log(`  - Last month spend: $${lastMonth.toFixed(2)}`)
+  logger.debug('Billing summary for period', { 
+    startDate, 
+    endDate,
+    currentMonth: currentMonth.toFixed(2),
+    monthToDate: monthToDate.toFixed(2),
+    currentDay,
+    lastMonth: lastMonth.toFixed(2)
+  })
   
   // Use month-to-date for currentMonth to match AWS console
   currentMonth = monthToDate
@@ -280,8 +284,7 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
 export const fetchAWSServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { accessKeyId, secretAccessKey, region = 'us-east-1' } = credentials
 
-  console.log(`[AWS Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[AWS Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('AWS Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     const cacheKey = `aws-${accessKeyId}-${region}`
@@ -341,7 +344,7 @@ export const fetchAWSServiceDetails = async (credentials, serviceName, startDate
       }))
       .sort((a, b) => b.cost - a.cost)
 
-    console.log(`[AWS Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('AWS Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -349,7 +352,13 @@ export const fetchAWSServiceDetails = async (credentials, serviceName, startDate
       subServices,
     }
   } catch (error) {
-    console.error(`[AWS Service Details] Error:`, error)
+    logger.error('AWS Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw error
   }
 }
@@ -419,8 +428,7 @@ function categorizeUsageType(usageType) {
 export const fetchAzureServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { tenantId, clientId, clientSecret, subscriptionId } = credentials
 
-  console.log(`[Azure Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[Azure Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('Azure Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     const token = await getAzureAccessToken(tenantId, clientId, clientSecret)
@@ -459,7 +467,12 @@ export const fetchAzureServiceDetails = async (credentials, serviceName, startDa
     })
 
     if (!response.ok) {
-      console.error(`[Azure Service Details] API error: ${response.status}`)
+      logger.error('Azure Service Details: API error', { 
+        serviceName, 
+        status: response.status, 
+        startDate, 
+        endDate 
+      })
       return { serviceName, totalCost: 0, subServices: [] }
     }
 
@@ -477,7 +490,7 @@ export const fetchAzureServiceDetails = async (credentials, serviceName, startDa
       }))
       .sort((a, b) => b.cost - a.cost)
 
-    console.log(`[Azure Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('Azure Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -485,7 +498,13 @@ export const fetchAzureServiceDetails = async (credentials, serviceName, startDa
       subServices,
     }
   } catch (error) {
-    console.error(`[Azure Service Details] Error:`, error)
+    logger.error('Azure Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw error
   }
 }
@@ -516,12 +535,11 @@ function categorizeAzureMeter(meter) {
 export const fetchGCPServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { projectId, serviceAccountKey, bigQueryDataset } = credentials
 
-  console.log(`[GCP Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[GCP Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('GCP Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     if (!serviceAccountKey || !bigQueryDataset) {
-      console.log(`[GCP Service Details] BigQuery not configured, using simulated data`)
+      logger.warn('GCP Service Details: BigQuery not configured', { serviceName })
       return { serviceName, totalCost: 0, subServices: [] }
     }
 
@@ -559,7 +577,12 @@ export const fetchGCPServiceDetails = async (credentials, serviceName, startDate
     })
 
     if (!response.ok) {
-      console.error(`[GCP Service Details] BigQuery error: ${response.status}`)
+      logger.error('GCP Service Details: BigQuery error', { 
+        serviceName, 
+        status: response.status, 
+        startDate, 
+        endDate 
+      })
       return { serviceName, totalCost: 0, subServices: [] }
     }
 
@@ -575,7 +598,7 @@ export const fetchGCPServiceDetails = async (credentials, serviceName, startDate
         category: categorizeGCPSku(row.f[0].v),
       }))
 
-    console.log(`[GCP Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('GCP Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -583,7 +606,13 @@ export const fetchGCPServiceDetails = async (credentials, serviceName, startDate
       subServices,
     }
   } catch (error) {
-    console.error(`[GCP Service Details] Error:`, error)
+    logger.error('GCP Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return { serviceName, totalCost: 0, subServices: [] }
   }
 }
@@ -606,8 +635,7 @@ function categorizeGCPSku(sku) {
 export const fetchDigitalOceanServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { apiToken } = credentials
 
-  console.log(`[DO Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[DO Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('DO Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     const headers = {
@@ -619,7 +647,12 @@ export const fetchDigitalOceanServiceDetails = async (credentials, serviceName, 
     const invoicesResponse = await fetch('https://api.digitalocean.com/v2/customers/my/invoices?per_page=50', { headers })
     
     if (!invoicesResponse.ok) {
-      console.error(`[DO Service Details] API error: ${invoicesResponse.status}`)
+      logger.error('DO Service Details: API error', { 
+        serviceName, 
+        status: invoicesResponse.status, 
+        startDate, 
+        endDate 
+      })
       return { serviceName, totalCost: 0, subServices: [] }
     }
 
@@ -663,7 +696,11 @@ export const fetchDigitalOceanServiceDetails = async (credentials, serviceName, 
             })
           }
         } catch (itemError) {
-          console.warn(`[DO Service Details] Error fetching invoice items: ${itemError.message}`)
+          logger.warn('DO Service Details: Error fetching invoice items', { 
+            serviceName, 
+            invoiceId: invoice.invoice_uuid, 
+            error: itemError.message 
+          })
         }
       }
     }
@@ -677,7 +714,7 @@ export const fetchDigitalOceanServiceDetails = async (credentials, serviceName, 
       }))
       .sort((a, b) => b.cost - a.cost)
 
-    console.log(`[DO Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('DO Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -685,7 +722,13 @@ export const fetchDigitalOceanServiceDetails = async (credentials, serviceName, 
       subServices,
     }
   } catch (error) {
-    console.error(`[DO Service Details] Error:`, error)
+    logger.error('DO Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return { serviceName, totalCost: 0, subServices: [] }
   }
 }
@@ -715,8 +758,7 @@ function categorizeDOItem(item) {
 export const fetchIBMServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { apiKey, accountId } = credentials
 
-  console.log(`[IBM Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[IBM Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('IBM Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     // Get IAM access token
@@ -733,7 +775,7 @@ export const fetchIBMServiceDetails = async (credentials, serviceName, startDate
     })
 
     if (!tokenResponse.ok) {
-      console.error(`[IBM Service Details] Auth failed`)
+      logger.error('IBM Service Details: Auth failed', { serviceName, startDate, endDate })
       return { serviceName, totalCost: 0, subServices: [] }
     }
 
@@ -752,7 +794,12 @@ export const fetchIBMServiceDetails = async (credentials, serviceName, startDate
     })
 
     if (!usageResponse.ok) {
-      console.error(`[IBM Service Details] Usage API error: ${usageResponse.status}`)
+      logger.error('IBM Service Details: Usage API error', { 
+        serviceName, 
+        status: usageResponse.status, 
+        startDate, 
+        endDate 
+      })
       return { serviceName, totalCost: 0, subServices: [] }
     }
 
@@ -790,7 +837,7 @@ export const fetchIBMServiceDetails = async (credentials, serviceName, startDate
       }))
       .sort((a, b) => b.cost - a.cost)
 
-    console.log(`[IBM Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('IBM Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -798,7 +845,13 @@ export const fetchIBMServiceDetails = async (credentials, serviceName, startDate
       subServices,
     }
   } catch (error) {
-    console.error(`[IBM Service Details] Error:`, error)
+    logger.error('IBM Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return { serviceName, totalCost: 0, subServices: [] }
   }
 }
@@ -826,8 +879,7 @@ function categorizeIBMMetric(metric) {
 export const fetchLinodeServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { apiToken } = credentials
 
-  console.log(`[Linode Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[Linode Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('Linode Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     const headers = {
@@ -904,7 +956,11 @@ export const fetchLinodeServiceDetails = async (credentials, serviceName, startD
             })
           }
         } catch (itemError) {
-          console.warn(`[Linode Service Details] Error fetching invoice ${invoice.id} items: ${itemError.message}`)
+          logger.warn('Linode Service Details: Error fetching invoice items', { 
+            serviceName, 
+            invoiceId: invoice.id, 
+            error: itemError.message 
+          })
         }
       }
     }
@@ -918,7 +974,7 @@ export const fetchLinodeServiceDetails = async (credentials, serviceName, startD
       }))
       .sort((a, b) => b.cost - a.cost)
 
-    console.log(`[Linode Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('Linode Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -926,7 +982,13 @@ export const fetchLinodeServiceDetails = async (credentials, serviceName, startD
       subServices,
     }
   } catch (error) {
-    console.error(`[Linode Service Details] Error:`, error)
+    logger.error('Linode Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return { serviceName, totalCost: 0, subServices: [] }
   }
 }
@@ -956,8 +1018,7 @@ function categorizeLinodeItem(item) {
 export const fetchVultrServiceDetails = async (credentials, serviceName, startDate, endDate) => {
   const { apiKey } = credentials
 
-  console.log(`[Vultr Service Details] Fetching details for: ${serviceName}`)
-  console.log(`[Vultr Service Details] Date range: ${startDate} to ${endDate}`)
+  logger.debug('Vultr Service Details: Fetching details', { serviceName, startDate, endDate })
 
   try {
     const headers = {
@@ -1020,7 +1081,10 @@ export const fetchVultrServiceDetails = async (credentials, serviceName, startDa
         })
       }
     } catch (instanceError) {
-      console.warn(`[Vultr Service Details] Error fetching instances: ${instanceError.message}`)
+      logger.warn('Vultr Service Details: Error fetching instances', { 
+        serviceName, 
+        error: instanceError.message 
+      })
     }
 
     const subServices = Array.from(subServiceMap.entries())
@@ -1032,7 +1096,7 @@ export const fetchVultrServiceDetails = async (credentials, serviceName, startDa
       }))
       .sort((a, b) => b.cost - a.cost)
 
-    console.log(`[Vultr Service Details] Found ${subServices.length} sub-services`)
+    logger.debug('Vultr Service Details: Found sub-services', { count: subServices.length, serviceName })
 
     return {
       serviceName,
@@ -1040,7 +1104,13 @@ export const fetchVultrServiceDetails = async (credentials, serviceName, startDa
       subServices,
     }
   } catch (error) {
-    console.error(`[Vultr Service Details] Error:`, error)
+    logger.error('Vultr Service Details: Error fetching service details', { 
+      serviceName, 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     return { serviceName, totalCost: 0, subServices: [] }
   }
 }
@@ -1072,13 +1142,16 @@ function categorizeVultrItem(item) {
 export const fetchAzureCostData = async (credentials, startDate, endDate) => {
   const { tenantId, clientId, clientSecret, subscriptionId } = credentials
 
-  console.log(`[Azure Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
-  console.log(`[Azure Fetch] Subscription ID: ${subscriptionId?.slice(0, 8)}...`)
+  logger.debug('Azure Fetch: Starting fetch', { 
+    startDate, 
+    endDate, 
+    subscriptionIdPrefix: subscriptionId?.slice(0, 8) 
+  })
 
   try {
     // Get OAuth token
     const token = await getAzureAccessToken(tenantId, clientId, clientSecret)
-    console.log(`[Azure Fetch] Successfully obtained access token`)
+    logger.debug('Azure Fetch: Successfully obtained access token')
 
     const baseUrl = `https://management.azure.com/subscriptions/${subscriptionId}/providers/Microsoft.CostManagement/query?api-version=2021-10-01`
     
@@ -1101,7 +1174,7 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
       },
     }
 
-    console.log(`[Azure Fetch] Fetching total costs...`)
+    logger.debug('Azure Fetch: Fetching total costs')
     const totalResponse = await fetch(baseUrl, {
       method: 'POST',
       headers: {
@@ -1117,7 +1190,9 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
     }
 
     const totalResult = await totalResponse.json()
-    console.log(`[Azure Fetch] Total cost rows: ${totalResult.properties?.rows?.length || 0}`)
+    logger.debug('Azure Fetch: Total cost rows received', { 
+      rowCount: totalResult.properties?.rows?.length || 0 
+    })
 
     // Fetch with grouping for service breakdown
     const groupedPayload = {
@@ -1144,7 +1219,7 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
       },
     }
 
-    console.log(`[Azure Fetch] Fetching service breakdown...`)
+    logger.debug('Azure Fetch: Fetching service breakdown')
     const groupedResponse = await fetch(baseUrl, {
       method: 'POST',
       headers: {
@@ -1160,11 +1235,18 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
     }
 
     const groupedResult = await groupedResponse.json()
-    console.log(`[Azure Fetch] Grouped rows: ${groupedResult.properties?.rows?.length || 0}`)
+    logger.debug('Azure Fetch: Grouped rows received', { 
+      rowCount: groupedResult.properties?.rows?.length || 0 
+    })
 
     return transformAzureCostData(totalResult, groupedResult, startDate, endDate)
   } catch (error) {
-    console.error('[Azure Fetch] Azure Cost Management error:', error)
+    logger.error('Azure Fetch: Azure Cost Management error', { 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`Azure API Error: ${error.message}`)
   }
 }
@@ -1276,11 +1358,13 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
 
   const services = filterOutTaxServices(allServices)
 
-  console.log(`[Azure Transform] Processed data:`)
-  console.log(`  - Daily data points: ${dailyData.length}`)
-  console.log(`  - Current month total: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Last month total: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services found: ${allServices.length}, after tax filter: ${services.length}`)
+  logger.info('Azure Transform: Processed data', {
+    dailyDataPoints: dailyData.length,
+    currentMonth: currentMonth.toFixed(2),
+    lastMonth: lastMonth.toFixed(2),
+    servicesFound: allServices.length,
+    servicesAfterFilter: services.length
+  })
 
   return {
     currentMonth,
@@ -1301,8 +1385,7 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
 export const fetchGCPCostData = async (credentials, startDate, endDate) => {
   const { projectId, serviceAccountKey, billingAccountId, bigQueryDataset } = credentials
 
-  console.log(`[GCP Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
-  console.log(`[GCP Fetch] Project ID: ${projectId}`)
+  logger.debug('GCP Fetch: Starting fetch', { startDate, endDate, projectId })
 
   try {
     if (!serviceAccountKey) {
@@ -1316,7 +1399,7 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
 
     // Get access token using service account
     const token = await getGCPAccessToken(keyData)
-    console.log(`[GCP Fetch] Successfully obtained access token`)
+    logger.debug('GCP Fetch: Successfully obtained access token')
 
     // If BigQuery dataset is configured, query billing data from there
     if (bigQueryDataset) {
@@ -1326,7 +1409,7 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
     // Otherwise, use Cloud Billing API for basic billing info
     const billingUrl = `https://cloudbilling.googleapis.com/v1/billingAccounts/${billingAccountId || '-'}`
     
-    console.log(`[GCP Fetch] Fetching billing account info...`)
+    logger.debug('GCP Fetch: Fetching billing account info')
     const response = await fetch(billingUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1336,7 +1419,10 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
 
     if (!response.ok) {
       const error = await response.json()
-      console.warn(`[GCP Fetch] Billing API error: ${error.error?.message}`)
+      logger.warn('GCP Fetch: Billing API error', { 
+        errorMessage: error.error?.message, 
+        status: response.status 
+      })
       // Return empty data if billing API not accessible
       return {
         currentMonth: 0,
@@ -1350,11 +1436,13 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
     }
 
     const billingData = await response.json()
-    console.log(`[GCP Fetch] Billing account: ${billingData.displayName || billingData.name}`)
+    logger.info('GCP Fetch: Billing account retrieved', { 
+      displayName: billingData.displayName || billingData.name 
+    })
 
     // GCP Cloud Billing API doesn't provide detailed cost breakdown without BigQuery export
     // Return structure with note about BigQuery requirement
-    console.log(`[GCP Fetch] Note: For detailed cost data, set up BigQuery billing export`)
+    logger.warn('GCP Fetch: BigQuery billing export not configured - detailed cost data unavailable')
     
     return {
       currentMonth: 0,
@@ -1366,7 +1454,13 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
       dailyData: [],
     }
   } catch (error) {
-    console.error('[GCP Fetch] GCP Billing error:', error)
+    logger.error('GCP Fetch: GCP Billing error', { 
+      startDate, 
+      endDate, 
+      projectId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`GCP API Error: ${error.message}`)
   }
 }
@@ -1430,7 +1524,7 @@ const createGCPJWT = (header, claims, privateKey) => {
  * Fetch GCP billing data from BigQuery export
  */
 const fetchGCPBigQueryBilling = async (token, projectId, dataset, startDate, endDate) => {
-  console.log(`[GCP Fetch] Fetching from BigQuery dataset: ${dataset}`)
+  logger.debug('GCP Fetch: Fetching from BigQuery dataset', { dataset, projectId, startDate, endDate })
   
   const query = `
     SELECT
@@ -1514,11 +1608,13 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
 
   const services = filterOutTaxServices(allServices)
 
-  console.log(`[GCP Transform] Processed data:`)
-  console.log(`  - Daily data points: ${dailyData.length}`)
-  console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
+  logger.info('GCP Transform: Processed data', {
+    dailyDataPoints: dailyData.length,
+    currentMonth: currentMonth.toFixed(2),
+    lastMonth: lastMonth.toFixed(2),
+    servicesFound: allServices.length,
+    servicesAfterFilter: services.length
+  })
 
   return {
     currentMonth,
@@ -1537,11 +1633,11 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
 export const fetchDigitalOceanCostData = async (credentials, startDate, endDate) => {
   const { apiToken } = credentials
 
-  console.log(`[DO Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
+  logger.debug('DO Fetch: Starting fetch', { startDate, endDate })
 
   try {
     // Fetch invoices
-    console.log(`[DO Fetch] Fetching invoices...`)
+    logger.debug('DO Fetch: Fetching invoices')
     const invoicesResponse = await fetch('https://api.digitalocean.com/v2/customers/my/invoices', {
       headers: {
         'Authorization': `Bearer ${apiToken}`,
@@ -1554,12 +1650,12 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
     }
 
     const invoicesData = await invoicesResponse.json()
-    console.log(`[DO Fetch] Found ${invoicesData.invoices?.length || 0} invoices`)
+    logger.debug('DO Fetch: Found invoices', { count: invoicesData.invoices?.length || 0 })
 
     // Fetch billing history for more detailed breakdown
     let billingHistory = []
     try {
-      console.log(`[DO Fetch] Fetching billing history...`)
+      logger.debug('DO Fetch: Fetching billing history')
       const historyResponse = await fetch('https://api.digitalocean.com/v2/customers/my/billing_history', {
         headers: {
           'Authorization': `Bearer ${apiToken}`,
@@ -1570,15 +1666,20 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
       if (historyResponse.ok) {
         const historyData = await historyResponse.json()
         billingHistory = historyData.billing_history || []
-        console.log(`[DO Fetch] Found ${billingHistory.length} billing history entries`)
+        logger.debug('DO Fetch: Found billing history entries', { count: billingHistory.length })
       }
     } catch (historyError) {
-      console.warn(`[DO Fetch] Could not fetch billing history: ${historyError.message}`)
+      logger.warn('DO Fetch: Could not fetch billing history', { error: historyError.message })
     }
 
     return transformDigitalOceanCostData(invoicesData, billingHistory, startDate, endDate)
   } catch (error) {
-    console.error('[DO Fetch] DigitalOcean API error:', error)
+    logger.error('DO Fetch: DigitalOcean API error', { 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`DigitalOcean API Error: ${error.message}`)
   }
 }
@@ -1637,11 +1738,13 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
 
   const services = filterOutTaxServices(allServices)
 
-  console.log(`[DO Transform] Processed data:`)
-  console.log(`  - Daily data points: ${dailyData.length}`)
-  console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
+  logger.info('DO Transform: Processed data', {
+    dailyDataPoints: dailyData.length,
+    currentMonth: currentMonth.toFixed(2),
+    lastMonth: lastMonth.toFixed(2),
+    servicesFound: allServices.length,
+    servicesAfterFilter: services.length
+  })
 
   return {
     currentMonth,
@@ -1661,7 +1764,7 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
 export const fetchIBMCloudCostData = async (credentials, startDate, endDate) => {
   const { apiKey, accountId } = credentials
 
-  console.log(`[IBM Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
+  logger.debug('IBM Fetch: Starting fetch', { startDate, endDate })
 
   try {
     if (!apiKey) {
@@ -1669,7 +1772,7 @@ export const fetchIBMCloudCostData = async (credentials, startDate, endDate) => 
     }
 
     // Get IAM access token
-    console.log(`[IBM Fetch] Getting IAM access token...`)
+    logger.debug('IBM Fetch: Getting IAM access token')
     const tokenResponse = await fetch('https://iam.cloud.ibm.com/identity/token', {
       method: 'POST',
       headers: {
@@ -1689,14 +1792,14 @@ export const fetchIBMCloudCostData = async (credentials, startDate, endDate) => 
 
     const tokenData = await tokenResponse.json()
     const accessToken = tokenData.access_token
-    console.log(`[IBM Fetch] Successfully obtained access token`)
+    logger.debug('IBM Fetch: Successfully obtained access token')
 
     // Get account summary for the billing month
     const startMonth = startDate.substring(0, 7) // YYYY-MM format
     const endMonth = endDate.substring(0, 7)
     
     // Fetch account summary
-    console.log(`[IBM Fetch] Fetching account summary for ${startMonth}...`)
+    logger.debug('IBM Fetch: Fetching account summary', { month: startMonth })
     const summaryUrl = `https://billing.cloud.ibm.com/v4/accounts/${accountId}/summary/${startMonth}`
     
     const summaryResponse = await fetch(summaryUrl, {
@@ -1709,13 +1812,16 @@ export const fetchIBMCloudCostData = async (credentials, startDate, endDate) => 
     let accountSummary = null
     if (summaryResponse.ok) {
       accountSummary = await summaryResponse.json()
-      console.log(`[IBM Fetch] Account summary retrieved`)
+      logger.debug('IBM Fetch: Account summary retrieved')
     } else {
-      console.warn(`[IBM Fetch] Could not fetch account summary: ${summaryResponse.statusText}`)
+      logger.warn('IBM Fetch: Could not fetch account summary', { 
+        status: summaryResponse.status, 
+        statusText: summaryResponse.statusText 
+      })
     }
 
     // Fetch usage reports
-    console.log(`[IBM Fetch] Fetching usage reports...`)
+    logger.debug('IBM Fetch: Fetching usage reports')
     const usageUrl = `https://billing.cloud.ibm.com/v4/accounts/${accountId}/usage/${startMonth}`
     
     const usageResponse = await fetch(usageUrl, {
@@ -1728,14 +1834,22 @@ export const fetchIBMCloudCostData = async (credentials, startDate, endDate) => 
     let usageData = null
     if (usageResponse.ok) {
       usageData = await usageResponse.json()
-      console.log(`[IBM Fetch] Usage data retrieved`)
+      logger.debug('IBM Fetch: Usage data retrieved')
     } else {
-      console.warn(`[IBM Fetch] Could not fetch usage data: ${usageResponse.statusText}`)
+      logger.warn('IBM Fetch: Could not fetch usage data', { 
+        status: usageResponse.status, 
+        statusText: usageResponse.statusText 
+      })
     }
 
     return transformIBMCloudCostData(accountSummary, usageData, startDate, endDate)
   } catch (error) {
-    console.error('[IBM Fetch] IBM Cloud error:', error)
+    logger.error('IBM Fetch: IBM Cloud error', { 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`IBM Cloud API Error: ${error.message}`)
   }
 }
@@ -1798,9 +1912,11 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
 
   const services = filterOutTaxServices(allServices)
 
-  console.log(`[IBM Transform] Processed data:`)
-  console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
+  logger.info('IBM Transform: Processed data', {
+    currentMonth: currentMonth.toFixed(2),
+    servicesFound: allServices.length,
+    servicesAfterFilter: services.length
+  })
 
   return {
     currentMonth,
@@ -1820,7 +1936,7 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
 export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
   const { apiToken } = credentials
 
-  console.log(`[Linode Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
+  logger.debug('Linode Fetch: Starting fetch', { startDate, endDate })
 
   try {
     if (!apiToken) {
@@ -1833,7 +1949,7 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
     }
 
     // Fetch account info
-    console.log(`[Linode Fetch] Fetching account info...`)
+    logger.debug('Linode Fetch: Fetching account info')
     const accountResponse = await fetch('https://api.linode.com/v4/account', { headers })
     
     if (!accountResponse.ok) {
@@ -1841,37 +1957,44 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
     }
     
     const accountData = await accountResponse.json()
-    console.log(`[Linode Fetch] Account: ${accountData.email}`)
-    console.log(`[Linode Fetch] Balance: $${accountData.balance || 0}`)
+    logger.info('Linode Fetch: Account info retrieved', { 
+      email: accountData.email, 
+      balance: accountData.balance || 0 
+    })
 
     // Fetch invoices for historical data
-    console.log(`[Linode Fetch] Fetching invoices...`)
+    logger.debug('Linode Fetch: Fetching invoices')
     const invoicesResponse = await fetch('https://api.linode.com/v4/account/invoices?page_size=100', { headers })
     
     let invoices = []
     if (invoicesResponse.ok) {
       const invoicesData = await invoicesResponse.json()
       invoices = invoicesData.data || []
-      console.log(`[Linode Fetch] Found ${invoices.length} invoices`)
+      logger.debug('Linode Fetch: Found invoices', { count: invoices.length })
     }
 
     // Fetch current month's invoice items (unbilled usage)
-    console.log(`[Linode Fetch] Fetching current invoice items...`)
+    logger.debug('Linode Fetch: Fetching current invoice items')
     let currentInvoiceItems = []
     try {
       const invoiceItemsResponse = await fetch('https://api.linode.com/v4/account/invoices/current/items?page_size=500', { headers })
       if (invoiceItemsResponse.ok) {
         const itemsData = await invoiceItemsResponse.json()
         currentInvoiceItems = itemsData.data || []
-        console.log(`[Linode Fetch] Found ${currentInvoiceItems.length} current invoice items`)
+        logger.debug('Linode Fetch: Found current invoice items', { count: currentInvoiceItems.length })
       }
     } catch (itemsError) {
-      console.warn(`[Linode Fetch] Could not fetch current invoice items: ${itemsError.message}`)
+      logger.warn('Linode Fetch: Could not fetch current invoice items', { error: itemsError.message })
     }
 
     return transformLinodeCostData(accountData, invoices, currentInvoiceItems, startDate, endDate)
   } catch (error) {
-    console.error('[Linode Fetch] Linode API error:', error)
+    logger.error('Linode Fetch: Linode API error', { 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`Linode API Error: ${error.message}`)
   }
 }
@@ -1942,11 +2065,13 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
 
   const services = filterOutTaxServices(allServices)
 
-  console.log(`[Linode Transform] Processed data:`)
-  console.log(`  - Daily data points: ${dailyData.length}`)
-  console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
+  logger.info('Linode Transform: Processed data', {
+    dailyDataPoints: dailyData.length,
+    currentMonth: currentMonth.toFixed(2),
+    lastMonth: lastMonth.toFixed(2),
+    servicesFound: allServices.length,
+    servicesAfterFilter: services.length
+  })
 
   return {
     currentMonth,
@@ -1966,7 +2091,7 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
 export const fetchVultrCostData = async (credentials, startDate, endDate) => {
   const { apiKey } = credentials
 
-  console.log(`[Vultr Fetch] Starting fetch for date range: ${startDate} to ${endDate}`)
+  logger.debug('Vultr Fetch: Starting fetch', { startDate, endDate })
 
   try {
     if (!apiKey) {
@@ -1979,7 +2104,7 @@ export const fetchVultrCostData = async (credentials, startDate, endDate) => {
     }
 
     // Fetch account info
-    console.log(`[Vultr Fetch] Fetching account info...`)
+    logger.debug('Vultr Fetch: Fetching account info')
     const accountResponse = await fetch('https://api.vultr.com/v2/account', { headers })
     
     if (!accountResponse.ok) {
@@ -1988,35 +2113,42 @@ export const fetchVultrCostData = async (credentials, startDate, endDate) => {
     
     const accountData = await accountResponse.json()
     const account = accountData.account || {}
-    console.log(`[Vultr Fetch] Account email: ${account.email}`)
-    console.log(`[Vultr Fetch] Balance: $${account.balance || 0}`)
-    console.log(`[Vultr Fetch] Pending charges: $${account.pending_charges || 0}`)
+    logger.info('Vultr Fetch: Account info retrieved', { 
+      email: account.email, 
+      balance: account.balance || 0, 
+      pendingCharges: account.pending_charges || 0 
+    })
 
     // Fetch billing history
-    console.log(`[Vultr Fetch] Fetching billing history...`)
+    logger.debug('Vultr Fetch: Fetching billing history')
     const billingResponse = await fetch('https://api.vultr.com/v2/billing/history', { headers })
     
     let billingHistory = []
     if (billingResponse.ok) {
       const billingData = await billingResponse.json()
       billingHistory = billingData.billing_history || []
-      console.log(`[Vultr Fetch] Found ${billingHistory.length} billing history entries`)
+      logger.debug('Vultr Fetch: Found billing history entries', { count: billingHistory.length })
     }
 
     // Fetch invoices
-    console.log(`[Vultr Fetch] Fetching invoices...`)
+    logger.debug('Vultr Fetch: Fetching invoices')
     const invoicesResponse = await fetch('https://api.vultr.com/v2/billing/invoices', { headers })
     
     let invoices = []
     if (invoicesResponse.ok) {
       const invoicesData = await invoicesResponse.json()
       invoices = invoicesData.billing_invoices || []
-      console.log(`[Vultr Fetch] Found ${invoices.length} invoices`)
+      logger.debug('Vultr Fetch: Found invoices', { count: invoices.length })
     }
 
     return transformVultrCostData(account, billingHistory, invoices, startDate, endDate)
   } catch (error) {
-    console.error('[Vultr Fetch] Vultr API error:', error)
+    logger.error('Vultr Fetch: Vultr API error', { 
+      startDate, 
+      endDate, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`Vultr API Error: ${error.message}`)
   }
 }
@@ -2097,11 +2229,13 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
 
   const services = filterOutTaxServices(allServices)
 
-  console.log(`[Vultr Transform] Processed data:`)
-  console.log(`  - Daily data points: ${dailyData.length}`)
-  console.log(`  - Current month: $${currentMonth.toFixed(2)}`)
-  console.log(`  - Last month: $${lastMonth.toFixed(2)}`)
-  console.log(`  - Services: ${allServices.length}, after tax filter: ${services.length}`)
+  logger.info('Vultr Transform: Processed data', {
+    dailyDataPoints: dailyData.length,
+    currentMonth: currentMonth.toFixed(2),
+    lastMonth: lastMonth.toFixed(2),
+    servicesFound: allServices.length,
+    servicesAfterFilter: services.length
+  })
 
   return {
     currentMonth,

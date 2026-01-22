@@ -4,6 +4,7 @@
  */
 
 import { BudgetsClient, CreateBudgetCommand } from '@aws-sdk/client-budgets'
+import logger from '../utils/logger.js'
 
 /**
  * Create a budget in AWS using AWS Budgets API
@@ -88,10 +89,15 @@ export const createAWSBudget = async (credentials, budgetData) => {
     })
 
     const response = await client.send(command)
-    console.log(`[AWS Budget] Created budget: ${budgetName}`)
+    logger.info('AWS Budget: Created budget', { budgetName, awsAccountId })
     return response
   } catch (error) {
-    console.error('[AWS Budget] Error creating budget:', error)
+    logger.error('AWS Budget: Error creating budget', { 
+      budgetName, 
+      awsAccountId, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`Failed to create AWS budget: ${error.message}`)
   }
 }
@@ -109,8 +115,8 @@ export const createAzureBudget = async (credentials, budgetData) => {
     // 2. Specific permissions (Cost Management Contributor)
     // 3. Different authentication flow
     
-    console.log(`[Azure Budget] Budget definition prepared: ${budgetName}`)
-    console.warn('[Azure Budget] Azure budget creation requires billing account configuration and additional permissions')
+    logger.info('Azure Budget: Budget definition prepared', { budgetName })
+    logger.warn('Azure Budget: Azure budget creation requires billing account configuration and additional permissions')
     
     // Return success but note that manual setup may be required
     return { 
@@ -119,7 +125,11 @@ export const createAzureBudget = async (credentials, budgetData) => {
       requiresManualSetup: true
     }
   } catch (error) {
-    console.error('[Azure Budget] Error creating budget:', error)
+    logger.error('Azure Budget: Error creating budget', { 
+      budgetName, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`Failed to create Azure budget: ${error.message}`)
   }
 }
@@ -137,8 +147,8 @@ export const createGCPBudget = async (credentials, budgetData) => {
     // 2. Cloud Billing Budgets API enabled
     // 3. Billing Account User or Billing Account Administrator role
     
-    console.log(`[GCP Budget] Budget definition prepared: ${budgetName}`)
-    console.warn('[GCP Budget] GCP budget creation requires billing account ID and additional setup')
+    logger.info('GCP Budget: Budget definition prepared', { budgetName })
+    logger.warn('GCP Budget: GCP budget creation requires billing account ID and additional setup')
     
     // Return success but note that manual setup may be required
     return { 
@@ -147,7 +157,11 @@ export const createGCPBudget = async (credentials, budgetData) => {
       requiresManualSetup: true
     }
   } catch (error) {
-    console.error('[GCP Budget] Error creating budget:', error)
+    logger.error('GCP Budget: Error creating budget', { 
+      budgetName, 
+      error: error.message, 
+      stack: error.stack 
+    })
     throw new Error(`Failed to create GCP budget: ${error.message}`)
   }
 }
