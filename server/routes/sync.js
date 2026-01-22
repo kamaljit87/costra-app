@@ -1,6 +1,5 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
-import { syncLimiter } from '../middleware/rateLimiter.js'
 import { 
   getCloudProviderCredentialsByAccountId,
   getUserCloudProviders, 
@@ -25,8 +24,7 @@ const router = express.Router()
 // All routes require authentication
 router.use(authenticateToken)
 
-// Apply sync rate limiter to all sync routes
-router.use(syncLimiter)
+// No rate limiting for sync endpoints - users need to sync their data freely
 
 /**
  * Sync cost data from all active cloud provider accounts
