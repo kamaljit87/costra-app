@@ -77,14 +77,24 @@ router.post('/login',
     try {
       const { email, password } = req.body
 
+      // Email is already normalized by validateLogin middleware
+      // But ensure it's lowercase for database lookup (PostgreSQL is case-sensitive by default)
+      const normalizedEmail = email.toLowerCase().trim()
+
+      logger.debug('Login attempt', {
+        requestId: req.requestId,
+        email: normalizedEmail,
+        emailLength: normalizedEmail.length,
+      })
+
       // Find user
       let user
       try {
-        user = await getUserByEmail(email)
+        user = await getUserByEmail(normalizedEmail)
       } catch (dbError) {
         logger.error('Database error in login', {
           requestId: req.requestId,
-          email: req.body.email,
+          email: normalizedEmail,
           error: dbError.message,
           stack: dbError.stack,
         })
@@ -92,12 +102,21 @@ router.post('/login',
       }
       
       if (!user) {
+        logger.warn('Login attempt with non-existent email', {
+          requestId: req.requestId,
+          email: normalizedEmail,
+        })
         return res.status(401).json({ error: 'Invalid credentials' })
       }
 
       // Verify password
       const isValidPassword = await bcrypt.compare(password, user.password_hash)
       if (!isValidPassword) {
+        logger.warn('Login attempt with incorrect password', {
+          requestId: req.requestId,
+          email: normalizedEmail,
+          userId: user.id,
+        })
         return res.status(401).json({ error: 'Invalid credentials' })
       }
 

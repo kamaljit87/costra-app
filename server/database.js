@@ -733,7 +733,9 @@ export const getUserByGoogleId = async (googleId) => {
 export const getUserByEmail = async (email) => {
   const client = await pool.connect()
   try {
-    const result = await client.query('SELECT * FROM users WHERE email = $1', [email])
+    // Use LOWER() for case-insensitive email lookup
+    // This ensures emails are matched regardless of case
+    const result = await client.query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email])
     return result.rows[0] || null
   } finally {
     client.release()
