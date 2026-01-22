@@ -31,14 +31,13 @@ const __dirname = path.dirname(__filename)
 dotenv.config({ path: path.join(__dirname, '.env') })
 
 // Initialize Sentry (if DSN is provided)
-// Note: Express integration will be added after app is created
 if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
     tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
     integrations: [
-      new Sentry.Integrations.Http({ tracing: true }),
+      Sentry.expressIntegration(),
     ],
   })
   logger.info('Sentry initialized', { dsn: process.env.SENTRY_DSN.substring(0, 20) + '...' })
@@ -63,11 +62,8 @@ if (process.env.NODE_ENV === 'production') {
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Sentry request handler must be the first middleware
-if (process.env.SENTRY_DSN) {
-  app.use(Sentry.Handlers.requestHandler())
-  app.use(Sentry.Handlers.tracingHandler())
-}
+// Sentry Express integration automatically handles request/tracing
+// No need for separate requestHandler/tracingHandler in v10
 
 // Request ID middleware (must be early in the chain)
 app.use(requestIdMiddleware)
@@ -167,7 +163,7 @@ app.get('/api/health', (req, res) => {
 
 // Sentry error handler must be before other error handlers
 if (process.env.SENTRY_DSN) {
-  app.use(Sentry.Handlers.errorHandler())
+  Sentry.setupExpressErrorHandler(app)
 }
 
 // Centralized error handling middleware (must be last)
