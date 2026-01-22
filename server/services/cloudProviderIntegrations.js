@@ -195,8 +195,9 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
   totalResultsByTime.slice(0, 10).forEach((result, idx) => {
     const date = result.TimePeriod?.Start
     const unblended = result.Total?.UnblendedCost?.Amount
-    logger.debug('Processing day', { dayIndex: idx, date, unblendedCost: unblended.toFixed(2) })
-    totalSum += parseFloat(unblended || 0)
+    const unblendedNum = parseFloat(unblended || 0)
+    logger.debug('Processing day', { dayIndex: idx, date, unblendedCost: unblendedNum.toFixed(2) })
+    totalSum += unblendedNum
   })
   logger.debug('First 10 days total calculated', { totalSum: totalSum.toFixed(2) })
 
