@@ -60,7 +60,10 @@ export const validateLogin = [
   body('email')
     .isEmail()
     .withMessage('Invalid email address')
-    .normalizeEmail(),
+    // Don't normalize email - it removes dots which can cause mismatches
+    // We'll handle case-insensitivity in the database lookup instead
+    .trim()
+    .toLowerCase(),
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
