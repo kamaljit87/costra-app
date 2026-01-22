@@ -657,9 +657,9 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
 
       {/* Add Provider Modal */}
       {showAddModal && (
-        <div className={modalMode ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" : ""}>
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+        <div className={modalMode ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto" : ""}>
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto my-4">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-gray-900">Add Cloud Provider Account</h3>
                 <button
@@ -686,7 +686,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                   <label className="block text-sm font-medium text-gray-700 mb-4">
                     Select Provider
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                     {AVAILABLE_PROVIDERS.map((provider) => {
                       const count = getAccountCount(provider.id)
                       const isSelected = selectedProvider === provider.id
@@ -1015,7 +1015,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                   </div>
                 )}
 
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 mt-6">
                   <button
                     onClick={() => {
                       setShowAddModal(false)
@@ -1025,8 +1025,11 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                       setAwsConnectionType('simple')
                       setAutomatedConnectionData(null)
                       setError('')
+                      if (modalMode) {
+                        onClose?.()
+                      }
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto order-2 sm:order-1"
                   >
                     Cancel
                   </button>
@@ -1034,7 +1037,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                     <button
                       onClick={handleAddProvider}
                       disabled={isSubmitting || !selectedProvider}
-                      className="btn-primary"
+                      className="btn-primary w-full sm:w-auto order-1 sm:order-2"
                     >
                       {isSubmitting ? 'Adding...' : 'Add Account'}
                     </button>
