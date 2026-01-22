@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
 import AIChat from './AIChat'
@@ -9,6 +9,18 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [sidebarOpen])
 
   return (
     <div className="flex h-screen bg-[#F8FAFC]">
@@ -27,7 +39,7 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
-          <div className="min-h-full">
+          <div className="min-h-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             {children}
           </div>
         </main>

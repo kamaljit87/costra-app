@@ -6,7 +6,8 @@ import {
   Sparkles,
   ChevronUp,
   Wallet,
-  FileText
+  FileText,
+  X
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cloudProvidersAPI } from '../services/api'
@@ -112,9 +113,10 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
           {!isPermanent && (
             <button
               onClick={onClose}
-              className="lg:hidden text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+              className="lg:hidden text-white/70 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Close sidebar"
             >
-              ✕
+              <X className="h-5 w-5" />
             </button>
           )}
         </div>

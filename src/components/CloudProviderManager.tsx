@@ -683,12 +683,13 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-4">
                     Select Provider
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                     {AVAILABLE_PROVIDERS.map((provider) => {
                       const count = getAccountCount(provider.id)
+                      const isSelected = selectedProvider === provider.id
                       return (
                         <button
                           key={provider.id}
@@ -699,21 +700,47 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             // Suggest a default alias
                             setAccountAlias(count > 0 ? `${provider.name} Account ${count + 1}` : '')
                           }}
-                          className={`p-4 border-2 rounded-lg text-left transition-colors ${
-                            selectedProvider === provider.id
-                              ? 'border-primary-500 bg-primary-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
+                          className={`
+                            relative aspect-square p-4 sm:p-5 rounded-xl text-center
+                            border-2 transition-all duration-200 ease-in-out
+                            ${isSelected
+                              ? 'border-[#22B8A0] bg-[#22B8A0]/5 shadow-lg shadow-[#22B8A0]/20 scale-[1.02]'
+                              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md hover:scale-[1.01]'
+                            }
+                            focus:outline-none focus:ring-2 focus:ring-[#22B8A0] focus:ring-offset-2
+                            min-h-[120px] sm:min-h-[140px]
+                          `}
+                          aria-label={`Select ${provider.name}`}
                         >
-                          <div className="flex items-center justify-between mb-2">
-                            <ProviderIcon providerId={provider.id} size={32} />
-                            {count > 0 && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                {count} account{count > 1 ? 's' : ''}
-                              </span>
-                            )}
+                          {/* Provider Icon */}
+                          <div className={`flex items-center justify-center mb-3 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
+                            <ProviderIcon providerId={provider.id} size={40} />
                           </div>
-                          <div className="font-medium text-gray-900">{provider.name}</div>
+                          
+                          {/* Provider Name */}
+                          <div className={`font-semibold text-sm sm:text-base mb-1 transition-colors ${
+                            isSelected ? 'text-[#22B8A0]' : 'text-gray-900'
+                          }`}>
+                            {provider.name}
+                          </div>
+                          
+                          {/* Account Count Badge */}
+                          {count > 0 && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              isSelected 
+                                ? 'bg-[#22B8A0] text-white' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {count} account{count > 1 ? 's' : ''}
+                            </span>
+                          )}
+                          
+                          {/* Selection Indicator */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 w-5 h-5 bg-[#22B8A0] rounded-full flex items-center justify-center">
+                              <Check className="h-3 w-3 text-white" />
+                            </div>
+                          )}
                         </button>
                       )
                     })}
@@ -752,7 +779,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Connection Type
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                           <button
                             type="button"
                             onClick={() => {
