@@ -657,8 +657,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
 
       {/* Add Provider Modal */}
       {showAddModal && (
-        <div className={modalMode ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto" : ""}>
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto my-4">
+        <div className={modalMode ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto" : ""}>
+          <div className="bg-white rounded-none sm:rounded-xl shadow-xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto sm:my-4">
             <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-gray-900">Add Cloud Provider Account</h3>

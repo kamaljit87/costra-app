@@ -281,8 +281,10 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
       </div>
 
       {/* Efficiency Metrics Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="inline-block min-w-full align-middle sm:rounded-lg">
+          <div className="overflow-hidden sm:rounded-lg border border-gray-200">
+            <table className="w-full divide-y divide-gray-200">
           <thead>
             <tr className="border-b border-frozenWater-200">
               <th className="text-left py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
@@ -358,7 +360,10 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
               )
             })}
           </tbody>
-        </table>
+            </table>
+          </div>
+        </div>
+      </div>
       </div>
 
       {data.efficiencyMetrics.length > 0 && (

@@ -190,8 +190,10 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle sm:rounded-lg">
+              <div className="overflow-hidden sm:rounded-lg border border-gray-200">
+                <table className="w-full divide-y divide-gray-200">
               <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
@@ -274,7 +276,10 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
                   </tr>
                 ))}
               </tbody>
-            </table>
+                </table>
+              </div>
+            </div>
+          </div>
           </div>
         )}
       </div>

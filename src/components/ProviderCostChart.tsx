@@ -130,7 +130,7 @@ export default function ProviderCostChart({
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={280} className="min-h-[200px] sm:min-h-[280px]">
         {isMonthlyView ? (
           <BarChart data={chartData} barCategoryGap="20%">
             <defs>

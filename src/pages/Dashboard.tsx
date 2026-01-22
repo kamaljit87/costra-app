@@ -112,7 +112,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="w-full px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Breadcrumbs */}
         <Breadcrumbs />
 
@@ -132,9 +132,9 @@ export default function Dashboard() {
         )}
 
         {/* Header with Sync and Add Provider - Compact */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#0F172A] mb-0.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#0F172A] mb-0.5">
               Dashboard
             </h1>
             <p className="text-xs text-[#64748B]">
@@ -142,10 +142,10 @@ export default function Dashboard() {
             </p>
           </div>
           {!isDemoMode && (
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-3 sm:space-y-0">
               <button
                 onClick={() => setShowAddProvider(true)}
-                className="btn-secondary flex items-center space-x-2"
+                className="btn-secondary flex items-center justify-center space-x-2 min-h-[44px]"
                 title="Add a new cloud provider account"
               >
                 <Plus className="h-4 w-4" />
@@ -154,7 +154,7 @@ export default function Dashboard() {
               <button
                 onClick={handleSync}
                 disabled={isSyncing}
-                className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 title="Sync fresh data from all cloud providers (clears cache)"
               >
                 <Cloud className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
