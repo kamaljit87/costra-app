@@ -1,30 +1,22 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { body, validationResult } from 'express-validator'
 import { createUser, getUserByEmail, getUserById } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
+import { authLimiter } from '../middleware/rateLimiter.js'
+import { validateSignup, validateLogin } from '../middleware/validator.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
 
+// Apply auth rate limiter to all auth routes
+router.use(authLimiter)
+
 // Signup endpoint
 router.post('/signup',
-  [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-  ],
+  validateSignup,
   async (req, res) => {
     try {
-      const errors = validationResult(req)
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ 
-          error: errors.array().map(e => e.msg).join(', '),
-          errors: errors.array() 
-        })
-      }
-
       const { name, email, password } = req.body
 
       // Check if user already exists
@@ -80,17 +72,9 @@ router.post('/signup',
 
 // Login endpoint
 router.post('/login',
-  [
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').notEmpty().withMessage('Password is required'),
-  ],
+  validateLogin,
   async (req, res) => {
     try {
-      const errors = validationResult(req)
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() })
-      }
-
       const { email, password } = req.body
 
       // Find user

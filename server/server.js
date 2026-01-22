@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import helmet from 'helmet'
+import compression from 'compression'
 import * as Sentry from '@sentry/node'
 import { initDatabase } from './database.js'
 import authRoutes from './routes/auth.js'
@@ -20,6 +22,7 @@ import { fileURLToPath } from 'url'
 import logger from './utils/logger.js'
 import { requestIdMiddleware } from './middleware/requestId.js'
 import { errorHandler } from './middleware/errorHandler.js'
+import { apiLimiter } from './middleware/rateLimiter.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -43,11 +46,18 @@ if (process.env.SENTRY_DSN) {
   logger.warn('Sentry DSN not provided - error tracking disabled')
 }
 
-// Validate required environment variables
+// Validate required environment variables and security configuration
+import { runSecurityAudit } from './utils/securityAudit.js'
+
 if (!process.env.JWT_SECRET) {
   logger.error('JWT_SECRET is not set in environment variables!')
   logger.error('Please set JWT_SECRET in server/.env file')
   process.exit(1)
+}
+
+// Run security audit on startup (warnings only, won't exit)
+if (process.env.NODE_ENV === 'production') {
+  runSecurityAudit()
 }
 
 const app = express()
@@ -62,7 +72,36 @@ if (process.env.SENTRY_DSN) {
 // Request ID middleware (must be early in the chain)
 app.use(requestIdMiddleware)
 
-// Middleware
+// Security middleware - Helmet (must be before other middleware)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for React
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'https:'], // Allow data URIs and HTTPS images
+      connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:5173'],
+      fontSrc: ["'self'", 'data:', 'https:'],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  xssFilter: true,
+}))
+
+// Compression middleware (reduce response size)
+app.use(compression())
+
+// CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.FRONTEND_URL 
@@ -71,7 +110,27 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
 }))
-app.use(express.json())
+
+// Request body parsing with size limits
+app.use(express.json({ limit: '10mb' })) // 10MB limit for JSON
+app.use(express.urlencoded({ extended: true, limit: '5mb' })) // 5MB limit for form data
+
+// Request timeout configuration (30 seconds)
+app.use((req, res, next) => {
+  req.setTimeout(30000, () => {
+    logger.warn('Request timeout', { requestId: req.requestId, path: req.path })
+    res.status(408).json({
+      error: 'Request timeout',
+      code: 'REQUEST_TIMEOUT',
+      requestId: req.requestId,
+      timestamp: new Date().toISOString(),
+    })
+  })
+  next()
+})
+
+// Apply general API rate limiting to all routes
+app.use('/api', apiLimiter)
 
 // Initialize database
 initDatabase().catch((error) => {

@@ -5,6 +5,7 @@
 
 import { CostExplorerClient, GetCostAndUsageCommand } from '@aws-sdk/client-cost-explorer'
 import logger from '../utils/logger.js'
+import { retryWithBackoff } from '../utils/retry.js'
 
 // Cache for provider clients to avoid recreating them
 const clientCache = new Map()
@@ -101,7 +102,12 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     })
 
     logger.debug('Sending GetCostAndUsage command with SERVICE grouping', { startDate, endDate })
-    const groupedResponse = await client.send(command)
+    const groupedResponse = await retryWithBackoff(
+      () => client.send(command),
+      { maxAttempts: 3, timeout: 30000 },
+      'aws',
+      { startDate, endDate, operation: 'getCostAndUsage-grouped' }
+    )
     
     logger.debug('Grouped response received', { resultsByTimeCount: groupedResponse.ResultsByTime?.length || 0 })
     
@@ -134,14 +140,37 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     })
 
     logger.debug('Sending GetCostAndUsage command for daily totals', { startDate, endDate })
-    const totalResponse = await client.send(totalCommand)
+    const totalResponse = await retryWithBackoff(
+      () => client.send(totalCommand),
+      { maxAttempts: 3, timeout: 30000 },
+      'aws',
+      { startDate, endDate, operation: 'getCostAndUsage-total' }
+    )
     
     logger.debug('Total response received', { resultsByTimeCount: totalResponse.ResultsByTime?.length || 0 })
 
     return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate)
   } catch (error) {
-    logger.error('AWS Cost Explorer error', { error: error.message, code: error.code, name: error.name, stack: error.stack })
-    throw new Error(`AWS API Error: ${error.message}`)
+    // Map AWS-specific errors to user-friendly messages
+    let userMessage = error.message
+    if (error.name === 'UnauthorizedOperation' || error.name === 'AccessDenied') {
+      userMessage = 'AWS credentials do not have permission to access Cost Explorer. Please check IAM permissions.'
+    } else if (error.name === 'InvalidParameterException') {
+      userMessage = 'Invalid date range or parameters for AWS Cost Explorer query.'
+    } else if (error.message?.includes('timeout')) {
+      userMessage = 'AWS API request timed out. Please try again.'
+    } else if (error.$metadata?.httpStatusCode === 429) {
+      userMessage = 'AWS API rate limit exceeded. Please wait a moment and try again.'
+    }
+    
+    logger.error('AWS Cost Explorer error', { 
+      error: error.message, 
+      code: error.code, 
+      name: error.name, 
+      httpStatusCode: error.$metadata?.httpStatusCode,
+      stack: error.stack 
+    })
+    throw new Error(`AWS API Error: ${userMessage}`)
   }
 }
 
@@ -1175,19 +1204,26 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
     }
 
     logger.debug('Azure Fetch: Fetching total costs')
-    const totalResponse = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    const totalResponse = await retryWithBackoff(
+      async () => {
+        const response = await fetch(baseUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(totalPayload),
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(`Azure API Error: ${error.error?.message || response.statusText}`)
+        }
+        return response
       },
-      body: JSON.stringify(totalPayload),
-    })
-
-    if (!totalResponse.ok) {
-      const error = await totalResponse.json()
-      throw new Error(`Azure API Error: ${error.error?.message || totalResponse.statusText}`)
-    }
+      { maxAttempts: 3, timeout: 30000 },
+      'azure',
+      { startDate, endDate, operation: 'fetchTotalCosts' }
+    )
 
     const totalResult = await totalResponse.json()
     logger.debug('Azure Fetch: Total cost rows received', { 
@@ -1220,19 +1256,26 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
     }
 
     logger.debug('Azure Fetch: Fetching service breakdown')
-    const groupedResponse = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    const groupedResponse = await retryWithBackoff(
+      async () => {
+        const response = await fetch(baseUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(groupedPayload),
+        })
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(`Azure API Error: ${error.error?.message || response.statusText}`)
+        }
+        return response
       },
-      body: JSON.stringify(groupedPayload),
-    })
-
-    if (!groupedResponse.ok) {
-      const error = await groupedResponse.json()
-      throw new Error(`Azure API Error: ${error.error?.message || groupedResponse.statusText}`)
-    }
+      { maxAttempts: 3, timeout: 30000 },
+      'azure',
+      { startDate, endDate, operation: 'fetchServiceBreakdown' }
+    )
 
     const groupedResult = await groupedResponse.json()
     logger.debug('Azure Fetch: Grouped rows received', { 
@@ -1241,13 +1284,27 @@ export const fetchAzureCostData = async (credentials, startDate, endDate) => {
 
     return transformAzureCostData(totalResult, groupedResult, startDate, endDate)
   } catch (error) {
+    // Map Azure-specific errors to user-friendly messages
+    let userMessage = error.message
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      userMessage = 'Azure credentials are invalid or expired. Please check your credentials.'
+    } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      userMessage = 'Azure credentials do not have permission to access Cost Management API.'
+    } else if (error.message?.includes('404')) {
+      userMessage = 'Azure subscription not found. Please check your subscription ID.'
+    } else if (error.message?.includes('timeout')) {
+      userMessage = 'Azure API request timed out. Please try again.'
+    } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+      userMessage = 'Azure API rate limit exceeded. Please wait a moment and try again.'
+    }
+    
     logger.error('Azure Fetch: Azure Cost Management error', { 
       startDate, 
       endDate, 
       error: error.message, 
       stack: error.stack 
     })
-    throw new Error(`Azure API Error: ${error.message}`)
+    throw new Error(`Azure API Error: ${userMessage}`)
   }
 }
 
@@ -1410,20 +1467,34 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
     const billingUrl = `https://cloudbilling.googleapis.com/v1/billingAccounts/${billingAccountId || '-'}`
     
     logger.debug('GCP Fetch: Fetching billing account info')
-    const response = await fetch(billingUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    const response = await retryWithBackoff(
+      async () => {
+        const res = await fetch(billingUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!res.ok) {
+          const error = await res.json()
+          throw new Error(`GCP API Error: ${error.error?.message || res.statusText}`)
+        }
+        return res
       },
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
+      { maxAttempts: 3, timeout: 30000 },
+      'gcp',
+      { startDate, endDate, operation: 'fetchBillingAccount' }
+    ).catch((error) => {
       logger.warn('GCP Fetch: Billing API error', { 
-        errorMessage: error.error?.message, 
-        status: response.status 
+        errorMessage: error.message, 
+        startDate,
+        endDate,
       })
       // Return empty data if billing API not accessible
+      return null
+    })
+
+    if (!response) {
       return {
         currentMonth: 0,
         lastMonth: 0,
@@ -1454,6 +1525,20 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
       dailyData: [],
     }
   } catch (error) {
+    // Map GCP-specific errors to user-friendly messages
+    let userMessage = error.message
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      userMessage = 'GCP service account credentials are invalid or expired. Please check your credentials.'
+    } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      userMessage = 'GCP service account does not have permission to access Cloud Billing API.'
+    } else if (error.message?.includes('404')) {
+      userMessage = 'GCP billing account not found. Please check your billing account ID.'
+    } else if (error.message?.includes('timeout')) {
+      userMessage = 'GCP API request timed out. Please try again.'
+    } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+      userMessage = 'GCP API rate limit exceeded. Please wait a moment and try again.'
+    }
+    
     logger.error('GCP Fetch: GCP Billing error', { 
       startDate, 
       endDate, 
@@ -1461,7 +1546,7 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
       error: error.message, 
       stack: error.stack 
     })
-    throw new Error(`GCP API Error: ${error.message}`)
+    throw new Error(`GCP API Error: ${userMessage}`)
   }
 }
 
@@ -1638,16 +1723,23 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
   try {
     // Fetch invoices
     logger.debug('DO Fetch: Fetching invoices')
-    const invoicesResponse = await fetch('https://api.digitalocean.com/v2/customers/my/invoices', {
-      headers: {
-        'Authorization': `Bearer ${apiToken}`,
-        'Content-Type': 'application/json',
+    const invoicesResponse = await retryWithBackoff(
+      async () => {
+        const response = await fetch('https://api.digitalocean.com/v2/customers/my/invoices', {
+          headers: {
+            'Authorization': `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) {
+          throw new Error(`DigitalOcean API error: ${response.statusText}`)
+        }
+        return response
       },
-    })
-
-    if (!invoicesResponse.ok) {
-      throw new Error(`DigitalOcean API error: ${invoicesResponse.statusText}`)
-    }
+      { maxAttempts: 3, timeout: 30000 },
+      'digitalocean',
+      { startDate, endDate, operation: 'fetchInvoices' }
+    )
 
     const invoicesData = await invoicesResponse.json()
     logger.debug('DO Fetch: Found invoices', { count: invoicesData.invoices?.length || 0 })
@@ -1656,14 +1748,24 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
     let billingHistory = []
     try {
       logger.debug('DO Fetch: Fetching billing history')
-      const historyResponse = await fetch('https://api.digitalocean.com/v2/customers/my/billing_history', {
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
+      const historyResponse = await retryWithBackoff(
+        async () => {
+          return await fetch('https://api.digitalocean.com/v2/customers/my/billing_history', {
+            headers: {
+              'Authorization': `Bearer ${apiToken}`,
+              'Content-Type': 'application/json',
+            },
+          })
         },
+        { maxAttempts: 3, timeout: 30000 },
+        'digitalocean',
+        { startDate, endDate, operation: 'fetchBillingHistory' }
+      ).catch((error) => {
+        logger.warn('DO Fetch: Could not fetch billing history', { error: error.message })
+        return null
       })
 
-      if (historyResponse.ok) {
+      if (historyResponse && historyResponse.ok) {
         const historyData = await historyResponse.json()
         billingHistory = historyData.billing_history || []
         logger.debug('DO Fetch: Found billing history entries', { count: billingHistory.length })
@@ -1674,13 +1776,25 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
 
     return transformDigitalOceanCostData(invoicesData, billingHistory, startDate, endDate)
   } catch (error) {
+    // Map DigitalOcean-specific errors to user-friendly messages
+    let userMessage = error.message
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      userMessage = 'DigitalOcean API token is invalid or expired. Please check your API token.'
+    } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      userMessage = 'DigitalOcean API token does not have required permissions.'
+    } else if (error.message?.includes('timeout')) {
+      userMessage = 'DigitalOcean API request timed out. Please try again.'
+    } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+      userMessage = 'DigitalOcean API rate limit exceeded. Please wait a moment and try again.'
+    }
+    
     logger.error('DO Fetch: DigitalOcean API error', { 
       startDate, 
       endDate, 
       error: error.message, 
       stack: error.stack 
     })
-    throw new Error(`DigitalOcean API Error: ${error.message}`)
+    throw new Error(`DigitalOcean API Error: ${userMessage}`)
   }
 }
 

@@ -1,6 +1,7 @@
 import express from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { authenticateToken } from '../middleware/auth.js'
+import { aiLimiter } from '../middleware/rateLimiter.js'
 import { getCostDataForUser, getDailyCostData, getServiceCostsForDateRange } from '../database.js'
 import logger from '../utils/logger.js'
 
@@ -20,6 +21,9 @@ const getAnthropicClient = () => {
 
 // All routes require authentication
 router.use(authenticateToken)
+
+// Apply AI rate limiter to all AI routes
+router.use(aiLimiter)
 
 // Chat with AI about cost data
 router.post('/chat', async (req, res) => {

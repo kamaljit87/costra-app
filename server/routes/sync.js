@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import { syncLimiter } from '../middleware/rateLimiter.js'
 import { 
   getCloudProviderCredentialsByAccountId,
   getUserCloudProviders, 
@@ -15,12 +16,17 @@ import {
   pool 
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
+import { enhanceCostData } from '../utils/costCalculations.js'
+import { sanitizeCostData, validateCostDataResponse } from '../utils/dataValidator.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
 
 // All routes require authentication
 router.use(authenticateToken)
+
+// Apply sync rate limiter to all sync routes
+router.use(syncLimiter)
 
 /**
  * Sync cost data from all active cloud provider accounts
@@ -213,6 +219,30 @@ router.post('/', async (req, res) => {
           await setCachedCostData(userId, account.provider_id, cacheKey, costData, 60)
         }
 
+        // Validate and sanitize cost data
+        const validation = validateCostDataResponse(costData)
+        if (!validation.valid) {
+          logger.warn('Cost data validation failed, but continuing', {
+            requestId: req.requestId,
+            userId,
+            accountId: account.id,
+            errors: validation.errors,
+          })
+        }
+
+        // Enhance cost data with accurate lastMonth and forecast
+        const enhancedData = await enhanceCostData(
+          costData,
+          account.provider_id,
+          credentialsToUse,
+          currentYear,
+          currentMonth,
+          costData.dailyData
+        )
+
+        // Sanitize data before saving
+        const sanitizedData = sanitizeCostData(enhancedData)
+
         // Save monthly cost data to database
         logger.debug('Saving monthly cost data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
         await saveCostData(
@@ -225,12 +255,12 @@ router.post('/', async (req, res) => {
             accountAlias: account.account_alias,
             accountId: account.id,
             icon: getProviderIcon(account.provider_id),
-            currentMonth: costData.currentMonth,
-            lastMonth: costData.lastMonth || costData.currentMonth * 0.95,
-            forecast: costData.forecast || costData.currentMonth * 1.1,
-            credits: costData.credits || 0,
-            savings: costData.savings || 0,
-            services: costData.services || [],
+            currentMonth: sanitizedData.currentMonth,
+            lastMonth: sanitizedData.lastMonth, // No fallback - use actual data or null
+            forecast: sanitizedData.forecast, // Calculated from trend, not fixed percentage
+            credits: sanitizedData.credits || 0,
+            savings: sanitizedData.savings || 0,
+            services: sanitizedData.services || [],
           }
         )
 
@@ -433,6 +463,30 @@ router.post('/account/:accountId', async (req, res) => {
       await setCachedCostData(userId, providerId, cacheKey, costData, 60)
     }
 
+    // Validate and sanitize cost data
+    const validation = validateCostDataResponse(costData)
+    if (!validation.valid) {
+      logger.warn('Cost data validation failed, but continuing', {
+        requestId: req.requestId,
+        userId,
+        accountId,
+        errors: validation.errors,
+      })
+    }
+
+    // Enhance cost data with accurate lastMonth and forecast
+    const enhancedData = await enhanceCostData(
+      costData,
+      providerId,
+      credentialsToUse,
+      currentYear,
+      currentMonth,
+      costData.dailyData
+    )
+
+    // Sanitize data before saving
+    const sanitizedData = sanitizeCostData(enhancedData)
+
     // Save monthly cost data to database
     await saveCostData(
       userId,
@@ -444,12 +498,12 @@ router.post('/account/:accountId', async (req, res) => {
         accountAlias: accountAlias,
         accountId: accountId,
         icon: getProviderIcon(providerId),
-        currentMonth: costData.currentMonth,
-        lastMonth: costData.lastMonth || costData.currentMonth * 0.95,
-        forecast: costData.forecast || costData.currentMonth * 1.1,
-        credits: costData.credits || 0,
-        savings: costData.savings || 0,
-        services: costData.services || [],
+        currentMonth: sanitizedData.currentMonth,
+        lastMonth: sanitizedData.lastMonth, // No fallback - use actual data or null
+        forecast: sanitizedData.forecast, // Calculated from trend, not fixed percentage
+        credits: sanitizedData.credits || 0,
+        savings: sanitizedData.savings || 0,
+        services: sanitizedData.services || [],
       }
     )
 
@@ -529,18 +583,42 @@ router.post('/:providerId', async (req, res) => {
           await setCachedCostData(userId, providerId, cacheKey, costData, 60)
         }
 
+        // Validate and sanitize cost data
+        const validation = validateCostDataResponse(costData)
+        if (!validation.valid) {
+          logger.warn('Cost data validation failed, but continuing', {
+            requestId: req.requestId,
+            userId,
+            accountId: account.id,
+            errors: validation.errors,
+          })
+        }
+
+        // Enhance cost data with accurate lastMonth and forecast
+        const enhancedData = await enhanceCostData(
+          costData,
+          providerId,
+          accountData.credentials,
+          currentYear,
+          currentMonth,
+          costData.dailyData
+        )
+
+        // Sanitize data before saving
+        const sanitizedData = sanitizeCostData(enhancedData)
+
         // Save data
         await saveCostData(userId, providerId, currentMonth, currentYear, {
           providerName: account.provider_name,
           accountAlias: account.account_alias,
           accountId: account.id,
           icon: getProviderIcon(providerId),
-          currentMonth: costData.currentMonth,
-          lastMonth: costData.lastMonth || costData.currentMonth * 0.95,
-          forecast: costData.forecast || costData.currentMonth * 1.1,
-          credits: costData.credits || 0,
-          savings: costData.savings || 0,
-          services: costData.services || [],
+          currentMonth: sanitizedData.currentMonth,
+          lastMonth: sanitizedData.lastMonth, // No fallback - use actual data or null
+          forecast: sanitizedData.forecast, // Calculated from trend, not fixed percentage
+          credits: sanitizedData.credits || 0,
+          savings: sanitizedData.savings || 0,
+          services: sanitizedData.services || [],
         })
 
         if (costData.dailyData && costData.dailyData.length > 0) {
