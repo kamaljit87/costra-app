@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight } from 'lucide-react'
+import Logo from '../components/Logo'
 
 export default function LandingPage() {
   return (
@@ -9,11 +10,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <img 
-                src="/logo.png" 
-                alt="Costra" 
-                className="h-10 w-auto"
-              />
+              <Logo height={40} />
             </div>
             <div className="flex items-center space-x-4">
               <Link to="/login" className="text-gray-600 hover:text-gray-900 font-medium">

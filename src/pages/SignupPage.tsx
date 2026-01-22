@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import Logo from '../components/Logo'
 import { UserPlus, Mail, Lock, Eye, EyeOff, User, Cloud, Zap, TrendingUp } from 'lucide-react'
 
 export default function SignupPage() {
@@ -62,12 +63,8 @@ export default function SignupPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-12 lg:px-12 overflow-y-auto">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <div className="flex items-center space-x-3 mb-8">
-            <img 
-              src="/logo.png" 
-              alt="Costra" 
-              className="h-12 w-auto"
-            />
+          <div className="mb-8">
+            <Logo height={48} />
           </div>
 
           {/* Title */}
