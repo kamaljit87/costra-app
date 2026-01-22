@@ -3,11 +3,11 @@ import logger from '../utils/logger.js'
 
 /**
  * Rate limiter for authentication endpoints
- * 5 requests per 15 minutes per IP
+ * Disabled for development - very lenient limits in production
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 50 : 1000, // Very lenient limits
   message: {
     error: 'Too many authentication attempts from this IP, please try again after 15 minutes.',
     code: 'RATE_LIMIT_EXCEEDED',

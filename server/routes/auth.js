@@ -9,8 +9,8 @@ import logger from '../utils/logger.js'
 
 const router = express.Router()
 
-// Apply auth rate limiter to all auth routes
-router.use(authLimiter)
+// Auth rate limiter removed - no rate limiting for authentication endpoints
+// router.use(authLimiter)
 
 // Signup endpoint
 router.post('/signup',
