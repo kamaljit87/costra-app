@@ -2,7 +2,7 @@ import pkg from 'pg'
 const { Pool } = pkg
 import logger from './utils/logger.js'
 
-// Create PostgreSQL connection pool
+// Create PostgreSQL connection pool with optimized settings
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
@@ -14,17 +14,39 @@ const pool = new Pool({
     user: process.env.DB_USER || 'postgres',
     password: String(process.env.DB_PASSWORD || 'postgres'),
   }),
+  // Connection pool settings
+  max: parseInt(process.env.DB_POOL_MAX || '20', 10), // Maximum number of clients in the pool
+  min: parseInt(process.env.DB_POOL_MIN || '5', 10), // Minimum number of clients in the pool
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
+  // Query timeout (30 seconds)
+  query_timeout: 30000,
 })
 
 // Test connection
-pool.on('connect', () => {
-  logger.info('Connected to PostgreSQL database')
+pool.on('connect', (client) => {
+  logger.info('Connected to PostgreSQL database', { 
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount 
+  })
 })
 
 pool.on('error', (err) => {
   logger.error('Unexpected error on idle client', { error: err.message, stack: err.stack })
   process.exit(-1)
 })
+
+// Connection pool monitoring - log stats periodically
+if (process.env.NODE_ENV === 'production') {
+  setInterval(() => {
+    logger.debug('Database connection pool stats', {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount,
+    })
+  }, 60000) // Log every minute
+}
 
 // Initialize database schema
 export const initDatabase = async () => {
@@ -620,9 +642,35 @@ export const initDatabase = async () => {
         ON cloud_provider_credentials(user_id)
       `)
 
+      // Composite index for user_id + provider_id queries (Day 5 optimization)
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cloud_provider_credentials_user_provider 
+        ON cloud_provider_credentials(user_id, provider_id)
+      `)
+
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_daily_cost_data_user_provider_date 
         ON daily_cost_data(user_id, provider_id, date)
+      `)
+
+      // Additional indexes for Day 5 performance optimizations
+      // Composite index for cost_data queries (user_id, provider_id, month, year)
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cost_data_user_provider_month_year 
+        ON cost_data(user_id, provider_id, month, year)
+      `)
+
+      // Index for service_costs joined with cost_data (via cost_data_id)
+      // Note: service_costs doesn't have user_id directly, but we can optimize joins
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_service_costs_cost_data_id_service 
+        ON service_costs(cost_data_id, service_name)
+      `)
+
+      // Index for notifications (user_id, created_at) - already exists but ensure it's optimal
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_created 
+        ON notifications(user_id, created_at DESC)
       `)
 
       await client.query(`
@@ -4592,28 +4640,39 @@ export const saveReport = async (userId, reportData) => {
 /**
  * Get reports for a user
  */
-export const getReports = async (userId, reportType = null, limit = 50) => {
+export const getReports = async (userId, reportType = null, limit = 50, offset = 0, includeTotal = false) => {
   const client = await pool.connect()
   try {
-    let query = `
-      SELECT * FROM reports
-      WHERE user_id = $1
-    `
+    // Build WHERE clause
+    let whereClause = `WHERE user_id = $1`
     const params = [userId]
     let paramIndex = 2
     
     if (reportType) {
-      query += ` AND report_type = $${paramIndex}`
+      whereClause += ` AND report_type = $${paramIndex}`
       params.push(reportType)
       paramIndex++
     }
     
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex}`
-    params.push(limit)
+    // Get total count if requested
+    let total = null
+    if (includeTotal) {
+      const countQuery = `SELECT COUNT(*) as total FROM reports ${whereClause}`
+      const countResult = await client.query(countQuery, params)
+      total = parseInt(countResult.rows[0].total, 10)
+    }
+    
+    // Get paginated results
+    let query = `
+      SELECT * FROM reports
+      ${whereClause}
+      ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
+    params.push(limit, offset)
     
     const result = await client.query(query, params)
     
-    return result.rows.map(row => ({
+    const reports = result.rows.map(row => ({
       id: row.id,
       userId: row.user_id,
       reportType: row.report_type,
@@ -4631,9 +4690,16 @@ export const getReports = async (userId, reportType = null, limit = 50) => {
       createdAt: row.created_at,
       completedAt: row.completed_at
     }))
+    
+    // Return with total if requested
+    if (includeTotal) {
+      return { reports, total }
+    }
+    
+    return reports
   } catch (error) {
     logger.error('getReports error', { userId, error: error.message, stack: error.stack })
-    return []
+    return includeTotal ? { reports: [], total: 0 } : []
   } finally {
     client.release()
   }
@@ -4827,32 +4893,43 @@ export const createNotification = async (userId, notification) => {
 export const getNotifications = async (userId, options = {}) => {
   const client = await pool.connect()
   try {
-    const { unreadOnly = false, limit = 50, offset = 0, type = null } = options
+    const { unreadOnly = false, limit = 50, offset = 0, type = null, includeTotal = false } = options
     
-    let query = `
-      SELECT id, type, title, message, link, link_text, is_read, metadata, created_at, read_at
-      FROM notifications
-      WHERE user_id = $1
-    `
+    // Build WHERE clause
+    let whereClause = `WHERE user_id = $1`
     const params = [userId]
     let paramIndex = 2
     
     if (unreadOnly) {
-      query += ` AND is_read = false`
+      whereClause += ` AND is_read = false`
     }
     
     if (type) {
-      query += ` AND type = $${paramIndex}`
+      whereClause += ` AND type = $${paramIndex}`
       params.push(type)
       paramIndex++
     }
     
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+    // Get total count if requested
+    let total = null
+    if (includeTotal) {
+      const countQuery = `SELECT COUNT(*) as total FROM notifications ${whereClause}`
+      const countResult = await client.query(countQuery, params)
+      total = parseInt(countResult.rows[0].total, 10)
+    }
+    
+    // Get paginated results
+    let query = `
+      SELECT id, type, title, message, link, link_text, is_read, metadata, created_at, read_at
+      FROM notifications
+      ${whereClause}
+      ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `
     params.push(limit, offset)
     
     const result = await client.query(query, params)
     
-    return result.rows.map(row => ({
+    const notifications = result.rows.map(row => ({
       id: row.id,
       type: row.type,
       title: row.title,
@@ -4864,6 +4941,13 @@ export const getNotifications = async (userId, options = {}) => {
       createdAt: row.created_at,
       readAt: row.read_at
     }))
+    
+    // Return with total if requested
+    if (includeTotal) {
+      return { notifications, total }
+    }
+    
+    return notifications
   } finally {
     client.release()
   }

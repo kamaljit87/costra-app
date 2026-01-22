@@ -10,6 +10,7 @@ import {
   deleteNotification,
   deleteOldNotifications
 } from '../database.js'
+import { parsePagination, createPaginationMeta, createPaginatedResponse } from '../utils/pagination.js'
 
 const router = express.Router()
 
@@ -23,19 +24,30 @@ router.use(authenticateToken)
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    const { unreadOnly, limit = 50, offset = 0, type } = req.query
+    const { unreadOnly, type } = req.query
 
-    const notifications = await getNotifications(userId, {
+    // Parse pagination (default: 30 per page for notifications)
+    const { page, limit, offset } = parsePagination(req, { page: 1, limit: 30, maxLimit: 100 })
+
+    const result = await getNotifications(userId, {
       unreadOnly: unreadOnly === 'true',
-      limit: parseInt(limit, 10),
-      offset: parseInt(offset, 10),
-      type: type || null
+      limit,
+      offset,
+      type: type || null,
+      includeTotal: true, // Request total count for pagination
     })
 
-    res.json({ notifications })
+    const notifications = result.notifications || result
+    const total = result.total || notifications.length
+
+    // Create pagination metadata
+    const pagination = createPaginationMeta(page, limit, total)
+
+    // Return paginated response
+    res.json(createPaginatedResponse(notifications, pagination))
   } catch (error) {
     logger.error('Notifications: Error fetching notifications', { 
-      userId, 
+      userId: req.user?.userId || req.user?.id, 
       error: error.message, 
       stack: error.stack 
     })

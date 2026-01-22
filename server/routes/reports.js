@@ -11,6 +11,7 @@ import {
   createNotification,
 } from '../database.js'
 import { generateCSVReport, generatePDFReport } from '../utils/reportGenerator.js'
+import { parsePagination, createPaginationMeta, createPaginatedResponse } from '../utils/pagination.js'
 import path from 'path'
 import fs from 'fs/promises'
 
@@ -285,15 +286,27 @@ router.get('/', async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: 'User ID not found' })
     }
-    const { reportType, limit } = req.query
+    const { reportType } = req.query
     
-    const reports = await getReports(
+    // Parse pagination (default: 20 per page for reports)
+    const { page, limit, offset } = parsePagination(req, { page: 1, limit: 20, maxLimit: 100 })
+    
+    const result = await getReports(
       userId,
       reportType || null,
-      limit ? parseInt(limit) : 50
+      limit,
+      offset,
+      true // includeTotal
     )
     
-    res.json({ reports })
+    const reports = result.reports || result
+    const total = result.total || reports.length
+    
+    // Create pagination metadata
+    const pagination = createPaginationMeta(page, limit, total)
+    
+    // Return paginated response
+    res.json(createPaginatedResponse(reports, pagination))
   } catch (error) {
     logger.error('Get reports error', { 
       userId: req.user?.userId || req.user?.id, 

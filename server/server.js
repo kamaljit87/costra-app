@@ -5,6 +5,7 @@ import helmet from 'helmet'
 import compression from 'compression'
 import * as Sentry from '@sentry/node'
 import { initDatabase } from './database.js'
+import { initRedis } from './utils/cache.js'
 import authRoutes from './routes/auth.js'
 import costDataRoutes from './routes/costData.js'
 import savingsPlansRoutes from './routes/savingsPlans.js'
@@ -23,6 +24,10 @@ import logger from './utils/logger.js'
 import { requestIdMiddleware } from './middleware/requestId.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { apiLimiter } from './middleware/rateLimiter.js'
+import { performanceMonitor } from './middleware/performanceMonitor.js'
+import { metricsMiddleware } from './middleware/metrics.js'
+import healthRoutes from './routes/health.js'
+import { setupSwagger } from './swagger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -45,14 +50,12 @@ if (process.env.SENTRY_DSN) {
   logger.warn('Sentry DSN not provided - error tracking disabled')
 }
 
-// Validate required environment variables and security configuration
+// Validate configuration
+import { validateConfig } from './utils/config.js'
 import { runSecurityAudit } from './utils/securityAudit.js'
 
-if (!process.env.JWT_SECRET) {
-  logger.error('JWT_SECRET is not set in environment variables!')
-  logger.error('Please set JWT_SECRET in server/.env file')
-  process.exit(1)
-}
+// Validate configuration on startup
+validateConfig()
 
 // Run security audit on startup (warnings only, won't exit)
 if (process.env.NODE_ENV === 'production') {
@@ -125,6 +128,12 @@ app.use((req, res, next) => {
   next()
 })
 
+// Performance monitoring middleware (must be before routes)
+app.use(performanceMonitor)
+
+// Metrics collection middleware (must be before routes)
+app.use(metricsMiddleware)
+
 // Apply general API rate limiting to all routes
 app.use('/api', apiLimiter)
 
@@ -133,6 +142,21 @@ initDatabase().catch((error) => {
   logger.error('Failed to initialize database', { error: error.message, stack: error.stack })
   process.exit(1)
 })
+
+// Initialize Redis cache (optional - app continues if Redis unavailable)
+initRedis().catch((error) => {
+  logger.warn('Failed to initialize Redis - caching disabled', { error: error.message })
+  // Don't exit - app can run without Redis
+})
+
+// Initialize alerting system (in production)
+if (process.env.NODE_ENV === 'production') {
+  import('./utils/alerting.js').then(({ initAlerting }) => {
+    initAlerting()
+  }).catch((error) => {
+    logger.warn('Failed to initialize alerting system', { error: error.message })
+  })
+}
 
 // Serve static files for uploaded avatars
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')))
@@ -151,14 +175,20 @@ app.use('/api/budgets', budgetsRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/notifications', notificationsRoutes)
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Costra API is running',
-    timestamp: new Date().toISOString(),
-    requestId: req.requestId,
-  })
+// Health check routes
+app.use('/api/health', healthRoutes)
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    const { getMetrics } = await import('./utils/metrics.js')
+    const metrics = await getMetrics()
+    res.set('Content-Type', 'text/plain; version=0.0.4')
+    res.send(metrics)
+  } catch (error) {
+    logger.error('Error generating metrics', { error: error.message })
+    res.status(500).send('# Error generating metrics\n')
+  }
 })
 
 // Sentry error handler must be before other error handlers
@@ -169,10 +199,16 @@ if (process.env.SENTRY_DSN) {
 // Centralized error handling middleware (must be last)
 app.use(errorHandler)
 
-app.listen(PORT, () => {
-  logger.info(`Server running on http://localhost:${PORT}`, { 
-    port: PORT, 
-    environment: process.env.NODE_ENV || 'development',
-    nodeVersion: process.version,
+// Only start server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    logger.info(`Server running on http://localhost:${PORT}`, { 
+      port: PORT, 
+      environment: process.env.NODE_ENV || 'development',
+      nodeVersion: process.version,
+    })
   })
-})
+}
+
+// Export app for testing
+export default app

@@ -12,6 +12,7 @@ import {
   getCloudProviderCredentials,
   createNotification,
 } from '../database.js'
+import { cached, cacheKeys, clearUserCache } from '../utils/cache.js'
 import { 
   fetchAWSServiceDetails, 
   fetchAzureServiceDetails,
@@ -51,7 +52,13 @@ router.get('/', async (req, res) => {
     const month = now.getMonth() + 1 // 1-12
     const year = now.getFullYear()
 
-    const costData = await getCostDataForUser(userId, month, year)
+    // Use cache with 5-minute TTL for cost data
+    const cacheKey = `cost_data:${userId}:${month}:${year}`
+    const costData = await cached(
+      cacheKey,
+      async () => await getCostDataForUser(userId, month, year),
+      300 // 5 minutes TTL
+    )
 
     // Format response to match frontend expectations
     const formattedData = costData.map(cost => ({
@@ -99,6 +106,9 @@ router.post('/', async (req, res) => {
     if (!providerId || !costData) {
       return res.status(400).json({ error: 'Provider ID and cost data are required' })
     }
+
+    // Clear cache after saving new cost data
+    await clearUserCache(userId)
 
     const now = new Date()
     const month = now.getMonth() + 1
@@ -398,7 +408,14 @@ router.get('/preferences', async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: 'User ID not found in token' })
     }
-    const preferences = await getUserPreferences(userId)
+    
+    // Cache user preferences with 1-hour TTL
+    const preferences = await cached(
+      cacheKeys.userPreferences(userId),
+      async () => await getUserPreferences(userId),
+      3600 // 1 hour TTL
+    )
+    
     // Always return preferences, even if null (will use defaults)
     res.json({ 
       preferences: preferences || {
@@ -408,7 +425,7 @@ router.get('/preferences', async (req, res) => {
     })
   } catch (error) {
     logger.error('Get preferences error', { 
-      userId, 
+      userId: req.user?.userId || req.user?.id, 
       error: error.message, 
       stack: error.stack 
     })
@@ -433,6 +450,9 @@ router.put('/preferences/currency', async (req, res) => {
     }
 
     await updateUserCurrency(userId, currency)
+    
+    // Clear user preferences cache
+    await cacheDel(cacheKeys.userPreferences(userId))
     
     // Create notification for currency change
     try {
@@ -479,6 +499,10 @@ router.put('/:providerId/credits', async (req, res) => {
     }
 
     await updateProviderCredits(userId, providerId, month, year, credits)
+    
+    // Clear cost data cache for this user
+    await clearUserCache(userId)
+    
     res.json({ message: 'Credits updated successfully', credits })
   } catch (error) {
     logger.error('Update credits error', { 
