@@ -280,7 +280,6 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
               </div>
             </div>
           </div>
-          </div>
         )}
       </div>
 

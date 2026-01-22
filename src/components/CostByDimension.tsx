@@ -556,7 +556,6 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
             </div>
           </div>
         </div>
-        </div>
       )}
 
       {!isLoadingData && data.length === 0 && selectedDimension && (

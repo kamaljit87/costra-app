@@ -364,7 +364,6 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
           </div>
         </div>
       </div>
-      </div>
 
       {data.efficiencyMetrics.length > 0 && (
         <div className="mt-4 pt-4 border-t border-frozenWater-200">

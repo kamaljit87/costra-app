@@ -372,7 +372,6 @@ export default function CostVsUsage({ providerId, startDate, endDate, accountId 
           </div>
         </div>
       </div>
-      </div>
 
       {data.length > 0 && (
         <div className="mt-4 pt-4 border-t border-frozenWater-200">

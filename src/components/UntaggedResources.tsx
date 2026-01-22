@@ -376,7 +376,6 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
           </div>
         </div>
       </div>
-      </div>
 
       {resources.length > 0 && (
         <div className="mt-4 pt-4 border-t border-frozenWater-200">
