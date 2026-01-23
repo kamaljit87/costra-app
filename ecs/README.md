@@ -1,83 +1,53 @@
 # ECS Deployment Files
 
-This directory contains all files necessary for deploying Costra to AWS ECS.
+This directory contains all files necessary for deploying Costra to AWS ECS with a load balancer architecture.
+
+## Architecture
+
+- **Frontend**: Vite Preview on port 3001
+- **Backend**: Node.js API on port 3002
+- **Load Balancers**: Frontend ALB (internet-facing) and Backend ALB (internal)
 
 ## Files
 
-- **`task-definition.json`** - ECS task definition template
-  - Update with your AWS account ID and region
-  - Configure secrets ARNs
-  - Adjust CPU/memory as needed
+### Task Definitions
+- **`task-definition-frontend.json`** - Frontend task definition
+- **`task-definition-backend.json`** - Backend task definition
 
-- **`service-definition.json`** - ECS service configuration template
-  - Update with your subnet IDs
-  - Update with your security group ID
-  - Update with your target group ARN
-  - Adjust desired count for scaling
+### Service Definitions
+- **`service-definition-frontend.json`** - Frontend service configuration
+- **`service-definition-backend.json`** - Backend service configuration
 
-- **`deploy.sh`** - Automated deployment script
-  - Builds Docker image
-  - Pushes to ECR
-  - Registers new task definition
-  - Updates ECS service
-  - Waits for deployment completion
-
-- **`setup-infrastructure.sh`** - Infrastructure setup script
-  - Creates ECR repository
-  - Creates CloudWatch log group
-  - Creates ECS cluster
-  - Provides instructions for manual setup steps
-
+### Infrastructure
 - **`cloudformation-template.yaml`** - Complete infrastructure as code
   - VPC with public/private subnets
-  - Application Load Balancer
+  - Frontend and Backend Application Load Balancers
   - ECS cluster
   - Security groups
-  - CloudWatch log group
+  - CloudWatch log groups
 
+### Setup Scripts
+- **`setup-services.sh`** - Interactive script to create secrets and ECS services
 - **`iam-policies.json`** - IAM policy templates
-  - Task execution role policy
-  - Task role policy
 
-- **`.env.example`** - Environment variable template
-  - Copy to `.env` and fill in your values
+### Documentation
+- **`QUICK_SETUP.md`** - Quick setup guide for completing deployment
 
 ## Quick Start
 
-1. **Set up infrastructure:**
-   ```bash
-   # Option 1: CloudFormation (recommended)
-   aws cloudformation create-stack \
-     --stack-name costra-infrastructure \
-     --template-body file://ecs/cloudformation-template.yaml \
-     --parameters ParameterKey=Environment,ParameterValue=production \
-     --capabilities CAPABILITY_NAMED_IAM \
-     --region us-east-1
+Since you've already created ECR repos, cluster, and VPC:
 
-   # Option 2: Manual setup
-   ./ecs/setup-infrastructure.sh
+1. **Run the setup script:**
+   ```bash
+   ./ecs/setup-services.sh
    ```
 
-2. **Create secrets in AWS Secrets Manager:**
-   ```bash
-   aws secretsmanager create-secret \
-     --name costra/database-url \
-     --secret-string "postgresql://user:pass@host:5432/costra" \
-     --region us-east-1
-   # Repeat for: jwt-secret, stripe-secret-key, stripe-webhook-secret, frontend-url
-   ```
+2. **Or follow the manual setup in `QUICK_SETUP.md`**
 
-3. **Update configuration files:**
-   - Edit `task-definition.json` with your account ID and region
-   - Edit `service-definition.json` with your infrastructure IDs
-   - Copy `.env.example` to `.env` and fill in values
-
-4. **Deploy:**
-   ```bash
-   ./ecs/deploy.sh production latest
-   ```
+3. **Deploy via GitHub Actions** (automatic on push to main) or manually build and push images
 
 ## See Also
 
-- [`../ECS_DEPLOYMENT.md`](../ECS_DEPLOYMENT.md) - Complete deployment guide
+- [`../ECS_LOAD_BALANCER_SETUP.md`](../ECS_LOAD_BALANCER_SETUP.md) - Complete architecture documentation
+- [`../ENVIRONMENT_VARIABLES.md`](../ENVIRONMENT_VARIABLES.md) - Environment variables reference
 - [`../README.md`](../README.md) - Project overview
