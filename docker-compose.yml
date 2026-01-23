@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  costra-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: costra-app
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/costra}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-this-in-production-min-32-chars}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3001}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./server/uploads:/app/uploads
+      - ./server/logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - costra-network
+
+  db:
+    image: postgres:15-alpine
+    container_name: costra-db
+    environment:
+      - POSTGRES_DB=costra
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - costra-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: costra-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - costra-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  costra-network:
+    driver: bridge

@@ -206,6 +206,17 @@ app.get('/metrics', async (req, res) => {
   }
 })
 
+// Serve frontend static files in production (after all API routes)
+if (process.env.NODE_ENV === 'production') {
+  const publicPath = path.join(__dirname, 'public')
+  app.use(express.static(publicPath))
+  
+  // Serve index.html for all non-API routes (SPA routing)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(publicPath, 'index.html'))
+  })
+}
+
 // Sentry error handler must be before other error handlers
 if (process.env.SENTRY_DSN) {
   Sentry.setupExpressErrorHandler(app)

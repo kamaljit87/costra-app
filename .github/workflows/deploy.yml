@@ -1,0 +1,132 @@
+name: Deploy to ECS
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: costra
+  CLUSTER_NAME: costra-cluster
+  SERVICE_NAME: costra-service
+  TASK_FAMILY: costra-app
+
+jobs:
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get image tag
+        id: image-tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            IMAGE_TAG=${GITHUB_REF#refs/tags/}
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            IMAGE_TAG=main-${GITHUB_SHA::8}
+          else
+            IMAGE_TAG=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}
+          fi
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "Using image tag: $IMAGE_TAG"
+
+      - name: Verify image exists in ECR
+        run: |
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-ids imageTag=${{ steps.image-tag.outputs.tag }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_FAMILY }} \
+            --query taskDefinition \
+            --region ${{ env.AWS_REGION }} \
+            > task-definition.json
+
+      - name: Update task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: costra-app
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image-tag.outputs.tag }}
+
+      - name: Register new task definition
+        id: register-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://${{ steps.task-def.outputs.task-definition }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task-definition-arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          echo "Registered task definition: $TASK_DEF_ARN"
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --service ${{ env.SERVICE_NAME }} \
+            --task-definition ${{ steps.register-task-def.outputs.task-definition-arn }} \
+            --region ${{ env.AWS_REGION }} \
+            --force-new-deployment
+
+      - name: Wait for service to stabilize
+        run: |
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --services ${{ env.SERVICE_NAME }} \
+            --region ${{ env.AWS_REGION }}
+          echo "Service is stable!"
+
+      - name: Get service status
+        run: |
+          aws ecs describe-services \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --services ${{ env.SERVICE_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'services[0].{Status:status,RunningCount:runningCount,DesiredCount:desiredCount,Deployments:deployments[*].{Status:status,TaskDefinition:taskDefinition,RunningCount:runningCount}}' \
+            --output json
+
+      - name: Deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: ${{ steps.image-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Task Definition**: ${{ steps.register-task-def.outputs.task-definition-arn }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cluster**: ${{ env.CLUSTER_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployment completed successfully!" >> $GITHUB_STEP_SUMMARY

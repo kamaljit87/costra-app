@@ -11,7 +11,13 @@
     "server:stop": "cd server && npm run pm2:stop",
     "server:restart": "cd server && npm run pm2:restart",
     "server:logs": "cd server && npm run pm2:logs",
-    "server:status": "pm2 status"
+    "server:status": "pm2 status",
+    "docker:build": "docker build -t costra:latest .",
+    "docker:run": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "ecs:deploy": "./ecs/deploy.sh",
+    "ecs:setup": "./ecs/setup-infrastructure.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

@@ -178,28 +178,59 @@ npm start
 
 ## Deployment
 
-### AWS Amplify (Frontend)
+### AWS ECS (Recommended)
 
-The frontend is ready for deployment to AWS Amplify. See deployment guides:
+The application is optimized for deployment to AWS ECS with Fargate. This provides a fully containerized solution with automatic scaling, load balancing, and high availability.
 
-- **Quick Start:** [`AMPLIFY_QUICKSTART.md`](./AMPLIFY_QUICKSTART.md) - 5-minute setup guide
-- **Full Guide:** [`AWS_AMPLIFY_DEPLOYMENT.md`](./AWS_AMPLIFY_DEPLOYMENT.md) - Complete deployment documentation
+**Quick Start:**
+1. Set up infrastructure: `./ecs/setup-infrastructure.sh`
+2. Configure secrets in AWS Secrets Manager
+3. Deploy: `./ecs/deploy.sh production latest`
 
-**Key Steps:**
-1. Connect your Git repository to AWS Amplify
-2. Set environment variable: `VITE_API_URL=https://your-backend-api.com/api`
-3. Deploy!
+**Full Documentation:** See [`ECS_DEPLOYMENT.md`](./ECS_DEPLOYMENT.md) for complete deployment guide including:
+- Infrastructure setup (CloudFormation or manual)
+- IAM roles and permissions
+- Secrets management
+- Deployment process
+- Monitoring and troubleshooting
 
-The `amplify.yml` build configuration is already included in the repository.
+### CI/CD Pipeline (GitHub Actions)
 
-### Backend Deployment
+Automated CI/CD pipeline for testing, building, and deploying:
 
-The backend can be deployed to:
-- **AWS Elastic Beanstalk** (easiest)
-- **AWS ECS with Fargate** (recommended for production)
-- **EC2 Instance** (see [`DEPLOYMENT.md`](./DEPLOYMENT.md))
+**Features:**
+- ✅ Automated testing on pull requests
+- ✅ Docker image building and pushing to ECR
+- ✅ Automatic deployment to ECS on merge to main
+- ✅ Security vulnerability scanning
+- ✅ Manual rollback capability
 
-See [`AWS_AMPLIFY_DEPLOYMENT.md`](./AWS_AMPLIFY_DEPLOYMENT.md) for detailed backend deployment options.
+**Setup:** See [`GITHUB_ACTIONS_SETUP.md`](./GITHUB_ACTIONS_SETUP.md) for complete setup guide.
+
+**Workflows:**
+- `ci.yml` - Runs tests and builds Docker images
+- `deploy.yml` - Deploys to ECS
+- `security-scan.yml` - Security vulnerability scanning
+- `rollback.yml` - Manual rollback workflow
+
+### Docker Compose (Local/Development)
+
+For local testing with Docker:
+
+```bash
+docker-compose up -d
+```
+
+This will start:
+- Costra application (port 3001)
+- PostgreSQL database (port 5432)
+- Redis cache (port 6379)
+
+### Other Deployment Options
+
+- **AWS Elastic Beanstalk** - Traditional PaaS deployment
+- **EC2 Instance** - Manual server setup
+- **Kubernetes** - Use the Dockerfile with your K8s cluster
 
 ## Environment Variables
 
