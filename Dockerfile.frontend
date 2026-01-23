@@ -1,5 +1,5 @@
 # Frontend Dockerfile - Vite preview serving React app
-FROM node:18-alpine
+FROM node:25-alpine
 
 WORKDIR /app
 
