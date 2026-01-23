@@ -82,7 +82,7 @@ export default function LandingPage() {
               <ArrowRight className="ml-2 h-5 w-5" />
             </Link>
             <Link to="/login" className="btn-secondary text-lg px-8 py-3">
-              Try Demo
+              Sign In
             </Link>
           </div>
         </div>

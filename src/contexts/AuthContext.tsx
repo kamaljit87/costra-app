@@ -15,7 +15,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>
   signup: (name: string, email: string, password: string) => Promise<boolean>
   googleLogin: (googleId: string, name: string, email: string, avatarUrl?: string) => Promise<boolean>
-  demoLogin: () => void
   logout: () => void
   updateUser: (userData: Partial<User>) => void
 }
@@ -32,7 +31,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsDemoMode(false)
     setUser(null)
     authAPI.logout()
-    localStorage.removeItem('demoMode')
     localStorage.removeItem('authToken')
     localStorage.removeItem('user')
   }
@@ -74,13 +72,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // Check if user is already logged in
     const token = localStorage.getItem('authToken')
-    const demoStatus = localStorage.getItem('demoMode')
     const savedUser = localStorage.getItem('user')
 
-    if (demoStatus === 'true') {
-      setIsDemoMode(true)
-      setIsAuthenticated(true)
-    } else if (token && savedUser) {
+    // Remove any existing demo mode
+    localStorage.removeItem('demoMode')
+
+    if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser)
         setUser(userData)
@@ -179,13 +176,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const demoLogin = () => {
-    setIsAuthenticated(true)
-    setIsDemoMode(true)
-    localStorage.setItem('demoMode', 'true')
-    // Don't set authToken for demo mode
-  }
-
   const updateUser = (userData: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...userData }
@@ -203,7 +193,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         signup,
         googleLogin,
-        demoLogin,
         logout,
         updateUser,
       }}

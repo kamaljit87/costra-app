@@ -23,15 +23,10 @@ A modern, clean, and professional SaaS web application for multi-cloud cost mana
 - Secure authentication with JWT tokens
 
 ### 🗄️ Database Storage
-- SQLite database for user data
+- PostgreSQL database for user data
 - Secure password hashing with bcrypt
 - User-specific cost data and preferences
 - Savings plans and cloud provider configurations
-
-### 🎮 Demo Access
-- Demo mode with demo login
-- Explore all features without signing up
-- Sample data for testing
 
 ### 🎨 Modern Design System
 - Clean, minimal, data-first UI/UX
@@ -111,10 +106,6 @@ npm run dev
 
 6. Open your browser and navigate to `http://localhost:5173`
 
-### Demo Mode
-
-Click "Try Demo Mode" on the login page to explore the application with sample data without creating an account.
-
 ## Project Structure
 
 ```
@@ -177,11 +168,38 @@ The application uses PostgreSQL with the following tables:
 npm run build
 ```
 
+The build output will be in the `dist/` directory.
+
 ### Backend
 ```bash
 cd server
 npm start
 ```
+
+## Deployment
+
+### AWS Amplify (Frontend)
+
+The frontend is ready for deployment to AWS Amplify. See deployment guides:
+
+- **Quick Start:** [`AMPLIFY_QUICKSTART.md`](./AMPLIFY_QUICKSTART.md) - 5-minute setup guide
+- **Full Guide:** [`AWS_AMPLIFY_DEPLOYMENT.md`](./AWS_AMPLIFY_DEPLOYMENT.md) - Complete deployment documentation
+
+**Key Steps:**
+1. Connect your Git repository to AWS Amplify
+2. Set environment variable: `VITE_API_URL=https://your-backend-api.com/api`
+3. Deploy!
+
+The `amplify.yml` build configuration is already included in the repository.
+
+### Backend Deployment
+
+The backend can be deployed to:
+- **AWS Elastic Beanstalk** (easiest)
+- **AWS ECS with Fargate** (recommended for production)
+- **EC2 Instance** (see [`DEPLOYMENT.md`](./DEPLOYMENT.md))
+
+See [`AWS_AMPLIFY_DEPLOYMENT.md`](./AWS_AMPLIFY_DEPLOYMENT.md) for detailed backend deployment options.
 
 ## Environment Variables
 

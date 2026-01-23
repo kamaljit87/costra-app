@@ -6,6 +6,7 @@ import UpgradePrompt from '../components/UpgradePrompt'
 interface Subscription {
   planType: string
   status: string
+  billingPeriod?: 'monthly' | 'annual'
   trialStartDate: string | null
   trialEndDate: string | null
   subscriptionStartDate: string | null
@@ -15,6 +16,7 @@ interface Subscription {
 interface SubscriptionStatus {
   planType: string
   status: string
+  billingPeriod?: 'monthly' | 'annual'
   daysRemaining: number | null
   nextBillingDate: string | null
   historicalDataMonths: number
@@ -148,6 +150,17 @@ export default function BillingPage() {
 
   const currentPlan = subscription?.planType || 'trial'
   const planInfo = PLANS[currentPlan as keyof typeof PLANS]
+  const currentBillingPeriod = subscription?.billingPeriod || status?.billingPeriod || 'monthly'
+
+  // Format date for display
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -169,7 +182,7 @@ export default function BillingPage() {
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Current Plan</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {status?.isTrial ? 'Free trial' : 'Active subscription'}
+              {status?.isTrial ? 'Free trial' : `Active subscription • ${currentBillingPeriod === 'annual' ? 'Annual' : 'Monthly'} billing`}
             </p>
           </div>
           <div className="text-right">
@@ -183,15 +196,23 @@ export default function BillingPage() {
             ) : (
               <>
                 <div className="text-2xl font-bold text-frozenWater-700">
-                  {(planInfo as any).monthly.inr} <span className="text-lg text-gray-500">/ month</span>
+                  {currentBillingPeriod === 'annual' 
+                    ? (planInfo as any).annual.inr 
+                    : (planInfo as any).monthly.inr
+                  } <span className="text-lg text-gray-500">/ {currentBillingPeriod === 'annual' ? 'year' : 'month'}</span>
                 </div>
-                <div className="text-sm text-gray-500 mt-1">{(planInfo as any).monthly.usd} / month</div>
+                <div className="text-sm text-gray-500 mt-1">
+                  {currentBillingPeriod === 'annual' 
+                    ? (planInfo as any).annual.usd 
+                    : (planInfo as any).monthly.usd
+                  } / {currentBillingPeriod === 'annual' ? 'year' : 'month'}
+                </div>
               </>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-gray-400" />
             <div>
@@ -199,6 +220,16 @@ export default function BillingPage() {
               <p className="font-medium text-gray-900">{planInfo.name}</p>
             </div>
           </div>
+          
+          {!status?.isTrial && (
+            <div className="flex items-center space-x-2">
+              <CreditCard className="h-5 w-5 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500">Billing Cycle</p>
+                <p className="font-medium text-gray-900 capitalize">{currentBillingPeriod}</p>
+              </div>
+            </div>
+          )}
           
           {status?.daysRemaining !== null && (
             <div className="flex items-center space-x-2">
@@ -210,6 +241,11 @@ export default function BillingPage() {
                 <p className="font-medium text-gray-900">
                   {status.daysRemaining} {status.daysRemaining === 1 ? 'day' : 'days'}
                 </p>
+                {status.nextBillingDate && !status.isTrial && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formatDate(status.nextBillingDate)}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -222,6 +258,23 @@ export default function BillingPage() {
             </div>
           </div>
         </div>
+
+        {subscription?.subscriptionStartDate && !status?.isTrial && (
+          <div className="mb-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500">Subscription Started</p>
+                <p className="font-medium text-gray-900">{formatDate(subscription.subscriptionStartDate)}</p>
+              </div>
+              {subscription.subscriptionEndDate && (
+                <div>
+                  <p className="text-gray-500">Renews On</p>
+                  <p className="font-medium text-gray-900">{formatDate(subscription.subscriptionEndDate)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {subscription?.status === 'active' && !status?.isTrial && (
           <button

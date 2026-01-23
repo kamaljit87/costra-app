@@ -136,14 +136,16 @@ export const handleWebhook = async (event) => {
         const session = event.data.object
         const userId = parseInt(session.metadata?.userId, 10)
         const planType = session.metadata?.planType
+        const billingPeriod = session.metadata?.billingPeriod || 'monthly'
         
         if (userId && planType) {
           await upgradeSubscription(userId, planType, {
             customerId: session.customer,
             subscriptionId: session.subscription,
             priceId: session.display_items?.[0]?.price?.id,
+            billingPeriod,
           })
-          logger.info('Subscription upgraded from webhook', { userId, planType })
+          logger.info('Subscription upgraded from webhook', { userId, planType, billingPeriod })
         }
         break
       }

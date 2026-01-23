@@ -735,11 +735,25 @@ export const initDatabase = async () => {
           stripe_customer_id TEXT,
           stripe_subscription_id TEXT,
           stripe_price_id TEXT,
+          billing_period TEXT CHECK (billing_period IN ('monthly', 'annual')),
           currency TEXT DEFAULT 'USD',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
+      `)
+      
+      // Add billing_period column if it doesn't exist
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'subscriptions' AND column_name = 'billing_period'
+          ) THEN
+            ALTER TABLE subscriptions ADD COLUMN billing_period TEXT CHECK (billing_period IN ('monthly', 'annual'));
+          END IF;
+        END $$;
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id)`)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`)

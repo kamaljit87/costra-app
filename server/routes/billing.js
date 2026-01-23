@@ -36,6 +36,7 @@ router.get('/subscription', authenticateToken, async (req, res) => {
       subscription: {
         planType: subscription.plan_type,
         status: subscription.status,
+        billingPeriod: subscription.billing_period || 'monthly',
         trialStartDate: subscription.trial_start_date,
         trialEndDate: subscription.trial_end_date,
         subscriptionStartDate: subscription.subscription_start_date,

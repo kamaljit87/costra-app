@@ -126,10 +126,29 @@ export const upgradeSubscription = async (userId, planType, stripeData = {}) => 
     const subscription = await getUserSubscription(userId)
     const now = new Date()
     
+    // Determine billing period from price ID or stripeData
+    let billingPeriod = stripeData.billingPeriod || 'monthly'
+    if (stripeData.priceId) {
+      // Check if price ID contains 'annual' or matches annual price IDs
+      const annualPriceIds = [
+        process.env.STRIPE_STARTER_PRICE_ID_ANNUAL,
+        process.env.STRIPE_PRO_PRICE_ID_ANNUAL,
+      ]
+      if (annualPriceIds.includes(stripeData.priceId)) {
+        billingPeriod = 'annual'
+      }
+    }
+    
     // If upgrading from trial, set subscription dates
     const subscriptionStart = subscription.plan_type === 'trial' ? now : subscription.subscription_start_date || now
     const subscriptionEnd = new Date(subscriptionStart)
-    subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1) // Monthly subscription
+    
+    // Set subscription end date based on billing period
+    if (billingPeriod === 'annual') {
+      subscriptionEnd.setFullYear(subscriptionEnd.getFullYear() + 1)
+    } else {
+      subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1)
+    }
     
     const result = await client.query(
       `UPDATE subscriptions 
@@ -140,9 +159,10 @@ export const upgradeSubscription = async (userId, planType, stripeData = {}) => 
            stripe_customer_id = COALESCE($4, stripe_customer_id),
            stripe_subscription_id = COALESCE($5, stripe_subscription_id),
            stripe_price_id = COALESCE($6, stripe_price_id),
-           currency = COALESCE($7, currency, 'USD'),
+           billing_period = COALESCE($7, billing_period, 'monthly'),
+           currency = COALESCE($8, currency, 'USD'),
            updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $8
+       WHERE user_id = $9
        RETURNING *`,
       [
         planType,
@@ -151,12 +171,13 @@ export const upgradeSubscription = async (userId, planType, stripeData = {}) => 
         stripeData.customerId || null,
         stripeData.subscriptionId || null,
         stripeData.priceId || null,
+        billingPeriod,
         stripeData.currency || 'USD',
         userId,
       ]
     )
     
-    logger.info('Upgraded subscription', { userId, planType, stripeData })
+    logger.info('Upgraded subscription', { userId, planType, billingPeriod, stripeData })
     return result.rows[0]
   } catch (error) {
     logger.error('Error upgrading subscription', { userId, planType, error: error.message, stack: error.stack })
@@ -326,6 +347,7 @@ export const getSubscriptionStatus = async (userId) => {
   return {
     planType: subscription.plan_type,
     status: subscription.status,
+    billingPeriod: subscription.billing_period || 'monthly',
     daysRemaining,
     nextBillingDate,
     historicalDataMonths: features.historicalDataMonths,
