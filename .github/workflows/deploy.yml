@@ -4,31 +4,20 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: costra
-  CLUSTER_NAME: costra-cluster
-  SERVICE_NAME: costra-service
-  TASK_FAMILY: costra-app
+  AWS_ACCOUNT_ID: 005878674861
+  ECR_REPOSITORY: costra-backend
+  ECS_CLUSTER: costra-stack
+  ECS_SERVICE: costra-service
+  ECS_TASK_FAMILY: costra-app
 
 jobs:
   deploy:
-    name: Deploy to ECS
+    name: Build and Deploy
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
 
     steps:
       - name: Checkout code
@@ -45,32 +34,39 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Get image tag
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate image tag
         id: image-tag
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            IMAGE_TAG=${GITHUB_REF#refs/tags/}
-          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
-            IMAGE_TAG=main-${GITHUB_SHA::8}
+          if [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            IMAGE_TAG="latest-${GITHUB_SHA::8}"
           else
-            IMAGE_TAG=${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}
+            IMAGE_TAG="${GITHUB_REF#refs/heads/}-${GITHUB_SHA::8}"
           fi
           echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
           echo "Using image tag: $IMAGE_TAG"
 
-      - name: Verify image exists in ECR
-        run: |
-          aws ecr describe-images \
-            --repository-name ${{ env.ECR_REPOSITORY }} \
-            --image-ids imageTag=${{ steps.image-tag.outputs.tag }} \
-            --region ${{ env.AWS_REGION }}
+      - name: Build and push Docker image
+        id: build-image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image-tag.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache,mode=max
+          platforms: linux/amd64
 
       - name: Download task definition
         run: |
           aws ecs describe-task-definition \
-            --task-definition ${{ env.TASK_FAMILY }} \
+            --task-definition ${{ env.ECS_TASK_FAMILY }} \
             --query taskDefinition \
-            --region ${{ env.AWS_REGION }} \
             > task-definition.json
 
       - name: Update task definition with new image
@@ -86,7 +82,6 @@ jobs:
         run: |
           TASK_DEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://${{ steps.task-def.outputs.task-definition }} \
-            --region ${{ env.AWS_REGION }} \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
           echo "task-definition-arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
@@ -95,38 +90,25 @@ jobs:
       - name: Deploy to ECS
         run: |
           aws ecs update-service \
-            --cluster ${{ env.CLUSTER_NAME }} \
-            --service ${{ env.SERVICE_NAME }} \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
             --task-definition ${{ steps.register-task-def.outputs.task-definition-arn }} \
-            --region ${{ env.AWS_REGION }} \
             --force-new-deployment
 
-      - name: Wait for service to stabilize
+      - name: Wait for deployment
         run: |
           echo "Waiting for service to stabilize..."
           aws ecs wait services-stable \
-            --cluster ${{ env.CLUSTER_NAME }} \
-            --services ${{ env.SERVICE_NAME }} \
-            --region ${{ env.AWS_REGION }}
-          echo "Service is stable!"
-
-      - name: Get service status
-        run: |
-          aws ecs describe-services \
-            --cluster ${{ env.CLUSTER_NAME }} \
-            --services ${{ env.SERVICE_NAME }} \
-            --region ${{ env.AWS_REGION }} \
-            --query 'services[0].{Status:status,RunningCount:runningCount,DesiredCount:desiredCount,Deployments:deployments[*].{Status:status,TaskDefinition:taskDefinition,RunningCount:runningCount}}' \
-            --output json
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }}
+          echo "✅ Deployment completed successfully!"
 
       - name: Deployment summary
         run: |
-          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Tag**: ${{ steps.image-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Task Definition**: ${{ steps.register-task-def.outputs.task-definition-arn }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Cluster**: ${{ env.CLUSTER_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Service**: ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Deployment completed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image-tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Task Definition**: \`${{ steps.register-task-def.outputs.task-definition-arn }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cluster**: \`${{ env.ECS_CLUSTER }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: \`${{ env.ECS_SERVICE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
