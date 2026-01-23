@@ -1,8 +1,47 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Globe, TrendingDown, Shield, Zap, ArrowRight } from 'lucide-react'
+import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check } from 'lucide-react'
 import Logo from '../components/Logo'
 
+const PLANS = {
+  starter: {
+    name: 'Starter Plan (Default)',
+    monthly: { inr: '₹850', usd: '$10' },
+    annual: { inr: '₹8,500', usd: '$100' },
+    annualSavings: { inr: '₹1,700', usd: '$20' },
+    features: [
+      'Unlimited cloud providers',
+      'Up to 6 months of history',
+      'Correct cost before & after credits',
+      'Custom date ranges',
+      'Monthly "What changed & why"',
+      'Daily auto-sync',
+    ],
+    whoThisIsFor: 'Indie founders, Small startups, DevOps who want clarity without heavy FinOps tooling',
+    priceWorksBecause: '$10 is less than 15 minutes of wasted cloud spend.',
+  },
+  pro: {
+    name: 'Pro Plan (Active FinOps)',
+    monthly: { inr: '₹2,040', usd: '$24' },
+    annual: { inr: '₹20,400', usd: '$240' },
+    annualSavings: { inr: '₹4,080', usd: '$48' },
+    features: [
+      'Everything in Starter',
+      '12+ months history',
+      'Cost vs usage',
+      'Unit economics',
+      'Baseline anomaly detection',
+      'Email summaries',
+      'CSV exports',
+    ],
+    whoThisIsFor: 'Teams actively managing FinOps',
+    priceWorksBecause: 'Advanced features for serious cost optimization',
+  },
+}
+
 export default function LandingPage() {
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
+
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
@@ -124,6 +163,170 @@ export default function LandingPage() {
                 Get instant visibility into your cloud spending with live API integrations.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Start with a 7-day free trial. No credit card required. Cancel anytime.
+            </p>
+            
+            {/* Billing Period Toggle */}
+            <div className="flex items-center justify-center mt-8">
+              <div className="flex items-center space-x-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+                <button
+                  onClick={() => setBillingPeriod('monthly')}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                    billingPeriod === 'monthly'
+                      ? 'bg-frozenWater-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingPeriod('annual')}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                    billingPeriod === 'annual'
+                      ? 'bg-frozenWater-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Annual
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Starter Plan */}
+            <div className="bg-white rounded-xl border-2 border-gray-200 p-8 shadow-sm hover:shadow-lg transition-shadow">
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">{PLANS.starter.name}</h3>
+                <div className="mt-3">
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-4xl font-bold text-gray-900">
+                      {billingPeriod === 'monthly' ? PLANS.starter.monthly.usd : PLANS.starter.annual.usd}
+                    </span>
+                    <span className="text-gray-500">
+                      / {billingPeriod === 'monthly' ? 'month' : 'year'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {billingPeriod === 'monthly' ? PLANS.starter.monthly.inr : PLANS.starter.annual.inr}
+                    {' '}/ {billingPeriod === 'monthly' ? 'month' : 'year'}
+                  </div>
+                  {billingPeriod === 'annual' && (
+                    <div className="mt-3">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Save {PLANS.starter.annualSavings.usd}/year • 2 months free
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <ul className="space-y-3 mb-6">
+                <li className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Includes:</li>
+                {PLANS.starter.features.map((feature, idx) => (
+                  <li key={idx} className="flex items-start space-x-2">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-gray-700">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mb-6 pt-4 border-t border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Who this is for:</p>
+                <p className="text-sm text-gray-600">{PLANS.starter.whoThisIsFor}</p>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">This price works because:</p>
+                <p className="text-sm text-gray-600 italic">{PLANS.starter.priceWorksBecause}</p>
+              </div>
+
+              <Link
+                to="/signup"
+                className="w-full btn-primary text-center block py-2.5 rounded-lg font-medium"
+              >
+                Start Free Trial
+              </Link>
+            </div>
+
+            {/* Pro Plan */}
+            <div className="bg-white rounded-xl border-2 border-frozenWater-500 p-8 shadow-lg relative">
+              <div className="absolute top-0 right-0 -mt-4 -mr-4">
+                <span className="px-3 py-1 bg-frozenWater-600 text-white text-xs font-medium rounded-full shadow-lg">
+                  Recommended
+                </span>
+              </div>
+              
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">{PLANS.pro.name}</h3>
+                <div className="mt-3">
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-4xl font-bold text-gray-900">
+                      {billingPeriod === 'monthly' ? PLANS.pro.monthly.usd : PLANS.pro.annual.usd}
+                    </span>
+                    <span className="text-gray-500">
+                      / {billingPeriod === 'monthly' ? 'month' : 'year'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {billingPeriod === 'monthly' ? PLANS.pro.monthly.inr : PLANS.pro.annual.inr}
+                    {' '}/ {billingPeriod === 'monthly' ? 'month' : 'year'}
+                  </div>
+                  {billingPeriod === 'annual' && (
+                    <div className="mt-3">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Save {PLANS.pro.annualSavings.usd}/year • 2.5 months free
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <ul className="space-y-3 mb-6">
+                <li className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Includes:</li>
+                {PLANS.pro.features.map((feature, idx) => (
+                  <li key={idx} className="flex items-start space-x-2">
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-gray-700">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mb-6 pt-4 border-t border-gray-200">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Who this is for:</p>
+                <p className="text-sm text-gray-600">{PLANS.pro.whoThisIsFor}</p>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">This price works because:</p>
+                <p className="text-sm text-gray-600 italic">{PLANS.pro.priceWorksBecause}</p>
+              </div>
+
+              <Link
+                to="/signup"
+                className="w-full btn-primary text-center block py-2.5 rounded-lg font-medium"
+              >
+                Start Free Trial
+              </Link>
+            </div>
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-sm text-gray-500">
+              All plans include a 7-day free trial. No credit card required.
+            </p>
           </div>
         </div>
       </section>

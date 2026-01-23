@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useCurrency } from '../contexts/CurrencyContext'
-import { insightsAPI } from '../services/api'
+import { insightsAPI, billingAPI } from '../services/api'
 import { DollarSign, Users, Activity, TrendingUp, TrendingDown, Info, X } from 'lucide-react'
 import { getDateRangeForPeriod, PeriodType } from '../services/costService'
+import UpgradePrompt from './UpgradePrompt'
 
 interface UnitEconomicsData {
   metricType: string
@@ -28,6 +29,7 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showInfoDialog, setShowInfoDialog] = useState(false)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{ planType: string } | null>(null)
 
   // Calculate date range from period if not provided
   const dateRange = startDate && endDate 
@@ -43,8 +45,18 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
     : dateRange.endDate.toISOString().split('T')[0]
 
   useEffect(() => {
+    loadSubscriptionStatus()
     fetchUnitEconomics()
   }, [providerId, accountId, startDateStr, endDateStr])
+  
+  const loadSubscriptionStatus = async () => {
+    try {
+      const response = await billingAPI.getSubscription()
+      setSubscriptionStatus(response.status)
+    } catch (error) {
+      console.error('Failed to load subscription status:', error)
+    }
+  }
 
   const fetchUnitEconomics = async () => {
     setIsLoading(true)
@@ -59,7 +71,12 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
       setData(result.data || null)
     } catch (err: any) {
       console.error('Failed to fetch unit economics:', err)
-      setError(err.message || 'Failed to load unit economics data')
+      // Check if it's a 403 (feature not available)
+      if (err.message?.includes('403') || err.message?.includes('Feature not available') || err.message?.includes('Pro subscription')) {
+        setError('PRO_FEATURE')
+      } else {
+        setError(err.message || 'Failed to load unit economics data')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +119,19 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
             <p className="text-frozenWater-700">Loading unit economics...</p>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Show upgrade prompt if feature not available
+  if (error === 'PRO_FEATURE' || (subscriptionStatus && subscriptionStatus.planType !== 'pro' && error?.includes('403'))) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <UpgradePrompt
+          feature="Unit Economics"
+          requiredPlan="Pro"
+          description="Track cost per business metric (customers, API calls, transactions) to understand unit economics and optimize spending."
+        />
       </div>
     )
   }

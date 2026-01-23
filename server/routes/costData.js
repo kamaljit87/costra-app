@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import { requireFeature, limitHistoricalData } from '../middleware/featureGate.js'
 import logger from '../utils/logger.js'
 import {
   getCostDataForUser,
@@ -600,14 +601,29 @@ router.get('/:providerId/credits', async (req, res) => {
 })
 
 // Get daily cost data for a provider within a date range
-router.get('/:providerId/daily', async (req, res) => {
+router.get('/:providerId/daily', limitHistoricalData, async (req, res) => {
   try {
     const userId = req.user.userId
     const { providerId } = req.params
-    const { startDate, endDate } = req.query
+    let { startDate, endDate } = req.query
 
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'startDate and endDate query parameters are required' })
+    }
+
+    // Apply historical data limit if set
+    const monthsLimit = req.subscriptionDataLimit
+    if (monthsLimit && monthsLimit > 0) {
+      const limitDate = new Date()
+      limitDate.setMonth(limitDate.getMonth() - monthsLimit)
+      limitDate.setHours(0, 0, 0, 0)
+      const limitDateStr = limitDate.toISOString().split('T')[0]
+      
+      // Adjust startDate if it's before the limit
+      if (startDate < limitDateStr) {
+        startDate = limitDateStr
+        logger.debug('Historical data limit applied', { userId, monthsLimit, adjustedStartDate: startDate })
+      }
     }
 
     logger.debug('Daily Cost Data: Fetching data', { userId, providerId, startDate, endDate })

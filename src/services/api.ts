@@ -854,4 +854,68 @@ export const notificationsAPI = {
     })
     return response.json()
   },
+  
+  getSyncPreferences: async () => {
+    const response = await apiRequest('/sync/preferences')
+    return response.json()
+  },
+  
+  updateSyncPreferences: async (accountId: number, autoSyncEnabled: boolean, autoSyncTime?: string) => {
+    const response = await apiRequest('/sync/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ accountId, autoSyncEnabled, autoSyncTime }),
+    })
+    return response.json()
+  },
+}
+
+// Email Preferences API (Pro only)
+export const emailPreferencesAPI = {
+  getPreferences: async () => {
+    const response = await apiRequest('/email-preferences')
+    return response.json()
+  },
+  
+  updatePreferences: async (preferences: {
+    emailAlertsEnabled?: boolean
+    emailAnomalyAlerts?: boolean
+    emailBudgetAlerts?: boolean
+    emailWeeklySummary?: boolean
+  }) => {
+    const response = await apiRequest('/email-preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences),
+    })
+    return response.json()
+  },
+}
+
+// Billing API
+export const billingAPI = {
+  getSubscription: async () => {
+    const response = await apiRequest('/billing/subscription')
+    return response.json()
+  },
+
+  createCheckoutSession: async (planType: 'starter' | 'pro', billingPeriod: 'monthly' | 'annual' = 'monthly') => {
+    const response = await apiRequest('/billing/create-checkout-session', {
+      method: 'POST',
+      body: JSON.stringify({ planType, billingPeriod }),
+    })
+    return response.json()
+  },
+
+  createPortalSession: async () => {
+    const response = await apiRequest('/billing/create-portal-session', {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  cancelSubscription: async () => {
+    const response = await apiRequest('/billing/cancel', {
+      method: 'POST',
+    })
+    return response.json()
+  },
 }

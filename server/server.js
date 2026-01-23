@@ -12,12 +12,15 @@ import savingsPlansRoutes from './routes/savingsPlans.js'
 import cloudProvidersRoutes from './routes/cloudProviders.js'
 import googleAuthRoutes from './routes/googleAuth.js'
 import syncRoutes from './routes/sync.js'
+import syncPreferencesRoutes from './routes/syncPreferences.js'
 import profileRoutes from './routes/profile.js'
 import aiRoutes from './routes/ai.js'
 import insightsRoutes from './routes/insights.js'
 import budgetsRoutes from './routes/budgets.js'
 import reportsRoutes from './routes/reports.js'
 import notificationsRoutes from './routes/notifications.js'
+import billingRoutes from './routes/billing.js'
+import emailPreferencesRoutes from './routes/emailPreferences.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import logger from './utils/logger.js'
@@ -158,6 +161,15 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
+// Initialize scheduled syncs (in production)
+if (process.env.NODE_ENV === 'production') {
+  import('./services/syncScheduler.js').then(({ initScheduledSyncs }) => {
+    initScheduledSyncs()
+  }).catch((error) => {
+    logger.warn('Failed to initialize scheduled syncs', { error: error.message })
+  })
+}
+
 // Serve static files for uploaded avatars
 app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')))
 
@@ -169,11 +181,14 @@ app.use('/api/cost-data', costDataRoutes)
 app.use('/api/savings-plans', savingsPlansRoutes)
 app.use('/api/cloud-providers', cloudProvidersRoutes)
 app.use('/api/sync', syncRoutes)
+app.use('/api/sync', syncPreferencesRoutes)
 app.use('/api/ai', aiRoutes)
 app.use('/api/insights', insightsRoutes)
 app.use('/api/budgets', budgetsRoutes)
 app.use('/api/reports', reportsRoutes)
 app.use('/api/notifications', notificationsRoutes)
+app.use('/api/billing', billingRoutes)
+app.use('/api/email-preferences', emailPreferencesRoutes)
 
 // Health check routes
 app.use('/api/health', healthRoutes)

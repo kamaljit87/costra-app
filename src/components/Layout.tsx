@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
 import AIChat from './AIChat'
+import TrialBanner from './TrialBanner'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -36,6 +37,9 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden w-full lg:ml-0">
         {/* Top Navigation */}
         <TopNav onMenuClick={() => setSidebarOpen(true)} />
+        
+        {/* Trial Banner */}
+        <TrialBanner />
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">

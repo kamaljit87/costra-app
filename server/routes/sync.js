@@ -725,6 +725,23 @@ async function calculateBaselinesForServices(userId, providerId, accountId, cost
               isIncrease: topAnomaly.isIncrease
             }
           }).catch(err => logger.error('Failed to create anomaly notification', { userId, error: err.message, stack: err.stack }))
+          
+          // Send email alert (Pro only)
+          try {
+            const { sendAnomalyAlert } = await import('../services/emailService.js')
+            await sendAnomalyAlert(userId, {
+              serviceName: topAnomaly.serviceName,
+              variancePercent,
+              currentCost: topAnomaly.currentCost || 0,
+              baselineCost: topAnomaly.baselineCost || 0,
+              isIncrease: topAnomaly.isIncrease,
+              date: topAnomaly.baselineDate,
+              providerId,
+            })
+          } catch (emailError) {
+            // Don't fail sync if email fails
+            logger.error('Failed to send anomaly email', { userId, error: emailError.message })
+          }
         }
       }
     } catch (anomalyCheckError) {

@@ -57,6 +57,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [selectedResultIndex, setSelectedResultIndex] = useState(-1)
   const [allServices, setAllServices] = useState<Array<{ providerId: string; name: string }>>([])
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{ planType: string; daysRemaining: number | null } | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const providerMenuRef = useRef<HTMLDivElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
@@ -68,6 +69,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
     loadAllServices()
     if (!isDemoMode) {
       loadUnreadNotificationCount()
+      loadSubscriptionStatus()
       // Poll for new notifications every 60 seconds
       const interval = setInterval(() => {
         loadUnreadNotificationCount()
@@ -75,6 +77,16 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
       return () => clearInterval(interval)
     }
   }, [isDemoMode])
+  
+  const loadSubscriptionStatus = async () => {
+    try {
+      const { billingAPI } = await import('../services/api')
+      const response = await billingAPI.getSubscription()
+      setSubscriptionStatus(response.status)
+    } catch (error) {
+      console.error('Failed to load subscription status:', error)
+    }
+  }
 
   const loadUnreadNotificationCount = async () => {
     try {
@@ -558,6 +570,18 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <div className="px-4 py-3 border-b border-gray-200">
                     <p className="text-sm font-semibold text-gray-900">{user?.name || 'User'}</p>
                     <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    {subscriptionStatus && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-700 capitalize">
+                          {subscriptionStatus.planType} Plan
+                        </span>
+                        {subscriptionStatus.daysRemaining !== null && subscriptionStatus.planType === 'trial' && (
+                          <span className="text-xs text-amber-600 font-medium">
+                            {subscriptionStatus.daysRemaining} {subscriptionStatus.daysRemaining === 1 ? 'day' : 'days'} left
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   <Link
@@ -579,12 +603,12 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   </Link>
                   
                   <Link
-                    to="/settings#billing"
+                    to="/settings/billing"
                     onClick={() => setIsUserMenuOpen(false)}
                     className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <CreditCard className="h-4 w-4" />
-                    <span>Billing</span>
+                    <span>Billing & Subscription</span>
                   </Link>
                   
                   <Link

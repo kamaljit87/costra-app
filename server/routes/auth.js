@@ -5,6 +5,7 @@ import { createUser, getUserByEmail, getUserById } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimiter.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
+import { createTrialSubscription } from '../services/subscriptionService.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -79,6 +80,15 @@ router.post('/signup',
 
       // Create user
       const userId = await createUser(name, email, passwordHash)
+
+      // Create 7-day trial subscription
+      try {
+        await createTrialSubscription(userId)
+        logger.info('Trial subscription created for new user', { userId, email })
+      } catch (trialError) {
+        logger.error('Failed to create trial subscription', { userId, email, error: trialError.message })
+        // Don't fail signup if trial creation fails
+      }
 
       // Generate JWT token
       const token = jwt.sign(

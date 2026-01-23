@@ -471,12 +471,25 @@ router.get('/business-metrics', authenticateToken, async (req, res) => {
 
 /**
  * GET /api/insights/unit-economics
- * Get unit economics (cost per business metric)
+ * Get unit economics (cost per business metric) - Pro only
  */
 router.get('/unit-economics', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id
     const { startDate, endDate, providerId, accountId } = req.query
+    
+    // Check if user has access to unit economics (Pro only)
+    const { canAccessFeature } = await import('../services/subscriptionService.js')
+    const hasAccess = await canAccessFeature(userId, 'unit_economics')
+    if (!hasAccess) {
+      return res.status(403).json({
+        error: 'Feature not available',
+        message: 'Unit economics requires a Pro subscription',
+        feature: 'unit_economics',
+        requiredPlan: 'Pro',
+        upgradeUrl: '/settings/billing',
+      })
+    }
     
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'startDate and endDate are required' })

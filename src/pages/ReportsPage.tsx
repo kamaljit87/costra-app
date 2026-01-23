@@ -57,14 +57,26 @@ export default function ReportsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('')
   const [selectedProduct, setSelectedProduct] = useState<string>('')
   const [format, setFormat] = useState<'csv' | 'pdf'>('csv')
+  const [subscriptionStatus, setSubscriptionStatus] = useState<{ planType: string } | null>(null)
 
   useEffect(() => {
     if (!isDemoMode) {
       loadReports()
       loadProviders()
       loadTeamsAndProducts()
+      loadSubscriptionStatus()
     }
   }, [isDemoMode])
+  
+  const loadSubscriptionStatus = async () => {
+    try {
+      const { billingAPI } = await import('../services/api')
+      const response = await billingAPI.getSubscription()
+      setSubscriptionStatus(response.status)
+    } catch (error) {
+      console.error('Failed to load subscription status:', error)
+    }
+  }
 
   useEffect(() => {
     if (!isDemoMode && reports.some(r => r.status === 'generating' || r.status === 'pending')) {
@@ -363,10 +375,18 @@ export default function ReportsPage() {
                 value={format}
                 onChange={(e) => setFormat(e.target.value as 'csv' | 'pdf')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                disabled={subscriptionStatus?.planType !== 'pro' && format === 'csv'}
               >
-                <option value="csv">CSV</option>
+                <option value="csv" disabled={subscriptionStatus?.planType !== 'pro'}>
+                  CSV {subscriptionStatus?.planType !== 'pro' ? '(Pro only)' : ''}
+                </option>
                 <option value="pdf">PDF</option>
               </select>
+              {subscriptionStatus?.planType !== 'pro' && format === 'csv' && (
+                <p className="mt-1 text-xs text-amber-600">
+                  CSV export requires Pro subscription. <a href="/settings/billing" className="underline">Upgrade now</a>
+                </p>
+              )}
             </div>
           </div>
 

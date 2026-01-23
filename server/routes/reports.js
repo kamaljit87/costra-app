@@ -1,5 +1,6 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
+import { requireFeature } from '../middleware/featureGate.js'
 import logger from '../utils/logger.js'
 import {
   generateReportData,
@@ -166,6 +167,21 @@ router.post('/chargeback', async (req, res) => {
     
     if (!['csv', 'pdf'].includes(format)) {
       return res.status(400).json({ error: 'format must be csv or pdf' })
+    }
+    
+    // Check if CSV export is requested (Pro only)
+    if (format === 'csv') {
+      const { canAccessFeature } = await import('../services/subscriptionService.js')
+      const hasAccess = await canAccessFeature(userId, 'csv_export')
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'Feature not available',
+          message: 'CSV export requires a Pro subscription',
+          feature: 'csv_export',
+          requiredPlan: 'Pro',
+          upgradeUrl: '/settings/billing',
+        })
+      }
     }
     
     // Generate report data

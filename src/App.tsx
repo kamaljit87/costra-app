@@ -14,6 +14,7 @@ import BudgetsPage from './pages/BudgetsPage'
 import ProductCostView from './pages/ProductCostView'
 import TeamCostView from './pages/TeamCostView'
 import ReportsPage from './pages/ReportsPage'
+import BillingPage from './pages/BillingPage'
 import DebugPage from './pages/DebugPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,6 +46,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/billing"
+              element={
+                <ProtectedRoute>
+                  <BillingPage />
                 </ProtectedRoute>
               }
             />

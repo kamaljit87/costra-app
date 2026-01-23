@@ -107,16 +107,54 @@ export const initDatabase = async () => {
         END $$;
       `)
 
-      // User preferences table (currency, etc.)
+      // User preferences table (currency, email preferences, etc.)
       await client.query(`
         CREATE TABLE IF NOT EXISTS user_preferences (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL UNIQUE,
           currency TEXT DEFAULT 'USD',
+          email_alerts_enabled BOOLEAN DEFAULT true,
+          email_anomaly_alerts BOOLEAN DEFAULT true,
+          email_budget_alerts BOOLEAN DEFAULT true,
+          email_weekly_summary BOOLEAN DEFAULT false,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
+      `)
+      
+      // Add email preference columns if they don't exist
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'user_preferences' AND column_name = 'email_alerts_enabled'
+          ) THEN
+            ALTER TABLE user_preferences ADD COLUMN email_alerts_enabled BOOLEAN DEFAULT true;
+          END IF;
+          
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'user_preferences' AND column_name = 'email_anomaly_alerts'
+          ) THEN
+            ALTER TABLE user_preferences ADD COLUMN email_anomaly_alerts BOOLEAN DEFAULT true;
+          END IF;
+          
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'user_preferences' AND column_name = 'email_budget_alerts'
+          ) THEN
+            ALTER TABLE user_preferences ADD COLUMN email_budget_alerts BOOLEAN DEFAULT true;
+          END IF;
+          
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'user_preferences' AND column_name = 'email_weekly_summary'
+          ) THEN
+            ALTER TABLE user_preferences ADD COLUMN email_weekly_summary BOOLEAN DEFAULT false;
+          END IF;
+        END $$;
       `)
 
       // Cloud providers table
@@ -681,6 +719,65 @@ export const initDatabase = async () => {
       await client.query(`
         CREATE INDEX IF NOT EXISTS idx_cost_data_cache_expires 
         ON cost_data_cache(expires_at)
+      `)
+
+      // Subscriptions table - for managing user subscriptions and trials
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL UNIQUE,
+          plan_type TEXT NOT NULL CHECK (plan_type IN ('trial', 'starter', 'pro')),
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired', 'past_due')),
+          trial_start_date TIMESTAMP,
+          trial_end_date TIMESTAMP,
+          subscription_start_date TIMESTAMP,
+          subscription_end_date TIMESTAMP,
+          stripe_customer_id TEXT,
+          stripe_subscription_id TEXT,
+          stripe_price_id TEXT,
+          currency TEXT DEFAULT 'USD',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_subscriptions_trial_end ON subscriptions(trial_end_date)`)
+
+      // Subscription usage tracking (for analytics)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS subscription_usage (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          feature_name TEXT NOT NULL,
+          usage_count INTEGER DEFAULT 1,
+          usage_date DATE NOT NULL,
+          metadata JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_usage_user_date ON subscription_usage(user_id, usage_date)`)
+
+      // Add auto_sync columns to cloud_provider_credentials
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'auto_sync_enabled'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN auto_sync_enabled BOOLEAN DEFAULT false;
+          END IF;
+          
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'auto_sync_time'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN auto_sync_time TIME DEFAULT '02:00:00';
+          END IF;
+        END $$;
       `)
 
       logger.info('Database schema initialized successfully')
@@ -3722,6 +3819,7 @@ export const updateBudgetSpend = async (userId, budgetId) => {
           : '/budgets'
         
         try {
+          // Create in-app notification
           await createNotification(userId, {
             type: notificationType,
             title,
@@ -3737,6 +3835,21 @@ export const updateBudgetSpend = async (userId, budgetId) => {
             }
           })
           logger.debug('Created budget notification', { userId, budgetId: budgetData.id, title })
+          
+          // Send email alert (Pro only)
+          try {
+            const { sendBudgetAlert } = await import('../services/emailService.js')
+            await sendBudgetAlert(userId, {
+              budgetName: budgetData.budgetName,
+              currentSpend,
+              budgetAmount: budgetData.budgetAmount,
+              percentage,
+              isExceeded: percentage >= 100,
+            })
+          } catch (emailError) {
+            // Don't fail budget update if email fails
+            logger.error('Failed to send budget email', { userId, budgetId: budgetData.id, error: emailError.message })
+          }
         } catch (notifError) {
           logger.error('Failed to create budget notification', { userId, budgetId: budgetData.id, error: notifError.message, stack: notifError.stack })
           // Don't fail the budget update if notification fails
