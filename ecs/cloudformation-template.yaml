@@ -173,12 +173,12 @@ Resources:
         - Key: Name
           Value: !Sub ${Environment}-costra-alb-sg
 
-  # Security Group for ECS Tasks
-  ECSSecurityGroup:
+  # Security Group for Frontend ECS Tasks
+  FrontendECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub ${Environment}-costra-ecs-sg
-      GroupDescription: Security group for Costra ECS tasks
+      GroupName: !Sub ${Environment}-costra-frontend-ecs-sg
+      GroupDescription: Security group for Costra Frontend ECS tasks
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -188,13 +188,47 @@ Resources:
           Description: Allow traffic from ALB
       Tags:
         - Key: Name
-          Value: !Sub ${Environment}-costra-ecs-sg
+          Value: !Sub ${Environment}-costra-frontend-ecs-sg
 
-  # Application Load Balancer
-  ApplicationLoadBalancer:
+  # Security Group for Backend ECS Tasks
+  BackendECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Environment}-costra-backend-ecs-sg
+      GroupDescription: Security group for Costra Backend ECS tasks
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3002
+          ToPort: 3002
+          SourceSecurityGroupId: !Ref BackendALBSecurityGroup
+          Description: Allow traffic from Backend ALB
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-costra-backend-ecs-sg
+
+  # Security Group for Backend ALB
+  BackendALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${Environment}-costra-backend-alb-sg
+      GroupDescription: Security group for Costra Backend Application Load Balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref FrontendECSSecurityGroup
+          Description: Allow traffic from Frontend ECS tasks
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-costra-backend-alb-sg
+
+  # Frontend Application Load Balancer (Main Entry Point)
+  FrontendApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub ${Environment}-costra-alb
+      Name: !Sub ${Environment}-costra-frontend-alb
       Type: application
       Scheme: internet-facing
       Subnets:
@@ -204,14 +238,59 @@ Resources:
         - !Ref ALBSecurityGroup
       Tags:
         - Key: Name
-          Value: !Sub ${Environment}-costra-alb
+          Value: !Sub ${Environment}-costra-frontend-alb
 
-  # Target Group
-  TargetGroup:
+  # Frontend Target Group
+  FrontendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub ${Environment}-costra-tg
+      Name: !Sub ${Environment}-costra-frontend-tg
       Port: 3001
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+
+  # Frontend ALB Listener
+  FrontendALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendTargetGroup
+      LoadBalancerArn: !Ref FrontendApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # Backend Application Load Balancer
+  BackendApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${Environment}-costra-backend-alb
+      Type: application
+      Scheme: internal
+      Subnets:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroups:
+        - !Ref BackendALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${Environment}-costra-backend-alb
+
+  # Backend Target Group
+  BackendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${Environment}-costra-backend-tg
+      Port: 3002
       Protocol: HTTP
       VpcId: !Ref VPC
       TargetType: ip
@@ -224,14 +303,14 @@ Resources:
       Matcher:
         HttpCode: 200
 
-  # ALB Listener
-  ALBListener:
+  # Backend ALB Listener
+  BackendALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
+          TargetGroupArn: !Ref BackendTargetGroup
+      LoadBalancerArn: !Ref BackendApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
 
@@ -252,11 +331,17 @@ Resources:
         - Name: containerInsights
           Value: enabled
 
-  # CloudWatch Log Group
-  LogGroup:
+  # CloudWatch Log Groups
+  FrontendLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /ecs/costra-app
+      LogGroupName: /ecs/costra-frontend
+      RetentionInDays: 30
+
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/costra-backend
       RetentionInDays: 30
 
 Outputs:
@@ -296,23 +381,41 @@ Outputs:
     Export:
       Name: !Sub ${Environment}-Costra-ALBSecurityGroup
 
-  ECSSecurityGroupId:
-    Description: ECS Security Group ID
-    Value: !Ref ECSSecurityGroup
+  FrontendECSSecurityGroupId:
+    Description: Frontend ECS Security Group ID
+    Value: !Ref FrontendECSSecurityGroup
     Export:
-      Name: !Sub ${Environment}-Costra-ECSSecurityGroup
+      Name: !Sub ${Environment}-Costra-FrontendECSSecurityGroup
 
-  ApplicationLoadBalancerDNS:
-    Description: Application Load Balancer DNS Name
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  BackendECSSecurityGroupId:
+    Description: Backend ECS Security Group ID
+    Value: !Ref BackendECSSecurityGroup
     Export:
-      Name: !Sub ${Environment}-Costra-ALBDNS
+      Name: !Sub ${Environment}-Costra-BackendECSSecurityGroup
 
-  TargetGroupArn:
-    Description: Target Group ARN
-    Value: !Ref TargetGroup
+  FrontendApplicationLoadBalancerDNS:
+    Description: Frontend Application Load Balancer DNS Name
+    Value: !GetAtt FrontendApplicationLoadBalancer.DNSName
     Export:
-      Name: !Sub ${Environment}-Costra-TargetGroupArn
+      Name: !Sub ${Environment}-Costra-FrontendALBDNS
+
+  BackendApplicationLoadBalancerDNS:
+    Description: Backend Application Load Balancer DNS Name
+    Value: !GetAtt BackendApplicationLoadBalancer.DNSName
+    Export:
+      Name: !Sub ${Environment}-Costra-BackendALBDNS
+
+  FrontendTargetGroupArn:
+    Description: Frontend Target Group ARN
+    Value: !Ref FrontendTargetGroup
+    Export:
+      Name: !Sub ${Environment}-Costra-FrontendTargetGroupArn
+
+  BackendTargetGroupArn:
+    Description: Backend Target Group ARN
+    Value: !Ref BackendTargetGroup
+    Export:
+      Name: !Sub ${Environment}-Costra-BackendTargetGroupArn
 
   ECSClusterName:
     Description: ECS Cluster Name

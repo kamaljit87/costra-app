@@ -1,5 +1,5 @@
 // Use relative URL to leverage Vite proxy in development, or absolute URL in production
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3001/api')
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3002/api')
 
 // Get auth token from localStorage
 const getToken = (): string | null => {
