@@ -51,11 +51,11 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <Activity className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
-            <p className="text-frozenWater-700">Analyzing cost patterns...</p>
+            <Activity className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
+            <p className="text-accent-700">Analyzing cost patterns...</p>
           </div>
         </div>
       </div>
@@ -64,11 +64,11 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (error) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
-            <p className="text-sm text-frozenWater-600">{error}</p>
+            <p className="text-sm text-accent-600">{error}</p>
           </div>
         </div>
       </div>
@@ -77,21 +77,21 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (anomalies.length === 0) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-frozenWater-600" />
+              <Zap className="h-5 w-5 text-accent-600" />
               Cost Anomalies
               <button
                 onClick={() => setShowInfoDialog(true)}
-                className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+                className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
                 title="Learn more about Cost Anomalies"
               >
-                <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+                <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
               </button>
             </h3>
-            <p className="text-sm text-frozenWater-600">Cost changes vs 30-day baseline</p>
+            <p className="text-sm text-accent-600">Cost changes vs 30-day baseline</p>
           </div>
         </div>
         <div className="flex items-center justify-center py-12 bg-green-50 rounded-xl border border-green-200">
@@ -108,11 +108,11 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
         {/* Info Dialog */}
         {showInfoDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowInfoDialog(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-frozenWater-200" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 border-2 border-accent-200" onClick={(e) => e.stopPropagation()}>
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Zap className="h-6 w-6 text-frozenWater-600" />
+                    <Zap className="h-6 w-6 text-accent-600" />
                     What are Cost Anomalies?
                   </h3>
                   <button
@@ -125,28 +125,28 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
                 
                 <div className="space-y-4 text-gray-700">
                   <p>
-                    <strong className="text-frozenWater-700">Cost Anomalies</strong> are unexpected cost changes that deviate significantly 
+                    <strong className="text-accent-700">Cost Anomalies</strong> are unexpected cost changes that deviate significantly 
                     from your normal spending patterns. They help you quickly identify unusual spending that might indicate issues, 
                     waste, or opportunities for optimization.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                    <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
+                  <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                    <h4 className="font-semibold text-accent-800 mb-2">How It Works:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span>Compares current costs to a <strong>30-day rolling average</strong> baseline</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span>Flags services with costs <strong>{thresholdPercent}% or more</strong> different from baseline</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span>Shows both <strong>increases</strong> (spending spikes) and <strong>decreases</strong> (cost savings)</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span>Updates automatically as new cost data arrives</span>
                       </li>
                     </ul>
@@ -181,21 +181,21 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
   const sortedAnomalies = [...anomalies].sort((a, b) => b.variancePercent - a.variancePercent)
 
   return (
-    <div className="card bg-white border-frozenWater-100">
+    <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-frozenWater-600" />
+            <Zap className="h-5 w-5 text-accent-600" />
             Cost Anomalies
             <button
               onClick={() => setShowInfoDialog(true)}
-              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
               title="Learn more about Cost Anomalies"
             >
-              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+              <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
             </button>
           </h3>
-          <p className="text-sm text-frozenWater-600">
+          <p className="text-sm text-accent-600">
             Services with costs {thresholdPercent}%+ different from 30-day baseline
           </p>
         </div>
@@ -274,12 +274,12 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
       </div>
 
       {anomalies.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-frozenWater-200">
+        <div className="mt-4 pt-4 border-t border-accent-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-frozenWater-700">
+            <span className="text-accent-700">
               {anomalies.length} anomal{anomalies.length !== 1 ? 'ies' : 'y'} detected
             </span>
-            <span className="text-xs text-frozenWater-600">
+            <span className="text-xs text-accent-600">
               Threshold: ±{thresholdPercent}% from 30-day average
             </span>
           </div>
@@ -293,7 +293,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Zap className="h-6 w-6 text-frozenWater-600" />
+                  <Zap className="h-6 w-6 text-accent-600" />
                   What are Cost Anomalies?
                 </h3>
                 <button
@@ -306,28 +306,28 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
               
               <div className="space-y-4 text-gray-700">
                 <p>
-                  <strong className="text-frozenWater-700">Cost Anomalies</strong> are unexpected cost changes that deviate significantly 
+                  <strong className="text-accent-700">Cost Anomalies</strong> are unexpected cost changes that deviate significantly 
                   from your normal spending patterns. They help you quickly identify unusual spending that might indicate issues, 
                   waste, or opportunities for optimization.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
+                <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                  <h4 className="font-semibold text-accent-800 mb-2">How It Works:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span>Compares current costs to a <strong>30-day rolling average</strong> baseline</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span>Flags services with costs <strong>{thresholdPercent}% or more</strong> different from baseline</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span>Shows both <strong>increases</strong> (spending spikes) and <strong>decreases</strong> (cost savings)</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span>Updates automatically as new cost data arrives</span>
                     </li>
                   </ul>
@@ -345,7 +345,7 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
               <div className="mt-6 flex justify-end">
                 <button
                   onClick={() => setShowInfoDialog(false)}
-                  className="px-4 py-2 bg-frozenWater-600 hover:bg-frozenWater-700 text-white rounded-lg font-medium transition-colors"
+                  className="px-4 py-2 bg-accent-600 hover:bg-accent-700 text-white rounded-lg font-medium transition-colors"
                 >
                   Got it
                 </button>

@@ -91,11 +91,11 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <Zap className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
-            <p className="text-frozenWater-700">Analyzing resources for optimization opportunities...</p>
+            <Zap className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
+            <p className="text-accent-700">Analyzing resources for optimization opportunities...</p>
           </div>
         </div>
       </div>
@@ -104,11 +104,11 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
   if (error) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
-            <p className="text-sm text-frozenWater-600">{error}</p>
+            <p className="text-sm text-accent-600">{error}</p>
           </div>
         </div>
       </div>
@@ -117,28 +117,28 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
 
   if (!data || filteredRecommendations.length === 0) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-frozenWater-600" />
+              <Zap className="h-5 w-5 text-accent-600" />
               Rightsizing Recommendations
               <button
                 onClick={() => setShowInfoDialog(true)}
-                className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+                className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
                 title="Learn more about Rightsizing"
               >
-                <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+                <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
               </button>
             </h3>
-            <p className="text-sm text-frozenWater-600">Optimize resource sizing based on utilization</p>
+            <p className="text-sm text-accent-600">Optimize resource sizing based on utilization</p>
           </div>
         </div>
-        <div className="flex items-center justify-center py-12 bg-frozenWater-50 rounded-xl border border-frozenWater-200">
+        <div className="flex items-center justify-center py-12 bg-accent-50 rounded-xl border border-accent-200">
           <div className="text-center">
             <CheckCircle className="h-10 w-10 text-green-600 mx-auto mb-3" />
-            <p className="text-frozenWater-900 font-medium mb-1">No optimization opportunities found</p>
-            <p className="text-frozenWater-700 text-sm">
+            <p className="text-accent-900 font-medium mb-1">No optimization opportunities found</p>
+            <p className="text-accent-700 text-sm">
               All resources appear to be appropriately sized based on current utilization.
             </p>
           </div>
@@ -151,7 +151,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Zap className="h-6 w-6 text-frozenWater-600" />
+                    <Zap className="h-6 w-6 text-accent-600" />
                     What are Rightsizing Recommendations?
                   </h3>
                   <button
@@ -164,23 +164,23 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                 
                 <div className="space-y-4 text-gray-700">
                   <p>
-                    <strong className="text-frozenWater-700">Rightsizing Recommendations</strong> analyze your 
+                    <strong className="text-accent-700">Rightsizing Recommendations</strong> analyze your 
                     resource utilization and suggest size adjustments to optimize costs while maintaining performance.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                    <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
+                  <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                    <h4 className="font-semibold text-accent-800 mb-2">How It Works:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Downsizing:</strong> If utilization is consistently low (&lt;20%), consider smaller instance types to reduce costs</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Upsizing:</strong> If utilization is consistently high (&gt;80%), consider larger instances to avoid performance issues</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span>Recommendations are prioritized by potential savings and impact</span>
                       </li>
                     </ul>
@@ -222,21 +222,21 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
   }
 
   return (
-    <div className="card bg-white border-frozenWater-100">
+    <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-frozenWater-600" />
+            <Zap className="h-5 w-5 text-accent-600" />
             Rightsizing Recommendations
             <button
               onClick={() => setShowInfoDialog(true)}
-              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
               title="Learn more about Rightsizing"
             >
-              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+              <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
             </button>
           </h3>
-          <p className="text-sm text-frozenWater-600">
+          <p className="text-sm text-accent-600">
             {filteredRecommendations.length} recommendation{filteredRecommendations.length !== 1 ? 's' : ''} • 
             Potential savings: {formatCurrency(data.totalPotentialSavings)}/month
           </p>
@@ -304,7 +304,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                 </button>
               </div>
               
-              <div className="mt-3 pt-3 border-t border-frozenWater-200">
+              <div className="mt-3 pt-3 border-t border-accent-200">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="capitalize font-medium">{rec.priority}</span>
                   <span>priority</span>
@@ -318,12 +318,12 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
       </div>
 
       {filteredRecommendations.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-frozenWater-200">
+        <div className="mt-4 pt-4 border-t border-accent-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-frozenWater-700">
+            <span className="text-accent-700">
               Total potential monthly savings: <strong className="text-green-600">{formatCurrency(data.totalPotentialSavings)}</strong>
             </span>
-            <span className="text-xs text-frozenWater-600">
+            <span className="text-xs text-accent-600">
               {data.recommendationCount} total recommendation{data.recommendationCount !== 1 ? 's' : ''}
             </span>
           </div>
@@ -337,7 +337,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Zap className="h-6 w-6 text-frozenWater-600" />
+                  <Zap className="h-6 w-6 text-accent-600" />
                   What are Rightsizing Recommendations?
                 </h3>
                 <button
@@ -350,23 +350,23 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
               
               <div className="space-y-4 text-gray-700">
                 <p>
-                  <strong className="text-frozenWater-700">Rightsizing Recommendations</strong> analyze your 
+                  <strong className="text-accent-700">Rightsizing Recommendations</strong> analyze your 
                   resource utilization and suggest size adjustments to optimize costs while maintaining performance.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">How It Works:</h4>
+                <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                  <h4 className="font-semibold text-accent-800 mb-2">How It Works:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Downsizing:</strong> If utilization is consistently low (&lt;20%), consider smaller instance types to reduce costs</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Upsizing:</strong> If utilization is consistently high (&gt;80%), consider larger instances to avoid performance issues</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span>Recommendations are prioritized by potential savings and impact</span>
                     </li>
                   </ul>

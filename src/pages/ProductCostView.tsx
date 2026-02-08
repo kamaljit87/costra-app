@@ -89,7 +89,7 @@ export default function ProductCostView() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <Package className="h-8 w-8 text-frozenWater-600" />
+                <Package className="h-8 w-8 text-accent-600" />
                 Product Costs
               </h1>
               <p className="mt-2 text-gray-600">
@@ -98,7 +98,7 @@ export default function ProductCostView() {
             </div>
             <button
               onClick={loadProducts}
-              className="flex items-center gap-2 px-4 py-2 bg-frozenWater-600 text-white rounded-lg hover:bg-frozenWater-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors"
             >
               <RefreshCw className="h-5 w-5" />
               Refresh
@@ -113,7 +113,7 @@ export default function ProductCostView() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               />
             </div>
             <div>
@@ -122,16 +122,16 @@ export default function ProductCostView() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               />
             </div>
           </div>
         </div>
 
         {/* Info Section */}
-        <div className="mb-8 bg-frozenWater-50 border border-frozenWater-200 rounded-lg p-4">
+        <div className="mb-8 bg-accent-50 border border-accent-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-frozenWater-600 mt-0.5 flex-shrink-0" />
+            <Info className="h-5 w-5 text-accent-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-gray-700">
               <p className="font-medium mb-1">About Product Costs</p>
               <p>
@@ -159,7 +159,7 @@ export default function ProductCostView() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 text-frozenWater-600 animate-spin mx-auto mb-4" />
+              <RefreshCw className="h-8 w-8 text-accent-600 animate-spin mx-auto mb-4" />
               <p className="text-gray-500">Loading product costs...</p>
             </div>
           </div>

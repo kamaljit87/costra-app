@@ -24,12 +24,12 @@ export default function Layout({ children }: LayoutProps) {
   }, [sidebarOpen])
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC]">
+    <div className="flex h-screen bg-surface-50">
       {/* Sidebar - Always visible on desktop, drawer on mobile */}
       <div className="hidden lg:block">
         <Sidebar isOpen={true} onClose={() => {}} isPermanent={true} />
       </div>
-      
+
       {/* Mobile Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isPermanent={false} />
 
@@ -37,13 +37,13 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden w-full lg:ml-0">
         {/* Top Navigation */}
         <TopNav onMenuClick={() => setSidebarOpen(true)} />
-        
+
         {/* Trial Banner */}
         <TrialBanner />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
-          <div className="min-h-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        <main className="flex-1 overflow-y-auto bg-surface-50">
+          <div className="min-h-full px-6 lg:px-8 py-6 lg:py-8">
             {children}
           </div>
         </main>

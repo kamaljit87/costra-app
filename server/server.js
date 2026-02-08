@@ -21,6 +21,7 @@ import reportsRoutes from './routes/reports.js'
 import notificationsRoutes from './routes/notifications.js'
 import billingRoutes from './routes/billing.js'
 import emailPreferencesRoutes from './routes/emailPreferences.js'
+import complianceRoutes from './routes/compliance.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import logger from './utils/logger.js'
@@ -189,6 +190,7 @@ app.use('/api/reports', reportsRoutes)
 app.use('/api/notifications', notificationsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/email-preferences', emailPreferencesRoutes)
+app.use('/api/compliance', complianceRoutes)
 
 // Health check routes
 app.use('/api/health', healthRoutes)

@@ -49,7 +49,7 @@ export default function ProviderSection({
   void _chartData3Months
   void _chartData4Months
   void _chartData6Months
-  
+
   const { formatCurrency, convertAmount } = useCurrency()
   const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>('6months')
 
@@ -70,13 +70,13 @@ export default function ProviderSection({
   const providerColor = getProviderColor(providerId)
 
   return (
-    <div className="card-modern group animate-fade-in">
+    <div className="card group animate-fade-in">
       {/* Provider Header - Compact */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-4">
-          <div 
+          <div
             className="w-14 h-14 flex items-center justify-center rounded-2xl transition-all duration-200"
-            style={{ 
+            style={{
               backgroundColor: `${providerColor}15`
             }}
           >
@@ -84,10 +84,10 @@ export default function ProviderSection({
           </div>
           <div>
             <div className="flex items-center space-x-2.5 mb-1">
-              <h2 className="text-lg font-bold text-[#0F172A]">{providerName}</h2>
+              <h2 className="text-lg font-bold text-gray-900">{providerName}</h2>
               {budgetCount > 0 && (
-                <span 
-                  className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-accent-50 text-accent-700 border border-accent-200"
                   title={`You have ${budgetCount} budget${budgetCount === 1 ? '' : 's'} configured for this provider`}
                 >
                   <Target className="h-2.5 w-2.5 mr-0.5" />
@@ -96,12 +96,12 @@ export default function ProviderSection({
               )}
             </div>
             <div className="flex items-center space-x-3 text-sm">
-              <span className="font-semibold text-[#0F172A]">
+              <span className="font-semibold text-gray-900">
                 {formatCurrency(convertAmount(currentMonth))}
               </span>
               {changePercent !== 0 && (
                 <span className={`flex items-center font-medium text-xs ${
-                  changePercent >= 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'
+                  changePercent >= 0 ? 'text-red-600' : 'text-green-600'
                 }`}>
                   {changePercent >= 0 ? (
                     <TrendingUp className="h-3 w-3 mr-0.5" />
@@ -116,7 +116,7 @@ export default function ProviderSection({
         </div>
         <Link
           to={`/provider/${providerId}`}
-          className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-[#22B8A0] hover:text-[#1F3A5F] bg-[#F0FDFA] hover:bg-[#CCFBF1] rounded-lg transition-all duration-150"
+          className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-accent-600 hover:text-accent-700 bg-accent-50 hover:bg-accent-100 rounded-lg transition-all duration-150"
         >
           <span>Details</span>
           <ArrowRight className="h-3.5 w-3.5" />
@@ -125,7 +125,7 @@ export default function ProviderSection({
 
       {/* Period Selector */}
       <div className="flex items-center space-x-2 mb-3 relative z-10">
-        <div className="flex bg-gray-100 rounded-xl p-1">
+        <div className="flex bg-surface-100 rounded-xl p-1">
           {(['3months', '6months', '12months'] as const).map((period) => (
             <button
               key={period}
@@ -137,8 +137,8 @@ export default function ProviderSection({
               }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 relative z-10 cursor-pointer ${
                 selectedPeriod === period
-                  ? 'bg-white text-[#0F172A] shadow-sm'
-                  : 'text-[#64748B] hover:text-[#0F172A] hover:bg-gray-50'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-surface-50'
               }`}
               type="button"
             >
@@ -165,21 +165,21 @@ export default function ProviderSection({
 
       {/* Quick Stats - Compact, Equal Heights */}
       <div className="grid grid-cols-3 gap-2.5">
-        <div className="bg-[#F8FAFC] rounded-xl p-3 border border-[#E2E8F0]">
-          <div className="flex items-center space-x-1.5 text-[#64748B] mb-1">
+        <div className="bg-surface-50 rounded-xl p-3 border border-surface-200">
+          <div className="flex items-center space-x-1.5 text-gray-500 mb-1">
             <Target className="h-3 w-3" />
             <span className="text-[10px] font-semibold uppercase tracking-wide">Forecast</span>
           </div>
-          <div className="text-sm font-bold text-[#0F172A]">
+          <div className="text-sm font-bold text-gray-900">
             {formatCurrency(convertAmount(forecast))}
           </div>
         </div>
-        <div className="bg-[#EFF6FF] rounded-xl p-3 border border-[#DBEAFE]">
-          <div className="flex items-center space-x-1.5 text-[#1F3A5F] mb-1">
+        <div className="bg-accent-50 rounded-xl p-3 border border-accent-200">
+          <div className="flex items-center space-x-1.5 text-accent-700 mb-1">
             <PiggyBank className="h-3 w-3" />
             <span className="text-[10px] font-semibold uppercase tracking-wide">Savings</span>
           </div>
-          <div className="text-sm font-bold text-[#1F3A5F]">
+          <div className="text-sm font-bold text-accent-700">
             {formatCurrency(convertAmount(_savings))}
           </div>
         </div>

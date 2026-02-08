@@ -210,8 +210,8 @@ export default function ProfilePage() {
           {/* Profile Picture Section */}
           <section className="card">
             <div className="flex items-center mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500/10 to-accent-500/10 flex items-center justify-center">
-                <Camera className="h-5 w-5 text-primary-600" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 flex items-center justify-center">
+                <Camera className="h-5 w-5 text-accent-700" />
               </div>
               <div className="ml-3">
                 <h2 className="text-lg font-semibold text-gray-900">Profile Picture</h2>
@@ -229,7 +229,7 @@ export default function ProfilePage() {
                     className="w-28 h-28 rounded-2xl object-cover ring-4 ring-gray-100 shadow-lg"
                   />
                 ) : (
-                  <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center ring-4 ring-gray-100 shadow-lg">
+                  <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-primary-800 to-accent-600 flex items-center justify-center ring-4 ring-gray-100 shadow-lg">
                     <span className="text-white text-4xl font-bold">
                       {user?.name?.charAt(0).toUpperCase() || 'U'}
                     </span>
@@ -317,8 +317,8 @@ export default function ProfilePage() {
           <section className="card">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500/10 to-accent-500/10 flex items-center justify-center">
-                  <User className="h-5 w-5 text-primary-600" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 flex items-center justify-center">
+                  <User className="h-5 w-5 text-accent-700" />
                 </div>
                 <div className="ml-3">
                   <h2 className="text-lg font-semibold text-gray-900">Basic Information</h2>
@@ -428,8 +428,8 @@ export default function ProfilePage() {
           {/* Security Section */}
           <section className="card">
             <div className="flex items-center mb-6">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500/10 to-accent-500/10 flex items-center justify-center">
-                <Shield className="h-5 w-5 text-primary-600" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 flex items-center justify-center">
+                <Shield className="h-5 w-5 text-accent-700" />
               </div>
               <div className="ml-3">
                 <h2 className="text-lg font-semibold text-gray-900">Security</h2>

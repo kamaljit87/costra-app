@@ -614,7 +614,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                     <div className="flex items-center space-x-3">
                       <button
                         onClick={() => handleStartEdit(provider)}
-                        className="p-2 text-frozenWater-600 hover:bg-frozenWater-50 rounded-lg transition-colors"
+                        className="p-2 text-accent-600 hover:bg-accent-50 rounded-lg transition-colors"
                         title="Edit account credentials"
                       >
                         <Edit2 className="h-5 w-5" />
@@ -704,10 +704,10 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             relative aspect-square p-4 sm:p-5 rounded-xl text-center
                             border-2 transition-all duration-200 ease-in-out
                             ${isSelected
-                              ? 'border-[#22B8A0] bg-[#22B8A0]/5 shadow-lg shadow-[#22B8A0]/20 scale-[1.02]'
+                              ? 'border-accent-500 bg-accent-500/5 shadow-lg shadow-accent-500/20 scale-[1.02]'
                               : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md hover:scale-[1.01]'
                             }
-                            focus:outline-none focus:ring-2 focus:ring-[#22B8A0] focus:ring-offset-2
+                            focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2
                             min-h-[120px] sm:min-h-[140px]
                           `}
                           aria-label={`Select ${provider.name}`}
@@ -719,7 +719,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           
                           {/* Provider Name */}
                           <div className={`font-semibold text-sm sm:text-base mb-1 transition-colors ${
-                            isSelected ? 'text-[#22B8A0]' : 'text-gray-900'
+                            isSelected ? 'text-accent-500' : 'text-gray-900'
                           }`}>
                             {provider.name}
                           </div>
@@ -728,7 +728,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           {count > 0 && (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                               isSelected 
-                                ? 'bg-[#22B8A0] text-white' 
+                                ? 'bg-accent-500 text-white' 
                                 : 'bg-gray-100 text-gray-600'
                             }`}>
                               {count} account{count > 1 ? 's' : ''}
@@ -737,7 +737,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           
                           {/* Selection Indicator */}
                           {isSelected && (
-                            <div className="absolute top-2 right-2 w-5 h-5 bg-[#22B8A0] rounded-full flex items-center justify-center">
+                            <div className="absolute top-2 right-2 w-5 h-5 bg-accent-500 rounded-full flex items-center justify-center">
                               <Check className="h-3 w-3 text-white" />
                             </div>
                           )}
@@ -789,7 +789,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             }}
                             className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
                               awsConnectionType === 'simple'
-                                ? 'bg-[#F0FDFA] border-[#22B8A0] text-[#22B8A0]'
+                                ? 'bg-accent-50 border-accent-500 text-accent-500'
                                 : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                           >
@@ -868,7 +868,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             <button
                               onClick={handleVerifyConnection}
                               disabled={isVerifying}
-                              className="w-full px-4 py-2 bg-[#22B8A0] text-white rounded-lg hover:bg-[#1F9A8A] transition-colors font-medium disabled:opacity-50"
+                              className="w-full px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-[#1F9A8A] transition-colors font-medium disabled:opacity-50"
                             >
                               {isVerifying ? 'Verifying...' : 'Verify Connection'}
                             </button>
@@ -882,7 +882,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           <button
                             type="button"
                             onClick={() => setShowIAMDialog(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:bg-[#F0FDFA] rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm text-accent-500 hover:text-accent-700 hover:bg-accent-50 rounded-lg transition-colors"
                           >
                             <HelpCircle className="h-4 w-4" />
                             How to set up IAM permissions
@@ -931,7 +931,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                           setCredentials({})
                                           setError('')
                                         }}
-                                        className="px-4 py-2 bg-[#22B8A0] text-white rounded-lg hover:bg-[#1ea088] transition-colors text-sm font-medium"
+                                        className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-[#1ea088] transition-colors text-sm font-medium"
                                       >
                                         Switch to Simple (API Keys)
                                       </button>

@@ -183,7 +183,7 @@ export default function ReportsPage() {
       case 'failed':
         return <XCircle className="h-5 w-5 text-red-600" />
       case 'generating':
-        return <RefreshCw className="h-5 w-5 text-frozenWater-600 animate-spin" />
+        return <RefreshCw className="h-5 w-5 text-accent-600 animate-spin" />
       default:
         return <Clock className="h-5 w-5 text-yellow-600" />
     }
@@ -218,7 +218,7 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="mt-6 mb-8">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <FileText className="h-8 w-8 text-frozenWater-600" />
+            <FileText className="h-8 w-8 text-accent-600" />
             Reports
           </h1>
           <p className="mt-2 text-gray-600">
@@ -227,9 +227,9 @@ export default function ReportsPage() {
         </div>
 
         {/* Info Section */}
-        <div className="mb-8 bg-frozenWater-50 border border-frozenWater-200 rounded-lg p-4">
+        <div className="mb-8 bg-accent-50 border border-accent-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-frozenWater-600 mt-0.5 flex-shrink-0" />
+            <Info className="h-5 w-5 text-accent-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-gray-700">
               <p className="font-medium mb-1">About Reports</p>
               <p>
@@ -252,7 +252,7 @@ export default function ReportsPage() {
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value as 'showback' | 'chargeback')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               >
                 <option value="showback">Cost Visibility Report (View Only)</option>
                 <option value="chargeback">Cost Allocation Report (For Billing)</option>
@@ -266,7 +266,7 @@ export default function ReportsPage() {
                 type="text"
                 value={reportName}
                 onChange={(e) => setReportName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 placeholder="e.g., Q1 2025 Team Costs"
               />
             </div>
@@ -278,7 +278,7 @@ export default function ReportsPage() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               />
             </div>
 
@@ -289,7 +289,7 @@ export default function ReportsPage() {
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               />
             </div>
 
@@ -302,7 +302,7 @@ export default function ReportsPage() {
                   setSelectedProvider(e.target.value)
                   setSelectedAccount(undefined)
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               >
                 <option value="">All Providers</option>
                 {Array.from(new Set(providers.map(p => p.providerId))).map(providerId => (
@@ -320,7 +320,7 @@ export default function ReportsPage() {
                 <select
                   value={selectedAccount || ''}
                   onChange={(e) => setSelectedAccount(e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 >
                   <option value="">All Accounts</option>
                   {filteredAccounts.map(account => (
@@ -341,7 +341,7 @@ export default function ReportsPage() {
                   setSelectedTeam(e.target.value)
                   setSelectedProduct('')
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               >
                 <option value="">All Teams</option>
                 {teams.map(team => (
@@ -359,7 +359,7 @@ export default function ReportsPage() {
                   setSelectedProduct(e.target.value)
                   setSelectedTeam('')
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
               >
                 <option value="">All Products</option>
                 {products.map(product => (
@@ -374,7 +374,7 @@ export default function ReportsPage() {
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value as 'csv' | 'pdf')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-frozenWater-500 focus:border-frozenWater-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 disabled={subscriptionStatus?.planType !== 'pro' && format === 'csv'}
               >
                 <option value="csv" disabled={subscriptionStatus?.planType !== 'pro'}>
@@ -393,7 +393,7 @@ export default function ReportsPage() {
           <button
             onClick={handleGenerateReport}
             disabled={isGenerating || !reportName.trim()}
-            className="mt-6 px-6 py-2 bg-frozenWater-600 text-white rounded-lg hover:bg-frozenWater-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="mt-6 px-6 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isGenerating ? 'Generating...' : 'Generate Report'}
           </button>
@@ -405,7 +405,7 @@ export default function ReportsPage() {
           
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <RefreshCw className="h-8 w-8 text-frozenWater-600 animate-spin" />
+              <RefreshCw className="h-8 w-8 text-accent-600 animate-spin" />
             </div>
           ) : reports.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
@@ -465,7 +465,7 @@ export default function ReportsPage() {
                           {report.status === 'completed' && (
                             <button
                               onClick={() => handleDownload(report)}
-                              className="text-frozenWater-600 hover:text-frozenWater-700"
+                              className="text-accent-600 hover:text-accent-700"
                             >
                               <Download className="h-5 w-5" />
                             </button>

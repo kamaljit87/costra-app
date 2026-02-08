@@ -320,7 +320,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   })
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-gray-300 shadow-sm">
+    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-surface-200 shadow-xs">
       <div className="w-full px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Mobile Menu Button - Minimum 44x44px touch target */}
@@ -344,7 +344,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={handleSearchKeyDown}
-                className="w-full pl-10 sm:pl-12 pr-9 sm:pr-10 py-2 sm:py-2.5 text-sm sm:text-base bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-frozenWater-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                className="w-full pl-10 sm:pl-12 pr-9 sm:pr-10 py-2 sm:py-2.5 text-sm sm:text-base bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-gray-900 placeholder-gray-400"
               />
               {searchQuery && (
                 <button
@@ -369,7 +369,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                           w-full px-4 py-3 text-left flex items-center justify-between
                           transition-colors
                           ${selectedResultIndex === index 
-                            ? 'bg-frozenWater-50 text-frozenWater-700' 
+                            ? 'bg-accent-50 text-accent-700' 
                             : 'text-gray-700 hover:bg-gray-50'
                           }
                         `}
@@ -439,7 +439,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   flex items-center space-x-2 px-4 py-2 rounded-lg
                   transition-colors
                   ${isProviderPage 
-                    ? 'bg-frozenWater-50 text-frozenWater-700' 
+                    ? 'bg-accent-50 text-accent-700' 
                     : 'text-gray-700 hover:bg-gray-100'
                   }
                 `}
@@ -458,7 +458,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                       <Link
                         to="/settings"
                         onClick={() => setIsProviderMenuOpen(false)}
-                              className="text-sm text-frozenWater-600 hover:text-frozenWater-700 mt-2 inline-block"
+                              className="text-sm text-accent-600 hover:text-accent-700 mt-2 inline-block"
                       >
                         Add Provider →
                       </Link>
@@ -493,7 +493,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                                     flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm
                                     transition-colors
                                     ${isAccountActive
-                                      ? 'bg-frozenWater-50 text-frozenWater-700'
+                                      ? 'bg-accent-50 text-accent-700'
                                       : 'text-gray-600 hover:bg-gray-50'
                                     }
                                   `}
@@ -557,7 +557,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                     className="w-8 h-8 rounded-full"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-frozenWater-500 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center">
                     <User className="h-4 w-4 text-white" />
                   </div>
                 )}

@@ -23,7 +23,7 @@ export default function AIChat() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'insights'>('chat')
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -56,7 +56,7 @@ export default function AIChat() {
           'Content-Type': 'application/json'
         }
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         setInsights(data.insights || [])
@@ -159,7 +159,7 @@ export default function AIChat() {
       {/* Floating Chat Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 ${isOpen ? 'hidden' : ''}`}
+        className={`fixed bottom-6 right-6 z-50 p-4 rounded-full bg-gradient-to-r from-accent-600 to-accent-500 text-white shadow-glow-accent hover:shadow-xl transform hover:scale-105 transition-all duration-200 ${isOpen ? 'hidden' : ''}`}
         title="AI Cost Assistant"
       >
         <Sparkles className="h-6 w-6" />
@@ -167,9 +167,9 @@ export default function AIChat() {
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[420px] h-[600px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-6 right-6 z-50 w-[420px] h-[600px] bg-white rounded-2xl shadow-2xl border border-surface-200 flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
           {/* Header */}
-          <div className="bg-[#1F3A5F] p-4 text-white">
+          <div className="bg-gradient-to-br from-primary-800 to-primary-900 p-4 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-lg">
@@ -193,8 +193,8 @@ export default function AIChat() {
               <button
                 onClick={() => setActiveTab('chat')}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'chat' 
-                    ? 'bg-white text-violet-600' 
+                  activeTab === 'chat'
+                    ? 'bg-white text-accent-600'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -204,8 +204,8 @@ export default function AIChat() {
               <button
                 onClick={() => setActiveTab('insights')}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === 'insights' 
-                    ? 'bg-white text-violet-600' 
+                  activeTab === 'insights'
+                    ? 'bg-white text-accent-600'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
@@ -219,11 +219,11 @@ export default function AIChat() {
           {activeTab === 'chat' ? (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-surface-50">
                 {messages.length === 0 ? (
                   <div className="text-center py-8">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-violet-100 to-indigo-100 flex items-center justify-center">
-                      <Sparkles className="h-8 w-8 text-violet-600" />
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-accent-100 to-accent-50 flex items-center justify-center">
+                      <Sparkles className="h-8 w-8 text-accent-600" />
                     </div>
                     <h4 className="font-semibold text-gray-900 mb-2">How can I help you?</h4>
                     <p className="text-sm text-gray-500 mb-6">
@@ -237,7 +237,7 @@ export default function AIChat() {
                             setInputValue(question)
                             inputRef.current?.focus()
                           }}
-                          className="block w-full text-left px-4 py-2 text-sm text-gray-600 bg-white rounded-lg border border-gray-200 hover:border-violet-300 hover:bg-violet-50 transition-colors"
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-600 bg-white rounded-lg border border-surface-200 hover:border-accent-300 hover:bg-accent-50 transition-colors"
                         >
                           {question}
                         </button>
@@ -251,9 +251,9 @@ export default function AIChat() {
                       className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
                     >
                       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        message.role === 'user' 
-                          ? 'bg-violet-600 text-white' 
-                          : 'bg-gradient-to-r from-violet-100 to-indigo-100 text-violet-600'
+                        message.role === 'user'
+                          ? 'bg-accent-600 text-white'
+                          : 'bg-gradient-to-r from-accent-100 to-accent-50 text-accent-600'
                       }`}>
                         {message.role === 'user' ? (
                           <User className="h-4 w-4" />
@@ -264,8 +264,8 @@ export default function AIChat() {
                       <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
                         <div className={`inline-block px-4 py-2 rounded-2xl ${
                           message.role === 'user'
-                            ? 'bg-violet-600 text-white rounded-tr-sm'
-                            : 'bg-white text-gray-800 rounded-tl-sm shadow-sm border border-gray-100'
+                            ? 'bg-accent-600 text-white rounded-tr-sm'
+                            : 'bg-white text-gray-800 rounded-tl-sm shadow-sm border border-surface-100'
                         }`}>
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
@@ -276,13 +276,13 @@ export default function AIChat() {
                     </div>
                   ))
                 )}
-                
+
                 {isLoading && (
                   <div className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-violet-100 to-indigo-100 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-violet-600" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-accent-100 to-accent-50 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-accent-600" />
                     </div>
-                    <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-100">
+                    <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-surface-100">
                       <div className="flex items-center gap-2 text-gray-500">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         <span className="text-sm">Thinking...</span>
@@ -302,7 +302,7 @@ export default function AIChat() {
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t border-gray-200 bg-white">
+              <div className="p-4 border-t border-surface-200 bg-white">
                 <div className="flex gap-2">
                   <input
                     ref={inputRef}
@@ -311,13 +311,13 @@ export default function AIChat() {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Ask about your cloud costs..."
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                    className="flex-1 px-4 py-2 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-sm"
                     disabled={isLoading}
                   />
                   <button
                     onClick={sendMessage}
                     disabled={!inputValue.trim() || isLoading}
-                    className="p-2 bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 bg-accent-600 text-white rounded-xl hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Send className="h-5 w-5" />
                   </button>
@@ -326,10 +326,10 @@ export default function AIChat() {
             </>
           ) : (
             /* Insights Tab */
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 bg-surface-50">
               {isLoadingInsights ? (
                 <div className="flex flex-col items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-violet-600 mb-4" />
+                  <Loader2 className="h-8 w-8 animate-spin text-accent-600 mb-4" />
                   <p className="text-sm text-gray-500">Analyzing your cost data...</p>
                 </div>
               ) : insights.length === 0 ? (
@@ -343,7 +343,7 @@ export default function AIChat() {
                   </p>
                   <button
                     onClick={fetchInsights}
-                    className="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm hover:bg-violet-700 transition-colors"
+                    className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm hover:bg-accent-700 transition-colors"
                   >
                     Refresh Insights
                   </button>
@@ -375,10 +375,10 @@ export default function AIChat() {
                       </div>
                     </div>
                   ))}
-                  
+
                   <button
                     onClick={fetchInsights}
-                    className="w-full mt-4 px-4 py-2 text-sm text-violet-600 hover:bg-violet-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="w-full mt-4 px-4 py-2 text-sm text-accent-600 hover:bg-accent-50 rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <Sparkles className="h-4 w-4" />
                     Refresh Insights

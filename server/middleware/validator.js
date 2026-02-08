@@ -53,6 +53,11 @@ export const validateSignup = [
     .isLength({ min: 1, max: 100 })
     .withMessage('Name must be between 1 and 100 characters')
     .customSanitizer(sanitizeString),
+  body('consentAccepted')
+    .isBoolean()
+    .withMessage('Consent acceptance must be a boolean')
+    .custom((value) => value === true)
+    .withMessage('You must accept the Privacy Policy and Terms of Service'),
   handleValidationErrors,
 ]
 

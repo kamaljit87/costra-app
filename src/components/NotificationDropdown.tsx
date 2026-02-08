@@ -154,17 +154,17 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
       case 'anomaly':
         return 'text-[#DC2626] bg-[#FEE2E2]'
       case 'sync':
-        return 'text-[#22B8A0] bg-[#F0FDFA]'
+        return 'text-accent-500 bg-accent-50'
       case 'report':
-        return 'text-[#1F3A5F] bg-[#EFF6FF]'
+        return 'text-accent-700 bg-[#EFF6FF]'
       case 'warning':
         return 'text-[#F59E0B] bg-[#FEF3C7]'
       case 'info':
-        return 'text-[#1F3A5F] bg-[#EFF6FF]'
+        return 'text-accent-700 bg-[#EFF6FF]'
       case 'success':
         return 'text-[#16A34A] bg-[#F0FDF4]'
       default:
-        return 'text-[#64748B] bg-[#F1F5F9]'
+        return 'text-gray-500 bg-[#F1F5F9]'
     }
   }
 
@@ -185,17 +185,17 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-xl border border-[#E2E8F0] z-50 max-h-[600px] flex flex-col"
+      className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-xl border border-surface-200 z-50 max-h-[600px] flex flex-col"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-[#E2E8F0]">
-        <h3 className="text-lg font-semibold text-[#0F172A]">Notifications</h3>
+      <div className="flex items-center justify-between p-4 border-b border-surface-200">
+        <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
               disabled={isMarkingAll}
-              className="text-xs text-[#64748B] hover:text-[#0F172A] flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[#F8FAFC] transition-colors disabled:opacity-50"
+              className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-surface-50 transition-colors disabled:opacity-50"
             >
               {isMarkingAll ? (
                 <Loader className="h-3 w-3 animate-spin" />
@@ -207,7 +207,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
           )}
           <button
             onClick={onClose}
-            className="p-1 text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] rounded-lg transition-colors"
+            className="p-1 text-gray-500 hover:text-gray-900 hover:bg-surface-50 rounded-lg transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -218,16 +218,16 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
       <div className="overflow-y-auto flex-1">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader className="h-6 w-6 animate-spin text-[#22B8A0]" />
+            <Loader className="h-6 w-6 animate-spin text-accent-500" />
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
-            <Bell className="h-12 w-12 text-[#64748B] mb-3" />
-            <p className="text-sm text-[#64748B] text-center">No notifications</p>
-            <p className="text-xs text-[#64748B] text-center mt-1">You're all caught up!</p>
+            <Bell className="h-12 w-12 text-gray-500 mb-3" />
+            <p className="text-sm text-gray-500 text-center">No notifications</p>
+            <p className="text-xs text-gray-500 text-center mt-1">You're all caught up!</p>
           </div>
         ) : (
-          <div className="divide-y divide-[#E2E8F0]">
+          <div className="divide-y divide-surface-200">
             {notifications.map((notification) => {
               const Icon = getNotificationIcon(notification.type)
               const iconColor = getNotificationColor(notification.type)
@@ -235,8 +235,8 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
               return (
                 <div
                   key={notification.id}
-                  className={`p-4 hover:bg-[#F8FAFC] transition-colors ${
-                    !notification.isRead ? 'bg-[#F0FDFA]' : ''
+                  className={`p-4 hover:bg-surface-50 transition-colors ${
+                    !notification.isRead ? 'bg-accent-50' : ''
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -246,18 +246,18 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${!notification.isRead ? 'text-[#0F172A]' : 'text-[#64748B]'}`}>
+                          <p className={`text-sm font-medium ${!notification.isRead ? 'text-gray-900' : 'text-gray-500'}`}>
                             {notification.title}
                           </p>
                           {notification.message && (
-                            <p className="text-xs text-[#64748B] mt-1 line-clamp-2">{notification.message}</p>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notification.message}</p>
                           )}
-                          <p className="text-xs text-[#64748B] mt-1">{formatTimeAgo(notification.createdAt)}</p>
+                          <p className="text-xs text-gray-500 mt-1">{formatTimeAgo(notification.createdAt)}</p>
                           {notification.link && (
                             <Link
                               to={notification.link}
                               onClick={onClose}
-                              className="text-xs text-[#22B8A0] hover:text-[#1F3A5F] mt-1 inline-block font-medium"
+                              className="text-xs text-accent-500 hover:text-accent-700 mt-1 inline-block font-medium"
                             >
                               {notification.linkText || 'View details'} →
                             </Link>
@@ -267,7 +267,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                           {!notification.isRead && (
                             <button
                               onClick={() => handleMarkAsRead(notification.id)}
-                              className="p-1 text-[#64748B] hover:text-[#22B8A0] hover:bg-[#F0FDFA] rounded transition-colors"
+                              className="p-1 text-gray-500 hover:text-accent-500 hover:bg-accent-50 rounded transition-colors"
                               title="Mark as read"
                             >
                               <Check className="h-4 w-4" />
@@ -275,7 +275,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                           )}
                           <button
                             onClick={() => handleDelete(notification.id)}
-                            className="p-1 text-[#64748B] hover:text-[#DC2626] hover:bg-[#FEE2E2] rounded transition-colors"
+                            className="p-1 text-gray-500 hover:text-[#DC2626] hover:bg-[#FEE2E2] rounded transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />

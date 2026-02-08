@@ -15,7 +15,7 @@ export default function ProviderCostCard({ data }: ProviderCostCardProps) {
   const changePercent = lastMonth > 0 ? ((currentMonth - lastMonth) / lastMonth) * 100 : 0
 
   return (
-    <div className="card-modern group">
+    <div className="card group">
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center mb-2">

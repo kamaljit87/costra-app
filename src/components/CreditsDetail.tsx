@@ -118,7 +118,7 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
     return (
       <div className="card p-6">
         <div className="flex items-center justify-center py-8">
-          <div className="text-[#64748B]">Loading credit information...</div>
+          <div className="text-gray-500">Loading credit information...</div>
         </div>
       </div>
     )
@@ -127,27 +127,27 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
   return (
     <div className="space-y-4">
       {/* Summary Section */}
-      <div className="card p-5 bg-gradient-to-br from-[#F0FDF4] to-[#ECFDF5] border-[#BBF7D0]">
+      <div className="card p-5 bg-gradient-to-br from-[#F0FDF4] to-[#ECFDF5] border-accent-200">
         <div className="flex items-center gap-2 mb-4">
           <Gift className="h-5 w-5 text-[#16A34A]" />
-          <h3 className="text-lg font-semibold text-[#0F172A]">Credit Summary</h3>
+          <h3 className="text-lg font-semibold text-gray-900">Credit Summary</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <div className="text-xs text-[#64748B] mb-1.5 uppercase tracking-wide">Total Amount Remaining</div>
+            <div className="text-xs text-gray-500 mb-1.5 uppercase tracking-wide">Total Amount Remaining</div>
             <div className="text-2xl font-bold text-[#16A34A]">
               {formatCurrency(convertAmount(summary.totalRemaining))}
             </div>
           </div>
           <div>
-            <div className="text-xs text-[#64748B] mb-1.5 uppercase tracking-wide">Total Amount Used</div>
-            <div className="text-2xl font-bold text-[#0F172A]">
+            <div className="text-xs text-gray-500 mb-1.5 uppercase tracking-wide">Total Amount Used</div>
+            <div className="text-2xl font-bold text-gray-900">
               {formatCurrency(convertAmount(summary.totalUsed))}
             </div>
           </div>
           <div>
-            <div className="text-xs text-[#64748B] mb-1.5 uppercase tracking-wide">Active Credits</div>
-            <div className="text-2xl font-bold text-[#1F3A5F]">
+            <div className="text-xs text-gray-500 mb-1.5 uppercase tracking-wide">Active Credits</div>
+            <div className="text-2xl font-bold text-accent-700">
               {summary.activeCredits}
             </div>
           </div>
@@ -156,14 +156,14 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
 
       {/* Active Credits Table */}
       <div className="card p-0 overflow-hidden">
-        <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between">
+        <div className="p-4 border-b border-surface-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-[#0F172A]">
+            <h3 className="text-base font-semibold text-gray-900">
               Active Credits ({summary.activeCredits})
             </h3>
             <div className="group relative">
-              <Info className="h-4 w-4 text-[#64748B] cursor-help" />
-              <div className="absolute left-0 bottom-full mb-2 w-64 p-2 bg-[#0F172A] text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              <Info className="h-4 w-4 text-gray-500 cursor-help" />
+              <div className="absolute left-0 bottom-full mb-2 w-64 p-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                 Credits are promotional credits, refunds, or account credits that reduce your total cost. They are automatically applied to your bill.
               </div>
             </div>
@@ -173,7 +173,7 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
               href="https://console.aws.amazon.com/billing/home#/credits"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-[#22B8A0] hover:text-[#1F3A5F] hover:underline"
+              className="flex items-center gap-1 text-xs text-accent-500 hover:text-accent-700 hover:underline"
             >
               View in AWS Console
               <ExternalLink className="h-3 w-3" />
@@ -183,9 +183,9 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
 
         {credits.length === 0 ? (
           <div className="p-8 text-center">
-            <Gift className="h-12 w-12 text-[#64748B] mx-auto mb-3 opacity-50" />
-            <p className="text-sm text-[#64748B]">No active credits found</p>
-            <p className="text-xs text-[#64748B] mt-1">
+            <Gift className="h-12 w-12 text-gray-500 mx-auto mb-3 opacity-50" />
+            <p className="text-sm text-gray-500">No active credits found</p>
+            <p className="text-xs text-gray-500 mt-1">
               Credits will appear here when available from your cloud provider
             </p>
           </div>
@@ -194,41 +194,41 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
             <div className="inline-block min-w-full align-middle sm:rounded-lg">
               <div className="overflow-hidden sm:rounded-lg border border-gray-200">
                 <table className="w-full divide-y divide-gray-200">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+              <thead className="bg-surface-50 border-b border-surface-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Credit Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Issued Credit Amount
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Expiration Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Amount Used
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Amount Remaining
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Applicable Products
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
+              <tbody className="divide-y divide-surface-200">
                 {credits.map((credit, index) => (
-                  <tr key={index} className="hover:bg-[#F8FAFC] transition-colors">
+                  <tr key={index} className="hover:bg-surface-50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Gift className="h-4 w-4 text-[#16A34A]" />
-                        <span className="text-sm font-medium text-[#0F172A]">
+                        <span className="text-sm font-medium text-gray-900">
                           {credit.creditName || credit.creditType || 'Credit'}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-[#0F172A]">
+                      <span className="text-sm text-gray-900">
                         {credit.issuedAmount 
                           ? formatCurrency(convertAmount(credit.issuedAmount))
                           : 'N/A'}
@@ -236,8 +236,8 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-[#64748B]" />
-                        <span className="text-sm text-[#64748B]">
+                        <Calendar className="h-3.5 w-3.5 text-gray-500" />
+                        <span className="text-sm text-gray-500">
                           {formatDate(credit.expirationDate)}
                         </span>
                       </div>
@@ -245,7 +245,7 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <TrendingUp className="h-3.5 w-3.5 text-[#F59E0B]" />
-                        <span className="text-sm font-medium text-[#0F172A]">
+                        <span className="text-sm font-medium text-gray-900">
                           {formatCurrency(convertAmount(credit.amountUsed || 0))}
                         </span>
                       </div>
@@ -263,13 +263,13 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
                           credit.applicableProducts.map((product, idx) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
+                              className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-[#EFF6FF] text-accent-700 border border-[#DBEAFE]"
                             >
                               {product}
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-[#64748B]">All services</span>
+                          <span className="text-xs text-gray-500">All services</span>
                         )}
                       </div>
                     </td>

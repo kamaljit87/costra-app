@@ -112,11 +112,11 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <DollarSign className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
-            <p className="text-frozenWater-700">Loading unit economics...</p>
+            <DollarSign className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
+            <p className="text-accent-700">Loading unit economics...</p>
           </div>
         </div>
       </div>
@@ -138,11 +138,11 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
 
   if (error) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
-            <p className="text-sm text-frozenWater-600">{error}</p>
+            <p className="text-sm text-accent-600">{error}</p>
           </div>
         </div>
       </div>
@@ -151,31 +151,31 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
 
   if (!data || data.unitEconomics.length === 0) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-frozenWater-600" />
+              <DollarSign className="h-5 w-5 text-accent-600" />
               Unit Economics
               <button
                 onClick={() => setShowInfoDialog(true)}
-                className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+                className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
                 title="Learn more about Unit Economics"
               >
-                <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+                <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
               </button>
             </h3>
-            <p className="text-sm text-frozenWater-600">Cost per business metric (customer, API call, transaction)</p>
+            <p className="text-sm text-accent-600">Cost per business metric (customer, API call, transaction)</p>
           </div>
         </div>
-        <div className="flex items-center justify-center py-12 bg-frozenWater-50 rounded-xl border border-frozenWater-200">
+        <div className="flex items-center justify-center py-12 bg-accent-50 rounded-xl border border-accent-200">
           <div className="text-center">
-            <DollarSign className="h-10 w-10 text-frozenWater-600 mx-auto mb-3" />
-            <p className="text-frozenWater-900 font-medium mb-1">No business metrics found</p>
-            <p className="text-frozenWater-700 text-sm mb-2">
+            <DollarSign className="h-10 w-10 text-accent-600 mx-auto mb-3" />
+            <p className="text-accent-900 font-medium mb-1">No business metrics found</p>
+            <p className="text-accent-700 text-sm mb-2">
               Add business metrics (customers, API calls, transactions) to calculate unit economics.
             </p>
-            <p className="text-frozenWater-600 text-xs">
+            <p className="text-accent-600 text-xs">
               Use the API or integration to track business metrics alongside costs.
             </p>
           </div>
@@ -188,7 +188,7 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <DollarSign className="h-6 w-6 text-frozenWater-600" />
+                    <DollarSign className="h-6 w-6 text-accent-600" />
                     What are Unit Economics?
                   </h3>
                   <button
@@ -201,23 +201,23 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
                 
                 <div className="space-y-4 text-gray-700">
                   <p>
-                    <strong className="text-frozenWater-700">Unit Economics</strong> measures the cost per unit of business value, 
+                    <strong className="text-accent-700">Unit Economics</strong> measures the cost per unit of business value, 
                     helping you understand how efficiently you're spending money relative to your business metrics.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                    <h4 className="font-semibold text-frozenWater-800 mb-2">Examples:</h4>
+                  <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                    <h4 className="font-semibold text-accent-800 mb-2">Examples:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Cost per Customer:</strong> Total cloud costs ÷ Number of customers</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Cost per API Call:</strong> Total cloud costs ÷ Number of API requests</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Cost per Transaction:</strong> Total cloud costs ÷ Number of transactions processed</span>
                       </li>
                     </ul>
@@ -268,21 +268,21 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
   })
 
   return (
-    <div className="card bg-white border-frozenWater-100">
+    <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-frozenWater-600" />
+            <DollarSign className="h-5 w-5 text-accent-600" />
             Unit Economics
             <button
               onClick={() => setShowInfoDialog(true)}
-              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
               title="Learn more about Unit Economics"
             >
-              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+              <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
             </button>
           </h3>
-          <p className="text-sm text-frozenWater-600">
+          <p className="text-sm text-accent-600">
             Cost per business metric • Total cost: {formatCurrency(data.totalCost)}
           </p>
         </div>
@@ -297,11 +297,11 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
           return (
             <div
               key={`${item.metricType}-${item.metricName}`}
-              className="p-4 bg-gradient-to-br from-white to-frozenWater-50/50 rounded-xl border border-frozenWater-200 hover:shadow-md transition-shadow"
+              className="p-4 bg-gradient-to-br from-white to-accent-50/50 rounded-xl border border-accent-200 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-frozenWater-100 flex items-center justify-center">
-                  <Icon className="h-5 w-5 text-frozenWater-600" />
+                <div className="w-10 h-10 rounded-lg bg-accent-100 flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-accent-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium text-gray-500 uppercase tracking-wider truncate">
@@ -337,35 +337,35 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-frozenWater-200">
-              <th className="text-left py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+            <tr className="border-b border-accent-200">
+              <th className="text-left py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Business Metric
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Total Metric Value
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Total Cost
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Unit Cost
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Efficiency
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-frozenWater-100">
+          <tbody className="divide-y divide-accent-100">
             {sortedEconomics.map((item) => {
               const Icon = getMetricIcon(item.metricType)
               const hasUnitCost = item.unitCost !== null && item.unitCost > 0
               const isHighCost = hasUnitCost && item.unitCost! > 0.01
               
               return (
-                <tr key={`${item.metricType}-${item.metricName}`} className="hover:bg-frozenWater-50/50 transition-colors">
+                <tr key={`${item.metricType}-${item.metricName}`} className="hover:bg-accent-50/50 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-frozenWater-500" />
+                      <Icon className="h-4 w-4 text-accent-500" />
                       <div>
                         <div className="font-medium text-gray-900">{item.metricName}</div>
                         <div className="text-xs text-gray-500 capitalize">{item.metricType}</div>
@@ -423,12 +423,12 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
       </div>
 
       {data.unitEconomics.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-frozenWater-200">
+        <div className="mt-4 pt-4 border-t border-accent-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-frozenWater-700">
+            <span className="text-accent-700">
               Showing {data.unitEconomics.length} business metric{data.unitEconomics.length !== 1 ? 's' : ''}
             </span>
-            <span className="text-xs text-frozenWater-600">
+            <span className="text-xs text-accent-600">
               {startDateStr} to {endDateStr}
             </span>
           </div>
@@ -442,7 +442,7 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <DollarSign className="h-6 w-6 text-frozenWater-600" />
+                  <DollarSign className="h-6 w-6 text-accent-600" />
                   What are Unit Economics?
                 </h3>
                 <button
@@ -455,23 +455,23 @@ export default function UnitEconomics({ providerId, accountId, period = '1month'
               
               <div className="space-y-4 text-gray-700">
                 <p>
-                  <strong className="text-frozenWater-700">Unit Economics</strong> measures the cost per unit of business value, 
+                  <strong className="text-accent-700">Unit Economics</strong> measures the cost per unit of business value, 
                   helping you understand how efficiently you're spending money relative to your business metrics.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">Examples:</h4>
+                <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                  <h4 className="font-semibold text-accent-800 mb-2">Examples:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Cost per Customer:</strong> Total cloud costs ÷ Number of customers</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Cost per API Call:</strong> Total cloud costs ÷ Number of API requests</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Cost per Transaction:</strong> Total cloud costs ÷ Number of transactions processed</span>
                     </li>
                   </ul>

@@ -53,7 +53,7 @@ export default function ProviderCostChart({
     ...point,
     cost: convertAmount(point.cost),
     originalCost: point.cost,
-    monthLabel: isMonthlyView 
+    monthLabel: isMonthlyView
       ? new Date(point.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       : point.date,
   }))
@@ -79,13 +79,13 @@ export default function ProviderCostChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const originalCost = payload[0]?.payload?.originalCost ?? payload[0]?.value
-      const displayDate = isMonthlyView 
-        ? label 
+      const displayDate = isMonthlyView
+        ? label
         : new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-      
+
       return (
-        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border-2 border-frozenWater-200 p-4">
-          <p className="text-sm text-frozenWater-700 mb-1">{displayDate}</p>
+        <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-accent-200 p-4">
+          <p className="text-sm text-accent-700 mb-1">{displayDate}</p>
           <p className="text-lg font-bold text-gray-900">{formatCurrency(originalCost)}</p>
         </div>
       )
@@ -94,12 +94,12 @@ export default function ProviderCostChart({
   }
 
   return (
-      <div className="bg-white rounded-2xl border border-frozenWater-100 shadow-card">
+      <div className="bg-white rounded-2xl border border-surface-200 shadow-card">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div 
+          <div
             className="w-12 h-12 flex items-center justify-center rounded-xl"
-            style={{ 
+            style={{
               backgroundColor: `${providerColor}15`,
               boxShadow: `0 4px 14px ${providerColor}15`
             }}
@@ -135,27 +135,27 @@ export default function ProviderCostChart({
           <BarChart data={chartData} barCategoryGap="20%">
             <defs>
               <linearGradient id={`barGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#45baa5" />
-                <stop offset="100%" stopColor="#379584" />
+                <stop offset="0%" stopColor="#20C997" />
+                <stop offset="100%" stopColor="#12B886" />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#b5e3db" opacity={0.3} vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#96F2D7" opacity={0.3} vertical={false} />
             <XAxis
               dataKey="monthLabel"
-              stroke="#379584"
+              stroke="#12B886"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dy={10}
-              tick={{ fill: '#297063' }}
+              tick={{ fill: '#099268' }}
             />
             <YAxis
-              stroke="#379584"
+              stroke="#12B886"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dx={-10}
-              tick={{ fill: '#297063' }}
+              tick={{ fill: '#099268' }}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -163,15 +163,15 @@ export default function ProviderCostChart({
                 return `${symbol}${value.toFixed(0)}`
               }}
             />
-            <Tooltip 
-              content={<CustomTooltip />} 
-              cursor={{ fill: '#b5e3db', opacity: 0.3 }} 
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ fill: '#96F2D7', opacity: 0.3 }}
             />
-            <Bar 
-              dataKey="cost" 
+            <Bar
+              dataKey="cost"
               fill={`url(#barGradient-${providerId})`}
               radius={[8, 8, 0, 0]}
-              stroke="#379584"
+              stroke="#12B886"
               strokeWidth={1}
             />
           </BarChart>
@@ -179,31 +179,31 @@ export default function ProviderCostChart({
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id={`areaGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#45baa5" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#45baa5" stopOpacity={0} />
+                <stop offset="0%" stopColor="#20C997" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#20C997" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#b5e3db" opacity={0.3} vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#96F2D7" opacity={0.3} vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#379584"
+              stroke="#12B886"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dy={10}
-              tick={{ fill: '#297063' }}
+              tick={{ fill: '#099268' }}
               tickFormatter={(value) => {
                 const date = new Date(value)
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }}
             />
             <YAxis
-              stroke="#379584"
+              stroke="#12B886"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dx={-10}
-              tick={{ fill: '#297063' }}
+              tick={{ fill: '#099268' }}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -211,14 +211,14 @@ export default function ProviderCostChart({
                 return `${symbol}${value.toFixed(0)}`
               }}
             />
-            <Tooltip 
+            <Tooltip
               content={<CustomTooltip />}
-              cursor={{ stroke: '#45baa5', strokeWidth: 1, strokeDasharray: '3 3' }}
+              cursor={{ stroke: '#20C997', strokeWidth: 1, strokeDasharray: '3 3' }}
             />
             <Area
               type="monotone"
               dataKey="cost"
-              stroke="#45baa5"
+              stroke="#20C997"
               strokeWidth={2.5}
               fill={`url(#areaGradient-${providerId})`}
             />

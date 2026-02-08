@@ -18,7 +18,6 @@ import {
   cancelStripeSubscription,
 } from '../services/stripeService.js'
 import logger from '../utils/logger.js'
-import Stripe from 'stripe'
 
 const router = express.Router()
 
@@ -125,10 +124,11 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   }
   
   let event
-  
+
   try {
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '')
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
+    const { default: Stripe } = await import('stripe')
+    const stripeClient = Stripe(process.env.STRIPE_SECRET_KEY || '')
+    event = stripeClient.webhooks.constructEvent(req.body, sig, webhookSecret)
   } catch (err) {
     logger.error('Webhook signature verification failed', { error: err.message })
     return res.status(400).json({ error: `Webhook Error: ${err.message}` })

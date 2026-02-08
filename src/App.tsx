@@ -16,6 +16,9 @@ import TeamCostView from './pages/TeamCostView'
 import ReportsPage from './pages/ReportsPage'
 import BillingPage from './pages/BillingPage'
 import DebugPage from './pages/DebugPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+import TermsOfServicePage from './pages/TermsOfServicePage'
+import CookieConsent from './components/CookieConsent'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -33,6 +36,8 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
             <Route
               path="/dashboard"
               element={
@@ -114,6 +119,7 @@ function App() {
               }
             />
           </Routes>
+          <CookieConsent />
             </NotificationProvider>
           </FilterProvider>
         </CurrencyProvider>

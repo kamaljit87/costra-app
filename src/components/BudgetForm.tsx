@@ -117,7 +117,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
               type="text"
               value={formData.budgetName}
               onChange={(e) => setFormData({ ...formData, budgetName: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 transition-all"
+              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 transition-all"
               required
               placeholder="e.g., AWS Production Budget"
             />
@@ -131,7 +131,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
             <select
               value={formData.providerId || ''}
               onChange={(e) => setFormData({ ...formData, providerId: e.target.value || undefined, accountId: undefined })}
-              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 transition-all"
+              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 transition-all"
             >
               <option value="">All Providers</option>
               {Array.from(new Set(providers.map(p => p.providerId))).map(providerId => (
@@ -151,7 +151,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
               <select
                 value={formData.accountId || ''}
                 onChange={(e) => setFormData({ ...formData, accountId: e.target.value ? parseInt(e.target.value) : undefined })}
-                className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 transition-all"
+                className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 transition-all"
               >
                 <option value="">All Accounts</option>
                 {filteredAccounts.map(account => (
@@ -174,7 +174,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
               min="0"
               value={formData.budgetAmount}
               onChange={(e) => setFormData({ ...formData, budgetAmount: parseFloat(e.target.value) || 0 })}
-              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 transition-all"
+              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 transition-all"
               required
               placeholder="5000.00"
             />
@@ -188,7 +188,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
             <select
               value={formData.budgetPeriod}
               onChange={(e) => setFormData({ ...formData, budgetPeriod: e.target.value as 'monthly' | 'quarterly' | 'yearly' })}
-              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 transition-all"
+              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 transition-all"
               required
             >
               <option value="monthly">Monthly</option>
@@ -208,7 +208,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
               max="100"
               value={formData.alertThreshold}
               onChange={(e) => setFormData({ ...formData, alertThreshold: parseInt(e.target.value) || 80 })}
-              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-frozenWater-500/20 focus:border-frozenWater-500/60 transition-all"
+              className="w-full px-4 py-2.5 border border-gray-300/60 rounded-xl focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 transition-all"
               placeholder="80"
             />
             <p className="mt-1 text-xs text-gray-500">
@@ -224,7 +224,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
                 id="createInCloudProvider"
                 checked={createInCloudProvider}
                 onChange={(e) => setCreateInCloudProvider(e.target.checked)}
-                className="mt-1 h-4 w-4 text-frozenWater-600 focus:ring-frozenWater-500 border-gray-300 rounded"
+                className="mt-1 h-4 w-4 text-accent-600 focus:ring-accent-500 border-gray-300 rounded"
               />
               <div className="flex-1">
                 <label htmlFor="createInCloudProvider" className="block text-sm font-medium text-gray-900 cursor-pointer">
@@ -249,7 +249,7 @@ export default function BudgetForm({ budget, onClose, onSuccess }: BudgetFormPro
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-frozenWater-600 text-white rounded-lg hover:bg-frozenWater-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? 'Saving...' : budget?.id ? 'Update Budget' : 'Create Budget'}
             </button>

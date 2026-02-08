@@ -13,7 +13,7 @@ interface AuthContextType {
   isDemoMode: boolean
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  signup: (name: string, email: string, password: string) => Promise<boolean>
+  signup: (name: string, email: string, password: string, consentAccepted?: boolean) => Promise<boolean>
   googleLogin: (googleId: string, name: string, email: string, avatarUrl?: string) => Promise<boolean>
   logout: () => void
   updateUser: (userData: Partial<User>) => void
@@ -159,9 +159,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const signup = async (name: string, email: string, password: string): Promise<boolean> => {
+  const signup = async (name: string, email: string, password: string, consentAccepted: boolean = true): Promise<boolean> => {
     try {
-      const response = await authAPI.signup(name, email, password)
+      const response = await authAPI.signup(name, email, password, consentAccepted)
       if (response.token && response.user) {
         setUser(response.user)
         setIsAuthenticated(true)

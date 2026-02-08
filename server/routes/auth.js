@@ -1,7 +1,7 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { createUser, getUserByEmail, getUserById } from '../database.js'
+import { createUser, getUserByEmail, getUserById, recordMultipleConsents } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { authLimiter } from '../middleware/rateLimiter.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
@@ -10,8 +10,8 @@ import logger from '../utils/logger.js'
 
 const router = express.Router()
 
-// Auth rate limiter removed - no rate limiting for authentication endpoints
-// router.use(authLimiter)
+// Rate limit auth endpoints to prevent brute-force attacks (GDPR Art. 32 - security of processing)
+router.use(authLimiter)
 
 /**
  * @swagger
@@ -67,7 +67,12 @@ router.post('/signup',
   validateSignup,
   async (req, res) => {
     try {
-      const { name, email, password } = req.body
+      const { name, email, password, consentAccepted } = req.body
+
+      // Require consent to Privacy Policy and Terms of Service (GDPR Art. 6 / DPDPA Sec. 6)
+      if (!consentAccepted) {
+        return res.status(400).json({ error: 'You must accept the Privacy Policy and Terms of Service to create an account' })
+      }
 
       // Check if user already exists
       const existingUser = await getUserByEmail(email)
@@ -80,6 +85,20 @@ router.post('/signup',
 
       // Create user
       const userId = await createUser(name, email, passwordHash)
+
+      // Record consent (GDPR/DPDPA compliance)
+      try {
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress
+        const userAgent = req.headers['user-agent'] || ''
+        await recordMultipleConsents(userId, [
+          { consentType: 'privacy_policy', version: '1.0' },
+          { consentType: 'terms_of_service', version: '1.0' },
+          { consentType: 'data_processing', version: '1.0' },
+        ], ipAddress, userAgent)
+        logger.info('Consent recorded for new user', { userId, email })
+      } catch (consentError) {
+        logger.error('Failed to record consent', { userId, email, error: consentError.message })
+      }
 
       // Create 7-day trial subscription
       try {

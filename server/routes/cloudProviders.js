@@ -24,6 +24,7 @@ import {
   healthCheckAWSConnection,
   extractAccountIdFromRoleArn,
 } from '../services/awsConnectionService.js'
+import { getMaxProviderAccounts } from '../services/subscriptionService.js'
 
 const router = express.Router()
 
@@ -80,6 +81,18 @@ router.post('/',
 
       const userId = req.user.userId
       const { providerId, providerName, credentials, accountAlias } = req.body
+
+      // Check provider account limit for user's plan
+      const existingProviders = await getUserCloudProviders(userId)
+      const maxAccounts = await getMaxProviderAccounts(userId)
+      if (existingProviders.length >= maxAccounts) {
+        return res.status(403).json({
+          error: `Your current plan allows up to ${maxAccounts} cloud provider account${maxAccounts !== 1 ? 's' : ''}. Please upgrade to Pro for unlimited accounts.`,
+          code: 'ACCOUNT_LIMIT_REACHED',
+          currentCount: existingProviders.length,
+          maxAllowed: maxAccounts,
+        })
+      }
 
       const accountId = await addCloudProvider(userId, providerId, providerName, credentials, accountAlias)
 
@@ -395,6 +408,18 @@ router.post('/aws/automated',
 
       const userId = req.user.userId || req.user.id
       const { connectionName, awsAccountId, connectionType = 'billing' } = req.body
+
+      // Check provider account limit for user's plan
+      const existingProviders = await getUserCloudProviders(userId)
+      const maxAccounts = await getMaxProviderAccounts(userId)
+      if (existingProviders.length >= maxAccounts) {
+        return res.status(403).json({
+          error: `Your current plan allows up to ${maxAccounts} cloud provider account${maxAccounts !== 1 ? 's' : ''}. Please upgrade to Pro for unlimited accounts.`,
+          code: 'ACCOUNT_LIMIT_REACHED',
+          currentCount: existingProviders.length,
+          maxAllowed: maxAccounts,
+        })
+      }
 
       // Sanitize connection name for CloudFormation and IAM role names
       // This ensures the stack name and role name are valid (no spaces, lowercase, etc.)

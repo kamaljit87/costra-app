@@ -118,13 +118,13 @@ export default function Dashboard() {
 
         {/* Demo Mode Banner */}
         {isDemoMode && (
-          <div className="mb-4 bg-[#F0FDFA] border border-[#BBF7D0] rounded-2xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
-            <div className="w-8 h-8 rounded-xl bg-[#CCFBF1] flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-[#22B8A0]" />
+          <div className="mb-4 bg-accent-50 border border-accent-200 rounded-2xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
+            <div className="w-8 h-8 rounded-xl bg-accent-100 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-accent-500" />
             </div>
             <div>
-              <span className="text-[#0F766E] font-semibold text-sm">Demo Mode</span>
-              <span className="text-[#64748B] text-xs ml-2">
+              <span className="text-accent-700 font-semibold text-sm">Demo Mode</span>
+              <span className="text-gray-500 text-xs ml-2">
                 You're viewing sample data. Sign up to connect your cloud accounts.
               </span>
             </div>
@@ -134,10 +134,10 @@ export default function Dashboard() {
         {/* Header with Sync and Add Provider - Compact */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#0F172A] mb-0.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-0.5">
               Dashboard
             </h1>
-            <p className="text-xs text-[#64748B]">
+            <p className="text-xs text-gray-500">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
@@ -167,7 +167,7 @@ export default function Dashboard() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 text-frozenWater-600 animate-spin mx-auto mb-4" />
+              <RefreshCw className="h-8 w-8 text-accent-600 animate-spin mx-auto mb-4" />
               <p className="text-gray-500">Loading cost data...</p>
             </div>
           </div>
@@ -185,12 +185,12 @@ export default function Dashboard() {
             {/* Provider Sections with Charts */}
             {(() => {
               const allProviders = new Map<string, CostData>()
-              
+
               // Add providers with cost data
               costData.forEach(data => {
                 allProviders.set(data.provider.id, data)
               })
-              
+
               // Add configured providers without cost data
               if (!isDemoMode) {
                 configuredProviders
@@ -219,9 +219,9 @@ export default function Dashboard() {
                     }
                   })
               }
-              
+
               const providersToShow = Array.from(allProviders.values())
-              
+
               // Show empty state if no providers exist
               if (providersToShow.length === 0 && !isDemoMode) {
                 return (
@@ -243,11 +243,11 @@ export default function Dashboard() {
                   </div>
                 )
               }
-              
+
               if (providersToShow.length > 0) {
                 return (
                   <div className="mb-6">
-                    <h2 className="text-xl font-bold text-[#0F172A] mb-4">By Provider</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">By Provider</h2>
                     <div className="space-y-4">
                       {providersToShow.map((data) => {
                         const hasData = data.currentMonth > 0 || data.services.length > 0
@@ -274,7 +274,7 @@ export default function Dashboard() {
                               <div className="card">
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="flex items-center space-x-4">
-                                    <div 
+                                    <div
                                       className="w-14 h-14 flex items-center justify-center rounded-2xl"
                                       style={{ backgroundColor: `${getProviderColor(data.provider.id)}15` }}
                                     >
@@ -293,7 +293,7 @@ export default function Dashboard() {
                                     View Details
                                   </Link>
                                 </div>
-                                <div className="bg-surface-50 rounded-xl p-6 text-center border border-gray-100">
+                                <div className="bg-surface-50 rounded-xl p-6 text-center border border-surface-100">
                                   <p className="text-gray-600 mb-2">Cost data will appear here once your provider is synced.</p>
                                   <p className="text-sm text-gray-400">Click "Sync Data" to fetch the latest costs from your cloud provider.</p>
                                 </div>
@@ -335,7 +335,7 @@ export default function Dashboard() {
             <button
               onClick={handleSync}
               disabled={isSyncing || isDemoMode}
-              className="fixed bottom-8 right-8 w-14 h-14 bg-frozenWater-600 text-white rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
+              className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-r from-accent-600 to-accent-500 text-white rounded-full shadow-glow-accent hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
               title="Quick sync"
             >
               <Sparkles className={`h-6 w-6 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -345,7 +345,7 @@ export default function Dashboard() {
 
         {/* Add Provider Modal */}
         {showAddProvider && (
-          <CloudProviderManager 
+          <CloudProviderManager
             modalMode={true}
             onProviderChange={() => {
               loadData()

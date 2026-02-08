@@ -108,7 +108,7 @@ export default function BudgetsPage() {
           </div>
           <button
             onClick={handleCreateBudget}
-            className="flex items-center gap-2 px-4 py-2 bg-frozenWater-600 text-white rounded-lg hover:bg-frozenWater-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors"
           >
             <Plus className="h-5 w-5" />
             Create Budget
@@ -133,9 +133,9 @@ export default function BudgetsPage() {
         )}
 
         {/* Info Section */}
-        <div className="mb-8 bg-frozenWater-50 border border-frozenWater-200 rounded-lg p-4">
+        <div className="mb-8 bg-accent-50 border border-accent-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-frozenWater-600 mt-0.5 flex-shrink-0" />
+            <Info className="h-5 w-5 text-accent-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-gray-700">
               <p className="font-medium mb-1">About Budgets</p>
               <p>
@@ -151,15 +151,15 @@ export default function BudgetsPage() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600 mx-auto mb-4" />
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600 mx-auto mb-4" />
               <p className="text-gray-500">Loading budgets...</p>
             </div>
           </div>
         ) : budgets.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
             <div className="max-w-md mx-auto">
-              <div className="h-16 w-16 bg-frozenWater-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Plus className="h-8 w-8 text-frozenWater-600" />
+              <div className="h-16 w-16 bg-accent-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus className="h-8 w-8 text-accent-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Budgets Yet</h3>
               <p className="text-gray-600 mb-6">
@@ -167,7 +167,7 @@ export default function BudgetsPage() {
               </p>
               <button
                 onClick={handleCreateBudget}
-                className="px-4 py-2 bg-frozenWater-600 text-white rounded-lg hover:bg-frozenWater-700 transition-colors"
+                className="px-4 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors"
               >
                 Create Your First Budget
               </button>

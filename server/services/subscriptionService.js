@@ -11,6 +11,7 @@ import logger from '../utils/logger.js'
 const FEATURE_DEFINITIONS = {
   trial: {
     historicalDataMonths: 12,
+    maxProviderAccounts: Infinity,
     features: [
       'connect_providers',
       'cost_vs_usage',
@@ -25,6 +26,7 @@ const FEATURE_DEFINITIONS = {
   },
   starter: {
     historicalDataMonths: 6,
+    maxProviderAccounts: 3,
     features: [
       'connect_providers',
       'cost_vs_usage',
@@ -40,6 +42,7 @@ const FEATURE_DEFINITIONS = {
   },
   pro: {
     historicalDataMonths: 12,
+    maxProviderAccounts: Infinity,
     features: [
       'connect_providers',
       'cost_vs_usage',
@@ -286,6 +289,14 @@ export const canAccessFeature = async (userId, featureName) => {
 export const getHistoricalDataLimit = async (userId) => {
   const features = await getSubscriptionFeatures(userId)
   return features.historicalDataMonths
+}
+
+/**
+ * Get max provider accounts for user's plan
+ */
+export const getMaxProviderAccounts = async (userId) => {
+  const features = await getSubscriptionFeatures(userId)
+  return features.maxProviderAccounts ?? Infinity
 }
 
 /**

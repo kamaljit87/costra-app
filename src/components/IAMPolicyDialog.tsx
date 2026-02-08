@@ -241,13 +241,13 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
     return (
       <div className="space-y-6">
         {/* Connection Type Tabs */}
-        <div className="flex gap-2 border-b border-[#E2E8F0]">
+        <div className="flex gap-2 border-b border-surface-200">
           <button
             onClick={() => setAwsConnectionType('simple')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               awsConnectionType === 'simple'
-                ? 'border-[#22B8A0] text-[#22B8A0]'
-                : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
+                ? 'border-accent-500 text-accent-500'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
             }`}
           >
             <Zap className="h-4 w-4 inline mr-2" />
@@ -257,8 +257,8 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             onClick={() => setAwsConnectionType('advanced')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               awsConnectionType === 'advanced'
-                ? 'border-[#22B8A0] text-[#22B8A0]'
-                : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
+                ? 'border-accent-500 text-accent-500'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
             }`}
           >
             <Database className="h-4 w-4 inline mr-2" />
@@ -269,40 +269,40 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
         {/* Simple (API Keys) Content */}
         {awsConnectionType === 'simple' && (
           <div className="space-y-6">
-            <div className="bg-[#F0FDFA] border border-[#CCFBF1] rounded-xl p-4">
-              <p className="text-sm text-[#0F172A] font-medium mb-2">✨ Recommended for most users</p>
-              <p className="text-sm text-[#0F172A]">
+            <div className="bg-accent-50 border border-accent-100 rounded-xl p-4">
+              <p className="text-sm text-gray-900 font-medium mb-2">✨ Recommended for most users</p>
+              <p className="text-sm text-gray-900">
                 Use AWS Cost Explorer API with simple API keys. No S3 bucket or CUR setup required. 
                 Perfect for getting started quickly with month-to-date costs and service breakdowns.
               </p>
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-[#22B8A0]" />
+              <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent-500" />
                 Step-by-Step Instructions
               </h4>
               <ol className="space-y-2 list-decimal list-inside">
-                <li className="text-sm text-[#64748B] pl-2">Log in to AWS Console and navigate to <strong>IAM → Users</strong></li>
-                <li className="text-sm text-[#64748B] pl-2">Click <strong>"Add users"</strong> and create a new user (e.g., "costra-readonly")</li>
-                <li className="text-sm text-[#64748B] pl-2">Select <strong>"Attach policies directly"</strong> and click <strong>"Create policy"</strong></li>
-                <li className="text-sm text-[#64748B] pl-2">Switch to the <strong>JSON tab</strong> and paste the policy below</li>
-                <li className="text-sm text-[#64748B] pl-2">Name the policy (e.g., "CostraReadOnlyAccess") and create it</li>
-                <li className="text-sm text-[#64748B] pl-2">Attach the policy to your IAM user</li>
-                <li className="text-sm text-[#64748B] pl-2">Go to <strong>Security credentials</strong> tab and create an <strong>Access Key</strong></li>
-                <li className="text-sm text-[#64748B] pl-2">Copy the <strong>Access Key ID</strong> and <strong>Secret Access Key</strong> to use in Costra</li>
+                <li className="text-sm text-gray-500 pl-2">Log in to AWS Console and navigate to <strong>IAM → Users</strong></li>
+                <li className="text-sm text-gray-500 pl-2">Click <strong>"Add users"</strong> and create a new user (e.g., "costra-readonly")</li>
+                <li className="text-sm text-gray-500 pl-2">Select <strong>"Attach policies directly"</strong> and click <strong>"Create policy"</strong></li>
+                <li className="text-sm text-gray-500 pl-2">Switch to the <strong>JSON tab</strong> and paste the policy below</li>
+                <li className="text-sm text-gray-500 pl-2">Name the policy (e.g., "CostraReadOnlyAccess") and create it</li>
+                <li className="text-sm text-gray-500 pl-2">Attach the policy to your IAM user</li>
+                <li className="text-sm text-gray-500 pl-2">Go to <strong>Security credentials</strong> tab and create an <strong>Access Key</strong></li>
+                <li className="text-sm text-gray-500 pl-2">Copy the <strong>Access Key ID</strong> and <strong>Secret Access Key</strong> to use in Costra</li>
               </ol>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-lg font-semibold text-[#0F172A] flex items-center gap-2">
-                  <Key className="h-5 w-5 text-[#22B8A0]" />
+                <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Key className="h-5 w-5 text-accent-500" />
                   IAM Policy JSON
                 </h4>
                 <button
                   onClick={() => handleCopy(simplePolicy, 'simple-policy')}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#22B8A0] hover:bg-[#F0FDFA] rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-accent-500 hover:bg-accent-50 rounded-lg transition-colors"
                 >
                   {copied === 'simple-policy' ? (
                     <>
@@ -317,19 +317,19 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   )}
                 </button>
               </div>
-              <pre className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 text-xs overflow-x-auto">
+              <pre className="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs overflow-x-auto">
                 <code>{simplePolicy}</code>
               </pre>
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Helpful Links</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Helpful Links</h4>
               <div className="space-y-2">
                 <a
                   href="https://console.aws.amazon.com/iam/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:underline"
+                  className="flex items-center gap-2 text-sm text-accent-500 hover:text-accent-700 hover:underline"
                 >
                   <ExternalLink className="h-4 w-4" />
                   AWS IAM Console
@@ -338,7 +338,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   href="https://console.aws.amazon.com/cost-management/home"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:underline"
+                  className="flex items-center gap-2 text-sm text-accent-500 hover:text-accent-700 hover:underline"
                 >
                   <ExternalLink className="h-4 w-4" />
                   AWS Cost Explorer
@@ -372,16 +372,16 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             </div>
             
             <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-xl p-4 opacity-60">
-              <p className="text-sm text-[#0F172A] font-medium mb-2">💼 For enterprise users with existing CUR setup</p>
-              <p className="text-sm text-[#0F172A] mb-3">
+              <p className="text-sm text-gray-900 font-medium mb-2">💼 For enterprise users with existing CUR setup</p>
+              <p className="text-sm text-gray-900 mb-3">
                 Use AWS Cost & Usage Reports (CUR) stored in S3 for more detailed billing data. 
                 Requires setting up a CUR report and cross-account IAM role.
               </p>
               <div className="bg-white rounded-lg p-3 mt-3 border border-[#DBEAFE]">
                 <div className="flex items-start gap-2">
-                  <DollarSign className="h-4 w-4 text-[#1F3A5F] mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-[#64748B]">
-                    <p className="font-medium text-[#0F172A] mb-1">Cost Impact:</p>
+                  <DollarSign className="h-4 w-4 text-accent-700 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-gray-500">
+                    <p className="font-medium text-gray-900 mb-1">Cost Impact:</p>
                     <p>Expected additional AWS cost is usually <strong>well under $5/month</strong> for most accounts, and often just a few cents. Only compressed billing files are stored in S3. There is no extra charge for the IAM role or CloudFormation stack.</p>
                   </div>
                 </div>
@@ -390,11 +390,11 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
 
             {/* Step 1: Enable CUR */}
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Step 1: Enable Cost & Usage Reports</h4>
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 space-y-3">
-                <ol className="space-y-2 list-decimal list-inside text-sm text-[#64748B]">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 1: Enable Cost & Usage Reports</h4>
+              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-3">
+                <ol className="space-y-2 list-decimal list-inside text-sm text-gray-500">
                   <li className="pl-2">Log into your <strong>payer account</strong> via AWS Console</li>
-                  <li className="pl-2">Open <a href="https://console.aws.amazon.com/billing/home?#/reports" target="_blank" rel="noopener noreferrer" className="text-[#22B8A0] hover:underline">Billing → Cost & Usage Reports</a></li>
+                  <li className="pl-2">Open <a href="https://console.aws.amazon.com/billing/home?#/reports" target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">Billing → Cost & Usage Reports</a></li>
                   <li className="pl-2">Click <strong>"Create report"</strong> or reconfigure an existing one</li>
                   <li className="pl-2">Use these settings:
                     <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
@@ -413,7 +413,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   href="https://console.aws.amazon.com/billing/home?#/reports"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#1F3A5F] text-white rounded-lg hover:bg-[#1a2f4d] transition-colors text-sm font-medium mt-2"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-[#1a2f4d] transition-colors text-sm font-medium mt-2"
                 >
                   <ExternalLink className="h-4 w-4" />
                   Open AWS Billing Console
@@ -423,17 +423,17 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
 
             {/* Step 2: Create Cross-Account Role */}
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Step 2: Create Cross-Account IAM Role</h4>
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 space-y-4">
-                <ol className="space-y-2 list-decimal list-inside text-sm text-[#64748B]">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 2: Create Cross-Account IAM Role</h4>
+              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-4">
+                <ol className="space-y-2 list-decimal list-inside text-sm text-gray-500">
                   <li className="pl-2">In AWS IAM, go to <strong>Roles → Create role</strong></li>
                   <li className="pl-2">Select <strong>"Another AWS account"</strong></li>
                   <li className="pl-2">Enter Costra Account ID:
                     <div className="mt-2 flex items-center gap-2">
-                      <code className="bg-white px-3 py-1.5 rounded border border-[#E2E8F0] text-[#0F172A] font-mono text-sm">{costraAccountId}</code>
+                      <code className="bg-white px-3 py-1.5 rounded border border-surface-200 text-gray-900 font-mono text-sm">{costraAccountId}</code>
                       <button
                         onClick={() => handleCopy(costraAccountId, 'account-id')}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-[#22B8A0] hover:bg-[#F0FDFA] rounded transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-accent-500 hover:bg-accent-50 rounded transition-colors"
                       >
                         {copied === 'account-id' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                         Copy
@@ -442,10 +442,10 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   </li>
                   <li className="pl-2">Check <strong>"Require external ID"</strong> and enter:
                     <div className="mt-2 flex items-center gap-2">
-                      <code className="bg-white px-3 py-1.5 rounded border border-[#E2E8F0] text-[#0F172A] font-mono text-sm">{costraExternalId}</code>
+                      <code className="bg-white px-3 py-1.5 rounded border border-surface-200 text-gray-900 font-mono text-sm">{costraExternalId}</code>
                       <button
                         onClick={() => handleCopy(costraExternalId, 'external-id')}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-[#22B8A0] hover:bg-[#F0FDFA] rounded transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-accent-500 hover:bg-accent-50 rounded transition-colors"
                       >
                         {copied === 'external-id' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                         Copy
@@ -467,7 +467,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   href="https://console.aws.amazon.com/iam/home#/roles"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#1F3A5F] text-white rounded-lg hover:bg-[#1a2f4d] transition-colors text-sm font-medium mt-2"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-[#1a2f4d] transition-colors text-sm font-medium mt-2"
                 >
                   <ExternalLink className="h-4 w-4" />
                   Open IAM Console
@@ -477,9 +477,9 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
 
             {/* Step 3: Custom S3 Policy */}
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Step 3: Generate S3 Access Policy</h4>
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 space-y-3">
-                <p className="text-sm text-[#64748B]">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 3: Generate S3 Access Policy</h4>
+              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-3">
+                <p className="text-sm text-gray-500">
                   Enter your S3 billing bucket name to generate the custom IAM policy:
                 </p>
                 <div className="flex gap-2">
@@ -487,7 +487,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                     type="text"
                     id="bucket-name"
                     placeholder="your-company-billing"
-                    className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#22B8A0]"
+                    className="flex-1 px-3 py-2 border border-surface-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const bucketName = (e.target as HTMLInputElement).value.trim()
@@ -508,12 +508,12 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                         alert('Please enter your S3 bucket name first')
                       }
                     }}
-                    className="px-4 py-2 bg-[#22B8A0] text-white rounded-lg hover:bg-[#1ea088] transition-colors text-sm font-medium"
+                    className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-[#1ea088] transition-colors text-sm font-medium"
                   >
                     Generate & Copy Policy
                   </button>
                 </div>
-                <p className="text-xs text-[#64748B]">
+                <p className="text-xs text-gray-500">
                   This policy grants read-only access to your CUR files in S3. Paste it as a custom policy when creating the IAM role.
                 </p>
               </div>
@@ -521,26 +521,26 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
 
             {/* Step 4: Connect in Costra */}
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Step 4: Connect in Costra</h4>
-              <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4">
-                <p className="text-sm text-[#64748B] mb-3">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 4: Connect in Costra</h4>
+              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
+                <p className="text-sm text-gray-500 mb-3">
                   When adding your AWS account in Costra, you'll need to provide:
                 </p>
-                <ul className="space-y-2 text-sm text-[#64748B]">
+                <ul className="space-y-2 text-sm text-gray-500">
                   <li className="flex items-start gap-2">
-                    <span className="text-[#22B8A0] mt-1">•</span>
+                    <span className="text-accent-500 mt-1">•</span>
                     <span><strong>Connection name:</strong> A friendly name to identify this account (e.g., "Production AWS")</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-[#22B8A0] mt-1">•</span>
+                    <span className="text-accent-500 mt-1">•</span>
                     <span><strong>S3 billing bucket name:</strong> The bucket where your CUR files are stored</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-[#22B8A0] mt-1">•</span>
+                    <span className="text-accent-500 mt-1">•</span>
                     <span><strong>Cost & Usage Report name:</strong> The name of your CUR report (found in AWS Billing Console)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-[#22B8A0] mt-1">•</span>
+                    <span className="text-accent-500 mt-1">•</span>
                     <span><strong>Cross-account Role ARN:</strong> The ARN of the role you created in Step 2</span>
                   </li>
                 </ul>
@@ -555,21 +555,21 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-[#E2E8F0] px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-surface-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F0FDFA] flex items-center justify-center">
-              <Shield className="h-5 w-5 text-[#22B8A0]" />
+            <div className="w-10 h-10 rounded-xl bg-accent-50 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-accent-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-[#0F172A]">
+              <h3 className="text-xl font-semibold text-gray-900">
                 {providerId === 'aws' ? 'AWS Connection Setup' : template?.title || 'Provider Setup'}
               </h3>
-              <p className="text-sm text-[#64748B]">{providerName}</p>
+              <p className="text-sm text-gray-500">{providerName}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] rounded-lg transition-colors"
+            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-surface-50 rounded-lg transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -581,20 +581,20 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           ) : template ? (
             <>
               {/* Description */}
-              <div className="bg-[#F0FDFA] border border-[#CCFBF1] rounded-xl p-4">
-                <p className="text-sm text-[#0F172A]">{template.description}</p>
+              <div className="bg-accent-50 border border-accent-100 rounded-xl p-4">
+                <p className="text-sm text-gray-900">{template.description}</p>
               </div>
 
           {/* Steps */}
           {template.steps.length > 0 && (
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-[#22B8A0]" />
+              <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent-500" />
                 Step-by-Step Instructions
               </h4>
               <ol className="space-y-2 list-decimal list-inside">
                 {template.steps.map((step, index) => (
-                  <li key={index} className="text-sm text-[#64748B] pl-2">
+                  <li key={index} className="text-sm text-gray-500 pl-2">
                     {step}
                   </li>
                 ))}
@@ -606,13 +606,13 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           {template.policy && (
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-lg font-semibold text-[#0F172A] flex items-center gap-2">
-                  <Key className="h-5 w-5 text-[#22B8A0]" />
+                <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Key className="h-5 w-5 text-accent-500" />
                   IAM Policy JSON
                 </h4>
                 <button
                   onClick={() => handleCopy(template.policy!, 'policy')}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-[#22B8A0] hover:bg-[#F0FDFA] rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm text-accent-500 hover:bg-accent-50 rounded-lg transition-colors"
                 >
                   {copied === 'policy' ? (
                     <>
@@ -627,7 +627,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   )}
                 </button>
               </div>
-              <pre className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 text-xs overflow-x-auto">
+              <pre className="bg-surface-50 border border-surface-200 rounded-xl p-4 text-xs overflow-x-auto">
                 <code>{template.policy}</code>
               </pre>
             </div>
@@ -636,11 +636,11 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           {/* Roles */}
           {template.roles && template.roles.length > 0 && (
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Required Roles</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Required Roles</h4>
               <ul className="space-y-2">
                 {template.roles.map((role, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-[#64748B]">
-                    <span className="text-[#22B8A0] mt-1">•</span>
+                  <li key={index} className="flex items-start gap-2 text-sm text-gray-500">
+                    <span className="text-accent-500 mt-1">•</span>
                     <span>{role}</span>
                   </li>
                 ))}
@@ -651,12 +651,12 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           {/* Permissions */}
           {template.permissions && template.permissions.length > 0 && (
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Required Permissions</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Required Permissions</h4>
               <ul className="space-y-2">
                 {template.permissions.map((permission, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-[#64748B]">
-                    <span className="text-[#22B8A0] mt-1">•</span>
-                    <code className="bg-[#F8FAFC] px-2 py-1 rounded text-xs">{permission}</code>
+                  <li key={index} className="flex items-start gap-2 text-sm text-gray-500">
+                    <span className="text-accent-500 mt-1">•</span>
+                    <code className="bg-surface-50 px-2 py-1 rounded text-xs">{permission}</code>
                   </li>
                 ))}
               </ul>
@@ -666,7 +666,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           {/* Links */}
           {template.links && template.links.length > 0 && (
             <div>
-              <h4 className="text-lg font-semibold text-[#0F172A] mb-3">Helpful Links</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Helpful Links</h4>
               <div className="space-y-2">
                 {template.links.map((link, index) => (
                   <a
@@ -674,7 +674,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                     href={link.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-[#22B8A0] hover:text-[#1F3A5F] hover:underline"
+                    className="flex items-center gap-2 text-sm text-accent-500 hover:text-accent-700 hover:underline"
                   >
                     <ExternalLink className="h-4 w-4" />
                     {link.label}
@@ -699,10 +699,10 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           ) : null}
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-[#E2E8F0] px-6 py-4 flex justify-end">
+        <div className="sticky bottom-0 bg-white border-t border-surface-200 px-6 py-4 flex justify-end">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-[#1F3A5F] text-white rounded-xl hover:bg-[#1a2f4d] transition-colors font-medium"
+            className="px-6 py-2.5 bg-primary-800 text-white rounded-xl hover:bg-[#1a2f4d] transition-colors font-medium"
           >
             Got it, thanks!
           </button>

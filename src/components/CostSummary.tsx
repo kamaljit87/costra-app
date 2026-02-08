@@ -113,7 +113,7 @@ export default function CostSummary({ providerId, month, year, accountId, startD
       <div className="card">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <FileText className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
+            <FileText className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
             <p className="text-gray-600">Generating cost summary...</p>
           </div>
         </div>
@@ -159,21 +159,21 @@ export default function CostSummary({ providerId, month, year, accountId, startD
   const isDecrease = costChange < 0
 
   return (
-    <div className="card bg-white border-frozenWater-100">
+    <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-frozenWater-600" />
+            <FileText className="h-5 w-5 text-accent-600" />
             Cost Summary
             <button
               onClick={() => setShowInfoDialog(true)}
-              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
               title="Learn more about Cost Summary"
             >
-              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+              <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
             </button>
           </h3>
-          <p className="text-sm text-frozenWater-600">
+          <p className="text-sm text-accent-600">
             {isCustomRange && startDate && endDate
               ? `${new Date(startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - What Changed & Why`
               : month && year
@@ -185,7 +185,7 @@ export default function CostSummary({ providerId, month, year, accountId, startD
           <button
             onClick={handleRegenerate}
             disabled={isRegenerating}
-            className="p-2 rounded-lg border border-frozenWater-200 hover:bg-frozenWater-50 transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg border border-accent-200 hover:bg-accent-50 transition-colors disabled:opacity-50"
             title="Regenerate cost summary"
           >
             <RefreshCw className={`h-4 w-4 text-gray-600 ${isRegenerating ? 'animate-spin' : ''}`} />
@@ -273,7 +273,7 @@ export default function CostSummary({ providerId, month, year, accountId, startD
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <FileText className="h-6 w-6 text-frozenWater-600" />
+                  <FileText className="h-6 w-6 text-accent-600" />
                   What is Cost Summary?
                 </h3>
                 <button
@@ -286,23 +286,23 @@ export default function CostSummary({ providerId, month, year, accountId, startD
               
               <div className="space-y-4 text-gray-700">
                 <p>
-                  <strong className="text-frozenWater-700">Cost Summary</strong> provides a plain-English explanation of your cloud cost changes, 
+                  <strong className="text-accent-700">Cost Summary</strong> provides a plain-English explanation of your cloud cost changes, 
                   making it easy to understand what happened and why your spending changed.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-lg p-4 border border-frozenWater-200">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">What You'll See:</h4>
+                <div className="bg-accent-50 rounded-lg p-4 border border-accent-200">
+                  <h4 className="font-semibold text-accent-800 mb-2">What You'll See:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Total Cost Change:</strong> The overall dollar amount and percentage change</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Plain-English Explanation:</strong> AI-generated narrative explaining the changes in simple terms</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Contributing Factors:</strong> Services that drove the most significant cost changes</span>
                     </li>
                   </ul>

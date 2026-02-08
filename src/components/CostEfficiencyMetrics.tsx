@@ -121,11 +121,11 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <Activity className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
-            <p className="text-frozenWater-700">Loading efficiency metrics...</p>
+            <Activity className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
+            <p className="text-accent-700">Loading efficiency metrics...</p>
           </div>
         </div>
       </div>
@@ -134,11 +134,11 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
 
   if (error) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
-            <p className="text-sm text-frozenWater-600">{error}</p>
+            <p className="text-sm text-accent-600">{error}</p>
           </div>
         </div>
       </div>
@@ -147,28 +147,28 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
 
   if (!data || data.efficiencyMetrics.length === 0) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-frozenWater-600" />
+              <Activity className="h-5 w-5 text-accent-600" />
               Cost Efficiency Metrics
               <button
                 onClick={() => setShowInfoDialog(true)}
-                className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+                className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
                 title="Learn more about Cost Efficiency"
               >
-                <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+                <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
               </button>
             </h3>
-            <p className="text-sm text-frozenWater-600">Cost per unit of usage (GB, hour, request)</p>
+            <p className="text-sm text-accent-600">Cost per unit of usage (GB, hour, request)</p>
           </div>
         </div>
-        <div className="flex items-center justify-center py-12 bg-frozenWater-50 rounded-xl border border-frozenWater-200">
+        <div className="flex items-center justify-center py-12 bg-accent-50 rounded-xl border border-accent-200">
           <div className="text-center">
-            <Activity className="h-10 w-10 text-frozenWater-600 mx-auto mb-3" />
-            <p className="text-frozenWater-900 font-medium mb-1">No efficiency data available</p>
-            <p className="text-frozenWater-700 text-sm">
+            <Activity className="h-10 w-10 text-accent-600 mx-auto mb-3" />
+            <p className="text-accent-900 font-medium mb-1">No efficiency data available</p>
+            <p className="text-accent-700 text-sm">
               Efficiency metrics require usage data. Sync your cost data to see efficiency metrics.
             </p>
           </div>
@@ -181,7 +181,7 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Activity className="h-6 w-6 text-frozenWater-600" />
+                    <Activity className="h-6 w-6 text-accent-600" />
                     What are Cost Efficiency Metrics?
                   </h3>
                   <button
@@ -194,24 +194,24 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
                 
                 <div className="space-y-4 text-gray-700">
                   <p>
-                    <strong className="text-frozenWater-700">Cost Efficiency Metrics</strong> measure how efficiently 
+                    <strong className="text-accent-700">Cost Efficiency Metrics</strong> measure how efficiently 
                     you're spending money relative to your usage. They help identify services that appear cheap 
                     but are inefficient at scale.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                    <h4 className="font-semibold text-frozenWater-800 mb-2">Examples:</h4>
+                  <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                    <h4 className="font-semibold text-accent-800 mb-2">Examples:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Storage:</strong> Cost per GB/month (e.g., $0.023/GB)</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Compute:</strong> Cost per compute hour (e.g., $0.05/hour)</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>API:</strong> Cost per request (e.g., $0.002/request)</span>
                       </li>
                     </ul>
@@ -260,21 +260,21 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
   })
 
   return (
-    <div className="card bg-white border-frozenWater-100">
+    <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-            <Activity className="h-5 w-5 text-frozenWater-600" />
+            <Activity className="h-5 w-5 text-accent-600" />
             Cost Efficiency Metrics
             <button
               onClick={() => setShowInfoDialog(true)}
-              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
               title="Learn more about Cost Efficiency"
             >
-              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+              <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
             </button>
           </h3>
-          <p className="text-sm text-frozenWater-600">
+          <p className="text-sm text-accent-600">
             Cost per unit of usage • {startDateStr} to {endDateStr}
           </p>
         </div>
@@ -286,44 +286,44 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
           <div className="overflow-hidden sm:rounded-lg border border-gray-200">
             <table className="w-full divide-y divide-gray-200">
           <thead>
-            <tr className="border-b border-frozenWater-200">
-              <th className="text-left py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+            <tr className="border-b border-accent-200">
+              <th className="text-left py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Service
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Total Cost
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Total Usage
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Efficiency
               </th>
-              <th className="text-right py-3 px-4 text-xs font-semibold text-frozenWater-700 uppercase tracking-wider">
+              <th className="text-right py-3 px-4 text-xs font-semibold text-accent-700 uppercase tracking-wider">
                 Trend
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-frozenWater-100">
+          <tbody className="divide-y divide-accent-100">
             {sortedMetrics.map((metric, index) => {
               const ServiceIcon = getServiceTypeIcon(metric.serviceType)
               const TrendIcon = getTrendIcon(metric.trend)
               const trendColor = getTrendColor(metric.trend)
               
               return (
-                <tr key={`${metric.serviceName}-${metric.unit}-${index}`} className="hover:bg-frozenWater-50/50 transition-colors">
+                <tr key={`${metric.serviceName}-${metric.unit}-${index}`} className="hover:bg-accent-50/50 transition-colors">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <ServiceIcon className="h-4 w-4 text-frozenWater-500" />
+                      <ServiceIcon className="h-4 w-4 text-accent-500" />
                       <div>
                         <div className="font-medium text-gray-900">{metric.serviceName}</div>
-                        <div className="text-xs text-frozenWater-600 capitalize">{metric.serviceType}</div>
+                        <div className="text-xs text-accent-600 capitalize">{metric.serviceType}</div>
                       </div>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="font-medium text-gray-900">{formatCurrency(metric.totalCost)}</div>
-                    <div className="text-xs text-frozenWater-600">{metric.daysWithData} days</div>
+                    <div className="text-xs text-accent-600">{metric.daysWithData} days</div>
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="text-gray-900">{formatUsage(metric.totalUsage, metric.unit)}</div>
@@ -366,12 +366,12 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
       </div>
 
       {data.efficiencyMetrics.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-frozenWater-200">
+        <div className="mt-4 pt-4 border-t border-accent-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-frozenWater-700">
+            <span className="text-accent-700">
               Showing {data.efficiencyMetrics.length} service{data.efficiencyMetrics.length !== 1 ? 's' : ''} with efficiency data
             </span>
-            <span className="text-xs text-frozenWater-600">
+            <span className="text-xs text-accent-600">
               {startDateStr} to {endDateStr}
             </span>
           </div>
@@ -385,7 +385,7 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Activity className="h-6 w-6 text-frozenWater-600" />
+                  <Activity className="h-6 w-6 text-accent-600" />
                   What are Cost Efficiency Metrics?
                 </h3>
                 <button
@@ -398,24 +398,24 @@ export default function CostEfficiencyMetrics({ providerId, accountId, period = 
               
               <div className="space-y-4 text-gray-700">
                 <p>
-                  <strong className="text-frozenWater-700">Cost Efficiency Metrics</strong> measure how efficiently 
+                  <strong className="text-accent-700">Cost Efficiency Metrics</strong> measure how efficiently 
                   you're spending money relative to your usage. They help identify services that appear cheap 
                   but are inefficient at scale.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">Examples:</h4>
+                <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                  <h4 className="font-semibold text-accent-800 mb-2">Examples:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Storage:</strong> Cost per GB/month (e.g., $0.023/GB)</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Compute:</strong> Cost per compute hour (e.g., $0.05/hour)</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>API:</strong> Cost per request (e.g., $0.002/request)</span>
                     </li>
                   </ul>

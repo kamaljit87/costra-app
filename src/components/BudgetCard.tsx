@@ -34,7 +34,7 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
   const getStatusColor = () => {
     if (budget.percentage >= 100) return 'text-red-600 bg-red-50 border-red-200'
     if (budget.percentage >= budget.alertThreshold) return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-    return 'text-frozenWater-600 bg-frozenWater-50 border-frozenWater-200'
+    return 'text-accent-600 bg-accent-50 border-accent-200'
   }
 
   const getStatusIcon = () => {
@@ -181,7 +181,7 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
                   ? 'bg-red-500'
                   : budget.percentage >= budget.alertThreshold
                   ? 'bg-yellow-500'
-                  : 'bg-frozenWater-500'
+                  : 'bg-accent-500'
               }`}
               style={{ width: `${progressWidth}%` }}
             />

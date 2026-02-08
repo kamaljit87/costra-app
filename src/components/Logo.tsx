@@ -152,7 +152,7 @@ export default function Logo({ className = '', height = 40, showText = true }: L
       
       {/* Logo Text */}
       {showText && (
-        <span className="text-2xl font-bold text-teal-800" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.5px' }}>
+        <span className="text-2xl font-bold text-primary-800" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.5px' }}>
           Costra
         </span>
       )}

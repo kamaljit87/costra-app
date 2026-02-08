@@ -3,12 +3,23 @@
  * Handles Stripe integration for subscriptions
  */
 
-import Stripe from 'stripe'
 import logger from '../utils/logger.js'
 import { upgradeSubscription, cancelSubscription as cancelSub, getUserSubscription } from './subscriptionService.js'
 
-// Initialize Stripe
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY || '')
+// Stripe is deprecated — Dodo Payments is the active payment provider.
+// Initialize Stripe only if STRIPE_SECRET_KEY is explicitly set (for migration).
+let stripe = null
+if (process.env.STRIPE_SECRET_KEY) {
+  try {
+    const { default: Stripe } = await import('stripe')
+    stripe = Stripe(process.env.STRIPE_SECRET_KEY)
+    logger.info('Stripe initialized (legacy)')
+  } catch (err) {
+    logger.warn('Failed to initialize Stripe', { error: err.message })
+  }
+} else {
+  logger.info('Stripe not configured — using Dodo Payments as payment provider')
+}
 
 /**
  * Create Stripe customer

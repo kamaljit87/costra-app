@@ -774,6 +774,58 @@ export const initDatabase = async () => {
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_subscription_usage_user_date ON subscription_usage(user_id, usage_date)`)
 
+      // Consent records table - for GDPR/DPDPA compliance
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS consent_records (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          consent_type TEXT NOT NULL CHECK (consent_type IN ('privacy_policy', 'terms_of_service', 'marketing_emails', 'data_processing', 'cookie_analytics')),
+          version TEXT NOT NULL,
+          given_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          ip_address TEXT,
+          user_agent TEXT,
+          withdrawn_at TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_consent_records_user ON consent_records(user_id, consent_type)`)
+
+      // Data deletion requests table - for right to erasure tracking
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS data_deletion_requests (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
+          requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          confirmed_at TIMESTAMP,
+          completed_at TIMESTAMP,
+          cancelled_at TIMESTAMP,
+          ip_address TEXT,
+          reason TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_data_deletion_requests_user ON data_deletion_requests(user_id, status)`)
+
+      // Grievance records table - for DPDPA compliance
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS grievance_records (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER,
+          email TEXT NOT NULL,
+          name TEXT,
+          category TEXT NOT NULL CHECK (category IN ('data_access', 'data_correction', 'data_deletion', 'consent_withdrawal', 'data_breach', 'other')),
+          subject TEXT NOT NULL,
+          description TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+          resolution TEXT,
+          submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          resolved_at TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_grievance_records_status ON grievance_records(status, submitted_at)`)
+
       // Add auto_sync columns to cloud_provider_credentials
       await client.query(`
         DO $$ 
@@ -5162,6 +5214,338 @@ export const deleteOldNotifications = async (userId, daysOld = 30) => {
       [userId]
     )
     return result.rowCount
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// COMPLIANCE: Consent Management (GDPR/DPDPA)
+// ==========================================
+
+/**
+ * Record user consent
+ */
+export const recordConsent = async (userId, consentType, version, ipAddress, userAgent) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO consent_records (user_id, consent_type, version, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [userId, consentType, version, ipAddress, userAgent]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Record multiple consents at once (e.g., during signup)
+ */
+export const recordMultipleConsents = async (userId, consents, ipAddress, userAgent) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const results = []
+    for (const { consentType, version } of consents) {
+      const result = await client.query(
+        `INSERT INTO consent_records (user_id, consent_type, version, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [userId, consentType, version, ipAddress, userAgent]
+      )
+      results.push(result.rows[0])
+    }
+    await client.query('COMMIT')
+    return results
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Withdraw consent
+ */
+export const withdrawConsent = async (userId, consentType) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `UPDATE consent_records SET withdrawn_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND consent_type = $2 AND withdrawn_at IS NULL
+       RETURNING *`,
+      [userId, consentType]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get user consent records
+ */
+export const getUserConsents = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM consent_records WHERE user_id = $1 ORDER BY given_at DESC`,
+      [userId]
+    )
+    return result.rows
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// COMPLIANCE: Right to Erasure (GDPR Art. 17)
+// ==========================================
+
+/**
+ * Delete a user and all associated data (cascading)
+ */
+export const deleteUser = async (userId) => {
+  const client = await pool.connect()
+  try {
+    // The ON DELETE CASCADE on all foreign keys ensures
+    // all related data is automatically removed
+    const result = await client.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, email',
+      [userId]
+    )
+    if (result.rows.length === 0) {
+      throw new Error('User not found')
+    }
+    logger.info('User account deleted (right to erasure)', { userId })
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Create a data deletion request
+ */
+export const createDeletionRequest = async (userId, ipAddress, reason) => {
+  const client = await pool.connect()
+  try {
+    // Check for existing pending request
+    const existing = await client.query(
+      `SELECT id FROM data_deletion_requests WHERE user_id = $1 AND status IN ('pending', 'confirmed')`,
+      [userId]
+    )
+    if (existing.rows.length > 0) {
+      throw new Error('A deletion request is already pending')
+    }
+    const result = await client.query(
+      `INSERT INTO data_deletion_requests (user_id, ip_address, reason)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [userId, ipAddress, reason]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Confirm and execute a data deletion request
+ */
+export const confirmDeletionRequest = async (userId, requestId) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    // Update the request status
+    const reqResult = await client.query(
+      `UPDATE data_deletion_requests
+       SET status = 'completed', confirmed_at = CURRENT_TIMESTAMP, completed_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND user_id = $2 AND status = 'pending'
+       RETURNING *`,
+      [requestId, userId]
+    )
+    if (reqResult.rows.length === 0) {
+      await client.query('ROLLBACK')
+      throw new Error('Deletion request not found or already processed')
+    }
+
+    // Delete the user (cascading)
+    await client.query('DELETE FROM users WHERE id = $1', [userId])
+
+    await client.query('COMMIT')
+    logger.info('User deletion request completed', { userId, requestId })
+    return reqResult.rows[0]
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Cancel a deletion request
+ */
+export const cancelDeletionRequest = async (userId, requestId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `UPDATE data_deletion_requests
+       SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND user_id = $2 AND status = 'pending'
+       RETURNING *`,
+      [requestId, userId]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// COMPLIANCE: Right to Data Portability (GDPR Art. 20)
+// ==========================================
+
+/**
+ * Export all user data in machine-readable format
+ */
+export const exportUserData = async (userId) => {
+  const client = await pool.connect()
+  try {
+    // Personal profile
+    const userResult = await client.query(
+      'SELECT id, name, email, avatar_url, created_at, updated_at FROM users WHERE id = $1',
+      [userId]
+    )
+    if (userResult.rows.length === 0) {
+      throw new Error('User not found')
+    }
+
+    // Preferences
+    const prefsResult = await client.query(
+      'SELECT currency, email_alerts_enabled, email_anomaly_alerts, email_budget_alerts, email_weekly_summary FROM user_preferences WHERE user_id = $1',
+      [userId]
+    )
+
+    // Cloud provider connections (metadata only, NOT credentials)
+    const providersResult = await client.query(
+      `SELECT id, provider_name, account_alias, is_active, connection_type, connection_status, last_sync_at, created_at
+       FROM cloud_provider_credentials WHERE user_id = $1`,
+      [userId]
+    )
+
+    // Cost data
+    const costDataResult = await client.query(
+      `SELECT provider_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, created_at
+       FROM cost_data WHERE user_id = $1 ORDER BY year DESC, month DESC`,
+      [userId]
+    )
+
+    // Daily cost data
+    const dailyCostResult = await client.query(
+      `SELECT provider_id, date, cost FROM daily_cost_data WHERE user_id = $1 ORDER BY date DESC LIMIT 365`,
+      [userId]
+    )
+
+    // Budgets
+    const budgetsResult = await client.query(
+      `SELECT budget_name, budget_amount, budget_period, alert_threshold, current_spend, status, created_at
+       FROM budgets WHERE user_id = $1`,
+      [userId]
+    )
+
+    // Reports metadata (not file contents)
+    const reportsResult = await client.query(
+      `SELECT report_type, report_name, start_date, end_date, file_format, status, created_at
+       FROM reports WHERE user_id = $1`,
+      [userId]
+    )
+
+    // Savings plans
+    const savingsResult = await client.query(
+      `SELECT name, provider, discount_percent, status, expires_at, created_at
+       FROM savings_plans WHERE user_id = $1`,
+      [userId]
+    )
+
+    // Notifications
+    const notificationsResult = await client.query(
+      `SELECT type, title, message, is_read, created_at
+       FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      [userId]
+    )
+
+    // Subscription
+    const subscriptionResult = await client.query(
+      `SELECT plan_type, status, billing_period, trial_start_date, trial_end_date,
+              subscription_start_date, subscription_end_date, created_at
+       FROM subscriptions WHERE user_id = $1`,
+      [userId]
+    )
+
+    // Consent records
+    const consentResult = await client.query(
+      `SELECT consent_type, version, given_at, withdrawn_at FROM consent_records WHERE user_id = $1`,
+      [userId]
+    )
+
+    return {
+      exportDate: new Date().toISOString(),
+      dataSubject: userResult.rows[0],
+      preferences: prefsResult.rows[0] || null,
+      subscription: subscriptionResult.rows[0] || null,
+      consentRecords: consentResult.rows,
+      cloudProviders: providersResult.rows,
+      costData: costDataResult.rows,
+      dailyCostData: dailyCostResult.rows,
+      budgets: budgetsResult.rows,
+      reports: reportsResult.rows,
+      savingsPlans: savingsResult.rows,
+      notifications: notificationsResult.rows,
+    }
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// COMPLIANCE: Grievance Redressal (DPDPA Sec. 13)
+// ==========================================
+
+/**
+ * Submit a grievance
+ */
+export const submitGrievance = async ({ userId, email, name, category, subject, description }) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO grievance_records (user_id, email, name, category, subject, description)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [userId || null, email, name, category, subject, description]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get grievances for a user
+ */
+export const getUserGrievances = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT id, category, subject, status, submitted_at, resolved_at
+       FROM grievance_records WHERE user_id = $1 ORDER BY submitted_at DESC`,
+      [userId]
+    )
+    return result.rows
   } finally {
     client.release()
   }

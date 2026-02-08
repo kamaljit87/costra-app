@@ -706,10 +706,10 @@ export default function ProviderDetailPage() {
               </div>
               <div>
                 <div className="flex items-center space-x-2.5 mb-0.5">
-                  <h1 className="text-2xl font-bold text-[#0F172A]">{providerData.provider.name}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{providerData.provider.name}</h1>
                   {providerBudgetCount > 0 && (
                     <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-[#1F3A5F] border border-[#DBEAFE]"
+                      className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-medium bg-[#EFF6FF] text-accent-700 border border-[#DBEAFE]"
                       title={`You have ${providerBudgetCount} budget${providerBudgetCount === 1 ? '' : 's'} configured for this provider`}
                     >
                       <BarChart2 className="h-2.5 w-2.5 mr-1" />
@@ -717,7 +717,7 @@ export default function ProviderDetailPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[#64748B]">Detailed cost breakdown and analytics</p>
+                <p className="text-xs text-gray-500">Detailed cost breakdown and analytics</p>
               </div>
             </div>
             
@@ -738,8 +738,8 @@ export default function ProviderDetailPage() {
           {/* Summary Cards - Compact, Equal Heights */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <div className="card p-4" title="Total cost for the current billing month">
-              <div className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wide mb-1.5">Current Month</div>
-              <div className="text-xl font-bold text-[#0F172A] mb-1">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Current Month</div>
+              <div className="text-xl font-bold text-gray-900 mb-1">
                 {formatCurrency(convertAmount(providerData.currentMonth))}
               </div>
               {changePercent !== 0 && (
@@ -757,15 +757,15 @@ export default function ProviderDetailPage() {
             </div>
 
             <div className="card p-4" title="Projected cost for the month based on current usage">
-              <div className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wide mb-1.5">Forecast</div>
-              <div className="text-xl font-bold text-[#0F172A]">
+              <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Forecast</div>
+              <div className="text-xl font-bold text-gray-900">
                 {formatCurrency(convertAmount(providerData.forecast))}
               </div>
             </div>
 
             <div className="card p-4 bg-[#EFF6FF] border-[#DBEAFE]" title="Savings from reserved instances and commitment plans">
-              <div className="text-[10px] font-semibold text-[#1F3A5F] uppercase tracking-wide mb-1.5">Savings</div>
-              <div className="text-xl font-bold text-[#1F3A5F]">
+              <div className="text-[10px] font-semibold text-accent-700 uppercase tracking-wide mb-1.5">Savings</div>
+              <div className="text-xl font-bold text-accent-700">
                 {formatCurrency(convertAmount(providerData.savings || 0))}
               </div>
             </div>
@@ -775,7 +775,7 @@ export default function ProviderDetailPage() {
 
         {/* Inline Filter Bar */}
         {!hasNoData && (
-          <div className="mb-4 bg-white rounded-2xl border border-[#E2E8F0] px-3 py-2.5">
+          <div className="mb-4 bg-white rounded-2xl border border-surface-200 px-3 py-2.5">
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Period Pills */}
               <div className="flex flex-wrap items-center gap-2">
@@ -920,7 +920,7 @@ export default function ProviderDetailPage() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1 ${
                     isDownloading || isDemoMode
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-[#22B8A0] text-white hover:bg-[#1ea890]'
+                      : 'bg-accent-500 text-white hover:bg-[#1ea890]'
                   }`}
                   title="Download report for selected period"
                 >
@@ -957,9 +957,9 @@ export default function ProviderDetailPage() {
 
             {/* Custom Date Range Input */}
             {showCustomFilter && (
-              <div className="mt-2.5 p-2.5 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+              <div className="mt-2.5 p-2.5 bg-surface-50 rounded-xl border border-surface-200">
                 <div className="flex items-center space-x-3">
-                  <Filter className="h-3.5 w-3.5 text-[#64748B]" />
+                  <Filter className="h-3.5 w-3.5 text-gray-500" />
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
@@ -997,7 +997,7 @@ export default function ProviderDetailPage() {
 
             {/* Advanced Filters Panel */}
             {showAdvancedFilters && (
-              <div className="mt-2.5 p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+              <div className="mt-2.5 p-3 bg-surface-50 rounded-xl border border-surface-200">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5">
                   {/* Service Search */}
                   <div>
@@ -1131,7 +1131,7 @@ export default function ProviderDetailPage() {
 
         {/* Tabs Navigation */}
         {!hasNoData && (
-          <div className="mb-4 border-b border-[#E2E8F0]">
+          <div className="mb-4 border-b border-surface-200">
             <nav className="flex space-x-6">
               <button
                 onClick={() => setActiveTab('overview')}
@@ -1139,8 +1139,8 @@ export default function ProviderDetailPage() {
                   py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'overview'
-                      ? 'border-[#22B8A0] text-[#22B8A0]'
-                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
+                      ? 'border-accent-500 text-accent-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-surface-200'
                   }
                 `}
               >
@@ -1155,8 +1155,8 @@ export default function ProviderDetailPage() {
                   py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'services'
-                      ? 'border-[#22B8A0] text-[#22B8A0]'
-                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
+                      ? 'border-accent-500 text-accent-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-surface-200'
                   }
                 `}
               >
@@ -1171,8 +1171,8 @@ export default function ProviderDetailPage() {
                   py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'analytics'
-                      ? 'border-[#22B8A0] text-[#22B8A0]'
-                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
+                      ? 'border-accent-500 text-accent-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-surface-200'
                   }
                 `}
               >
@@ -1187,8 +1187,8 @@ export default function ProviderDetailPage() {
                   py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'products'
-                      ? 'border-[#22B8A0] text-[#22B8A0]'
-                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
+                      ? 'border-accent-500 text-accent-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-surface-200'
                   }
                 `}
               >
@@ -1203,8 +1203,8 @@ export default function ProviderDetailPage() {
                   py-3 px-1 border-b-2 font-semibold text-xs transition-colors
                   ${
                     activeTab === 'teams'
-                      ? 'border-[#22B8A0] text-[#22B8A0]'
-                      : 'border-transparent text-[#64748B] hover:text-[#0F172A] hover:border-[#E2E8F0]'
+                      ? 'border-accent-500 text-accent-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-surface-200'
                   }
                 `}
               >
@@ -1285,7 +1285,7 @@ export default function ProviderDetailPage() {
                         onClick={() => setViewMode('daily')}
                         className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                           viewMode === 'daily'
-                            ? 'bg-white text-frozenWater-600 shadow-sm'
+                            ? 'bg-white text-accent-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-900'
                         }`}
                         title="View daily cost breakdown"
@@ -1297,7 +1297,7 @@ export default function ProviderDetailPage() {
                         onClick={() => setViewMode('monthly')}
                         className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                           viewMode === 'monthly'
-                            ? 'bg-white text-frozenWater-600 shadow-sm'
+                            ? 'bg-white text-accent-600 shadow-sm'
                             : 'text-gray-600 hover:text-gray-900'
                         }`}
                         title="View monthly aggregated costs"
@@ -1312,7 +1312,7 @@ export default function ProviderDetailPage() {
                   {isLoadingChartData ? (
                     <div className="card flex items-center justify-center h-64">
                       <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600 mx-auto mb-4"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600 mx-auto mb-4"></div>
                         <p className="text-gray-500">Loading chart data...</p>
                       </div>
                     </div>
@@ -1339,19 +1339,19 @@ export default function ProviderDetailPage() {
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Service Breakdown</h2>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto mb-6">
                     {/* Pie Chart - Service Distribution */}
-                    <div className="card bg-white border-[#E2E8F0]">
+                    <div className="card bg-white border-surface-200">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                          <BarChart2 className="h-5 w-5 text-frozenWater-600" />
+                          <BarChart2 className="h-5 w-5 text-accent-600" />
                           Cost by Service
                         </h3>
-                        <span className="text-xs font-semibold text-frozenWater-700 bg-frozenWater-100 px-3 py-1.5 rounded-full border border-frozenWater-200">
+                        <span className="text-xs font-semibold text-accent-700 bg-accent-100 px-3 py-1.5 rounded-full border border-accent-200">
                           {getPeriodLabel(selectedPeriod)}
                         </span>
                       </div>
                       {isLoadingServices ? (
                         <div className="flex items-center justify-center h-64">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
                         </div>
                       ) : serviceCostData.length > 0 ? (
                         <div className="relative">
@@ -1376,20 +1376,20 @@ export default function ProviderDetailPage() {
                               >
                               {serviceCostData.map((_entry, index) => {
                                 // Use frozen-water color palette with variations
-                                const frozenWaterColors = [
-                                  '#45baa5', // frozenWater-500
-                                  '#379584', // frozenWater-600
-                                  '#6ac8b7', // frozenWater-400
-                                  '#8fd6c9', // frozenWater-300
-                                  '#297063', // frozenWater-700
-                                  '#b5e3db', // frozenWater-200
-                                  '#1c4a42', // frozenWater-800
-                                  '#daf1ed', // frozenWater-100
+                                const accentColors = [
+                                  '#45baa5', // accent-500
+                                  '#379584', // accent-600
+                                  '#6ac8b7', // accent-400
+                                  '#8fd6c9', // accent-300
+                                  '#297063', // accent-700
+                                  '#b5e3db', // accent-200
+                                  '#1c4a42', // accent-800
+                                  '#daf1ed', // accent-100
                                 ]
                                 return (
                                   <Cell 
                                     key={`cell-${index}`} 
-                                    fill={frozenWaterColors[index % frozenWaterColors.length]} 
+                                    fill={accentColors[index % accentColors.length]} 
                                   />
                                 )
                               })}
@@ -1415,19 +1415,19 @@ export default function ProviderDetailPage() {
                     </div>
 
                     {/* Bar Chart - Service Costs */}
-                    <div className="card bg-white border-[#E2E8F0]">
+                    <div className="card bg-white border-surface-200">
                       <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                          <BarChart2 className="h-5 w-5 text-frozenWater-600" />
+                          <BarChart2 className="h-5 w-5 text-accent-600" />
                           Service Costs
                         </h3>
-                        <span className="text-xs font-semibold text-frozenWater-700 bg-frozenWater-100 px-3 py-1.5 rounded-full border border-frozenWater-200">
+                        <span className="text-xs font-semibold text-accent-700 bg-accent-100 px-3 py-1.5 rounded-full border border-accent-200">
                           {getPeriodLabel(selectedPeriod)}
                         </span>
                       </div>
                       {isLoadingServices ? (
                         <div className="flex items-center justify-center h-64">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
                         </div>
                       ) : serviceCostData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
@@ -1475,18 +1475,18 @@ export default function ProviderDetailPage() {
                               strokeWidth={1}
                             >
                               {serviceCostData.map((_entry, index) => {
-                                const frozenWaterColors = [
-                                  '#45baa5', // frozenWater-500
-                                  '#379584', // frozenWater-600
-                                  '#6ac8b7', // frozenWater-400
-                                  '#8fd6c9', // frozenWater-300
-                                  '#297063', // frozenWater-700
+                                const accentColors = [
+                                  '#45baa5', // accent-500
+                                  '#379584', // accent-600
+                                  '#6ac8b7', // accent-400
+                                  '#8fd6c9', // accent-300
+                                  '#297063', // accent-700
                                 ]
                                 return (
                                   <Cell 
                                     key={`bar-cell-${index}`} 
-                                    fill={frozenWaterColors[index % frozenWaterColors.length]}
-                                    stroke={frozenWaterColors[index % frozenWaterColors.length]}
+                                    fill={accentColors[index % accentColors.length]}
+                                    stroke={accentColors[index % accentColors.length]}
                                   />
                                 )
                               })}
@@ -1506,30 +1506,30 @@ export default function ProviderDetailPage() {
                 {/* Service Details Table */}
                 <div>
                   <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">Service Details</h2>
-                  <div className="card bg-gradient-to-br from-white to-frozenWater-50/30 border-frozenWater-100">
+                  <div className="card bg-gradient-to-br from-white to-accent-50/30 border-accent-100">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <Layers className="h-5 w-5 text-frozenWater-600" />
+                        <Layers className="h-5 w-5 text-accent-600" />
                         Service Breakdown
                         {selectedService && (
-                          <span className="text-sm font-normal text-frozenWater-700 ml-2 bg-frozenWater-100 px-2 py-1 rounded-full">
+                          <span className="text-sm font-normal text-accent-700 ml-2 bg-accent-100 px-2 py-1 rounded-full">
                             (filtered by {selectedService})
                           </span>
                         )}
                       </h3>
-                      <span className="text-xs font-semibold text-frozenWater-700 bg-frozenWater-100 px-3 py-1.5 rounded-full border border-frozenWater-200">
+                      <span className="text-xs font-semibold text-accent-700 bg-accent-100 px-3 py-1.5 rounded-full border border-accent-200">
                         {getPeriodLabel(selectedPeriod)}
                       </span>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b-2 border-frozenWater-200 bg-frozenWater-50/50">
-                            <th className="text-left py-4 px-4 font-semibold text-frozenWater-900 w-8"></th>
-                            <th className="text-left py-4 px-4 font-semibold text-frozenWater-900">Service</th>
-                            <th className="text-right py-4 px-4 font-semibold text-frozenWater-900">Cost</th>
-                            <th className="text-right py-4 px-4 font-semibold text-frozenWater-900">Change</th>
-                            <th className="text-right py-4 px-4 font-semibold text-frozenWater-900">% of Total</th>
+                          <tr className="border-b-2 border-accent-200 bg-accent-50/50">
+                            <th className="text-left py-4 px-4 font-semibold text-accent-900 w-8"></th>
+                            <th className="text-left py-4 px-4 font-semibold text-accent-900">Service</th>
+                            <th className="text-right py-4 px-4 font-semibold text-accent-900">Cost</th>
+                            <th className="text-right py-4 px-4 font-semibold text-accent-900">Change</th>
+                            <th className="text-right py-4 px-4 font-semibold text-accent-900">% of Total</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1542,18 +1542,18 @@ export default function ProviderDetailPage() {
                               return (
                                 <React.Fragment key={`service-${index}-${service.name}`}>
                                   <tr 
-                                    className={`border-b border-frozenWater-100 hover:bg-frozenWater-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-frozenWater-100/70' : ''}`}
+                                    className={`border-b border-accent-100 hover:bg-accent-50/50 transition-colors cursor-pointer ${isExpanded ? 'bg-accent-100/70' : ''}`}
                                     onClick={() => handleServiceExpand(service.name, service.cost)}
                                     title="Click to see sub-service breakdown"
                                   >
                                     <td className="py-4 px-2 text-center">
                                       <ChevronDown 
-                                        className={`h-4 w-4 text-frozenWater-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                        className={`h-4 w-4 text-accent-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                                       />
                                     </td>
                                     <td className="py-4 px-4 text-gray-900 font-medium">
                                       <div className="flex items-center gap-2">
-                                        <Layers className="h-4 w-4 text-frozenWater-500" />
+                                        <Layers className="h-4 w-4 text-accent-500" />
                                         {service.name}
                                       </div>
                                     </td>
@@ -1565,7 +1565,7 @@ export default function ProviderDetailPage() {
                                     }`}>
                                       {(service.change || 0) >= 0 ? '+' : ''}{(service.change || 0).toFixed(1)}%
                                     </td>
-                                    <td className="py-4 px-4 text-right text-frozenWater-700 font-medium">
+                                    <td className="py-4 px-4 text-right text-accent-700 font-medium">
                                       {percentage.toFixed(1)}%
                                     </td>
                                   </tr>
@@ -1573,17 +1573,17 @@ export default function ProviderDetailPage() {
                                   {/* Sub-services expandable row */}
                                   {isExpanded && (
                                     <tr key={`sub-${index}-${service.name}`}>
-                                      <td colSpan={5} className="bg-[#F8FAFC] p-0">
+                                      <td colSpan={5} className="bg-surface-50 p-0">
                                         <div className="px-8 py-6">
                                           {isLoadingSubServices ? (
                                             <div className="flex items-center justify-center py-6">
-                                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-frozenWater-600"></div>
-                                              <span className="ml-3 text-frozenWater-700">Loading sub-service details...</span>
+                                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent-600"></div>
+                                              <span className="ml-3 text-accent-700">Loading sub-service details...</span>
                                             </div>
                                           ) : subServices.length > 0 ? (
                                             <div className="space-y-3">
-                                              <h4 className="text-sm font-semibold text-frozenWater-800 flex items-center gap-2 mb-4">
-                                                <BarChart2 className="h-4 w-4 text-frozenWater-600" />
+                                              <h4 className="text-sm font-semibold text-accent-800 flex items-center gap-2 mb-4">
+                                                <BarChart2 className="h-4 w-4 text-accent-600" />
                                                 Sub-service Breakdown
                                               </h4>
                                               
@@ -1601,13 +1601,13 @@ export default function ProviderDetailPage() {
                                                     <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                                                       {category}
                                                     </div>
-                                                    <div className="bg-white rounded-lg border border-frozenWater-200 overflow-hidden shadow-sm">
+                                                    <div className="bg-white rounded-lg border border-accent-200 overflow-hidden shadow-sm">
                                                       {subs.map((sub: SubService, subIndex: number) => {
                                                         const subPercentage = service.cost > 0 ? (sub.cost / service.cost) * 100 : 0
                                                         return (
                                                           <div 
                                                             key={`${sub.name}-${subIndex}`}
-                                                            className="flex items-center justify-between px-4 py-2.5 border-b border-frozenWater-100 last:border-b-0 hover:bg-frozenWater-50/50 transition-colors"
+                                                            className="flex items-center justify-between px-4 py-2.5 border-b border-accent-100 last:border-b-0 hover:bg-accent-50/50 transition-colors"
                                                           >
                                                             <div className="flex items-center gap-3">
                                                               <div className="w-2 h-2 rounded-full" style={{ 
@@ -1793,7 +1793,7 @@ export default function ProviderDetailPage() {
                   if (isLoadingProducts) {
                     return (
                       <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
                       </div>
                     )
                   }
@@ -1844,7 +1844,7 @@ export default function ProviderDetailPage() {
                   if (isLoadingTeams) {
                     return (
                       <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-frozenWater-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
                       </div>
                     )
                   }

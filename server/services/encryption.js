@@ -1,8 +1,20 @@
 import crypto from 'node:crypto'
 import logger from '../utils/logger.js'
 
-// Get encryption key from environment or use a default (change in production!)
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.scryptSync('costra-default-key-change-in-production', 'salt', 32)
+// Get encryption key from environment
+// In production, ENCRYPTION_KEY must be set — refuse to start with a default key
+let ENCRYPTION_KEY
+if (process.env.ENCRYPTION_KEY) {
+  ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex').length === 32
+    ? Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
+    : crypto.scryptSync(process.env.ENCRYPTION_KEY, 'costra-encryption-salt', 32)
+} else if (process.env.NODE_ENV === 'production') {
+  logger.error('ENCRYPTION_KEY environment variable is required in production. Cloud provider credentials cannot be securely stored without it.')
+  process.exit(1)
+} else {
+  logger.warn('Using default encryption key — NOT SAFE FOR PRODUCTION. Set ENCRYPTION_KEY environment variable.')
+  ENCRYPTION_KEY = crypto.scryptSync('costra-dev-only-key', 'costra-encryption-salt', 32)
+}
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 16
 const AUTH_TAG_LENGTH = 16

@@ -74,11 +74,11 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <Activity className="h-8 w-8 text-frozenWater-600 animate-pulse mx-auto mb-4" />
-            <p className="text-frozenWater-700">Loading untagged resources...</p>
+            <Activity className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
+            <p className="text-accent-700">Loading untagged resources...</p>
           </div>
         </div>
       </div>
@@ -87,11 +87,11 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
 
   if (error) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <p className="text-red-600 mb-2">Error loading data</p>
-            <p className="text-sm text-frozenWater-600">{error}</p>
+            <p className="text-sm text-accent-600">{error}</p>
           </div>
         </div>
       </div>
@@ -100,21 +100,21 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
 
   if (resources.length === 0) {
     return (
-      <div className="card bg-white border-frozenWater-100">
+      <div className="card bg-white border-accent-100">
         <div className="flex items-center justify-between mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Tag className="h-5 w-5 text-frozenWater-600" />
+              <Tag className="h-5 w-5 text-accent-600" />
               Untagged Resources
               <button
                 onClick={() => setShowInfoDialog(true)}
-                className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+                className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
                 title="Learn more about Untagged Resources"
               >
-                <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+                <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
               </button>
             </h3>
-            <p className="text-sm text-frozenWater-600">Resources without tags or ownership metadata</p>
+            <p className="text-sm text-accent-600">Resources without tags or ownership metadata</p>
           </div>
         </div>
         <div className="flex items-center justify-center py-12 bg-green-50 rounded-xl border border-green-200">
@@ -132,7 +132,7 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
               <div className="p-8">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Tag className="h-6 w-6 text-frozenWater-600" />
+                    <Tag className="h-6 w-6 text-accent-600" />
                     What are Untagged Resources?
                   </h3>
                   <button
@@ -145,26 +145,26 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
                 
                 <div className="space-y-4 text-gray-700">
                   <p>
-                    <strong className="text-frozenWater-700">Untagged Resources</strong> are cloud resources that don't have any tags or ownership metadata attached to them. This is a critical FinOps concern because it makes cost allocation and accountability difficult.
+                    <strong className="text-accent-700">Untagged Resources</strong> are cloud resources that don't have any tags or ownership metadata attached to them. This is a critical FinOps concern because it makes cost allocation and accountability difficult.
                   </p>
                   
-                  <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                    <h4 className="font-semibold text-frozenWater-800 mb-2">Why Tagging Matters:</h4>
+                  <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                    <h4 className="font-semibold text-accent-800 mb-2">Why Tagging Matters:</h4>
                     <ul className="space-y-2 text-sm">
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Cost Allocation:</strong> Tags help you understand which team, project, or product is responsible for each resource's cost</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Accountability:</strong> When costs spike, tags help identify who to contact</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Optimization:</strong> Tagged resources enable better cost optimization and budget management</span>
                       </li>
                       <li className="flex items-start gap-2">
-                        <span className="text-frozenWater-600 mt-0.5">•</span>
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span><strong>Compliance:</strong> Many organizations require resource tagging for governance and compliance</span>
                       </li>
                     </ul>
@@ -196,21 +196,21 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
   }
 
   return (
-    <div className="card bg-white border-frozenWater-100">
+    <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
-            <Tag className="h-5 w-5 text-frozenWater-600" />
+            <Tag className="h-5 w-5 text-accent-600" />
             Untagged Resources
             <button
               onClick={() => setShowInfoDialog(true)}
-              className="ml-2 p-1 rounded-full hover:bg-frozenWater-100 transition-colors group"
+              className="ml-2 p-1 rounded-full hover:bg-accent-100 transition-colors group"
               title="Learn more about Untagged Resources"
             >
-              <Info className="h-4 w-4 text-frozenWater-600 group-hover:text-frozenWater-700" />
+              <Info className="h-4 w-4 text-accent-600 group-hover:text-accent-700" />
             </button>
           </h3>
-          <p className="text-sm text-frozenWater-600">Resources without tags or ownership metadata</p>
+          <p className="text-sm text-accent-600">Resources without tags or ownership metadata</p>
         </div>
         <AlertTriangle className="h-5 w-5 text-yellow-600" />
       </div>
@@ -222,7 +222,7 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
             <div className="p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Tag className="h-6 w-6 text-frozenWater-600" />
+                  <Tag className="h-6 w-6 text-accent-600" />
                   What are Untagged Resources?
                 </h3>
                 <button
@@ -235,26 +235,26 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
               
               <div className="space-y-4 text-gray-700">
                 <p>
-                  <strong className="text-frozenWater-700">Untagged Resources</strong> are cloud resources that don't have any tags or ownership metadata attached to them. This is a critical FinOps concern because it makes cost allocation and accountability difficult.
+                  <strong className="text-accent-700">Untagged Resources</strong> are cloud resources that don't have any tags or ownership metadata attached to them. This is a critical FinOps concern because it makes cost allocation and accountability difficult.
                 </p>
                 
-                <div className="bg-frozenWater-50 rounded-2xl p-5 border border-frozenWater-200/50">
-                  <h4 className="font-semibold text-frozenWater-800 mb-2">Why Tagging Matters:</h4>
+                <div className="bg-accent-50 rounded-2xl p-5 border border-accent-200/50">
+                  <h4 className="font-semibold text-accent-800 mb-2">Why Tagging Matters:</h4>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Cost Allocation:</strong> Tags help you understand which team, project, or product is responsible for each resource's cost</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Accountability:</strong> When costs spike, tags help identify who to contact</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Optimization:</strong> Tagged resources enable better cost optimization and budget management</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <span className="text-frozenWater-600 mt-0.5">•</span>
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span><strong>Compliance:</strong> Many organizations require resource tagging for governance and compliance</span>
                     </li>
                   </ul>
@@ -304,29 +304,29 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
           <div className="overflow-hidden sm:rounded-lg border border-gray-200">
             <table className="w-full divide-y divide-gray-200">
           <thead>
-            <tr className="border-b-2 border-frozenWater-200 bg-frozenWater-50/50">
-              <th className="text-left py-4 px-4 text-xs font-semibold text-frozenWater-900 uppercase tracking-wider">
+            <tr className="border-b-2 border-accent-200 bg-accent-50/50">
+              <th className="text-left py-4 px-4 text-xs font-semibold text-accent-900 uppercase tracking-wider">
                 Resource
               </th>
-              <th className="text-left py-4 px-4 text-xs font-semibold text-frozenWater-900 uppercase tracking-wider">
+              <th className="text-left py-4 px-4 text-xs font-semibold text-accent-900 uppercase tracking-wider">
                 Service
               </th>
-              <th className="text-left py-4 px-4 text-xs font-semibold text-frozenWater-900 uppercase tracking-wider">
+              <th className="text-left py-4 px-4 text-xs font-semibold text-accent-900 uppercase tracking-wider">
                 Region
               </th>
-              <th className="text-right py-4 px-4 text-xs font-semibold text-frozenWater-900 uppercase tracking-wider">
+              <th className="text-right py-4 px-4 text-xs font-semibold text-accent-900 uppercase tracking-wider">
                 Cost
               </th>
-              <th className="text-right py-4 px-4 text-xs font-semibold text-frozenWater-900 uppercase tracking-wider">
+              <th className="text-right py-4 px-4 text-xs font-semibold text-accent-900 uppercase tracking-wider">
                 Age
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-frozenWater-100">
+          <tbody className="divide-y divide-accent-100">
             {resources.map((resource) => (
               <tr 
                 key={resource.id} 
-                className="hover:bg-frozenWater-50/50 transition-colors"
+                className="hover:bg-accent-50/50 transition-colors"
                 title={`${resource.resourceType} - No tags found`}
               >
                 <td className="py-3 px-4">
@@ -378,9 +378,9 @@ export default function UntaggedResources({ providerId, limit = 50, accountId }:
       </div>
 
       {resources.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-frozenWater-200">
+        <div className="mt-4 pt-4 border-t border-accent-200">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-frozenWater-700">
+            <span className="text-accent-700">
               Showing {resources.length} untagged resource{resources.length !== 1 ? 's' : ''}
             </span>
             <span className="text-yellow-700 font-medium">

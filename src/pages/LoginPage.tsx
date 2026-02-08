@@ -6,10 +6,10 @@ import Logo from '../components/Logo'
 import { LogIn, Mail, Lock, Eye, EyeOff, Cloud, BarChart3, Brain, DollarSign } from 'lucide-react'
 
 const features = [
-  { icon: Cloud, text: 'Multi-cloud visibility', description: 'Connect AWS, Azure, GCP, and more in one unified view', color: 'bg-blue-500/20' },
-  { icon: BarChart3, text: 'Advanced analytics', description: 'Deep insights into your cloud spending patterns', color: 'bg-purple-500/20' },
-  { icon: Brain, text: 'AI-powered insights', description: 'Get intelligent recommendations to optimize costs', color: 'bg-indigo-500/20' },
-  { icon: DollarSign, text: 'Global currencies', description: 'View costs in your preferred currency with real-time rates', color: 'bg-green-500/20' }
+  { icon: Cloud, text: 'Multi-cloud visibility', description: 'Connect AWS, Azure, GCP, and more in one unified view', color: 'bg-accent-500/20' },
+  { icon: BarChart3, text: 'Advanced analytics', description: 'Deep insights into your cloud spending patterns', color: 'bg-accent-400/20' },
+  { icon: Brain, text: 'AI-powered insights', description: 'Get intelligent recommendations to optimize costs', color: 'bg-accent-600/20' },
+  { icon: DollarSign, text: 'Global currencies', description: 'View costs in your preferred currency with real-time rates', color: 'bg-accent-500/20' }
 ]
 
 export default function LoginPage() {
@@ -51,7 +51,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex">
+    <div className="min-h-screen bg-surface-50 flex">
       {/* Left Panel - Login Form */}
       <div className="flex-1 flex items-start justify-center px-6 pt-12 pb-8 lg:px-16 lg:pt-16 lg:pb-12">
         <div className="w-full max-w-md">
@@ -62,7 +62,7 @@ export default function LoginPage() {
 
           {/* Title Section */}
           <div className="mb-5">
-            <h1 className="text-3xl font-bold text-[#0F172A] mb-2">Welcome back</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h1>
             <p className="text-gray-600 text-base">Sign in to continue to your dashboard</p>
           </div>
 
@@ -74,10 +74,10 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#E2E8F0]"></div>
+              <div className="w-full border-t border-surface-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-[#F8FAFC] text-gray-500">or continue with email</span>
+              <span className="px-4 bg-surface-50 text-gray-500">or continue with email</span>
             </div>
           </div>
 
@@ -85,7 +85,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email Input */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-[#0F172A] mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
                 Email address
               </label>
               <div className="relative">
@@ -95,7 +95,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1F3A5F]/20 focus:border-[#1F3A5F]/30 text-[#0F172A] placeholder-gray-400 bg-white shadow-sm transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400 bg-white shadow-sm transition-all"
                   placeholder="you@company.com"
                   required
                 />
@@ -104,7 +104,7 @@ export default function LoginPage() {
 
             {/* Password Input */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-[#0F172A] mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900 mb-2">
                 Password
               </label>
               <div className="relative">
@@ -114,14 +114,14 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3.5 border border-[#E2E8F0] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1F3A5F]/20 focus:border-[#1F3A5F]/30 text-[#0F172A] placeholder-gray-400 bg-white shadow-sm transition-all"
+                  className="w-full pl-12 pr-12 py-3.5 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400 bg-white shadow-sm transition-all"
                   placeholder="Enter your password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#1F3A5F] transition-colors"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-accent-700 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -135,13 +135,13 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-[#1F3A5F] border-[#E2E8F0] rounded focus:ring-[#1F3A5F]/20 cursor-pointer"
+                  className="w-4 h-4 text-accent-600 border-surface-200 rounded focus:ring-accent-500/20 cursor-pointer"
                 />
-                <span className="ml-2.5 text-sm text-gray-700 group-hover:text-[#0F172A] transition-colors">Remember me</span>
+                <span className="ml-2.5 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">Remember me</span>
               </label>
               <Link
                 to="/forgot-password"
-                className="text-sm text-[#1F3A5F] hover:text-[#243b53] font-medium transition-colors"
+                className="text-sm text-accent-700 hover:text-accent-600 font-medium transition-colors"
               >
                 Forgot password?
               </Link>
@@ -176,7 +176,7 @@ export default function LoginPage() {
           {/* Sign Up Link */}
           <p className="mt-8 text-center text-sm text-gray-600">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-[#1F3A5F] hover:text-[#243b53] font-semibold transition-colors">
+            <Link to="/signup" className="text-accent-700 hover:text-accent-600 font-semibold transition-colors">
               Sign up for free
             </Link>
           </p>
@@ -184,12 +184,12 @@ export default function LoginPage() {
       </div>
 
       {/* Right Panel - Feature Showcase */}
-      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-[#1F3A5F] via-[#2A4A6F] to-[#243b53] items-center justify-center px-20 py-24 relative overflow-hidden">
-        {/* Background Effects */}
+      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-primary-800 via-primary-900 to-primary-800 items-center justify-center px-20 py-24 relative overflow-hidden">
+        {/* Animated Background Orbs */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-white/3 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl animate-float"></div>
+          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-accent-400/8 rounded-full blur-3xl animate-float-delayed"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-accent-500/5 rounded-full blur-3xl"></div>
         </div>
 
         <div className="relative z-10 w-full max-w-xl">
@@ -216,9 +216,9 @@ export default function LoginPage() {
                       isActive ? 'opacity-100' : 'opacity-0'
                     }`}
                   >
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 h-full flex flex-col items-center justify-center text-center">
+                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10 h-full flex flex-col items-center justify-center text-center">
                       <div className={`w-14 h-14 ${feature.color} rounded-lg flex items-center justify-center mb-4`}>
-                        <Icon className="h-7 w-7 text-white" />
+                        <Icon className="h-7 w-7 text-accent-400" />
                       </div>
                       <h3 className="text-lg font-semibold text-white mb-2">{feature.text}</h3>
                       <p className="text-sm text-white/70 leading-relaxed max-w-xs">{feature.description}</p>
@@ -227,7 +227,7 @@ export default function LoginPage() {
                 )
               })}
             </div>
-            
+
             {/* Carousel Dots */}
             <div className="flex items-center justify-center space-x-2 mt-6">
               {features.map((_, index) => (
@@ -236,7 +236,7 @@ export default function LoginPage() {
                   onClick={() => setCurrentFeature(index)}
                   className={`transition-all duration-300 rounded-full ${
                     index === currentFeature
-                      ? 'w-8 h-2 bg-white'
+                      ? 'w-8 h-2 bg-accent-400'
                       : 'w-2 h-2 bg-white/30 hover:bg-white/50'
                   }`}
                   aria-label={`Go to feature ${index + 1}`}

@@ -109,11 +109,11 @@ export default function ProductCostCard({ product, startDate, endDate, providerI
   }
 
   return (
-    <div className="card-modern group">
+    <div className="card group">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3 flex-1">
-          <div className="p-3 bg-gradient-to-br from-frozenWater-100 to-frozenWater-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-            <Package className="h-6 w-6 text-frozenWater-600" />
+          <div className="p-3 bg-gradient-to-br from-accent-100 to-accent-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+            <Package className="h-6 w-6 text-accent-600" />
           </div>
           <div className="flex-1">
             <h3 className="text-xl font-bold text-gray-900">{product.productName}</h3>

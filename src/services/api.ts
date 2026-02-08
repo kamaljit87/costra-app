@@ -58,10 +58,10 @@ const apiRequest = async (
 
 // Auth API
 export const authAPI = {
-  signup: async (name: string, email: string, password: string) => {
+  signup: async (name: string, email: string, password: string, consentAccepted: boolean = true) => {
     const response = await apiRequest('/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, consentAccepted }),
     })
     const data = await response.json()
     if (data.token) {
@@ -916,6 +916,66 @@ export const billingAPI = {
     const response = await apiRequest('/billing/cancel', {
       method: 'POST',
     })
+    return response.json()
+  },
+}
+
+// Compliance API (GDPR / DPDPA)
+export const complianceAPI = {
+  // Data Export (GDPR Art. 20 - Right to Data Portability)
+  exportData: async () => {
+    const response = await apiRequest('/compliance/export')
+    return response.json()
+  },
+
+  // Account Deletion (GDPR Art. 17 - Right to Erasure)
+  requestDeletion: async (reason?: string) => {
+    const response = await apiRequest('/compliance/delete-account', {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
+    return response.json()
+  },
+
+  confirmDeletion: async (requestId: number) => {
+    const response = await apiRequest(`/compliance/delete-account/${requestId}/confirm`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  cancelDeletion: async (requestId: number) => {
+    const response = await apiRequest(`/compliance/delete-account/${requestId}/cancel`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  // Consent management
+  getConsents: async () => {
+    const response = await apiRequest('/compliance/consents')
+    return response.json()
+  },
+
+  withdrawConsent: async (consentType: string) => {
+    const response = await apiRequest('/compliance/consents/withdraw', {
+      method: 'POST',
+      body: JSON.stringify({ consentType }),
+    })
+    return response.json()
+  },
+
+  // Grievance (DPDPA Sec. 13)
+  submitGrievance: async (data: { category: string; subject: string; description: string }) => {
+    const response = await apiRequest('/compliance/grievance', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+
+  getGrievances: async () => {
+    const response = await apiRequest('/compliance/grievances')
     return response.json()
   },
 }

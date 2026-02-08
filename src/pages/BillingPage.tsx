@@ -43,11 +43,11 @@ const PLANS = {
   },
   starter: {
     name: 'Starter Plan (Default)',
-    monthly: { inr: '₹850', usd: '$10' },
-    annual: { inr: '₹8,500', usd: '$100' },
-    annualSavings: { inr: '₹1,700', usd: '$20' },
+    monthly: { inr: '₹1,249', usd: '$14.99' },
+    annual: { inr: '₹12,499', usd: '$149.99' },
+    annualSavings: { inr: '₹2,489', usd: '$29.89' },
     features: [
-      'Unlimited cloud providers',
+      'Up to 3 cloud provider accounts',
       'Up to 6 months of history',
       'Correct cost before & after credits',
       'Custom date ranges',
@@ -56,15 +56,16 @@ const PLANS = {
     ],
     restrictions: ['CSV export', 'Email alerts', 'Unit economics'],
     whoThisIsFor: 'Indie founders, Small startups, DevOps who want clarity without heavy FinOps tooling',
-    priceWorksBecause: '$10 is less than 15 minutes of wasted cloud spend.',
+    priceWorksBecause: '$14.99 is less than 15 minutes of wasted cloud spend.',
   },
   pro: {
     name: 'Pro Plan (Active FinOps)',
-    monthly: { inr: '₹2,040', usd: '$24' },
-    annual: { inr: '₹20,400', usd: '$240' },
-    annualSavings: { inr: '₹4,080', usd: '$48' },
+    monthly: { inr: '₹2,099', usd: '$24.99' },
+    annual: { inr: '₹20,999', usd: '$249.99' },
+    annualSavings: { inr: '₹4,189', usd: '$49.89' },
     features: [
       'Everything in Starter',
+      'Unlimited cloud provider accounts',
       '12+ months history',
       'Cost vs usage',
       'Unit economics',
@@ -74,7 +75,7 @@ const PLANS = {
     ],
     restrictions: [],
     whoThisIsFor: 'Teams actively managing FinOps',
-    priceWorksBecause: 'Advanced features for serious cost optimization',
+    priceWorksBecause: 'Unlimited accounts and advanced features for serious cost optimization',
   },
 }
 
@@ -143,7 +144,7 @@ export default function BillingPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-frozenWater-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-accent-600" />
       </div>
     )
   }
@@ -188,14 +189,14 @@ export default function BillingPage() {
           <div className="text-right">
             {currentPlan === 'trial' ? (
               <>
-                <div className="text-2xl font-bold text-frozenWater-700">
+                <div className="text-2xl font-bold text-accent-700">
                   {planInfo.price.inr} <span className="text-lg text-gray-500">/ {planInfo.period}</span>
                 </div>
                 <div className="text-sm text-gray-500 mt-1">{planInfo.price.usd} / {planInfo.period}</div>
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold text-frozenWater-700">
+                <div className="text-2xl font-bold text-accent-700">
                   {currentBillingPeriod === 'annual' 
                     ? (planInfo as any).annual.inr 
                     : (planInfo as any).monthly.inr
@@ -331,7 +332,7 @@ export default function BillingPage() {
           {/* Starter Plan */}
           <div className={`bg-white rounded-xl border-2 p-6 ${
             currentPlan === 'starter' 
-              ? 'border-frozenWater-500 shadow-lg' 
+              ? 'border-accent-500 shadow-lg' 
               : 'border-gray-200'
           }`}>
             <div className="mb-4">
@@ -395,14 +396,14 @@ export default function BillingPage() {
           {/* Pro Plan */}
           <div className={`bg-white rounded-xl border-2 p-6 ${
             currentPlan === 'pro' 
-              ? 'border-frozenWater-500 shadow-lg' 
-              : 'border-frozenWater-300'
+              ? 'border-accent-500 shadow-lg' 
+              : 'border-accent-300'
           }`}>
             <div className="mb-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-semibold text-gray-900">{PLANS.pro.name}</h3>
                 {currentPlan !== 'pro' && (
-                  <span className="px-2 py-1 bg-frozenWater-100 text-frozenWater-700 text-xs font-medium rounded">
+                  <span className="px-2 py-1 bg-accent-100 text-accent-700 text-xs font-medium rounded">
                     Recommended
                   </span>
                 )}
@@ -423,7 +424,7 @@ export default function BillingPage() {
                 {billingPeriod === 'annual' && (
                   <div className="mt-2">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Save {PLANS.pro.annualSavings.usd}/year • 2.5 months free
+                      Save {PLANS.pro.annualSavings.usd}/year • 2 months free
                     </span>
                   </div>
                 )}
