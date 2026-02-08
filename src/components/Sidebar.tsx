@@ -7,6 +7,8 @@ import {
   ChevronUp,
   Wallet,
   FileText,
+  ArrowLeftRight,
+  MessageCircle,
   X
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +19,7 @@ interface SidebarProps {
   isOpen: boolean
   onClose: () => void
   isPermanent?: boolean
+  onContactClick?: () => void
 }
 
 interface CloudAccount {
@@ -29,7 +32,7 @@ interface CloudAccount {
   lastSyncAt: string | null
 }
 
-export default function Sidebar({ isOpen, onClose, isPermanent = false }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, isPermanent = false, onContactClick }: SidebarProps) {
   const location = useLocation()
   const { isDemoMode } = useAuth()
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([])
@@ -94,16 +97,14 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
       <aside
         className={`
           ${isPermanent ? 'relative' : 'fixed'} top-0 left-0 h-full z-50
-          bg-gradient-to-b from-primary-800 to-primary-900
+          bg-white border-r border-surface-300
           ${isPermanent ? '' : `transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
           ${isPermanent ? 'lg:block' : 'lg:hidden'}
           w-72 flex flex-col
-          border-r border-primary-700/50
-          shadow-xl
         `}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-20 px-6 border-b border-primary-700/50">
+        <div className="flex items-center justify-between h-20 px-6 border-b border-surface-300">
           <Link to="/dashboard" className="flex items-center group">
             <img
               src="/logo.png"
@@ -114,7 +115,7 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
           {!isPermanent && (
             <button
               onClick={onClose}
-              className="lg:hidden text-primary-300 hover:text-white transition-colors p-2 rounded-lg hover:bg-primary-700/60 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="lg:hidden text-gray-400 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-surface-200 min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="Close sidebar"
             >
               <X className="h-5 w-5" />
@@ -123,27 +124,24 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto dark-scrollbar">
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {/* Dashboard */}
           <Link
             to="/dashboard"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-xl
-              transition-all duration-200 group relative
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
               ${isActive('/dashboard')
-                ? 'bg-accent-500 text-white shadow-lg shadow-accent-500/20'
-                : 'text-primary-100/80 hover:text-white hover:bg-primary-700/60'
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
               }
             `}
           >
             <div className={`${isActive('/dashboard') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
               <LayoutDashboard className="h-5 w-5" />
             </div>
-            <span className="font-semibold text-sm">Dashboard</span>
-            {isActive('/dashboard') && (
-              <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white"></div>
-            )}
+            <span className="text-sm">Dashboard</span>
           </Link>
 
           {/* Budgets */}
@@ -151,21 +149,18 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
             to="/budgets"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-xl
-              transition-all duration-200 group relative
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
               ${isActive('/budgets')
-                ? 'bg-accent-500 text-white shadow-lg shadow-accent-500/20'
-                : 'text-primary-100/80 hover:text-white hover:bg-primary-700/60'
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
               }
             `}
           >
             <div className={`${isActive('/budgets') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
               <Wallet className="h-5 w-5" />
             </div>
-            <span className="font-semibold text-sm">Budgets</span>
-            {isActive('/budgets') && (
-              <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white"></div>
-            )}
+            <span className="text-sm">Budgets</span>
           </Link>
 
           {/* Reports */}
@@ -173,27 +168,43 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
             to="/reports"
             onClick={onClose}
             className={`
-              flex items-center space-x-3 px-4 py-3 rounded-xl
-              transition-all duration-200 group relative
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
               ${isActive('/reports')
-                ? 'bg-accent-500 text-white shadow-lg shadow-accent-500/20'
-                : 'text-primary-100/80 hover:text-white hover:bg-primary-700/60'
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
               }
             `}
           >
             <div className={`${isActive('/reports') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
               <FileText className="h-5 w-5" />
             </div>
-            <span className="font-semibold text-sm">Reports</span>
-            {isActive('/reports') && (
-              <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white"></div>
-            )}
+            <span className="text-sm">Reports</span>
+          </Link>
+
+          {/* Compare */}
+          <Link
+            to="/compare"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
+              ${isActive('/compare')
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <div className={`${isActive('/compare') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <ArrowLeftRight className="h-5 w-5" />
+            </div>
+            <span className="text-sm">Compare</span>
           </Link>
 
           {/* Cloud Accounts Section */}
           {!isDemoMode && Object.keys(groupedAccounts).length > 0 && (
-            <div className="pt-6 mt-6 border-t border-primary-700/50">
-              <div className="px-4 pb-3 text-[10px] font-bold text-primary-300/60 uppercase tracking-widest">
+            <div className="pt-6 mt-6 border-t border-surface-300">
+              <div className="px-4 pb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                 Cloud Providers
               </div>
 
@@ -202,19 +213,19 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
                   <button
                     onClick={() => toggleProviderExpand(providerId)}
                     className={`
-                      flex items-center space-x-3 px-4 py-3 w-full rounded-xl
-                      transition-all duration-200 group
+                      flex items-center space-x-3 px-4 py-3 w-full rounded-lg
+                      transition-colors duration-150 group
                       ${expandedProviders.has(providerId)
-                        ? 'bg-primary-700/60 text-white shadow-md'
-                        : 'text-primary-100/70 hover:text-white hover:bg-primary-700/40'
+                        ? 'bg-surface-100 text-gray-900'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-surface-100'
                       }
                     `}
                   >
                     <div
-                      className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${
+                      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
                         expandedProviders.has(providerId)
-                          ? 'bg-primary-600/60'
-                          : 'bg-primary-700/40 group-hover:bg-primary-600/40'
+                          ? 'bg-surface-200'
+                          : 'bg-surface-100 group-hover:bg-surface-200'
                       }`}
                     >
                       <ProviderIcon providerId={providerId} size={20} />
@@ -222,13 +233,13 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
                     <span className="flex-1 text-left text-sm font-semibold">
                       {accounts[0].providerName}
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-primary-600/50 text-primary-100">
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-surface-200 text-gray-600">
                       {accounts.length}
                     </span>
                     {expandedProviders.has(providerId) ? (
-                      <ChevronUp className="h-4 w-4 text-primary-300 transition-transform duration-200" />
+                      <ChevronUp className="h-4 w-4 text-gray-400 transition-transform duration-200" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-primary-300 transition-transform duration-200" />
+                      <ChevronDown className="h-4 w-4 text-gray-400 transition-transform duration-200" />
                     )}
                   </button>
 
@@ -241,25 +252,25 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
                           onClick={onClose}
                           className={`
                             flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs
-                            transition-all duration-200
+                            transition-colors duration-150
                             ${location.search.includes(`account=${account.accountId}`)
-                              ? 'bg-accent-500 text-white shadow-md'
+                              ? 'bg-accent-50 text-accent-600 font-medium'
                               : account.isActive
-                                ? 'text-primary-100/90 hover:text-white hover:bg-primary-700/40'
-                                : 'text-primary-300/50 hover:text-primary-100/70 hover:bg-primary-700/20'
+                                ? 'text-gray-600 hover:text-gray-900 hover:bg-surface-200'
+                                : 'text-gray-400 hover:text-gray-600 hover:bg-surface-100'
                             }
                           `}
                         >
                           <div
-                            className={`w-1.5 h-1.5 rounded-full transition-all ${
-                              account.isActive ? 'bg-accent-400' : 'bg-primary-400/40'
+                            className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                              account.isActive ? 'bg-accent-400' : 'bg-gray-300'
                             }`}
                           />
                           <span className="truncate flex-1 font-medium">
                             {account.accountAlias || `Account ${account.accountId}`}
                           </span>
                           {!account.isActive && (
-                            <span className="text-[10px] text-primary-400/50">Inactive</span>
+                            <span className="text-[10px] text-gray-400">Inactive</span>
                           )}
                         </Link>
                       ))}
@@ -272,28 +283,39 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false }: Sideba
 
           {/* Demo Mode Placeholder */}
           {isDemoMode && (
-            <div className="pt-6 mt-6 border-t border-primary-700/50">
-              <div className="px-4 pb-3 text-[10px] font-bold text-primary-300/60 uppercase tracking-widest">
+            <div className="pt-6 mt-6 border-t border-surface-300">
+              <div className="px-4 pb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                 Cloud Providers
               </div>
               <div className="px-4 py-8 text-center">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent-500/15 flex items-center justify-center">
-                  <Sparkles className="w-7 h-7 text-accent-400" />
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent-50 flex items-center justify-center">
+                  <Sparkles className="w-7 h-7 text-accent-500" />
                 </div>
-                <p className="text-xs text-primary-100/70 mb-4 font-medium">
+                <p className="text-xs text-gray-500 mb-4 font-medium">
                   Connect cloud providers to track costs
                 </p>
                 <Link
                   to="/signup"
-                  className="inline-flex items-center px-4 py-2 rounded-xl text-xs text-white bg-accent-500 hover:bg-accent-600 font-semibold transition-all duration-200 shadow-lg shadow-accent-500/20"
+                  className="inline-flex items-center px-4 py-2 rounded-lg text-xs text-white bg-accent-500 hover:bg-accent-600 font-semibold transition-colors duration-150"
                 >
-                  Get started →
+                  Get started
                 </Link>
               </div>
             </div>
           )}
 
         </nav>
+
+        {/* Footer with Contact link */}
+        <div className="px-4 py-4 border-t border-surface-300">
+          <button
+            onClick={() => { onContactClick?.(); onClose(); }}
+            className="flex items-center space-x-3 px-4 py-2.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-surface-200 transition-colors duration-150 group w-full text-left"
+          >
+            <MessageCircle className="h-4 w-4 opacity-70 group-hover:opacity-100" />
+            <span className="text-sm">Contact Us</span>
+          </button>
+        </div>
 
       </aside>
     </>

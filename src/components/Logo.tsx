@@ -28,14 +28,14 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="80"
           height="50"
           rx="8"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2.5"
         />
         
         {/* Antenna Nubs */}
-        <circle cx="45" cy="12" r="3" fill="#0F766E" />
-        <circle cx="75" cy="12" r="3" fill="#0F766E" />
+        <circle cx="45" cy="12" r="3" fill="#3F4ABF" />
+        <circle cx="75" cy="12" r="3" fill="#3F4ABF" />
         
         {/* Eyes - Orange/Yellow with black pupils */}
         <circle cx="40" cy="35" r="8" fill="#FBBF24" />
@@ -46,7 +46,7 @@ export default function Logo({ className = '', height = 40, showText = true }: L
         {/* Smile */}
         <path
           d="M 45 50 Q 60 55 75 50"
-          stroke="#0F766E"
+          stroke="#3F4ABF"
           strokeWidth="2.5"
           strokeLinecap="round"
           fill="none"
@@ -59,8 +59,8 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="70"
           height="45"
           rx="8"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2.5"
         />
         
@@ -85,8 +85,8 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="18"
           height="12"
           rx="6"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2"
         />
         <rect
@@ -95,15 +95,15 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="12"
           height="18"
           rx="6"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2"
         />
         {/* Hand - three fingers */}
-        <circle cx="8" cy="48" r="5" fill="#14B8A6" stroke="#0F766E" strokeWidth="2" />
-        <circle cx="6" cy="46" r="1.5" fill="#0F766E" />
-        <circle cx="10" cy="46" r="1.5" fill="#0F766E" />
-        <circle cx="8" cy="49" r="1.5" fill="#0F766E" />
+        <circle cx="8" cy="48" r="5" fill="#4F5BD5" stroke="#3F4ABF" strokeWidth="2" />
+        <circle cx="6" cy="46" r="1.5" fill="#3F4ABF" />
+        <circle cx="10" cy="46" r="1.5" fill="#3F4ABF" />
+        <circle cx="8" cy="49" r="1.5" fill="#3F4ABF" />
         
         {/* Right Arm - Resting at side */}
         <rect
@@ -112,8 +112,8 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="18"
           height="12"
           rx="6"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2"
         />
         <rect
@@ -122,8 +122,8 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="12"
           height="18"
           rx="6"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2"
         />
         
@@ -134,8 +134,8 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="20"
           height="10"
           rx="5"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2"
         />
         <rect
@@ -144,15 +144,15 @@ export default function Logo({ className = '', height = 40, showText = true }: L
           width="20"
           height="10"
           rx="5"
-          fill="#14B8A6"
-          stroke="#0F766E"
+          fill="#4F5BD5"
+          stroke="#3F4ABF"
           strokeWidth="2"
         />
       </svg>
       
       {/* Logo Text */}
       {showText && (
-        <span className="text-2xl font-bold text-primary-800" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.5px' }}>
+        <span className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '-0.5px' }}>
           Costra
         </span>
       )}

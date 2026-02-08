@@ -445,11 +445,11 @@ router.delete('/:reportId', async (req, res) => {
       try {
         await fs.unlink(report.filePath)
       } catch (error) {
-        logger.error('Failed to delete report file', { 
-          userId, 
-          reportId, 
-          filePath, 
-          error: error.message 
+        logger.error('Failed to delete report file', {
+          userId,
+          reportId,
+          filePath: report.filePath,
+          error: error.message
         })
       }
     }

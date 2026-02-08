@@ -108,10 +108,10 @@ export const authAPI = {
     localStorage.removeItem('user')
   },
 
-  googleLogin: async (googleId: string, name: string, email: string, avatarUrl?: string) => {
+  googleLogin: async (credential: string) => {
     const response = await apiRequest('/auth/google/callback', {
       method: 'POST',
-      body: JSON.stringify({ googleId, name, email, avatarUrl }),
+      body: JSON.stringify({ credential }),
     })
     const data = await response.json()
     if (data.token) {
@@ -124,8 +124,12 @@ export const authAPI = {
 
 // Cost Data API
 export const costDataAPI = {
-  getCostData: async () => {
-    const response = await apiRequest('/cost-data')
+  getCostData: async (month?: number, year?: number) => {
+    const params = new URLSearchParams()
+    if (month) params.set('month', String(month))
+    if (year) params.set('year', String(year))
+    const qs = params.toString()
+    const response = await apiRequest(`/cost-data${qs ? `?${qs}` : ''}`)
     return response.json()
   },
 
@@ -915,6 +919,17 @@ export const billingAPI = {
   cancelSubscription: async () => {
     const response = await apiRequest('/billing/cancel', {
       method: 'POST',
+    })
+    return response.json()
+  },
+}
+
+// Contact API (public, no auth required)
+export const contactAPI = {
+  submit: async (data: { name: string; email: string; category: string; subject: string; message: string }) => {
+    const response = await apiRequest('/contact', {
+      method: 'POST',
+      body: JSON.stringify(data),
     })
     return response.json()
   },

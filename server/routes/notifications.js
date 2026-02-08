@@ -65,10 +65,10 @@ router.get('/count', async (req, res) => {
     const count = await getUnreadNotificationCount(userId)
     res.json({ count })
   } catch (error) {
-    logger.error('Notifications: Error fetching notification count', { 
-      userId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Notifications: Error fetching notification count', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to fetch notification count' })
   }
@@ -87,21 +87,30 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Type and title are required' })
     }
 
+    // Validate notification type
+    const allowedTypes = ['info', 'success', 'warning', 'error', 'sync', 'anomaly']
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({ error: 'Invalid notification type' })
+    }
+
+    // Sanitize text inputs to prevent XSS when rendered
+    const sanitize = (str) => str ? String(str).replace(/[<>]/g, '').slice(0, 500) : str
+
     const notification = await createNotification(userId, {
       type,
-      title,
-      message,
-      link,
-      linkText,
+      title: sanitize(title),
+      message: sanitize(message),
+      link: link ? String(link).replace(/[<>]/g, '').slice(0, 500) : link,
+      linkText: sanitize(linkText),
       metadata
     })
 
     res.status(201).json({ notification })
   } catch (error) {
-    logger.error('Notifications: Error creating notification', { 
-      userId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Notifications: Error creating notification', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to create notification' })
   }
@@ -123,11 +132,11 @@ router.put('/:id/read', async (req, res) => {
     await markNotificationAsRead(userId, notificationId)
     res.json({ success: true })
   } catch (error) {
-    logger.error('Notifications: Error marking notification as read', { 
-      userId, 
-      notificationId: req.params.id, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Notifications: Error marking notification as read', {
+      userId: req.user?.userId || req.user?.id,
+      notificationId: req.params.id,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to mark notification as read' })
   }
@@ -143,10 +152,10 @@ router.put('/read-all', async (req, res) => {
     await markAllNotificationsAsRead(userId)
     res.json({ success: true })
   } catch (error) {
-    logger.error('Notifications: Error marking all notifications as read', { 
-      userId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Notifications: Error marking all notifications as read', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to mark all notifications as read' })
   }
@@ -168,11 +177,11 @@ router.delete('/:id', async (req, res) => {
     await deleteNotification(userId, notificationId)
     res.json({ success: true })
   } catch (error) {
-    logger.error('Notifications: Error deleting notification', { 
-      userId, 
-      notificationId: req.params.id, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Notifications: Error deleting notification', {
+      userId: req.user?.userId || req.user?.id,
+      notificationId: req.params.id,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to delete notification' })
   }
@@ -190,11 +199,10 @@ router.delete('/old', async (req, res) => {
     const deletedCount = await deleteOldNotifications(userId, daysOld)
     res.json({ deletedCount })
   } catch (error) {
-    logger.error('Notifications: Error deleting old notifications', { 
-      userId, 
-      daysOld, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Notifications: Error deleting old notifications', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to delete old notifications' })
   }

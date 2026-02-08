@@ -1,16 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import Logo from '../components/Logo'
-import { LogIn, Mail, Lock, Eye, EyeOff, Cloud, BarChart3, Brain, DollarSign } from 'lucide-react'
-
-const features = [
-  { icon: Cloud, text: 'Multi-cloud visibility', description: 'Connect AWS, Azure, GCP, and more in one unified view', color: 'bg-accent-500/20' },
-  { icon: BarChart3, text: 'Advanced analytics', description: 'Deep insights into your cloud spending patterns', color: 'bg-accent-400/20' },
-  { icon: Brain, text: 'AI-powered insights', description: 'Get intelligent recommendations to optimize costs', color: 'bg-accent-600/20' },
-  { icon: DollarSign, text: 'Global currencies', description: 'View costs in your preferred currency with real-time rates', color: 'bg-accent-500/20' }
-]
+import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -19,17 +12,8 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [currentFeature, setCurrentFeature] = useState(0)
   const { login } = useAuth()
   const navigate = useNavigate()
-
-  // Auto-rotate features
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFeature((prev) => (prev + 1) % features.length)
-    }, 4000)
-    return () => clearInterval(interval)
-  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,19 +35,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-50 flex">
-      {/* Left Panel - Login Form */}
-      <div className="flex-1 flex items-start justify-center px-6 pt-12 pb-8 lg:px-16 lg:pt-16 lg:pb-12">
-        <div className="w-full max-w-md">
-          {/* Logo */}
-          <div className="mb-6">
-            <Logo height={48} />
-          </div>
+    <div className="min-h-screen bg-surface-100 flex flex-col">
+      {/* Top bar with logo */}
+      <div className="py-6 px-8 border-b border-surface-300 bg-white">
+        <Link to="/">
+          <Logo height={36} />
+        </Link>
+      </div>
 
+      {/* Centered content */}
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md bg-white rounded-xl border border-surface-300 shadow-card p-8">
           {/* Title Section */}
-          <div className="mb-5">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h1>
-            <p className="text-gray-600 text-base">Sign in to continue to your dashboard</p>
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h1>
+            <p className="text-gray-500">Sign in to continue to your dashboard</p>
           </div>
 
           {/* Social Login */}
@@ -74,10 +60,10 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-surface-200"></div>
+              <div className="w-full border-t border-surface-300"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-surface-50 text-gray-500">or continue with email</span>
+              <span className="px-4 bg-white text-gray-500">or continue with email</span>
             </div>
           </div>
 
@@ -95,7 +81,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400 bg-white shadow-sm transition-all"
+                  className="w-full pl-12 pr-4 py-3 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400 bg-white transition-colors"
                   placeholder="you@company.com"
                   required
                 />
@@ -114,7 +100,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-12 py-3.5 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400 bg-white shadow-sm transition-all"
+                  className="w-full pl-12 pr-12 py-3 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400 bg-white transition-colors"
                   placeholder="Enter your password"
                   required
                 />
@@ -135,20 +121,20 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-accent-600 border-surface-200 rounded focus:ring-accent-500/20 cursor-pointer"
+                  className="w-4 h-4 text-accent-600 border-surface-300 rounded focus:ring-accent-500/20 cursor-pointer"
                 />
                 <span className="ml-2.5 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">Remember me</span>
               </label>
               <Link
                 to="/forgot-password"
-                className="text-sm text-accent-700 hover:text-accent-600 font-medium transition-colors"
+                className="text-sm text-accent-600 hover:text-accent-500 font-medium transition-colors"
               >
                 Forgot password?
               </Link>
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -157,7 +143,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn-primary py-3.5 px-4 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full btn-primary py-3 px-4 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {isLoading ? (
                 <>
@@ -176,74 +162,10 @@ export default function LoginPage() {
           {/* Sign Up Link */}
           <p className="mt-8 text-center text-sm text-gray-600">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-accent-700 hover:text-accent-600 font-semibold transition-colors">
+            <Link to="/signup" className="text-accent-600 hover:text-accent-500 font-semibold transition-colors">
               Sign up for free
             </Link>
           </p>
-        </div>
-      </div>
-
-      {/* Right Panel - Feature Showcase */}
-      <div className="hidden lg:flex lg:flex-1 bg-gradient-to-br from-primary-800 via-primary-900 to-primary-800 items-center justify-center px-20 py-24 relative overflow-hidden">
-        {/* Animated Background Orbs */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl animate-float"></div>
-          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-accent-400/8 rounded-full blur-3xl animate-float-delayed"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-accent-500/5 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="relative z-10 w-full max-w-xl">
-          {/* Main Heading */}
-          <div className="mb-16">
-            <h2 className="text-5xl font-bold text-white mb-4 leading-tight">
-              Multi-cloud cost<br />management made simple
-            </h2>
-            <p className="text-lg text-white/80 leading-relaxed">
-              Connect all your cloud providers in one unified dashboard
-            </p>
-          </div>
-
-          {/* Feature Carousel */}
-          <div className="mb-12">
-            <div className="relative h-56 overflow-hidden">
-              {features.map((feature, index) => {
-                const Icon = feature.icon
-                const isActive = index === currentFeature
-                return (
-                  <div
-                    key={index}
-                    className={`absolute inset-0 transition-opacity duration-500 ${
-                      isActive ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  >
-                    <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10 h-full flex flex-col items-center justify-center text-center">
-                      <div className={`w-14 h-14 ${feature.color} rounded-lg flex items-center justify-center mb-4`}>
-                        <Icon className="h-7 w-7 text-accent-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-white mb-2">{feature.text}</h3>
-                      <p className="text-sm text-white/70 leading-relaxed max-w-xs">{feature.description}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Carousel Dots */}
-            <div className="flex items-center justify-center space-x-2 mt-6">
-              {features.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentFeature(index)}
-                  className={`transition-all duration-300 rounded-full ${
-                    index === currentFeature
-                      ? 'w-8 h-2 bg-accent-400'
-                      : 'w-2 h-2 bg-white/30 hover:bg-white/50'
-                  }`}
-                  aria-label={`Go to feature ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>

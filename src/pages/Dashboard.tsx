@@ -110,6 +110,14 @@ export default function Dashboard() {
   const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
   const totalSavings = costData.reduce((sum, data) => sum + Math.abs(convertAmount(data.savings || 0)), 0)
 
+  // Average forecast confidence across providers (weighted by forecast amount)
+  const avgForecastConfidence = (() => {
+    const withConfidence = costData.filter((d: any) => d.forecastConfidence != null)
+    if (withConfidence.length === 0) return null
+    const totalWeight = withConfidence.reduce((s: number, d: any) => s + (d.forecast || 1), 0)
+    return Math.round(withConfidence.reduce((s: number, d: any) => s + d.forecastConfidence * ((d.forecast || 1) / totalWeight), 0))
+  })()
+
   return (
     <Layout>
       <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
@@ -118,8 +126,8 @@ export default function Dashboard() {
 
         {/* Demo Mode Banner */}
         {isDemoMode && (
-          <div className="mb-4 bg-accent-50 border border-accent-200 rounded-2xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
-            <div className="w-8 h-8 rounded-xl bg-accent-100 flex items-center justify-center">
+          <div className="mb-4 bg-accent-50 border border-accent-100 rounded-xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
+            <div className="w-8 h-8 rounded-lg bg-accent-100 flex items-center justify-center">
               <Sparkles className="h-4 w-4 text-accent-500" />
             </div>
             <div>
@@ -180,6 +188,7 @@ export default function Dashboard() {
                 totalLastMonth={totalLastMonth}
                 totalForecast={totalForecast}
                 totalSavings={totalSavings}
+                forecastConfidence={avgForecastConfidence}
               />
             </div>
             {/* Provider Sections with Charts */}
@@ -335,7 +344,7 @@ export default function Dashboard() {
             <button
               onClick={handleSync}
               disabled={isSyncing || isDemoMode}
-              className="fixed bottom-8 right-8 w-14 h-14 bg-gradient-to-r from-accent-600 to-accent-500 text-white rounded-full shadow-glow-accent hover:shadow-xl flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
+              className="fixed bottom-8 right-8 w-14 h-14 bg-accent-500 hover:bg-accent-600 text-white rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
               title="Quick sync"
             >
               <Sparkles className={`h-6 w-6 ${isSyncing ? 'animate-spin' : ''}`} />

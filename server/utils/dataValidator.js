@@ -120,6 +120,7 @@ export const sanitizeCostData = (data) => {
     currentMonth: validateCostValue(data.currentMonth, 'currentMonth'),
     lastMonth: data.lastMonth !== undefined ? validateCostValue(data.lastMonth, 'lastMonth') : null,
     forecast: data.forecast !== undefined ? validateCostValue(data.forecast, 'forecast') : null,
+    forecastConfidence: typeof data.forecastConfidence === 'number' ? Math.round(Math.min(100, Math.max(0, data.forecastConfidence))) : null,
     credits: validateCostValue(data.credits || 0, 'credits'),
     savings: validateCostValue(data.savings || 0, 'savings'),
     services: [],

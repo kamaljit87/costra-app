@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
 import AIChat from './AIChat'
+import ContactChat from './ContactChat'
 import TrialBanner from './TrialBanner'
 
 interface LayoutProps {
@@ -10,6 +11,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [contactChatOpen, setContactChatOpen] = useState(false)
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {
@@ -24,14 +26,14 @@ export default function Layout({ children }: LayoutProps) {
   }, [sidebarOpen])
 
   return (
-    <div className="flex h-screen bg-surface-50">
+    <div className="flex h-screen bg-surface-100">
       {/* Sidebar - Always visible on desktop, drawer on mobile */}
       <div className="hidden lg:block">
-        <Sidebar isOpen={true} onClose={() => {}} isPermanent={true} />
+        <Sidebar isOpen={true} onClose={() => {}} isPermanent={true} onContactClick={() => setContactChatOpen(true)} />
       </div>
 
       {/* Mobile Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isPermanent={false} />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isPermanent={false} onContactClick={() => setContactChatOpen(true)} />
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden w-full lg:ml-0">
@@ -42,7 +44,7 @@ export default function Layout({ children }: LayoutProps) {
         <TrialBanner />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-surface-50">
+        <main className="flex-1 overflow-y-auto bg-surface-100">
           <div className="min-h-full px-6 lg:px-8 py-6 lg:py-8">
             {children}
           </div>
@@ -51,6 +53,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* AI Chat Assistant */}
       <AIChat />
+
+      {/* Contact Support Chat */}
+      <ContactChat isOpen={contactChatOpen} onClose={() => setContactChatOpen(false)} />
     </div>
   )
 }

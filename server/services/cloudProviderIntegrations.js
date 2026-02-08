@@ -579,16 +579,16 @@ export const fetchGCPServiceDetails = async (credentials, serviceName, startDate
 
     const token = await getGCPAccessToken(keyData)
     
-    // Query SKU-level costs for the specific service
+    // Query SKU-level costs for the specific service (parameterized to prevent SQL injection)
     const query = `
-      SELECT 
+      SELECT
         sku.description as sku_name,
         SUM(cost) as cost,
         SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) as credits
       FROM \`${bigQueryDataset}.gcp_billing_export_v1_*\`
-      WHERE DATE(usage_start_time) >= '${startDate}'
-        AND DATE(usage_start_time) <= '${endDate}'
-        AND service.description = '${serviceName.replace(/'/g, "\\'")}'
+      WHERE DATE(usage_start_time) >= @startDate
+        AND DATE(usage_start_time) <= @endDate
+        AND service.description = @serviceName
       GROUP BY sku_name
       HAVING cost > 0
       ORDER BY cost DESC
@@ -596,14 +596,23 @@ export const fetchGCPServiceDetails = async (credentials, serviceName, startDate
     `
 
     const bigQueryUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries`
-    
+
     const response = await fetch(bigQueryUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query, useLegacySql: false }),
+      body: JSON.stringify({
+        query,
+        useLegacySql: false,
+        parameterMode: 'NAMED',
+        queryParameters: [
+          { name: 'startDate', parameterType: { type: 'DATE' }, parameterValue: { value: startDate } },
+          { name: 'endDate', parameterType: { type: 'DATE' }, parameterValue: { value: endDate } },
+          { name: 'serviceName', parameterType: { type: 'STRING' }, parameterValue: { value: serviceName } },
+        ],
+      }),
     })
 
     if (!response.ok) {
@@ -1619,14 +1628,14 @@ const fetchGCPBigQueryBilling = async (token, projectId, dataset, startDate, end
       SUM(cost) as cost,
       SUM(IFNULL((SELECT SUM(c.amount) FROM UNNEST(credits) c), 0)) as credits
     FROM \`${projectId}.${dataset}.gcp_billing_export_v1_*\`
-    WHERE DATE(usage_start_time) >= '${startDate}'
-      AND DATE(usage_start_time) <= '${endDate}'
+    WHERE DATE(usage_start_time) >= @startDate
+      AND DATE(usage_start_time) <= @endDate
     GROUP BY date, service_name
     ORDER BY date, cost DESC
   `
 
   const bigQueryUrl = `https://bigquery.googleapis.com/bigquery/v2/projects/${projectId}/queries`
-  
+
   const response = await fetch(bigQueryUrl, {
     method: 'POST',
     headers: {
@@ -1636,6 +1645,11 @@ const fetchGCPBigQueryBilling = async (token, projectId, dataset, startDate, end
     body: JSON.stringify({
       query,
       useLegacySql: false,
+      parameterMode: 'NAMED',
+      queryParameters: [
+        { name: 'startDate', parameterType: { type: 'DATE' }, parameterValue: { value: startDate } },
+        { name: 'endDate', parameterType: { type: 'DATE' }, parameterValue: { value: endDate } },
+      ],
     }),
   })
 

@@ -30,26 +30,14 @@ export default function GoogleSignInButton({ mode: _mode }: GoogleSignInButtonPr
     try {
       setIsLoading(true)
 
-      // Decode the credential (JWT)
+      // Send the raw credential token to backend for server-side verification
       const credential = response.credential
-      const base64Url = credential.split('.')[1]
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-          .join('')
-      )
+      if (!credential) {
+        setError('No credential received from Google')
+        return
+      }
 
-      const payload = JSON.parse(jsonPayload)
-
-      // Authenticate with backend
-      const success = await googleLogin(
-        payload.sub,
-        payload.name,
-        payload.email,
-        payload.picture
-      )
+      const success = await googleLogin(credential)
 
       if (success) {
         navigate('/dashboard')

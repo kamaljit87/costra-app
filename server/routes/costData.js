@@ -46,12 +46,17 @@ const router = express.Router()
 router.use(authenticateToken)
 
 // Get cost data for current user (tenant-scoped)
+// Supports optional ?month=X&year=Y query params (defaults to current month/year)
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.userId // Tenant isolation: only get data for this user
     const now = new Date()
-    const month = now.getMonth() + 1 // 1-12
-    const year = now.getFullYear()
+    const month = req.query.month ? parseInt(req.query.month, 10) : (now.getMonth() + 1)
+    const year = req.query.year ? parseInt(req.query.year, 10) : now.getFullYear()
+
+    if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+      return res.status(400).json({ error: 'Invalid month or year' })
+    }
 
     // Use cache with 5-minute TTL for cost data
     const cacheKey = `cost_data:${userId}:${month}:${year}`
@@ -71,6 +76,7 @@ router.get('/', async (req, res) => {
       currentMonth: parseFloat(cost.current_month_cost) || 0,
       lastMonth: parseFloat(cost.last_month_cost) || 0,
       forecast: parseFloat(cost.forecast_cost) || 0,
+      forecastConfidence: cost.forecast_confidence != null ? parseInt(cost.forecast_confidence) : null,
       credits: parseFloat(cost.credits) || 0,
       savings: parseFloat(cost.savings) || 0,
       // Transform service_name to name and change_percent to change for frontend compatibility

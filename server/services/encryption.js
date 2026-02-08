@@ -5,15 +5,20 @@ import logger from '../utils/logger.js'
 // In production, ENCRYPTION_KEY must be set — refuse to start with a default key
 let ENCRYPTION_KEY
 if (process.env.ENCRYPTION_KEY) {
-  ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY, 'hex').length === 32
-    ? Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
-    : crypto.scryptSync(process.env.ENCRYPTION_KEY, 'costra-encryption-salt', 32)
+  const keyBuffer = Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
+  if (keyBuffer.length === 32) {
+    ENCRYPTION_KEY = keyBuffer
+  } else {
+    // Derive a 32-byte key using a unique salt from environment or a high-entropy default
+    const salt = process.env.ENCRYPTION_SALT || crypto.createHash('sha256').update(process.env.ENCRYPTION_KEY).digest('hex').slice(0, 32)
+    ENCRYPTION_KEY = crypto.scryptSync(process.env.ENCRYPTION_KEY, salt, 32)
+  }
 } else if (process.env.NODE_ENV === 'production') {
   logger.error('ENCRYPTION_KEY environment variable is required in production. Cloud provider credentials cannot be securely stored without it.')
   process.exit(1)
 } else {
   logger.warn('Using default encryption key — NOT SAFE FOR PRODUCTION. Set ENCRYPTION_KEY environment variable.')
-  ENCRYPTION_KEY = crypto.scryptSync('costra-dev-only-key', 'costra-encryption-salt', 32)
+  ENCRYPTION_KEY = crypto.scryptSync('costra-default-key-change-in-production', 'costra-dev-salt-not-for-production', 32)
 }
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 16

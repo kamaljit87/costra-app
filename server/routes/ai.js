@@ -2,7 +2,7 @@ import express from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { authenticateToken } from '../middleware/auth.js'
 import { aiLimiter } from '../middleware/rateLimiter.js'
-import { getCostDataForUser, getDailyCostData, getServiceCostsForDateRange } from '../database.js'
+import { getCostDataForUser, getDailyCostData, getServiceCostsForDateRange, pool } from '../database.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -233,10 +233,23 @@ async function gatherCostContext(userId) {
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
 
   try {
-    // Get current month cost data
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
-    const costData = await getCostDataForUser(userId, month, year)
+    // Try current month first, then fall back to the most recent month with data
+    let month = now.getMonth() + 1
+    let year = now.getFullYear()
+    let costData = await getCostDataForUser(userId, month, year)
+
+    if (!costData || costData.length === 0) {
+      // Find the most recent month that has cost data for this user
+      const latestResult = await pool.query(
+        `SELECT month, year FROM cost_data WHERE user_id = $1 ORDER BY year DESC, month DESC LIMIT 1`,
+        [userId]
+      )
+      if (latestResult.rows.length > 0) {
+        month = latestResult.rows[0].month
+        year = latestResult.rows[0].year
+        costData = await getCostDataForUser(userId, month, year)
+      }
+    }
 
     if (!costData || costData.length === 0) {
       return { hasData: false }
@@ -251,7 +264,6 @@ async function gatherCostContext(userId) {
         const dailyData = await getDailyCostData(
           userId,
           providerId,
-          null,
           thirtyDaysAgo.toISOString().split('T')[0],
           now.toISOString().split('T')[0]
         )

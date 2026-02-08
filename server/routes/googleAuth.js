@@ -1,17 +1,53 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
+import { OAuth2Client } from 'google-auth-library'
 import { createOrUpdateGoogleUser, getUserByGoogleId } from '../database.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
 
-// Google OAuth callback
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
+
+// Google OAuth callback - verifies ID token server-side
 router.post('/callback', async (req, res) => {
   try {
-    const { googleId, name, email, avatarUrl } = req.body
+    const { credential } = req.body
 
-    if (!googleId || !email) {
-      return res.status(400).json({ error: 'Google ID and email are required' })
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential token is required' })
+    }
+
+    if (!GOOGLE_CLIENT_ID) {
+      logger.error('Google OAuth: GOOGLE_CLIENT_ID not configured')
+      return res.status(500).json({ error: 'Google OAuth is not configured' })
+    }
+
+    // Verify the Google ID token server-side
+    const client = new OAuth2Client(GOOGLE_CLIENT_ID)
+    let ticket
+    try {
+      ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: GOOGLE_CLIENT_ID,
+      })
+    } catch (verifyError) {
+      logger.warn('Google OAuth: Invalid ID token', { error: verifyError.message })
+      return res.status(401).json({ error: 'Invalid Google credential' })
+    }
+
+    const payload = ticket.getPayload()
+    if (!payload || !payload.sub || !payload.email) {
+      return res.status(401).json({ error: 'Invalid Google token payload' })
+    }
+
+    const googleId = payload.sub
+    const email = payload.email
+    const name = payload.name || email.split('@')[0]
+    const avatarUrl = payload.picture || null
+
+    // Verify email is verified by Google
+    if (!payload.email_verified) {
+      return res.status(401).json({ error: 'Google email not verified' })
     }
 
     // Create or update user
@@ -38,13 +74,11 @@ router.post('/callback', async (req, res) => {
       },
     })
   } catch (error) {
-    logger.error('Google auth error', { 
-      googleId: req.body?.googleId, 
-      email: req.body?.email, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Google auth error', {
+      error: error.message,
+      stack: error.stack
     })
-    res.status(500).json({ error: error.message || 'Internal server error' })
+    res.status(500).json({ error: 'Internal server error' })
   }
 })
 

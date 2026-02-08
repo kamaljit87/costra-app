@@ -74,10 +74,10 @@ router.post('/signup',
         return res.status(400).json({ error: 'You must accept the Privacy Policy and Terms of Service to create an account' })
       }
 
-      // Check if user already exists
+      // Check if user already exists (generic message to prevent user enumeration)
       const existingUser = await getUserByEmail(email)
       if (existingUser) {
-        return res.status(400).json({ error: 'User with this email already exists' })
+        return res.status(400).json({ error: 'Unable to create account with the provided information' })
       }
 
       // Hash password
@@ -136,14 +136,13 @@ router.post('/signup',
         stack: error.stack,
         code: error.code,
       })
-      // Provide more specific error messages
       if (error.code === '23505') { // PostgreSQL unique constraint violation
-        return res.status(400).json({ error: 'User with this email already exists' })
+        return res.status(400).json({ error: 'Unable to create account with the provided information' })
       }
       if (error.message && error.message.includes('database')) {
-        return res.status(500).json({ error: 'Database error. Please check your database connection.' })
+        return res.status(500).json({ error: 'Database error. Please try again later.' })
       }
-      res.status(500).json({ error: error.message || 'Internal server error' })
+      res.status(500).json({ error: 'Internal server error' })
     }
   }
 )
@@ -264,11 +263,10 @@ router.post('/login',
         error: error.message,
         stack: error.stack,
       })
-      // Provide more specific error messages
       if (error.message && error.message.includes('database')) {
-        return res.status(500).json({ error: 'Database error. Please check your database connection.' })
+        return res.status(500).json({ error: 'Database error. Please try again later.' })
       }
-      res.status(500).json({ error: error.message || 'Internal server error' })
+      res.status(500).json({ error: 'Internal server error' })
     }
   }
 )
@@ -324,8 +322,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       error: error.message,
       stack: error.stack,
     })
-    // Return error but don't crash - let frontend handle gracefully
-    res.status(500).json({ error: error.message || 'Internal server error' })
+    res.status(500).json({ error: 'Internal server error' })
   }
 })
 
@@ -366,7 +363,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
       error: error.message,
       stack: error.stack,
     })
-    res.status(500).json({ error: error.message || 'Internal server error' })
+    res.status(500).json({ error: 'Internal server error' })
   }
 })
 

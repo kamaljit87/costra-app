@@ -15,9 +15,11 @@ import ProductCostView from './pages/ProductCostView'
 import TeamCostView from './pages/TeamCostView'
 import ReportsPage from './pages/ReportsPage'
 import BillingPage from './pages/BillingPage'
+import CostComparePage from './pages/CostComparePage'
 import DebugPage from './pages/DebugPage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
+import ContactPage from './pages/ContactPage'
 import CookieConsent from './components/CookieConsent'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -38,6 +40,7 @@ function App() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route
               path="/dashboard"
               element={
@@ -99,6 +102,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TeamCostView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/compare"
+              element={
+                <ProtectedRoute>
+                  <CostComparePage />
                 </ProtectedRoute>
               }
             />

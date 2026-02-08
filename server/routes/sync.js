@@ -1,9 +1,10 @@
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
-import { 
+import { syncLimiter } from '../middleware/rateLimiter.js'
+import {
   getCloudProviderCredentialsByAccountId,
-  getUserCloudProviders, 
-  saveCostData, 
+  getUserCloudProviders,
+  saveCostData,
   saveBulkDailyCostData,
   getCachedCostData,
   setCachedCostData,
@@ -12,7 +13,7 @@ import {
   clearCostExplanationsCache,
   calculateAnomalyBaseline,
   createNotification,
-  pool 
+  pool
 } from '../database.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
 import { enhanceCostData } from '../utils/costCalculations.js'
@@ -24,7 +25,8 @@ const router = express.Router()
 // All routes require authentication
 router.use(authenticateToken)
 
-// No rate limiting for sync endpoints - users need to sync their data freely
+// Apply sync-specific rate limiting (20 requests/hour in production)
+router.use(syncLimiter)
 
 /**
  * Sync cost data from all active cloud provider accounts
@@ -255,7 +257,8 @@ router.post('/', async (req, res) => {
             icon: getProviderIcon(account.provider_id),
             currentMonth: sanitizedData.currentMonth,
             lastMonth: sanitizedData.lastMonth, // No fallback - use actual data or null
-            forecast: sanitizedData.forecast, // Calculated from trend, not fixed percentage
+            forecast: sanitizedData.forecast,
+            forecastConfidence: sanitizedData.forecastConfidence,
             credits: sanitizedData.credits || 0,
             savings: sanitizedData.savings || 0,
             services: sanitizedData.services || [],

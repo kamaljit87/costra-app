@@ -6,6 +6,14 @@ interface TotalBillSummaryProps {
   totalLastMonth: number
   totalForecast: number
   totalSavings: number
+  forecastConfidence?: number | null
+}
+
+const getConfidenceLabel = (confidence: number | null | undefined) => {
+  if (confidence == null) return null
+  if (confidence >= 70) return { text: 'High confidence', color: 'text-green-600' }
+  if (confidence >= 40) return { text: 'Medium confidence', color: 'text-amber-600' }
+  return { text: 'Low confidence', color: 'text-red-500' }
 }
 
 export default function TotalBillSummary({
@@ -13,6 +21,7 @@ export default function TotalBillSummary({
   totalLastMonth,
   totalForecast,
   totalSavings,
+  forecastConfidence,
 }: TotalBillSummaryProps) {
   const { formatCurrency, convertAmount } = useCurrency()
 
@@ -20,32 +29,34 @@ export default function TotalBillSummary({
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
     : 0
 
-  // totalSavings and totalForecast are surfaced in other components; suppress unused warnings
-  void totalForecast
   void totalSavings
+
+  const confidenceLabel = getConfidenceLabel(forecastConfidence)
 
   const stats = [
     {
       label: 'Current Month',
       value: formatCurrency(convertAmount(totalCurrent)),
       icon: Wallet,
-      iconBg: 'bg-white/20',
-      iconColor: 'text-white',
       highlight: true,
+      subtitle: null as string | null,
+      subtitleColor: '',
     },
     {
       label: 'Last Month',
       value: formatCurrency(convertAmount(totalLastMonth)),
       icon: Target,
-      iconBg: 'bg-accent-50',
-      iconColor: 'text-accent-500',
+      highlight: false,
+      subtitle: null as string | null,
+      subtitleColor: '',
     },
     {
       label: 'Forecast',
       value: formatCurrency(convertAmount(totalForecast)),
       icon: Zap,
-      iconBg: 'bg-accent-50',
-      iconColor: 'text-accent-500',
+      highlight: false,
+      subtitle: confidenceLabel?.text || null,
+      subtitleColor: confidenceLabel?.color || '',
     },
   ]
 
@@ -85,8 +96,8 @@ export default function TotalBillSummary({
               className={`
                 relative overflow-hidden rounded-2xl p-4 h-full flex flex-col
                 ${stat.highlight
-                  ? 'bg-primary-800 text-white shadow-sm'
-                  : 'bg-white border border-surface-200 shadow-sm'
+                  ? 'bg-accent-50 border border-accent-100 shadow-sm'
+                  : 'bg-white border border-surface-300 shadow-sm'
                 }
                 transition-all duration-150 ease-out
                 hover:shadow-md
@@ -96,24 +107,30 @@ export default function TotalBillSummary({
             >
               <div className="flex items-start justify-between mb-2.5">
                 <div className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${
-                  stat.highlight ? 'bg-white/20' : 'bg-accent-50'
+                  stat.highlight ? 'bg-accent-100' : 'bg-accent-50'
                 }`}>
-                  <Icon className={`h-4 w-4 ${stat.highlight ? 'text-white' : 'text-accent-500'}`} />
+                  <Icon className={`h-4 w-4 ${stat.highlight ? 'text-accent-600' : 'text-accent-500'}`} />
                 </div>
               </div>
 
               <div className="flex-1 flex flex-col justify-end">
                 <div className={`text-[10px] font-semibold mb-1.5 uppercase tracking-wider ${
-                  stat.highlight ? 'text-white/70' : 'text-gray-500'
+                  stat.highlight ? 'text-accent-600' : 'text-gray-500'
                 }`}>
                   {stat.label}
                 </div>
 
                 <div className={`text-2xl font-bold tracking-tight leading-tight ${
-                  stat.highlight ? 'text-white' : 'text-gray-900'
+                  stat.highlight ? 'text-accent-900' : 'text-gray-900'
                 }`}>
                   {stat.value}
                 </div>
+
+                {stat.subtitle && (
+                  <div className={`text-[10px] mt-1 font-medium ${stat.subtitleColor}`}>
+                    {stat.subtitle}
+                  </div>
+                )}
               </div>
             </div>
           )

@@ -320,7 +320,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   })
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-surface-200 shadow-xs">
+    <header className="sticky top-0 z-40 bg-white border-b border-surface-300">
       <div className="w-full px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Mobile Menu Button - Minimum 44x44px touch target */}
@@ -344,7 +344,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={handleSearchKeyDown}
-                className="w-full pl-10 sm:pl-12 pr-9 sm:pr-10 py-2 sm:py-2.5 text-sm sm:text-base bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                className="w-full pl-10 sm:pl-12 pr-9 sm:pr-10 py-2 sm:py-2.5 text-sm sm:text-base bg-surface-100 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400"
               />
               {searchQuery && (
                 <button
@@ -358,7 +358,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               
               {/* Search Results Dropdown */}
               {isSearchFocused && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 max-h-96 overflow-y-auto z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-dropdown border border-surface-300 max-h-96 overflow-y-auto z-50">
                   <div className="py-2">
                     {searchResults.map((result, index) => (
                       <button
@@ -418,7 +418,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               
               {/* No Results */}
               {isSearchFocused && searchQuery.length >= 2 && searchResults.length === 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 py-8 z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-dropdown border border-surface-300 py-8 z-50">
                   <div className="text-center">
                     <Search className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">No results found</p>
@@ -450,7 +450,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               </button>
 
               {isProviderMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 max-h-[500px] overflow-y-auto">
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-dropdown border border-surface-300 py-2 z-50 max-h-[500px] overflow-y-auto">
                   {sortedProviders.length === 0 ? (
                     <div className="px-4 py-8 text-center">
                       <Cloud className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -557,7 +557,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                     className="w-8 h-8 rounded-full"
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-accent-500 flex items-center justify-center">
                     <User className="h-4 w-4 text-white" />
                   </div>
                 )}
@@ -566,7 +566,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-dropdown border border-surface-300 py-2 z-50">
                   <div className="px-4 py-3 border-b border-gray-200">
                     <p className="text-sm font-semibold text-gray-900">{user?.name || 'User'}</p>
                     <p className="text-xs text-gray-500 truncate">{user?.email}</p>

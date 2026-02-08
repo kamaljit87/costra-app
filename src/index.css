@@ -4,11 +4,12 @@
 
 @layer base {
   * {
-    @apply border-surface-200;
+    border-color: theme('colors.surface.300');
   }
 
   body {
-    @apply bg-surface-50 text-gray-900 antialiased font-sans;
+    @apply text-gray-900 antialiased font-sans;
+    background-color: theme('colors.surface.100');
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -50,85 +51,57 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400;
   }
-
-  /* Dark scrollbar for sidebar */
-  .dark-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .dark-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-
-  .dark-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-white/20 rounded-full;
-  }
-
-  .dark-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/30;
-  }
 }
 
 @layer components {
   /* ─── Buttons ─── */
   .btn-primary {
-    @apply bg-gradient-to-r from-accent-600 to-accent-500
-           text-white px-5 py-2.5 rounded-xl font-semibold text-sm
-           hover:from-accent-700 hover:to-accent-600
-           transition-all duration-200 ease-out
+    @apply bg-accent-500 text-white px-5 py-2.5 rounded-lg font-semibold text-sm
+           hover:bg-accent-600
+           transition-colors duration-150
            focus:outline-none focus:ring-2 focus:ring-accent-500/25 focus:ring-offset-2
-           shadow-sm hover:shadow-md
+           shadow-xs
            active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply bg-white text-gray-700 px-5 py-2.5 rounded-xl font-semibold text-sm
-           border border-surface-200 shadow-sm
-           hover:bg-accent-50/50 hover:border-accent-200 hover:shadow-md
-           transition-all duration-200 ease-out
+    @apply bg-white text-gray-700 px-5 py-2.5 rounded-lg font-semibold text-sm
+           border border-surface-300
+           hover:bg-surface-200 hover:border-surface-400
+           transition-colors duration-150
            focus:outline-none focus:ring-2 focus:ring-accent-500/15 focus:ring-offset-2
+           shadow-xs
            active:scale-[0.98];
   }
 
   .btn-ghost {
-    @apply text-gray-600 px-5 py-2.5 rounded-xl font-medium text-sm
-           hover:bg-surface-100 hover:text-gray-900
-           transition-all duration-200 ease-out
-           active:scale-[0.96];
+    @apply text-gray-600 px-4 py-2.5 rounded-lg font-medium text-sm
+           hover:bg-surface-200 hover:text-gray-900
+           transition-colors duration-150;
   }
 
   /* ─── Cards ─── */
   .card {
     @apply bg-white rounded-xl shadow-card
-           border border-surface-200 p-6
-           transition-all duration-200 ease-out;
+           border border-surface-300 p-6
+           transition-shadow duration-200;
   }
   .card:hover {
     @apply shadow-card-hover;
-    border-color: theme('colors.surface.300');
   }
 
   .card-interactive {
     @apply card cursor-pointer active:scale-[0.995];
   }
   .card-interactive:hover {
-    border-color: theme('colors.accent.300');
-  }
-
-  .card-elevated {
-    @apply bg-white rounded-xl shadow-lg
-           border border-surface-200 p-6
-           transition-all duration-200 ease-out;
-  }
-  .card-elevated:hover {
-    @apply shadow-xl;
+    @apply shadow-card-hover;
   }
 
   /* ─── Inputs ─── */
   .input-field {
-    @apply w-full px-4 py-3 bg-white border border-surface-200 rounded-xl
+    @apply w-full px-4 py-3 bg-white border border-surface-300 rounded-lg
            focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500
-           transition-all duration-200
+           transition-colors duration-150
            placeholder:text-gray-400 text-gray-900;
   }
 
@@ -138,7 +111,7 @@
   }
 
   .badge-primary {
-    @apply badge bg-accent-100 text-accent-700;
+    @apply badge bg-accent-50 text-accent-700;
   }
 
   .badge-success {
@@ -156,9 +129,9 @@
   /* ─── Stat card ─── */
   .stat-card {
     @apply relative overflow-hidden rounded-xl p-6
-           bg-white border border-surface-200
+           bg-white border border-surface-300
            shadow-card
-           transition-all duration-200 ease-out
+           transition-shadow duration-200
            hover:shadow-card-hover;
   }
 
@@ -172,7 +145,7 @@
   }
 
   .skeleton-card {
-    @apply bg-white rounded-xl p-6 border border-surface-200 shadow-card;
+    @apply bg-white rounded-xl p-6 border border-surface-300 shadow-card;
   }
 
   .skeleton-line {
@@ -186,8 +159,8 @@
   /* ─── Chart container ─── */
   .chart-container {
     @apply bg-white rounded-xl p-6
-           border border-surface-200 shadow-card
-           transition-all duration-200
+           border border-surface-300 shadow-card
+           transition-shadow duration-200
            hover:shadow-card-hover;
   }
 
@@ -197,12 +170,12 @@
   }
 
   .table-modern thead {
-    @apply bg-surface-100;
+    @apply bg-surface-200;
   }
 
   .table-modern th {
     @apply px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider
-           border-b border-surface-200;
+           border-b border-surface-300;
   }
 
   .table-modern td {
@@ -210,18 +183,13 @@
   }
 
   .table-modern tbody tr {
-    @apply border-b border-surface-100 last:border-0
-           transition-all duration-200 ease-out
-           hover:bg-accent-50/50;
+    @apply border-b border-surface-200 last:border-0
+           transition-colors duration-150
+           hover:bg-accent-50/40;
   }
 
   .table-modern tbody tr:hover td {
     @apply text-gray-900;
-  }
-
-  /* ─── Glass effect ─── */
-  .glass {
-    @apply backdrop-blur-xl bg-white/70 border border-white/20;
   }
 
   /* ─── States ─── */
@@ -242,20 +210,11 @@
 
   /* ─── Progress bar ─── */
   .progress-bar {
-    @apply h-2 bg-surface-100 rounded-full overflow-hidden;
+    @apply h-2 bg-surface-200 rounded-full overflow-hidden;
   }
 
   .progress-bar-fill {
     @apply h-full bg-accent-500 rounded-full transition-all duration-500;
-  }
-
-  /* ─── Glow effects ─── */
-  .glow-primary {
-    @apply shadow-glow;
-  }
-
-  .glow-primary-lg {
-    @apply shadow-glow-lg;
   }
 
   /* ─── Touch targets ─── */

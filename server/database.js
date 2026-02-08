@@ -5,7 +5,10 @@ import logger from './utils/logger.js'
 // Create PostgreSQL connection pool with optimized settings
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false',
+    ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}),
+  } : false,
   // Ensure password is treated as string
   ...(process.env.DATABASE_URL ? {} : {
     host: process.env.DB_HOST || 'localhost',
@@ -846,6 +849,35 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // Add forecast_confidence column to cost_data
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'cost_data' AND column_name = 'forecast_confidence'
+          ) THEN
+            ALTER TABLE cost_data ADD COLUMN forecast_confidence INTEGER DEFAULT NULL;
+          END IF;
+        END $$;
+      `)
+
+      // Contact submissions table (public contact form)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS contact_submissions (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          category TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          message TEXT NOT NULL,
+          status TEXT DEFAULT 'open',
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          ip_address TEXT,
+          user_agent TEXT,
+          submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -1162,8 +1194,9 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
              credits = $4,
              savings = $5,
              account_id = COALESCE($6, account_id),
+             forecast_confidence = $7,
              updated_at = CURRENT_TIMESTAMP
-           WHERE id = $7
+           WHERE id = $8
            RETURNING id`,
           [
             costData.currentMonth,
@@ -1172,6 +1205,7 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
             costData.credits,
             costData.savings,
             accountId,
+            costData.forecastConfidence || null,
             existingResult.rows[0].id
           ]
         )
@@ -1179,9 +1213,9 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
       } else {
         // Insert new record
         const insertResult = await client.query(
-          `INSERT INTO cost_data 
-           (user_id, provider_id, account_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+          `INSERT INTO cost_data
+           (user_id, provider_id, account_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, forecast_confidence, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
            RETURNING id`,
           [
             userId,
@@ -1193,7 +1227,8 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
             costData.lastMonth,
             costData.forecast,
             costData.credits,
-            costData.savings
+            costData.savings,
+            costData.forecastConfidence || null
           ]
         )
         finalCostDataId = insertResult.rows[0].id
@@ -5546,6 +5581,22 @@ export const getUserGrievances = async (userId) => {
       [userId]
     )
     return result.rows
+  } finally {
+    client.release()
+  }
+}
+
+// Contact submission operations
+export const createContactSubmission = async (data) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO contact_submissions (name, email, category, subject, message, user_id, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, submitted_at`,
+      [data.name, data.email, data.category, data.subject, data.message, data.userId || null, data.ipAddress || null, data.userAgent || null]
+    )
+    return result.rows[0]
   } finally {
     client.release()
   }

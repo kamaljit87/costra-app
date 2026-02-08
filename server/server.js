@@ -22,6 +22,7 @@ import notificationsRoutes from './routes/notifications.js'
 import billingRoutes from './routes/billing.js'
 import emailPreferencesRoutes from './routes/emailPreferences.js'
 import complianceRoutes from './routes/compliance.js'
+import contactRoutes from './routes/contact.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import logger from './utils/logger.js'
@@ -31,13 +32,18 @@ import { apiLimiter } from './middleware/rateLimiter.js'
 import { performanceMonitor } from './middleware/performanceMonitor.js'
 import { metricsMiddleware } from './middleware/metrics.js'
 import healthRoutes from './routes/health.js'
-import { setupSwagger } from './swagger.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Load .env file from server directory
 dotenv.config({ path: path.join(__dirname, '.env') })
+
+// Swagger only loaded in non-production environments
+let setupSwagger
+if (process.env.NODE_ENV !== 'production') {
+  setupSwagger = (await import('./swagger.js')).setupSwagger
+}
 
 // Initialize Sentry (if DSN is provided)
 if (process.env.SENTRY_DSN) {
@@ -61,6 +67,15 @@ import { runSecurityAudit } from './utils/securityAudit.js'
 // Validate configuration on startup
 validateConfig()
 
+// Enforce secure JWT secret in production
+if (process.env.NODE_ENV === 'production') {
+  const jwtSecret = process.env.JWT_SECRET
+  if (!jwtSecret || jwtSecret === 'CHANGE_ME_TO_A_SECURE_RANDOM_SECRET' || jwtSecret.length < 32) {
+    logger.error('JWT_SECRET must be set to a strong secret (at least 32 characters) in production')
+    process.exit(1)
+  }
+}
+
 // Run security audit on startup (warnings only, won't exit)
 if (process.env.NODE_ENV === 'production') {
   runSecurityAudit()
@@ -69,8 +84,10 @@ if (process.env.NODE_ENV === 'production') {
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Sentry Express integration automatically handles request/tracing
-// No need for separate requestHandler/tracingHandler in v10
+// Trust proxy when behind ALB/reverse proxy in production
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
 
 // Request ID middleware (must be early in the chain)
 app.use(requestIdMiddleware)
@@ -106,12 +123,13 @@ app.use(compression())
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.FRONTEND_URL
     : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://192.168.122.4:5173', 'http://192.168.18.29:5173'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  maxAge: 86400, // Cache preflight responses for 24 hours
 }))
 
 // Request body parsing with size limits
@@ -171,8 +189,22 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-// Serve static files for uploaded avatars
-app.use('/api/uploads', express.static(path.join(__dirname, 'uploads')))
+// Serve static files for uploaded avatars (with path restrictions)
+app.use('/api/uploads', (req, res, next) => {
+  // Block path traversal attempts
+  if (req.path.includes('..') || req.path.includes('%2e')) {
+    return res.status(400).json({ error: 'Invalid path' })
+  }
+  // Only serve image files
+  const ext = path.extname(req.path).toLowerCase()
+  if (!['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext)) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+  next()
+}, express.static(path.join(__dirname, 'uploads'), {
+  dotfiles: 'deny',
+  index: false,
+}))
 
 // Routes
 app.use('/api/auth', authRoutes)
@@ -191,12 +223,25 @@ app.use('/api/notifications', notificationsRoutes)
 app.use('/api/billing', billingRoutes)
 app.use('/api/email-preferences', emailPreferencesRoutes)
 app.use('/api/compliance', complianceRoutes)
+app.use('/api/contact', contactRoutes)
 
 // Health check routes
 app.use('/api/health', healthRoutes)
 
-// Prometheus metrics endpoint
+// Prometheus metrics endpoint (requires METRICS_TOKEN or authenticated user)
 app.get('/metrics', async (req, res) => {
+  const metricsToken = process.env.METRICS_TOKEN
+  const authToken = req.query.token || req.headers['x-metrics-token']
+
+  if (process.env.NODE_ENV === 'production') {
+    if (!metricsToken) {
+      return res.status(503).send('# Metrics not configured\n')
+    }
+    if (authToken !== metricsToken) {
+      return res.status(401).send('# Unauthorized\n')
+    }
+  }
+
   try {
     const { getMetrics } = await import('./utils/metrics.js')
     const metrics = await getMetrics()
@@ -228,15 +273,61 @@ if (process.env.SENTRY_DSN) {
 app.use(errorHandler)
 
 // Only start server if not in test environment
+let server
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    logger.info(`Server running on http://localhost:${PORT}`, { 
-      port: PORT, 
+  server = app.listen(PORT, () => {
+    logger.info(`Server running on http://localhost:${PORT}`, {
+      port: PORT,
       environment: process.env.NODE_ENV || 'development',
       nodeVersion: process.version,
     })
   })
 }
+
+// Graceful shutdown handler
+const gracefulShutdown = async (signal) => {
+  logger.info(`${signal} received - starting graceful shutdown`)
+
+  // Stop accepting new connections
+  if (server) {
+    server.close(() => {
+      logger.info('HTTP server closed')
+    })
+  }
+
+  try {
+    // Close database pool
+    const { pool } = await import('./database.js')
+    if (pool) {
+      await pool.end()
+      logger.info('Database pool closed')
+    }
+  } catch (err) {
+    logger.warn('Error closing database pool', { error: err.message })
+  }
+
+  try {
+    // Close Redis connection
+    const { closeRedis } = await import('./utils/cache.js')
+    if (closeRedis) {
+      await closeRedis()
+      logger.info('Redis connection closed')
+    }
+  } catch (err) {
+    logger.warn('Error closing Redis', { error: err.message })
+  }
+
+  // Force exit after 10 seconds if graceful shutdown stalls
+  setTimeout(() => {
+    logger.error('Graceful shutdown timed out - forcing exit')
+    process.exit(1)
+  }, 10000).unref()
+
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 // Export app for testing
 export default app
