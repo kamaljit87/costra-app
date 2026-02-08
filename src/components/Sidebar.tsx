@@ -96,7 +96,7 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
       {/* Sidebar */}
       <aside
         className={`
-          ${isPermanent ? 'relative' : 'fixed'} top-0 left-0 h-full z-50
+          ${isPermanent ? 'relative' : 'fixed'} top-0 left-0 h-screen z-50
           bg-white border-r border-surface-300
           ${isPermanent ? '' : `transform transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
           ${isPermanent ? 'lg:block' : 'lg:hidden'}
@@ -124,7 +124,7 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-6 pb-20 space-y-1 overflow-y-auto">
           {/* Dashboard */}
           <Link
             to="/dashboard"
@@ -307,7 +307,7 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
         </nav>
 
         {/* Footer with Contact link */}
-        <div className="px-4 py-4 border-t border-surface-300">
+        <div className="absolute bottom-0 left-0 right-0 px-4 py-4 border-t border-surface-300 bg-white">
           <button
             onClick={() => { onContactClick?.(); onClose(); }}
             className="flex items-center space-x-3 px-4 py-2.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-surface-200 transition-colors duration-150 group w-full text-left"

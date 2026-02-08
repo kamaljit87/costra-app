@@ -68,7 +68,7 @@ export default function SignupPage() {
       {/* Top bar with logo */}
       <div className="py-6 px-8 border-b border-surface-300 bg-white">
         <Link to="/">
-          <Logo height={36} />
+          <Logo height={48} />
         </Link>
       </div>
 

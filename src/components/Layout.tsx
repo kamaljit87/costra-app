@@ -28,7 +28,7 @@ export default function Layout({ children }: LayoutProps) {
   return (
     <div className="flex h-screen bg-surface-100">
       {/* Sidebar - Always visible on desktop, drawer on mobile */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:flex h-full">
         <Sidebar isOpen={true} onClose={() => {}} isPermanent={true} onContactClick={() => setContactChatOpen(true)} />
       </div>
 
@@ -36,9 +36,11 @@ export default function Layout({ children }: LayoutProps) {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isPermanent={false} onContactClick={() => setContactChatOpen(true)} />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden w-full lg:ml-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full lg:ml-0">
         {/* Top Navigation */}
-        <TopNav onMenuClick={() => setSidebarOpen(true)} />
+        <div className="relative z-30 shrink-0">
+          <TopNav onMenuClick={() => setSidebarOpen(true)} />
+        </div>
 
         {/* Trial Banner */}
         <TrialBanner />

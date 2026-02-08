@@ -51,7 +51,7 @@ export default function ContactPage() {
       <div className="min-h-screen bg-surface-100 flex flex-col">
         <div className="py-6 px-8 border-b border-surface-300 bg-white">
           <Link to="/">
-            <Logo height={36} />
+            <Logo height={48} />
           </Link>
         </div>
         <div className="flex-1 flex items-center justify-center px-4 py-12">
@@ -92,7 +92,7 @@ export default function ContactPage() {
       {/* Top bar with logo */}
       <div className="py-6 px-8 border-b border-surface-300 bg-white">
         <Link to="/">
-          <Logo height={36} />
+          <Logo height={48} />
         </Link>
       </div>
 

@@ -38,7 +38,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
         notificationsAPI.getNotifications({ limit: 20 }),
         notificationsAPI.getUnreadCount()
       ])
-      setNotifications(notificationsResponse.notifications || [])
+      setNotifications(notificationsResponse.data || [])
       setUnreadCount(countResponse.count || 0)
     } catch (error) {
       console.error('Failed to fetch notifications:', error)

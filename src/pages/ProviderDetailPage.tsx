@@ -1375,16 +1375,15 @@ export default function ProviderDetailPage() {
                                 strokeWidth={2}
                               >
                               {serviceCostData.map((_entry, index) => {
-                                // Use frozen-water color palette with variations
                                 const accentColors = [
-                                  '#45baa5', // accent-500
-                                  '#379584', // accent-600
-                                  '#6ac8b7', // accent-400
-                                  '#8fd6c9', // accent-300
-                                  '#297063', // accent-700
-                                  '#b5e3db', // accent-200
-                                  '#1c4a42', // accent-800
-                                  '#daf1ed', // accent-100
+                                  '#4F5BD5', // accent-500
+                                  '#3F4ABF', // accent-600
+                                  '#7880E9', // accent-400
+                                  '#9CA3F0', // accent-300
+                                  '#2F3899', // accent-700
+                                  '#C1C5F7', // accent-200
+                                  '#1F2673', // accent-800
+                                  '#E0E2FB', // accent-100
                                 ]
                                 return (
                                   <Cell 
@@ -1394,10 +1393,10 @@ export default function ProviderDetailPage() {
                                 )
                               })}
                             </Pie>
-                            <Tooltip 
+                            <Tooltip
                               contentStyle={{
                                 backgroundColor: 'white',
-                                border: '2px solid #b5e3db',
+                                border: '2px solid #C1C5F7',
                                 borderRadius: '12px',
                                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                               }}
@@ -1432,20 +1431,20 @@ export default function ProviderDetailPage() {
                       ) : serviceCostData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
                           <BarChart data={serviceCostData} margin={{ top: 5, right: 10, left: 0, bottom: 60 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#b5e3db" opacity={0.3} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} />
                             <XAxis
                               dataKey="name"
-                              stroke="#379584"
+                              stroke="#9CA3F0"
                               fontSize={11}
                               angle={-45}
                               textAnchor="end"
                               height={80}
-                              tick={{ fill: '#297063' }}
+                              tick={{ fill: '#64748B' }}
                             />
                             <YAxis
-                              stroke="#379584"
+                              stroke="#9CA3F0"
                               fontSize={11}
-                              tick={{ fill: '#297063' }}
+                              tick={{ fill: '#64748B' }}
                               tickFormatter={(value) => {
                                 const symbol = getCurrencySymbol()
                                 if (value >= 1000000) {
@@ -1460,27 +1459,27 @@ export default function ProviderDetailPage() {
                             <Tooltip
                               contentStyle={{
                                 backgroundColor: 'white',
-                                border: '2px solid #b5e3db',
+                                border: '2px solid #C1C5F7',
                                 borderRadius: '12px',
                                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                               }}
                               formatter={(value: number) => formatCurrency(value)}
-                              labelStyle={{ color: '#297063', fontWeight: '600' }}
+                              labelStyle={{ color: '#2F3899', fontWeight: '600' }}
                             />
-                            <Bar 
-                              dataKey="value" 
-                              fill="#45baa5" 
+                            <Bar
+                              dataKey="value"
+                              fill="#4F5BD5"
                               radius={[8, 8, 0, 0]}
-                              stroke="#379584"
+                              stroke="#3F4ABF"
                               strokeWidth={1}
                             >
                               {serviceCostData.map((_entry, index) => {
                                 const accentColors = [
-                                  '#45baa5', // accent-500
-                                  '#379584', // accent-600
-                                  '#6ac8b7', // accent-400
-                                  '#8fd6c9', // accent-300
-                                  '#297063', // accent-700
+                                  '#4F5BD5', // accent-500
+                                  '#3F4ABF', // accent-600
+                                  '#7880E9', // accent-400
+                                  '#9CA3F0', // accent-300
+                                  '#2F3899', // accent-700
                                 ]
                                 return (
                                   <Cell 

@@ -132,30 +132,30 @@ export default function ProviderCostChart({
 
       <ResponsiveContainer width="100%" height={280} className="min-h-[200px] sm:min-h-[280px]">
         {isMonthlyView ? (
-          <BarChart data={chartData} barCategoryGap="20%">
+          <BarChart data={chartData} barCategoryGap="40%" maxBarSize={48}>
             <defs>
               <linearGradient id={`barGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#20C997" />
-                <stop offset="100%" stopColor="#12B886" />
+                <stop offset="0%" stopColor="#4F5BD5" />
+                <stop offset="100%" stopColor="#3F4ABF" />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#96F2D7" opacity={0.3} vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} vertical={false} />
             <XAxis
               dataKey="monthLabel"
-              stroke="#12B886"
+              stroke="#9CA3F0"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dy={10}
-              tick={{ fill: '#099268' }}
+              tick={{ fill: '#64748B' }}
             />
             <YAxis
-              stroke="#12B886"
+              stroke="#9CA3F0"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dx={-10}
-              tick={{ fill: '#099268' }}
+              tick={{ fill: '#64748B' }}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -165,45 +165,44 @@ export default function ProviderCostChart({
             />
             <Tooltip
               content={<CustomTooltip />}
-              cursor={{ fill: '#96F2D7', opacity: 0.3 }}
+              cursor={{ fill: '#E0E2FB', opacity: 0.5 }}
             />
             <Bar
               dataKey="cost"
               fill={`url(#barGradient-${providerId})`}
-              radius={[8, 8, 0, 0]}
-              stroke="#12B886"
-              strokeWidth={1}
+              radius={[6, 6, 0, 0]}
+              stroke="none"
             />
           </BarChart>
         ) : (
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id={`areaGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#20C997" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#20C997" stopOpacity={0} />
+                <stop offset="0%" stopColor="#4F5BD5" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#4F5BD5" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#96F2D7" opacity={0.3} vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#12B886"
+              stroke="#9CA3F0"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dy={10}
-              tick={{ fill: '#099268' }}
+              tick={{ fill: '#64748B' }}
               tickFormatter={(value) => {
                 const date = new Date(value)
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }}
             />
             <YAxis
-              stroke="#12B886"
+              stroke="#9CA3F0"
               fontSize={12}
               tickLine={false}
               axisLine={false}
               dx={-10}
-              tick={{ fill: '#099268' }}
+              tick={{ fill: '#64748B' }}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -213,12 +212,12 @@ export default function ProviderCostChart({
             />
             <Tooltip
               content={<CustomTooltip />}
-              cursor={{ stroke: '#20C997', strokeWidth: 1, strokeDasharray: '3 3' }}
+              cursor={{ stroke: '#4F5BD5', strokeWidth: 1, strokeDasharray: '3 3' }}
             />
             <Area
               type="monotone"
               dataKey="cost"
-              stroke="#20C997"
+              stroke="#4F5BD5"
               strokeWidth={2.5}
               fill={`url(#areaGradient-${providerId})`}
             />

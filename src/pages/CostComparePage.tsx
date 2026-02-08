@@ -387,20 +387,20 @@ export default function CostComparePage() {
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={panel.dailyData.map((d) => ({ ...d, cost: convertAmount(d.cost) }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.5} vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} vertical={false} />
                     <XAxis
                       dataKey="date"
                       fontSize={10}
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: '#9ca3af' }}
+                      tick={{ fill: '#64748B' }}
                       tickFormatter={(v) => new Date(v).getDate().toString()}
                     />
                     <YAxis
                       fontSize={10}
                       tickLine={false}
                       axisLine={false}
-                      tick={{ fill: '#9ca3af' }}
+                      tick={{ fill: '#64748B' }}
                       tickFormatter={(v) => {
                         const s = getCurrencySymbol()
                         return v >= 1000 ? `${s}${(v / 1000).toFixed(0)}k` : `${s}${v.toFixed(0)}`
