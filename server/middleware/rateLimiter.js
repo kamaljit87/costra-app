@@ -3,17 +3,17 @@ import logger from '../utils/logger.js'
 
 /**
  * Rate limiter for authentication endpoints
- * Disabled for development - very lenient limits in production
+ * Relaxed limits: 100 attempts per 15 min in production, 1000 in development
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'production' ? 10 : 1000, // 10 auth attempts per 15min in production
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 100 auth attempts per 15min in production
   message: {
     error: 'Too many authentication attempts from this IP, please try again after 15 minutes.',
     code: 'RATE_LIMIT_EXCEEDED',
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  standardHeaders: true,
+  legacyHeaders: false,
   handler: (req, res) => {
     logger.warn('Rate limit exceeded for auth endpoint', {
       requestId: req.requestId,
@@ -31,12 +31,11 @@ export const authLimiter = rateLimit({
 
 /**
  * Rate limiter for sync endpoints
- * More lenient limits: 30 requests per hour per user (requires authentication)
- * In development, allow more frequent syncing for testing
+ * Lenient limits so normal sync usage (manual + retries) does not hit "too many requests"
  */
 export const syncLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: process.env.NODE_ENV === 'production' ? 20 : 50, // More lenient in development
+  max: process.env.NODE_ENV === 'production' ? 120 : 500, // 120 syncs/hour in production, 500 in dev
   message: {
     error: 'Too many sync requests. Please wait before syncing again.',
     code: 'SYNC_RATE_LIMIT_EXCEEDED',
@@ -44,7 +43,6 @@ export const syncLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    // Use user ID if authenticated, otherwise fall back to IP
     return req.user?.userId || req.user?.id || req.ip
   },
   handler: (req, res) => {
@@ -76,9 +74,13 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip rate limiting for sync endpoints (they have their own limiter)
+  // Skip for auth/sync (have their own limiters) and for authenticated requests (no "too many requests" after sign-in)
   skip: (req) => {
-    return req.path.startsWith('/api/sync')
+    const p = (req.path || '').toLowerCase()
+    const url = (req.originalUrl || '').toLowerCase()
+    const isAuthPath = p.startsWith('/sync') || p.startsWith('/auth') || url.includes('/api/auth') || url.includes('/api/sync')
+    const hasAuthHeader = req.headers.authorization && String(req.headers.authorization).startsWith('Bearer ')
+    return isAuthPath || hasAuthHeader
   },
   handler: (req, res) => {
     logger.warn('Rate limit exceeded for API endpoint', {

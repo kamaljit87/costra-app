@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
 import Logo from '../components/Logo'
+import { FlickeringGrid } from '@/components/ui/flickering-grid'
 
 const PLANS = {
   starter: {
@@ -98,8 +99,16 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="py-24 lg:py-32 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-24 lg:py-32 bg-white overflow-hidden">
+        <FlickeringGrid
+          className="absolute inset-0 z-0 w-full h-full"
+          squareSize={4}
+          gridGap={6}
+          color="#94a3b8"
+          maxOpacity={0.35}
+          flickerChance={0.08}
+        />
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-accent-50 border border-accent-100 text-accent-700 text-sm font-medium mb-8">
               <Zap className="h-3.5 w-3.5 mr-1.5" />

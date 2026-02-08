@@ -3,15 +3,11 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { createUser, getUserByEmail, getUserById, recordMultipleConsents } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
-import { authLimiter } from '../middleware/rateLimiter.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
 import { createTrialSubscription } from '../services/subscriptionService.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
-
-// Rate limit auth endpoints to prevent brute-force attacks (GDPR Art. 32 - security of processing)
-router.use(authLimiter)
 
 /**
  * @swagger
