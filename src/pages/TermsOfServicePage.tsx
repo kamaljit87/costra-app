@@ -1,27 +1,10 @@
 import { Link } from 'react-router-dom'
-import Logo from '../components/Logo'
+import LandingNav from '../components/LandingNav'
 
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to="/">
-              <Logo height={56} />
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-gray-600 hover:text-gray-900 font-medium">
-                Sign In
-              </Link>
-              <Link to="/signup" className="btn-primary">
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <LandingNav />
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

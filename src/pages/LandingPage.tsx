@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
-import Logo from '../components/Logo'
+import LandingNav from '../components/LandingNav'
 import { FlickeringGrid } from '@/components/ui/flickering-grid'
 
 const PLANS = {
@@ -76,27 +76,19 @@ const FEATURES = [
 
 export default function LandingPage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
+  const location = useLocation()
+
+  // Scroll to pricing when navigating to /#pricing
+  useEffect(() => {
+    if (location.hash === '#pricing') {
+      const el = document.getElementById('pricing')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [location.pathname, location.hash])
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="border-b border-surface-300 bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Logo height={56} />
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
-                Sign In
-              </Link>
-              <Link to="/signup" className="btn-primary">
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <LandingNav />
 
       {/* Hero Section */}
       <section className="relative py-24 lg:py-32 bg-white overflow-hidden">
@@ -188,7 +180,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-24 bg-white">
+      <section id="pricing" className="py-24 bg-white scroll-mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">

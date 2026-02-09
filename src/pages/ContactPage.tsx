@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import Logo from '../components/Logo'
+import LandingNav from '../components/LandingNav'
 import { Send, Mail, User, MessageSquare, CheckCircle } from 'lucide-react'
 import { contactAPI } from '../services/api'
 
@@ -49,11 +49,7 @@ export default function ContactPage() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-surface-100 flex flex-col">
-        <div className="py-6 px-8 border-b border-surface-300 bg-white">
-          <Link to="/">
-            <Logo height={48} />
-          </Link>
-        </div>
+        <LandingNav />
         <div className="flex-1 flex items-center justify-center px-4 py-12">
           <div className="w-full max-w-md bg-white rounded-xl border border-surface-300 shadow-card p-8 text-center">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -89,12 +85,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-surface-100 flex flex-col">
-      {/* Top bar with logo */}
-      <div className="py-6 px-8 border-b border-surface-300 bg-white">
-        <Link to="/">
-          <Logo height={48} />
-        </Link>
-      </div>
+      <LandingNav />
 
       {/* Centered content */}
       <div className="flex-1 flex items-center justify-center px-4 py-12">

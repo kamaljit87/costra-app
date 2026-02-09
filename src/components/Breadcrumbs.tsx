@@ -62,6 +62,11 @@ export default function Breadcrumbs() {
             crumbs.push({ label: 'API Debug', path: '/debug' })
             break
 
+          case 'chat-demo':
+            crumbs.push({ label: 'Dashboard', path: '/dashboard' })
+            crumbs.push({ label: 'Chat bubble demo' })
+            break
+
           case 'budgets':
             crumbs.push({ label: 'Budgets' })
             break

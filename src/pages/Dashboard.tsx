@@ -336,16 +336,6 @@ export default function Dashboard() {
             <div className="mb-5">
               <SavingsPlansList plans={savingsPlans} />
             </div>
-
-            {/* Floating Action Button */}
-            <button
-              onClick={handleSync}
-              disabled={isSyncing || isDemoMode}
-              className="fixed bottom-8 right-8 w-14 h-14 bg-accent-500 hover:bg-accent-600 text-white rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed z-50"
-              title="Quick sync"
-            >
-              <Sparkles className={`h-6 w-6 ${isSyncing ? 'animate-spin' : ''}`} />
-            </button>
           </>
         )}
 
