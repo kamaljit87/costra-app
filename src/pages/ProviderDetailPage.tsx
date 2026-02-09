@@ -132,6 +132,8 @@ export default function ProviderDetailPage() {
                 forecast: 0,
                 credits: 0,
                 savings: 0,
+                taxCurrentMonth: 0,
+                taxLastMonth: 0,
                 services: [],
                 chartData1Month: [],
                 chartData2Months: [],
@@ -740,7 +742,7 @@ export default function ProviderDetailPage() {
             <div className="card p-4" title="Total cost for the current billing month">
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Current Month</div>
               <div className="text-xl font-bold text-gray-900 mb-1">
-                {formatCurrency(convertAmount(providerData.currentMonth))}
+                {formatCurrency(providerData.currentMonth)}
               </div>
               {changePercent !== 0 && (
                 <div className={`text-xs mt-1 flex items-center ${
@@ -759,14 +761,14 @@ export default function ProviderDetailPage() {
             <div className="card p-4" title="Projected cost for the month based on current usage">
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Forecast</div>
               <div className="text-xl font-bold text-gray-900">
-                {formatCurrency(convertAmount(providerData.forecast))}
+                {formatCurrency(providerData.forecast)}
               </div>
             </div>
 
             <div className="card p-4 bg-[#EFF6FF] border-[#DBEAFE]" title="Savings from reserved instances and commitment plans">
               <div className="text-[10px] font-semibold text-accent-700 uppercase tracking-wide mb-1.5">Savings</div>
               <div className="text-xl font-bold text-accent-700">
-                {formatCurrency(convertAmount(providerData.savings || 0))}
+                {formatCurrency(providerData.savings || 0)}
               </div>
             </div>
           </div>

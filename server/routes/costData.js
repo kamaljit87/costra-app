@@ -79,6 +79,8 @@ router.get('/', async (req, res) => {
       forecastConfidence: cost.forecast_confidence != null ? parseInt(cost.forecast_confidence) : null,
       credits: parseFloat(cost.credits) || 0,
       savings: parseFloat(cost.savings) || 0,
+      taxCurrentMonth: parseFloat(cost.tax_current_month) || 0,
+      taxLastMonth: parseFloat(cost.tax_last_month) || 0,
       // Transform service_name to name and change_percent to change for frontend compatibility
       // Filter out Tax entries - they are not services
       services: (cost.services || [])
@@ -480,11 +482,11 @@ router.put('/preferences/currency', async (req, res) => {
     
     res.json({ message: 'Currency preference updated' })
   } catch (error) {
-    logger.error('Update currency error', { 
-      userId, 
-      currency, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Update currency error', {
+      userId: req.user?.userId,
+      currency: req.body?.currency,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Internal server error' })
   }

@@ -23,7 +23,7 @@ interface CreditsDetailProps {
 }
 
 export default function CreditsDetail({ providerId, accountId, startDate, endDate, isDemoMode }: CreditsDetailProps) {
-  const { formatCurrency, convertAmount } = useCurrency()
+  const { formatCurrency } = useCurrency()
   const [credits, setCredits] = useState<CreditDetail[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [summary, setSummary] = useState({
@@ -136,13 +136,13 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
           <div>
             <div className="text-xs text-gray-500 mb-1.5 uppercase tracking-wide">Total Amount Remaining</div>
             <div className="text-2xl font-bold text-[#16A34A]">
-              {formatCurrency(convertAmount(summary.totalRemaining))}
+              {formatCurrency(summary.totalRemaining)}
             </div>
           </div>
           <div>
             <div className="text-xs text-gray-500 mb-1.5 uppercase tracking-wide">Total Amount Used</div>
             <div className="text-2xl font-bold text-gray-900">
-              {formatCurrency(convertAmount(summary.totalUsed))}
+              {formatCurrency(summary.totalUsed)}
             </div>
           </div>
           <div>
@@ -230,7 +230,7 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-900">
                         {credit.issuedAmount 
-                          ? formatCurrency(convertAmount(credit.issuedAmount))
+                          ? formatCurrency(credit.issuedAmount)
                           : 'N/A'}
                       </span>
                     </td>
@@ -246,14 +246,14 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
                       <div className="flex items-center gap-1.5">
                         <TrendingUp className="h-3.5 w-3.5 text-[#F59E0B]" />
                         <span className="text-sm font-medium text-gray-900">
-                          {formatCurrency(convertAmount(credit.amountUsed || 0))}
+                          {formatCurrency(credit.amountUsed || 0)}
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm font-semibold text-[#16A34A]">
                         {credit.amountRemaining 
-                          ? formatCurrency(convertAmount(credit.amountRemaining))
+                          ? formatCurrency(credit.amountRemaining)
                           : 'N/A'}
                       </span>
                     </td>

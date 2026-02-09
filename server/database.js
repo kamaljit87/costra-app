@@ -861,6 +861,28 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // Add tax columns to cost_data
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'cost_data' AND column_name = 'tax_current_month'
+          ) THEN
+            ALTER TABLE cost_data ADD COLUMN tax_current_month DECIMAL(15, 2) DEFAULT 0;
+          END IF;
+        END $$;
+      `)
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'cost_data' AND column_name = 'tax_last_month'
+          ) THEN
+            ALTER TABLE cost_data ADD COLUMN tax_last_month DECIMAL(15, 2) DEFAULT 0;
+          END IF;
+        END $$;
+      `)
+
       // Contact submissions table (public contact form)
       await client.query(`
         CREATE TABLE IF NOT EXISTS contact_submissions (
@@ -1205,8 +1227,10 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
              savings = $5,
              account_id = COALESCE($6, account_id),
              forecast_confidence = $7,
+             tax_current_month = $8,
+             tax_last_month = $9,
              updated_at = CURRENT_TIMESTAMP
-           WHERE id = $8
+           WHERE id = $10
            RETURNING id`,
           [
             costData.currentMonth,
@@ -1216,6 +1240,8 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
             costData.savings,
             accountId,
             costData.forecastConfidence || null,
+            costData.taxCurrentMonth || 0,
+            costData.taxLastMonth || 0,
             existingResult.rows[0].id
           ]
         )
@@ -1224,8 +1250,8 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
         // Insert new record
         const insertResult = await client.query(
           `INSERT INTO cost_data
-           (user_id, provider_id, account_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, forecast_confidence, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
+           (user_id, provider_id, account_id, month, year, current_month_cost, last_month_cost, forecast_cost, credits, savings, forecast_confidence, tax_current_month, tax_last_month, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
            RETURNING id`,
           [
             userId,
@@ -1238,7 +1264,9 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
             costData.forecast,
             costData.credits,
             costData.savings,
-            costData.forecastConfidence || null
+            costData.forecastConfidence || null,
+            costData.taxCurrentMonth || 0,
+            costData.taxLastMonth || 0
           ]
         )
         finalCostDataId = insertResult.rows[0].id

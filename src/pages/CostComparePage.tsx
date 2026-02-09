@@ -286,7 +286,7 @@ export default function CostComparePage() {
             {new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </p>
           <p className="text-sm font-bold text-gray-900">
-            {formatCurrency(convertAmount(payload[0].value))}
+            {formatCurrency(payload[0].value)}
           </p>
         </div>
       )
@@ -372,7 +372,7 @@ export default function CostComparePage() {
             >
               <div className="text-xs font-medium text-gray-500 mb-1">Total Cost</div>
               <div className="text-2xl font-bold text-gray-900">
-                {formatCurrency(convertAmount(panel.totalCost))}
+                {formatCurrency(panel.totalCost)}
               </div>
             </div>
 
@@ -421,7 +421,7 @@ export default function CostComparePage() {
                     <div key={s.name} className="flex items-center justify-between text-sm">
                       <span className="text-gray-700 truncate flex-1 mr-2">{s.name}</span>
                       <span className="font-semibold text-gray-900 whitespace-nowrap">
-                        {formatCurrency(convertAmount(s.cost))}
+                        {formatCurrency(s.cost)}
                       </span>
                     </div>
                   ))}
@@ -488,7 +488,7 @@ export default function CostComparePage() {
                       {providerAName} ({monthALabel})
                     </div>
                     <div className="text-xl font-bold text-gray-900">
-                      {formatCurrency(convertAmount(panelA.totalCost))}
+                      {formatCurrency(panelA.totalCost)}
                     </div>
                   </div>
                   <div className="flex items-center justify-center">
@@ -508,7 +508,7 @@ export default function CostComparePage() {
                         <span className={`text-sm font-bold ${
                           costDiff > 0 ? 'text-red-600' : costDiff < 0 ? 'text-green-600' : 'text-gray-500'
                         }`}>
-                          {costDiff > 0 ? '+' : ''}{formatCurrency(convertAmount(Math.abs(costDiff)))}
+                          {costDiff > 0 ? '+' : ''}{formatCurrency(Math.abs(costDiff))}
                         </span>
                       </div>
                       {costDiffPercent !== 0 && (
@@ -526,7 +526,7 @@ export default function CostComparePage() {
                       {providerBName} ({monthBLabel})
                     </div>
                     <div className="text-xl font-bold text-gray-900">
-                      {formatCurrency(convertAmount(panelB.totalCost))}
+                      {formatCurrency(panelB.totalCost)}
                     </div>
                   </div>
                 </div>
@@ -558,17 +558,17 @@ export default function CostComparePage() {
                             <tr key={row.name} className="border-b border-surface-100">
                               <td className="py-2.5 pr-4 text-gray-700 font-medium">{row.name}</td>
                               <td className="py-2.5 px-4 text-right text-gray-900 font-semibold">
-                                {row.costA > 0 ? formatCurrency(convertAmount(row.costA)) : '-'}
+                                {row.costA > 0 ? formatCurrency(row.costA) : '-'}
                               </td>
                               <td className="py-2.5 px-4 text-right text-gray-900 font-semibold">
-                                {row.costB > 0 ? formatCurrency(convertAmount(row.costB)) : '-'}
+                                {row.costB > 0 ? formatCurrency(row.costB) : '-'}
                               </td>
                               <td className={`py-2.5 pl-4 text-right font-semibold ${
                                 row.diff > 0 ? 'text-red-600' : row.diff < 0 ? 'text-green-600' : 'text-gray-400'
                               }`}>
                                 {row.diff !== 0 ? (
                                   <>
-                                    {row.diff > 0 ? '+' : ''}{formatCurrency(convertAmount(row.diff))}
+                                    {row.diff > 0 ? '+' : ''}{formatCurrency(row.diff)}
                                   </>
                                 ) : (
                                   '-'

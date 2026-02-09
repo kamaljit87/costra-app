@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { useCurrency } from '../contexts/CurrencyContext'
+
 import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
 import { cloudProvidersAPI, syncAPI, budgetsAPI } from '../services/api'
@@ -26,7 +26,7 @@ interface ConfiguredProvider {
 
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
-  const { convertAmount } = useCurrency()
+
   const { showSuccess, showError, showWarning } = useNotification()
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [showAddProvider, setShowAddProvider] = useState(false)
+  const [expandedProvider, setExpandedProvider] = useState<string | null>(null)
 
   const loadData = async () => {
     try {
@@ -106,11 +107,13 @@ export default function Dashboard() {
     }
   }
 
-  // Calculate totals
-  const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
-  const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
-  const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
-  const totalSavings = costData.reduce((sum, data) => sum + Math.abs(convertAmount(data.savings || 0)), 0)
+  // Calculate totals (in USD — conversion happens at display time via formatCurrency)
+  const totalCurrent = costData.reduce((sum, data) => sum + data.currentMonth, 0)
+  const totalLastMonth = costData.reduce((sum, data) => sum + data.lastMonth, 0)
+  const totalForecast = costData.reduce((sum, data) => sum + data.forecast, 0)
+  const totalSavings = costData.reduce((sum, data) => sum + Math.abs(data.savings || 0), 0)
+  const totalTaxCurrent = costData.reduce((sum, data) => sum + (data.taxCurrentMonth || 0), 0)
+  const totalTaxLastMonth = costData.reduce((sum, data) => sum + (data.taxLastMonth || 0), 0)
 
   // Average forecast confidence across providers (weighted by forecast amount)
   const avgForecastConfidence = (() => {
@@ -191,6 +194,8 @@ export default function Dashboard() {
                 totalForecast={totalForecast}
                 totalSavings={totalSavings}
                 forecastConfidence={avgForecastConfidence}
+                totalTaxCurrent={totalTaxCurrent}
+                totalTaxLastMonth={totalTaxLastMonth}
               />
             </div>
             {/* Provider Sections with Charts */}
@@ -218,6 +223,8 @@ export default function Dashboard() {
                         forecast: 0,
                         credits: 0,
                         savings: 0,
+                        taxCurrentMonth: 0,
+                        taxLastMonth: 0,
                         services: [],
                         chartData1Month: [],
                         chartData2Months: [],
@@ -280,6 +287,10 @@ export default function Dashboard() {
                                 chartData4Months={data.chartData4Months}
                                 chartData6Months={data.chartData6Months}
                                 chartData12Months={data.chartData12Months}
+                                isExpanded={expandedProvider === data.provider.id}
+                                onToggle={() => setExpandedProvider(
+                                  expandedProvider === data.provider.id ? null : data.provider.id
+                                )}
                               />
                             ) : (
                               <div className="card">

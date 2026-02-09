@@ -7,6 +7,8 @@ interface TotalBillSummaryProps {
   totalForecast: number
   totalSavings: number
   forecastConfidence?: number | null
+  totalTaxCurrent?: number
+  totalTaxLastMonth?: number
 }
 
 const getConfidenceLabel = (confidence: number | null | undefined) => {
@@ -22,8 +24,10 @@ export default function TotalBillSummary({
   totalForecast,
   totalSavings,
   forecastConfidence,
+  totalTaxCurrent = 0,
+  totalTaxLastMonth = 0,
 }: TotalBillSummaryProps) {
-  const { formatCurrency, convertAmount } = useCurrency()
+  const { formatCurrency } = useCurrency()
 
   const changePercent = totalLastMonth > 0
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
@@ -33,30 +37,38 @@ export default function TotalBillSummary({
 
   const confidenceLabel = getConfidenceLabel(forecastConfidence)
 
+  const hasTax = totalTaxCurrent > 0 || totalTaxLastMonth > 0
+
   const stats = [
     {
       label: 'Current Month',
-      value: formatCurrency(convertAmount(totalCurrent)),
+      value: formatCurrency(totalCurrent),
       icon: Wallet,
       highlight: true,
       subtitle: null as string | null,
       subtitleColor: '',
+      taxValue: hasTax ? formatCurrency(totalCurrent + totalTaxCurrent) : null,
+      taxAmount: hasTax ? formatCurrency(totalTaxCurrent) : null,
     },
     {
       label: 'Last Month',
-      value: formatCurrency(convertAmount(totalLastMonth)),
+      value: formatCurrency(totalLastMonth),
       icon: Target,
       highlight: false,
       subtitle: null as string | null,
       subtitleColor: '',
+      taxValue: hasTax ? formatCurrency(totalLastMonth + totalTaxLastMonth) : null,
+      taxAmount: hasTax ? formatCurrency(totalTaxLastMonth) : null,
     },
     {
       label: 'Forecast',
-      value: formatCurrency(convertAmount(totalForecast)),
+      value: formatCurrency(totalForecast),
       icon: Zap,
       highlight: false,
       subtitle: confidenceLabel?.text || null,
       subtitleColor: confidenceLabel?.color || '',
+      taxValue: null,
+      taxAmount: null,
     },
   ]
 
@@ -125,6 +137,14 @@ export default function TotalBillSummary({
                 }`}>
                   {stat.value}
                 </div>
+
+                {stat.taxValue && (
+                  <div className="text-[10px] mt-1.5 text-gray-500">
+                    <span className="font-medium text-gray-700">{stat.taxValue}</span>
+                    {' '}incl. tax
+                    <span className="text-gray-400 ml-1">({stat.taxAmount} tax)</span>
+                  </div>
+                )}
 
                 {stat.subtitle && (
                   <div className={`text-[10px] mt-1 font-medium ${stat.subtitleColor}`}>

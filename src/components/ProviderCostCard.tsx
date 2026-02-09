@@ -43,7 +43,7 @@ export default function ProviderCostCard({ data }: ProviderCostCardProps) {
           <div key={service.name} className="flex items-center justify-between text-sm">
             <span className="text-gray-600">{service.name}</span>
             <div className="flex items-center space-x-3">
-              <span className="font-medium text-gray-900">{formatCurrency(convertAmount(service.cost))}</span>
+              <span className="font-medium text-gray-900">{formatCurrency(service.cost)}</span>
               {service.change >= 0 ? (
                 <span className="text-red-600 text-xs">+{service.change.toFixed(1)}%</span>
               ) : (

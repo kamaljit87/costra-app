@@ -145,6 +145,8 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       credits: sanitizedData.credits || 0,
       savings: sanitizedData.savings || 0,
       services: sanitizedData.services || [],
+      taxCurrentMonth: sanitizedData.taxCurrentMonth || 0,
+      taxLastMonth: sanitizedData.taxLastMonth || 0,
     })
 
     // Save daily cost data for historical tracking
@@ -451,6 +453,8 @@ router.post('/account/:accountId', async (req, res) => {
         credits: sanitizedData.credits || 0,
         savings: sanitizedData.savings || 0,
         services: sanitizedData.services || [],
+        taxCurrentMonth: sanitizedData.taxCurrentMonth || 0,
+        taxLastMonth: sanitizedData.taxLastMonth || 0,
       }
     )
 
@@ -566,6 +570,8 @@ router.post('/:providerId', async (req, res) => {
           credits: sanitizedData.credits || 0,
           savings: sanitizedData.savings || 0,
           services: sanitizedData.services || [],
+          taxCurrentMonth: sanitizedData.taxCurrentMonth || 0,
+          taxLastMonth: sanitizedData.taxLastMonth || 0,
         })
 
         if (costData.dailyData && costData.dailyData.length > 0) {

@@ -143,7 +143,36 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     
     logger.debug('Total response received', { resultsByTimeCount: totalResponse.ResultsByTime?.length || 0 })
 
-    return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate)
+    // Fetch tax totals separately (MONTHLY granularity is enough)
+    const taxCommand = new GetCostAndUsageCommand({
+      TimePeriod: {
+        Start: startDate,
+        End: endDate,
+      },
+      Granularity: 'MONTHLY',
+      Metrics: ['UnblendedCost'],
+      Filter: {
+        Dimensions: {
+          Key: 'RECORD_TYPE',
+          Values: ['Tax'],
+        },
+      },
+    })
+
+    let taxResponse = null
+    try {
+      taxResponse = await retryWithBackoff(
+        () => client.send(taxCommand),
+        { maxAttempts: 2, timeout: 15000 },
+        'aws',
+        { startDate, endDate, operation: 'getCostAndUsage-tax' }
+      )
+      logger.debug('Tax response received', { resultsByTimeCount: taxResponse.ResultsByTime?.length || 0 })
+    } catch (taxErr) {
+      logger.warn('Failed to fetch tax data, continuing without it', { error: taxErr.message })
+    }
+
+    return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate, taxResponse)
   } catch (error) {
     // Map AWS-specific errors to user-friendly messages
     let userMessage = error.message
@@ -172,8 +201,9 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
  * Transform AWS Cost Explorer response to our format
  * @param totalData - Response from query without GroupBy (excludes Tax/Support/Refund/Credit)
  * @param groupedData - Response from query with GroupBy by SERVICE (for service breakdown)
+ * @param taxData - Response from tax-only query (optional)
  */
-const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
+const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxData = null) => {
   const totalResultsByTime = totalData.ResultsByTime || []
   const groupedResultsByTime = groupedData.ResultsByTime || []
   
@@ -297,6 +327,28 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
   currentMonth = monthToDate
   lastMonth = prevMonthTotal
 
+  // Extract tax amounts from the separate tax query
+  let taxCurrentMonth = 0
+  let taxLastMonth = 0
+  if (taxData && taxData.ResultsByTime) {
+    taxData.ResultsByTime.forEach((result) => {
+      const periodStart = result.TimePeriod?.Start
+      const amount = parseFloat(result.Total?.UnblendedCost?.Amount || 0)
+      if (periodStart) {
+        const d = new Date(periodStart)
+        if (d.getFullYear() === currentYear && d.getMonth() === currentMonthIdx) {
+          taxCurrentMonth += amount
+        } else if (d.getFullYear() === prevMonthYear && d.getMonth() === prevMonthIdx) {
+          taxLastMonth += amount
+        }
+      }
+    })
+    logger.info('AWS tax amounts', {
+      taxCurrentMonth: taxCurrentMonth.toFixed(2),
+      taxLastMonth: taxLastMonth.toFixed(2),
+    })
+  }
+
   return {
     currentMonth,
     lastMonth,
@@ -305,6 +357,8 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth,
+    taxLastMonth,
   }
 }
 
@@ -1467,6 +1521,8 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth: 0,
+    taxLastMonth: 0,
   }
 }
 
@@ -1764,6 +1820,8 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth: 0,
+    taxLastMonth: 0,
   }
 }
 
@@ -1936,6 +1994,8 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth: 0,
+    taxLastMonth: 0,
   }
 }
 
@@ -2123,6 +2183,8 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth: 0,
+    taxLastMonth: 0,
   }
 }
 
@@ -2289,6 +2351,8 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth: 0,
+    taxLastMonth: 0,
   }
 }
 
@@ -2464,6 +2528,8 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
     savings: 0,
     services,
     dailyData,
+    taxCurrentMonth: 0,
+    taxLastMonth: 0,
   }
 }
 

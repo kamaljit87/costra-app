@@ -10,6 +10,8 @@ export interface CostData {
   forecast: number
   credits: number
   savings: number
+  taxCurrentMonth: number
+  taxLastMonth: number
   services: ServiceCost[]
   chartData1Month: CostDataPoint[]
   chartData2Months: CostDataPoint[]
@@ -205,6 +207,8 @@ const getMockCostData = (): CostData[] => {
       forecast: 13500.00,
       credits: 500.00,
       savings: 1250.00,
+      taxCurrentMonth: 0,
+      taxLastMonth: 0,
       services: [
         { name: 'EC2 Instances', cost: 5200.00, change: 5.2 },
         { name: 'S3 Storage', cost: 3200.50, change: -2.1 },
@@ -221,6 +225,8 @@ const getMockCostData = (): CostData[] => {
       forecast: 9800.00,
       credits: 300.00,
       savings: 850.00,
+      taxCurrentMonth: 0,
+      taxLastMonth: 0,
       services: [
         { name: 'Virtual Machines', cost: 3800.00, change: -3.2 },
         { name: 'Blob Storage', cost: 2100.25, change: 4.5 },
@@ -237,6 +243,8 @@ const getMockCostData = (): CostData[] => {
       forecast: 7200.00,
       credits: 200.00,
       savings: 600.00,
+      taxCurrentMonth: 0,
+      taxLastMonth: 0,
       services: [
         { name: 'Compute Engine', cost: 2800.00, change: -5.5 },
         { name: 'Cloud Storage', cost: 1850.50, change: 3.2 },
