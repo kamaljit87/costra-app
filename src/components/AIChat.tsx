@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { MessageSquare, X, Send, Sparkles, Bot, User, Loader2, AlertCircle, Lightbulb, TrendingUp, AlertTriangle } from 'lucide-react'
+import { MessageSquare, X, Send, Sparkles, Bot, Loader2, AlertCircle, Lightbulb, TrendingUp, AlertTriangle } from 'lucide-react'
 import {
   ChatBubble,
   ChatBubbleAvatar,

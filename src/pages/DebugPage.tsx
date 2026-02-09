@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { costDataAPI, cloudProvidersAPI, syncAPI } from '../services/api'
 import { Bug, RefreshCw, Database, Calendar, Cloud, ArrowRight, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 
 interface DebugResponse {
   endpoint: string
@@ -314,7 +315,7 @@ export default function DebugPage() {
                     className="w-full btn-primary flex items-center justify-center space-x-2"
                   >
                     {isLoading ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <Spinner variant="bars" size={16} />
                     ) : (
                       <ArrowRight className="h-4 w-4" />
                     )}
@@ -329,7 +330,7 @@ export default function DebugPage() {
                     className="w-full btn-primary flex items-center justify-center space-x-2"
                   >
                     {isLoading ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <Spinner variant="bars" size={16} />
                     ) : (
                       <ArrowRight className="h-4 w-4" />
                     )}
@@ -344,7 +345,7 @@ export default function DebugPage() {
                     className="w-full btn-primary flex items-center justify-center space-x-2"
                   >
                     {isLoading ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <Spinner variant="bars" size={16} />
                     ) : (
                       <ArrowRight className="h-4 w-4" />
                     )}
@@ -360,7 +361,7 @@ export default function DebugPage() {
                       className="w-full btn-primary flex items-center justify-center space-x-2"
                     >
                       {isLoading ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <Spinner variant="bars" size={16} />
                       ) : (
                         <RefreshCw className="h-4 w-4" />
                       )}
@@ -372,7 +373,7 @@ export default function DebugPage() {
                       className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center justify-center space-x-2"
                     >
                       {isLoading ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <Spinner variant="bars" size={16} />
                       ) : (
                         <RefreshCw className="h-4 w-4" />
                       )}

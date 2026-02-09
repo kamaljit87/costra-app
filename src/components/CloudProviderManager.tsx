@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { cloudProvidersAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI } from '../services/api'
 import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check, HelpCircle } from 'lucide-react'
 import { ProviderIcon } from './CloudProviderIcons'
 import IAMPolicyDialog from './IAMPolicyDialog'
@@ -233,6 +233,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       if (modalMode && onClose) {
         onClose()
       }
+      // Auto-sync data for the newly added provider
+      syncAPI.syncAll().catch(() => {})
     } catch (error: any) {
       setError(error.message || 'Failed to add cloud provider')
     } finally {
@@ -299,6 +301,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         setAutomatedConnectionData(null)
         await loadProviders()
         onProviderChange?.()
+        // Auto-sync data for the newly verified provider
+        syncAPI.syncAll().catch(() => {})
       } catch (error: any) {
         setError(error.message || error.error || 'Failed to verify connection')
       } finally {
@@ -654,9 +658,27 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
 
       {/* Add Provider Modal */}
       {showAddModal && (
-        <div className={modalMode ? "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 sm:p-4 overflow-y-auto" : ""}>
-          <div className="bg-white rounded-none sm:rounded-xl shadow-xl max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto sm:my-4">
-            <div className="p-4 sm:p-6">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false)
+              setSelectedProvider('')
+              setAccountAlias('')
+              setCredentials({})
+              setAwsConnectionType('simple')
+              setAutomatedConnectionData(null)
+              setError('')
+              if (modalMode) onClose?.()
+            }
+          }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
+          {/* Modal */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fade-in ring-1 ring-black/5">
+            <div className="p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-gray-900">Add Cloud Provider Account</h3>
                 <button
@@ -668,13 +690,11 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                     setAwsConnectionType('simple')
                     setAutomatedConnectionData(null)
                     setError('')
-                    if (modalMode) {
-                      onClose?.()
-                    }
+                    if (modalMode) onClose?.()
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  ✕
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
@@ -683,7 +703,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                   <label className="block text-sm font-medium text-gray-700 mb-4">
                     Select Provider
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {AVAILABLE_PROVIDERS.map((provider) => {
                       const count = getAccountCount(provider.id)
                       const isSelected = selectedProvider === provider.id
@@ -694,47 +714,45 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             setSelectedProvider(provider.id)
                             setCredentials({})
                             setError('')
-                            // Suggest a default alias
                             setAccountAlias(count > 0 ? `${provider.name} Account ${count + 1}` : '')
                           }}
                           className={`
-                            relative aspect-square p-4 sm:p-5 rounded-xl text-center
+                            relative flex flex-col items-center justify-center p-5 rounded-xl text-center
                             border-2 transition-all duration-200 ease-in-out
                             ${isSelected
-                              ? 'border-accent-500 bg-accent-500/5 shadow-lg shadow-accent-500/20 scale-[1.02]'
+                              ? 'border-accent-500 bg-accent-50 shadow-lg shadow-accent-500/20 scale-[1.02]'
                               : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md hover:scale-[1.01]'
                             }
                             focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2
-                            min-h-[120px] sm:min-h-[140px]
                           `}
                           aria-label={`Select ${provider.name}`}
                         >
                           {/* Provider Icon */}
                           <div className={`flex items-center justify-center mb-3 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
-                            <ProviderIcon providerId={provider.id} size={40} />
+                            <ProviderIcon providerId={provider.id} size={48} />
                           </div>
-                          
+
                           {/* Provider Name */}
-                          <div className={`font-semibold text-sm sm:text-base mb-1 transition-colors ${
-                            isSelected ? 'text-accent-500' : 'text-gray-900'
+                          <div className={`font-semibold text-sm leading-tight transition-colors ${
+                            isSelected ? 'text-accent-600' : 'text-gray-900'
                           }`}>
                             {provider.name}
                           </div>
-                          
+
                           {/* Account Count Badge */}
                           {count > 0 && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              isSelected 
-                                ? 'bg-accent-500 text-white' 
+                            <span className={`mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              isSelected
+                                ? 'bg-accent-500 text-white'
                                 : 'bg-gray-100 text-gray-600'
                             }`}>
                               {count} account{count > 1 ? 's' : ''}
                             </span>
                           )}
-                          
+
                           {/* Selection Indicator */}
                           {isSelected && (
-                            <div className="absolute top-2 right-2 w-5 h-5 bg-accent-500 rounded-full flex items-center justify-center">
+                            <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-accent-500 rounded-full flex items-center justify-center">
                               <Check className="h-3 w-3 text-white" />
                             </div>
                           )}
@@ -1048,16 +1066,20 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
 
       {/* Edit Account Modal */}
       {showEditModal && editingAccount && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) handleCancelEdit() }}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fade-in ring-1 ring-black/5">
+            <div className="p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold text-gray-900">Edit Account Credentials</h3>
                 <button
                   onClick={handleCancelEdit}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
-                  ✕
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 

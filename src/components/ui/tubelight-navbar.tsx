@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
@@ -19,17 +18,6 @@ interface NavBarProps {
 
 export function NavBar({ items, className, inline }: NavBarProps) {
   const location = useLocation()
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   const pill = (
     <div className="flex items-center gap-3 bg-background/95 border border-border backdrop-blur-lg py-1 px-1 rounded-full shadow-lg">

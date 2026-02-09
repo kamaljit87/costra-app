@@ -52,10 +52,10 @@ const DotMap = () => {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
 
   const routes: { start: RoutePoint; end: RoutePoint; color: string }[] = [
-    { start: { x: 100, y: 150, delay: 0 }, end: { x: 200, y: 80, delay: 2 }, color: '#0d9488' },
-    { start: { x: 200, y: 80, delay: 2 }, end: { x: 260, y: 120, delay: 4 }, color: '#0d9488' },
-    { start: { x: 50, y: 50, delay: 1 }, end: { x: 150, y: 180, delay: 3 }, color: '#0d9488' },
-    { start: { x: 280, y: 60, delay: 0.5 }, end: { x: 180, y: 180, delay: 2.5 }, color: '#0d9488' },
+    { start: { x: 100, y: 150, delay: 0 }, end: { x: 200, y: 80, delay: 2 }, color: '#3F4ABF' },
+    { start: { x: 200, y: 80, delay: 2 }, end: { x: 260, y: 120, delay: 4 }, color: '#3F4ABF' },
+    { start: { x: 50, y: 50, delay: 1 }, end: { x: 150, y: 180, delay: 3 }, color: '#3F4ABF' },
+    { start: { x: 280, y: 60, delay: 0.5 }, end: { x: 180, y: 180, delay: 2.5 }, color: '#3F4ABF' },
   ]
 
   const generateDots = (width: number, height: number) => {
@@ -137,11 +137,11 @@ const DotMap = () => {
         context.fill()
         context.beginPath()
         context.arc(x, y, 3, 0, Math.PI * 2)
-        context.fillStyle = '#22B8A0'
+        context.fillStyle = '#3F4ABF'
         context.fill()
         context.beginPath()
         context.arc(x, y, 6, 0, Math.PI * 2)
-        context.fillStyle = 'rgba(34, 184, 160, 0.4)'
+        context.fillStyle = 'rgba(63, 74, 191, 0.4)'
         context.fill()
         if (progress === 1) {
           context.beginPath()

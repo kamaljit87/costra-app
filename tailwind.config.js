@@ -7,33 +7,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary brand color
+        // Primary brand color (#3F4ABF)
         primary: {
-          DEFAULT: '#1F3A5F',
-          50: '#f0f4f8',
-          100: '#d9e2ec',
-          200: '#bcccdc',
-          300: '#9fb3c8',
-          400: '#829ab1',
-          500: '#627d98',
-          600: '#486581',
-          700: '#334e68',
-          800: '#243b53',
-          900: '#1F3A5F',
+          DEFAULT: '#3F4ABF',
+          50: '#EEEFFE',
+          100: '#D8DAFC',
+          200: '#B3B7F9',
+          300: '#8B91F3',
+          400: '#656DEE',
+          500: '#3F4ABF',
+          600: '#353EA2',
+          700: '#2B3285',
+          800: '#212668',
+          900: '#171B4B',
         },
-        // Accent color
+        // Accent color (same as primary for brand consistency)
         accent: {
-          DEFAULT: '#22B8A0',
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#22B8A0',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
+          DEFAULT: '#3F4ABF',
+          50: '#EEEFFE',
+          100: '#D8DAFC',
+          200: '#B3B7F9',
+          300: '#8B91F3',
+          400: '#656DEE',
+          500: '#3F4ABF',
+          600: '#353EA2',
+          700: '#2B3285',
+          800: '#212668',
+          900: '#171B4B',
         },
         // Success green
         success: {
@@ -49,29 +49,16 @@ export default {
           800: '#14532d',
           900: '#14532d',
         },
-        // Frozen Water (keeping for backward compatibility, mapped to accent)
-        frozenWater: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#22B8A0',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-        },
-        // Dark sidebar colors (using frozen-water palette)
+        // Sidebar colors (using primary palette)
         sidebar: {
-          bg: '#297063', // frozen-water-700
-          'bg-dark': '#1c4a42', // frozen-water-800
-          hover: '#379584', // frozen-water-600
-          border: '#379584', // frozen-water-600
-          text: '#daf1ed', // frozen-water-100
-          'text-muted': '#8fd6c9', // frozen-water-300
-          active: '#ffffff', // White for active items
-          'active-bg': '#297063', // frozen-water-700
+          bg: '#2B3285',
+          'bg-dark': '#212668',
+          hover: '#353EA2',
+          border: '#353EA2',
+          text: '#D8DAFC',
+          'text-muted': '#8B91F3',
+          active: '#ffffff',
+          'active-bg': '#2B3285',
         },
         // Surface colors for cards
         surface: {
@@ -143,15 +130,15 @@ export default {
       },
       boxShadow: {
         'xs': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'glow': '0 0 20px rgba(59, 130, 246, 0.15)',
-        'glow-lg': '0 0 40px rgba(59, 130, 246, 0.2)',
+        'glow': '0 0 20px rgba(63, 74, 191, 0.15)',
+        'glow-lg': '0 0 40px rgba(63, 74, 191, 0.2)',
         'card': '0 1px 3px rgba(0, 0, 0, 0.05), 0 10px 30px rgba(0, 0, 0, 0.05)',
         'card-hover': '0 4px 6px rgba(0, 0, 0, 0.05), 0 20px 40px rgba(0, 0, 0, 0.08)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'hero-pattern': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        'mesh-gradient': 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        'hero-pattern': 'linear-gradient(135deg, #3F4ABF 0%, #656DEE 100%)',
+        'mesh-gradient': 'linear-gradient(135deg, #EEEFFE 0%, #D8DAFC 100%)',
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

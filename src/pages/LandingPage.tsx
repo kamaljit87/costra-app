@@ -96,7 +96,7 @@ export default function LandingPage() {
           className="absolute inset-0 z-0 w-full h-full"
           squareSize={4}
           gridGap={6}
-          color="#94a3b8"
+          color="#8B91F3"
           maxOpacity={0.35}
           flickerChance={0.08}
         />

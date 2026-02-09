@@ -10,7 +10,7 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
-import { Sparkles, RefreshCw, Plus } from 'lucide-react'
+import { Sparkles, RefreshCw, Plus, Cloud } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ProviderIcon } from '../components/CloudProviderIcons'
 import CloudProviderManager from '../components/CloudProviderManager'
@@ -57,8 +57,9 @@ export default function Dashboard() {
         }
       })
       setProviderBudgetCounts(counts)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load data:', error)
+      showError('Failed to Load Data', error.message || 'Could not load dashboard data. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -166,7 +167,7 @@ export default function Dashboard() {
                 className="btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 title="Sync fresh data from all cloud providers (clears cache)"
               >
-                <Spinner variant="bars" size={16} />
+                {isSyncing && <Spinner variant="bars" size={16} />}
                 <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
               </button>
             </div>

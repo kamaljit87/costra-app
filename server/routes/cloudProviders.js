@@ -551,7 +551,7 @@ router.post('/aws/:accountId/verify', async (req, res) => {
 
     // Extract connection metadata from credentials or use stored values
     const credentials = account.credentials || {}
-    const roleArn = credentials.roleArn || account.roleArn
+    let roleArn = credentials.roleArn || account.roleArn
     const externalId = credentials.externalId || account.externalId
 
     logger.debug('AWS Connection: Verification request', {

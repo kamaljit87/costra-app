@@ -19,6 +19,7 @@ import RightsizingRecommendations from '../components/RightsizingRecommendations
 import ProductCostCard from '../components/ProductCostCard'
 import TeamCostCard from '../components/TeamCostCard'
 import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users, Download, FileText } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { ProviderIcon } from '../components/CloudProviderIcons'
 
@@ -516,7 +517,7 @@ export default function ProviderDetailPage() {
         <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 xl:px-16 py-10">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <Spinner size={32} className="mx-auto mb-4" />
               <p className="text-gray-600">Loading provider data...</p>
             </div>
           </div>
@@ -728,7 +729,7 @@ export default function ProviderDetailPage() {
                 className="btn-primary flex items-center space-x-2"
                 title="Sync fresh data from cloud provider (clears cache)"
               >
-                <Cloud className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing && <Spinner variant="bars" size={16} />}
                 <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
               </button>
             )}

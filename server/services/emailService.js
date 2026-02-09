@@ -203,12 +203,12 @@ export const sendAnomalyAlert = async (userId, anomalyData) => {
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #1F3A5F; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+        .header { background: #3F4ABF; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
         .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
         .alert { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; }
         .metric { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
         .metric-label { font-weight: 600; }
-        .button { display: inline-block; padding: 12px 24px; background: #1F3A5F; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+        .button { display: inline-block; padding: 12px 24px; background: #3F4ABF; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
       </style>
     </head>
     <body>
@@ -275,7 +275,7 @@ export const sendBudgetAlert = async (userId, budgetData) => {
         .alert { background: ${isExceeded ? '#fee2e2' : '#fef3c7'}; border-left: 4px solid ${isExceeded ? '#DC2626' : '#F59E0B'}; padding: 15px; margin: 15px 0; }
         .metric { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
         .metric-label { font-weight: 600; }
-        .button { display: inline-block; padding: 12px 24px; background: #1F3A5F; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+        .button { display: inline-block; padding: 12px 24px; background: #3F4ABF; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
       </style>
     </head>
     <body>
@@ -333,11 +333,11 @@ export const sendWeeklySummary = async (userId, summaryData) => {
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #1F3A5F; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+        .header { background: #3F4ABF; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
         .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
         .metric { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
         .metric-label { font-weight: 600; }
-        .button { display: inline-block; padding: 12px 24px; background: #1F3A5F; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+        .button { display: inline-block; padding: 12px 24px; background: #3F4ABF; color: white; text-decoration: none; border-radius: 6px; margin-top: 20px; }
       </style>
     </head>
     <body>

@@ -330,11 +330,23 @@ router.post('/', async (req, res) => {
       }
     }
 
-    res.json({
-      message: 'Sync completed',
+    // Use appropriate status code based on results
+    const statusCode = errors.length > 0
+      ? (results.length > 0 ? 207 : 500)  // 207 partial success, 500 total failure
+      : 200
+
+    const responseBody = {
+      message: errors.length > 0
+        ? (results.length > 0 ? 'Sync completed with errors' : 'Sync failed for all accounts')
+        : 'Sync completed',
       results,
       errors: errors.length > 0 ? errors : undefined,
-    })
+    }
+    // Add error field for non-ok responses so frontend apiRequest can parse it
+    if (statusCode >= 400) {
+      responseBody.error = errors.map(e => `${e.accountAlias || e.providerId}: ${e.error}`).join('; ')
+    }
+    res.status(statusCode).json(responseBody)
   } catch (error) {
     logger.error('Sync error', { requestId: req.requestId, userId: req.user?.userId, error: error.message, stack: error.stack })
     res.status(500).json({ error: 'Internal server error' })
@@ -643,12 +655,22 @@ router.post('/:providerId', async (req, res) => {
       }
     }
 
-    res.json({
-      message: 'Sync completed',
+    const statusCode = errors.length > 0
+      ? (results.length > 0 ? 207 : 500)
+      : 200
+
+    const responseBody = {
+      message: errors.length > 0
+        ? (results.length > 0 ? 'Sync completed with errors' : 'Sync failed for all accounts')
+        : 'Sync completed',
       providerId,
       results,
       errors: errors.length > 0 ? errors : undefined,
-    })
+    }
+    if (statusCode >= 400) {
+      responseBody.error = errors.map(e => `Account ${e.accountId}: ${e.error}`).join('; ')
+    }
+    res.status(statusCode).json(responseBody)
   } catch (error) {
     logger.error('Sync provider error', { requestId: req.requestId, userId, providerId, error: error.message, stack: error.stack })
     res.status(500).json({ error: error.message || 'Internal server error' })

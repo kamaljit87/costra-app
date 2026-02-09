@@ -127,14 +127,14 @@ export default function ProviderCostChart({
           <BarChart data={chartData} barCategoryGap="40%" maxBarSize={48}>
             <defs>
               <linearGradient id={`barGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4F5BD5" />
+                <stop offset="0%" stopColor="#656DEE" />
                 <stop offset="100%" stopColor="#3F4ABF" />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} vertical={false} />
             <XAxis
               dataKey="monthLabel"
-              stroke="#9CA3F0"
+              stroke="#8B91F3"
               fontSize={12}
               tickLine={false}
               axisLine={false}
@@ -142,7 +142,7 @@ export default function ProviderCostChart({
               tick={{ fill: '#64748B' }}
             />
             <YAxis
-              stroke="#9CA3F0"
+              stroke="#8B91F3"
               fontSize={12}
               tickLine={false}
               axisLine={false}
@@ -157,7 +157,7 @@ export default function ProviderCostChart({
             />
             <Tooltip
               content={<CustomTooltip />}
-              cursor={{ fill: '#E0E2FB', opacity: 0.5 }}
+              cursor={{ fill: '#D8DAFC', opacity: 0.5 }}
             />
             <Bar
               dataKey="cost"
@@ -170,14 +170,14 @@ export default function ProviderCostChart({
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id={`areaGradient-${providerId}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4F5BD5" stopOpacity={0.2} />
-                <stop offset="100%" stopColor="#4F5BD5" stopOpacity={0} />
+                <stop offset="0%" stopColor="#3F4ABF" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#3F4ABF" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} vertical={false} />
             <XAxis
               dataKey="date"
-              stroke="#9CA3F0"
+              stroke="#8B91F3"
               fontSize={12}
               tickLine={false}
               axisLine={false}
@@ -189,7 +189,7 @@ export default function ProviderCostChart({
               }}
             />
             <YAxis
-              stroke="#9CA3F0"
+              stroke="#8B91F3"
               fontSize={12}
               tickLine={false}
               axisLine={false}
@@ -204,12 +204,12 @@ export default function ProviderCostChart({
             />
             <Tooltip
               content={<CustomTooltip />}
-              cursor={{ stroke: '#4F5BD5', strokeWidth: 1, strokeDasharray: '3 3' }}
+              cursor={{ stroke: '#3F4ABF', strokeWidth: 1, strokeDasharray: '3 3' }}
             />
             <Area
               type="monotone"
               dataKey="cost"
-              stroke="#4F5BD5"
+              stroke="#3F4ABF"
               strokeWidth={2.5}
               fill={`url(#areaGradient-${providerId})`}
             />
