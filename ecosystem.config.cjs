@@ -1,9 +1,10 @@
-export default {
+module.exports = {
   apps: [
     {
       name: 'costra-backend',
       script: 'server/server.js',
       cwd: '/home/vagrant/costra',
+      node_args: '--experimental-modules',
       instances: 1,
       exec_mode: 'fork',
       env: {
@@ -24,5 +25,22 @@ export default {
       wait_ready: true,
       listen_timeout: 10000,
     },
+    {
+      name: 'costra-frontend',
+      script: 'node_modules/.bin/vite',
+      cwd: '/home/vagrant/costra',
+      args: '--host',
+      instances: 1,
+      exec_mode: 'fork',
+      env: {
+        NODE_ENV: 'development',
+      },
+      error_file: './logs/frontend-error.log',
+      out_file: './logs/frontend-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      autorestart: true,
+      watch: false,
+    },
   ],
-}
+};

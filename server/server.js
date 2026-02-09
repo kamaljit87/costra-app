@@ -277,6 +277,10 @@ if (process.env.NODE_ENV !== 'test') {
       environment: process.env.NODE_ENV || 'development',
       nodeVersion: process.version,
     })
+    // Signal PM2 that the server is ready to accept connections
+    if (process.send) {
+      process.send('ready')
+    }
   })
 }
 

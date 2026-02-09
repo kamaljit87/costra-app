@@ -11,7 +11,7 @@
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest tests/unit",
     "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest tests/integration",
-    "pm2:start": "pm2 start ../ecosystem.config.js --only costra-backend",
+    "pm2:start": "pm2 start ../ecosystem.config.cjs --only costra-backend",
     "pm2:stop": "pm2 stop costra-backend",
     "pm2:restart": "pm2 restart costra-backend",
     "pm2:logs": "pm2 logs costra-backend",
