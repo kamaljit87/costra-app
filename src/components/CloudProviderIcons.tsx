@@ -1,4 +1,26 @@
-import React from 'react'
+import React, { useState } from 'react'
+
+/** Base path for custom provider icons. Place SVG or PNG files here to override built-in icons. */
+export const PROVIDER_ICONS_BASE = '/icons/providers'
+
+/** Maps providerId to icon filename (without extension). Used to load custom icons from public folder. */
+export const getProviderIconFilename = (providerId: string): string | null => {
+  const id = providerId.toLowerCase()
+  const map: Record<string, string> = {
+    aws: 'aws',
+    azure: 'azure',
+    gcp: 'gcp',
+    google: 'gcp',
+    digitalocean: 'digitalocean',
+    do: 'digitalocean',
+    linode: 'linode',
+    akamai: 'linode',
+    vultr: 'vultr',
+    ibm: 'ibm',
+    ibmcloud: 'ibm',
+  }
+  return map[id] ?? null
+}
 
 interface IconProps {
   className?: string
@@ -109,36 +131,99 @@ export const CloudIcon: React.FC<IconProps> = ({ className = '', size = 24 }) =>
   </svg>
 )
 
-// Provider icon component that returns the appropriate icon
+// Inline icon components by provider id (for fallback when custom image is missing)
+const PROVIDER_SVG_MAP: Record<string, React.FC<IconProps>> = {
+  aws: AWSIcon,
+  azure: AzureIcon,
+  gcp: GCPIcon,
+  google: GCPIcon,
+  digitalocean: DigitalOceanIcon,
+  do: DigitalOceanIcon,
+  linode: LinodeIcon,
+  akamai: LinodeIcon,
+  vultr: VultrIcon,
+  ibm: IBMCloudIcon,
+  ibmcloud: IBMCloudIcon,
+}
+
+function getInlineIcon(providerId: string): React.FC<IconProps> {
+  const id = providerId.toLowerCase()
+  return PROVIDER_SVG_MAP[id] ?? CloudIcon
+}
+
+// Provider icon component: uses custom image from /icons/providers/{name}.svg or .png if present, else inline SVG
 interface ProviderIconProps extends IconProps {
   providerId: string
 }
 
 export const ProviderIcon: React.FC<ProviderIconProps> = ({ providerId, className = '', size = 24 }) => {
-  const id = providerId.toLowerCase()
-  
-  switch (id) {
-    case 'aws':
-      return <AWSIcon className={className} size={size} />
-    case 'azure':
-      return <AzureIcon className={className} size={size} />
-    case 'gcp':
-    case 'google':
-      return <GCPIcon className={className} size={size} />
-    case 'digitalocean':
-    case 'do':
-      return <DigitalOceanIcon className={className} size={size} />
-    case 'linode':
-    case 'akamai':
-      return <LinodeIcon className={className} size={size} />
-    case 'vultr':
-      return <VultrIcon className={className} size={size} />
-    case 'ibm':
-    case 'ibmcloud':
-      return <IBMCloudIcon className={className} size={size} />
-    default:
-      return <CloudIcon className={className} size={size} />
+  const filename = getProviderIconFilename(providerId)
+  const [useFallback, setUseFallback] = useState(false)
+  const InlineIcon = getInlineIcon(providerId)
+
+  // No custom path for this provider, or we already failed loading custom icon
+  if (!filename || useFallback) {
+    return <InlineIcon className={className} size={size} />
   }
+
+  // Try SVG first, then PNG (img onError will trigger fallback)
+  const svgSrc = `${PROVIDER_ICONS_BASE}/${filename}.svg`
+  const pngSrc = `${PROVIDER_ICONS_BASE}/${filename}.png`
+
+  return (
+    <ProviderIconImage
+      src={svgSrc}
+      fallbackSrc={pngSrc}
+      alt=""
+      width={size}
+      height={size}
+      className={className}
+      onError={() => setUseFallback(true)}
+    />
+  )
+}
+
+// Renders img; on error tries fallbackSrc (PNG) once, then calls onError so parent can render inline SVG
+function ProviderIconImage({
+  src,
+  fallbackSrc,
+  alt,
+  width,
+  height,
+  className,
+  onError,
+}: {
+  src: string
+  fallbackSrc: string
+  alt: string
+  width: number
+  height: number
+  className: string
+  onError: () => void
+}) {
+  const [tryPng, setTryPng] = useState(false)
+  const currentSrc = tryPng ? fallbackSrc : src
+
+  const handleError = () => {
+    if (!tryPng) {
+      setTryPng(true)
+    } else {
+      onError()
+    }
+  }
+
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      loading="lazy"
+      onError={handleError}
+      style={{ objectFit: 'contain' }}
+    />
+  )
 }
 
 // Helper to get provider color

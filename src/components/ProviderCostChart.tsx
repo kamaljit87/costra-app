@@ -1,7 +1,7 @@
 import { useCurrency } from '../contexts/CurrencyContext'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
+import { ProviderIcon } from './CloudProviderIcons'
 
 interface CostDataPoint {
   date: string
@@ -73,8 +73,6 @@ export default function ProviderCostChart({
     }
   }
 
-  const providerColor = getProviderColor(providerId)
-
   // Modern tooltip style
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -97,13 +95,7 @@ export default function ProviderCostChart({
       <div className="bg-white rounded-2xl border border-surface-200 shadow-card">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-3">
-          <div
-            className="w-12 h-12 flex items-center justify-center rounded-xl"
-            style={{
-              backgroundColor: `${providerColor}15`,
-              boxShadow: `0 4px 14px ${providerColor}15`
-            }}
-          >
+          <div className="w-12 h-12 flex items-center justify-center rounded-xl shrink-0">
             <ProviderIcon providerId={providerId} size={26} />
           </div>
           <div>

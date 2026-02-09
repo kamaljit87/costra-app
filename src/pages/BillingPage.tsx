@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Check, X, Loader2, CreditCard, Calendar, AlertCircle } from 'lucide-react'
+import { Check, Loader2, CreditCard, Calendar, AlertCircle } from 'lucide-react'
 import { billingAPI } from '../services/api'
-import UpgradePrompt from '../components/UpgradePrompt'
 
 interface Subscription {
   planType: string
@@ -190,9 +189,9 @@ export default function BillingPage() {
             {currentPlan === 'trial' ? (
               <>
                 <div className="text-2xl font-bold text-accent-700">
-                  {planInfo.price.inr} <span className="text-lg text-gray-500">/ {planInfo.period}</span>
+                  {PLANS.trial.price.inr} <span className="text-lg text-gray-500">/ {PLANS.trial.period}</span>
                 </div>
-                <div className="text-sm text-gray-500 mt-1">{planInfo.price.usd} / {planInfo.period}</div>
+                <div className="text-sm text-gray-500 mt-1">{PLANS.trial.price.usd} / {PLANS.trial.period}</div>
               </>
             ) : (
               <>
@@ -232,17 +231,17 @@ export default function BillingPage() {
             </div>
           )}
           
-          {status?.daysRemaining !== null && (
+          {status?.daysRemaining != null && (
             <div className="flex items-center space-x-2">
               <Calendar className="h-5 w-5 text-gray-400" />
               <div>
                 <p className="text-sm text-gray-500">
-                  {status.isTrial ? 'Trial ends in' : 'Next billing'}
+                  {status?.isTrial ? 'Trial ends in' : 'Next billing'}
                 </p>
                 <p className="font-medium text-gray-900">
-                  {status.daysRemaining} {status.daysRemaining === 1 ? 'day' : 'days'}
+                  {status?.daysRemaining} {status?.daysRemaining === 1 ? 'day' : 'days'}
                 </p>
-                {status.nextBillingDate && !status.isTrial && (
+                {status?.nextBillingDate && !status?.isTrial && (
                   <p className="text-xs text-gray-400 mt-0.5">
                     {formatDate(status.nextBillingDate)}
                   </p>
@@ -255,7 +254,7 @@ export default function BillingPage() {
             <CreditCard className="h-5 w-5 text-gray-400" />
             <div>
               <p className="text-sm text-gray-500">History</p>
-              <p className="font-medium text-gray-900">{status?.historicalDataMonths || 0} months</p>
+              <p className="font-medium text-gray-900">{status?.historicalDataMonths ?? 0} months</p>
             </div>
           </div>
         </div>

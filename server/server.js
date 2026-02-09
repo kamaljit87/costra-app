@@ -28,7 +28,6 @@ import { fileURLToPath } from 'url'
 import logger from './utils/logger.js'
 import { requestIdMiddleware } from './middleware/requestId.js'
 import { errorHandler } from './middleware/errorHandler.js'
-import { apiLimiter } from './middleware/rateLimiter.js'
 import { performanceMonitor } from './middleware/performanceMonitor.js'
 import { metricsMiddleware } from './middleware/metrics.js'
 import healthRoutes from './routes/health.js'
@@ -155,9 +154,6 @@ app.use(performanceMonitor)
 
 // Metrics collection middleware (must be before routes)
 app.use(metricsMiddleware)
-
-// Apply general API rate limiting to all routes
-app.use('/api', apiLimiter)
 
 // Initialize database
 initDatabase().catch((error) => {

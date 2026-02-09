@@ -11,7 +11,7 @@ import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
 import { Sparkles, RefreshCw, Cloud, Plus } from 'lucide-react'
-import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
+import { ProviderIcon } from '../components/CloudProviderIcons'
 import CloudProviderManager from '../components/CloudProviderManager'
 
 interface ConfiguredProvider {
@@ -283,10 +283,7 @@ export default function Dashboard() {
                               <div className="card">
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="flex items-center space-x-4">
-                                    <div
-                                      className="w-14 h-14 flex items-center justify-center rounded-2xl"
-                                      style={{ backgroundColor: `${getProviderColor(data.provider.id)}15` }}
-                                    >
+                                    <div className="w-14 h-14 flex items-center justify-center rounded-2xl shrink-0">
                                       <ProviderIcon providerId={data.provider.id} size={32} />
                                     </div>
                                     <div>

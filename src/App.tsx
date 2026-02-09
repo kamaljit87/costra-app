@@ -5,8 +5,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
+import LoginTravelPage from './pages/LoginTravelPage'
+import SignupTravelPage from './pages/SignupTravelPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import ProviderDetailPage from './pages/ProviderDetailPage'
@@ -37,8 +37,8 @@ function App() {
             <NotificationProvider>
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/login" element={<LoginTravelPage />} />
+            <Route path="/signup" element={<SignupTravelPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/contact" element={<ContactPage />} />

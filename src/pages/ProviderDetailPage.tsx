@@ -20,7 +20,7 @@ import ProductCostCard from '../components/ProductCostCard'
 import TeamCostCard from '../components/TeamCostCard'
 import { ArrowLeft, TrendingUp, TrendingDown, Calendar, Filter, BarChart2, LineChart, Cloud, Layers, ChevronDown, X, SlidersHorizontal, Search, ArrowUpDown, DollarSign, LayoutDashboard, Package, TrendingUp as TrendingUpIcon, Users, Download, FileText } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
+import { ProviderIcon } from '../components/CloudProviderIcons'
 
 // Helper function to get colors for sub-service categories
 const getCategoryColor = (category: string): string => {
@@ -697,9 +697,8 @@ export default function ProviderDetailPage() {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <div 
-                className="w-14 h-14 flex items-center justify-center rounded-2xl"
-                style={{ backgroundColor: `${getProviderColor(providerId || '')}15` }}
+              <div
+                className="w-14 h-14 flex items-center justify-center rounded-2xl shrink-0"
                 title={`${providerData.provider.name} cloud provider`}
               >
                 <ProviderIcon providerId={providerId || ''} size={32} />

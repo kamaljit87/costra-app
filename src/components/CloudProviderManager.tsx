@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { cloudProvidersAPI } from '../services/api'
 import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check, HelpCircle } from 'lucide-react'
-import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
+import { ProviderIcon } from './CloudProviderIcons'
 import IAMPolicyDialog from './IAMPolicyDialog'
 
 interface CloudProvider {
@@ -536,10 +536,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                     }`}
                   >
                     <div className="flex items-center space-x-4">
-                      <div 
-                        className="w-10 h-10 flex items-center justify-center rounded-lg" 
-                        style={{ backgroundColor: `${getProviderColor(provider.providerId)}15` }}
-                      >
+                      <div className="w-10 h-10 flex items-center justify-center rounded-lg shrink-0">
                         <ProviderIcon providerId={provider.providerId} size={24} />
                       </div>
                       <div>

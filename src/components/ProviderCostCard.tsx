@@ -1,7 +1,7 @@
 import { useCurrency } from '../contexts/CurrencyContext'
 import { CostData } from '../services/costService'
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react'
-import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
+import { ProviderIcon } from './CloudProviderIcons'
 
 interface ProviderCostCardProps {
   data: CostData
@@ -19,13 +19,7 @@ export default function ProviderCostCard({ data }: ProviderCostCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <div className="flex items-center mb-2">
-            <div 
-              className="w-10 h-10 flex items-center justify-center rounded-2xl mr-3 group-hover:scale-110 transition-transform duration-300"
-              style={{ 
-                backgroundColor: `${getProviderColor(data.provider.id)}15`,
-                boxShadow: `0 4px 12px ${getProviderColor(data.provider.id)}20`
-              }}
-            >
+            <div className="w-10 h-10 flex items-center justify-center rounded-2xl mr-3 group-hover:scale-110 transition-transform duration-300 shrink-0">
               <ProviderIcon providerId={data.provider.id} size={24} />
             </div>
             <h3 className="text-lg font-semibold text-gray-900">{data.provider.name}</h3>

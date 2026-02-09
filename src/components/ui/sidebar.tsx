@@ -66,42 +66,6 @@ const AnimatedMenuToggle = ({
   </button>
 )
 
-const CollapsibleSection = ({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) => {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div className="mb-4">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between py-2 px-4 rounded-xl hover:bg-surface-200 text-gray-900"
-        onClick={() => setOpen(!open)}
-      >
-        <span className="font-semibold">{title}</span>
-        <span className="text-gray-500 text-sm">{open ? '−' : '+'}</span>
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-          >
-            <div className="p-2">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
 export interface NavItem {
   to: string
   label: string

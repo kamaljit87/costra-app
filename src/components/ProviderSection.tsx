@@ -4,7 +4,7 @@ import { useCurrency } from '../contexts/CurrencyContext'
 import ProviderCostChart from './ProviderCostChart'
 import { ArrowRight, TrendingUp, TrendingDown, Target, PiggyBank } from 'lucide-react'
 import { aggregateToMonthly } from '../services/costService'
-import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
+import { ProviderIcon } from './CloudProviderIcons'
 
 interface CostDataPoint {
   date: string
@@ -67,18 +67,13 @@ export default function ProviderSection({
     return monthlyData.slice(-monthsToShow)
   }
 
-  const providerColor = getProviderColor(providerId)
-
   return (
     <div className="card group animate-fade-in">
       {/* Provider Header - Compact */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-4">
           <div
-            className="w-14 h-14 flex items-center justify-center rounded-2xl transition-all duration-200"
-            style={{
-              backgroundColor: `${providerColor}15`
-            }}
+            className="w-14 h-14 flex items-center justify-center rounded-2xl transition-all duration-200 shrink-0"
           >
             <ProviderIcon providerId={providerId} size={32} />
           </div>

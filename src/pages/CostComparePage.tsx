@@ -305,10 +305,7 @@ export default function CostComparePage() {
     return (
       <div className="card flex-1 min-w-0">
         <div className="flex items-center space-x-2 mb-4">
-          <div
-            className="w-8 h-8 flex items-center justify-center rounded-lg"
-            style={{ backgroundColor: `${providerColor}15` }}
-          >
+          <div className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0">
             {panel.providerId ? (
               <ProviderIcon providerId={panel.providerId} size={20} />
             ) : (
