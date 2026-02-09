@@ -42,11 +42,15 @@ export interface CostDataPoint {
 
 import { costDataAPI } from './api'
 
-// Helper function to slice daily data for different periods
-const sliceDailyData = (dailyData: CostDataPoint[], days: number): CostDataPoint[] => {
-  if (dailyData.length === 0) return []
-  const sorted = [...dailyData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  return sorted.slice(-days)
+// Slice daily data starting from the 1st of N months ago
+const sliceByMonths = (sortedDailyData: CostDataPoint[], monthsBack: number): CostDataPoint[] => {
+  if (sortedDailyData.length === 0) return []
+  const cutoff = new Date()
+  cutoff.setDate(1)
+  cutoff.setMonth(cutoff.getMonth() - monthsBack)
+  cutoff.setHours(0, 0, 0, 0)
+  const cutoffStr = cutoff.toISOString().split('T')[0]
+  return sortedDailyData.filter(d => d.date >= cutoffStr)
 }
 
 // Helper function to aggregate daily data into monthly data
@@ -144,12 +148,12 @@ export const getCostData = async (isDemoMode: boolean = false): Promise<CostData
           
           return {
             ...data,
-            chartData1Month: sliceDailyData(sortedDaily, 30),
-            chartData2Months: sliceDailyData(sortedDaily, 60),
-            chartData3Months: sliceDailyData(sortedDaily, 90),
-            chartData4Months: sliceDailyData(sortedDaily, 120),
-            chartData6Months: sliceDailyData(sortedDaily, 180),
-            chartData12Months: sliceDailyData(sortedDaily, 365),
+            chartData1Month: sliceByMonths(sortedDaily, 0),
+            chartData2Months: sliceByMonths(sortedDaily, 1),
+            chartData3Months: sliceByMonths(sortedDaily, 2),
+            chartData4Months: sliceByMonths(sortedDaily, 3),
+            chartData6Months: sliceByMonths(sortedDaily, 5),
+            chartData12Months: sliceByMonths(sortedDaily, 11),
             allHistoricalData: sortedDaily,
           }
         } catch (dailyError) {
@@ -158,12 +162,12 @@ export const getCostData = async (isDemoMode: boolean = false): Promise<CostData
           const allHistoricalData = generateHistoricalData(data.currentMonth || 100, 365, 0.15)
           return {
             ...data,
-            chartData1Month: sliceDailyData(allHistoricalData, 30),
-            chartData2Months: sliceDailyData(allHistoricalData, 60),
-            chartData3Months: sliceDailyData(allHistoricalData, 90),
-            chartData4Months: sliceDailyData(allHistoricalData, 120),
-            chartData6Months: sliceDailyData(allHistoricalData, 180),
-            chartData12Months: sliceDailyData(allHistoricalData, 365),
+            chartData1Month: sliceByMonths(allHistoricalData, 0),
+            chartData2Months: sliceByMonths(allHistoricalData, 1),
+            chartData3Months: sliceByMonths(allHistoricalData, 2),
+            chartData4Months: sliceByMonths(allHistoricalData, 3),
+            chartData6Months: sliceByMonths(allHistoricalData, 5),
+            chartData12Months: sliceByMonths(allHistoricalData, 11),
             allHistoricalData,
           }
         }
@@ -183,12 +187,12 @@ const getMockCostData = (): CostData[] => {
   const generateAllData = (baseCost: number) => {
     const allHistoricalData = generateHistoricalData(baseCost, 365, 0.15)
     return {
-      chartData1Month: sliceDailyData(allHistoricalData, 30),
-      chartData2Months: sliceDailyData(allHistoricalData, 60),
-      chartData3Months: sliceDailyData(allHistoricalData, 90),
-      chartData4Months: sliceDailyData(allHistoricalData, 120),
-      chartData6Months: sliceDailyData(allHistoricalData, 180),
-      chartData12Months: sliceDailyData(allHistoricalData, 365),
+      chartData1Month: sliceByMonths(allHistoricalData, 0),
+      chartData2Months: sliceByMonths(allHistoricalData, 1),
+      chartData3Months: sliceByMonths(allHistoricalData, 2),
+      chartData4Months: sliceByMonths(allHistoricalData, 3),
+      chartData6Months: sliceByMonths(allHistoricalData, 5),
+      chartData12Months: sliceByMonths(allHistoricalData, 11),
       allHistoricalData,
     }
   }
@@ -305,6 +309,10 @@ const getMockSavingsPlans = (): SavingsPlan[] => {
 export type PeriodType = '1month' | '2months' | '3months' | '4months' | '6months' | '12months' | 'custom'
 
 // Helper function to get date range for a period
+// All periods start from the 1st of a calendar month:
+//   '1month'  → 1st of current month to now
+//   '2months' → 1st of previous month to now
+//   '3months' → 1st of 2 months ago to now  (etc.)
 export const getDateRangeForPeriod = (period: PeriodType, customStartDate?: string, customEndDate?: string): { startDate: Date, endDate: Date } => {
   const endDate = new Date()
   endDate.setHours(23, 59, 59, 999)
@@ -314,8 +322,6 @@ export const getDateRangeForPeriod = (period: PeriodType, customStartDate?: stri
     const parsedStart = new Date(customStartDate)
     const parsedEnd = new Date(customEndDate)
 
-    // If the user (or a bug) produces an invalid or out-of-range year like 0000-12-31,
-    // clamp to a sane default (last 12 months) instead of sending bad dates to the backend.
     const isValidDate = (d: Date) => !isNaN(d.getTime())
     const isReasonableYear = (d: Date) => d.getFullYear() >= 1970 && d.getFullYear() <= 2100
 
@@ -331,36 +337,28 @@ export const getDateRangeForPeriod = (period: PeriodType, customStartDate?: stri
         customStartDate,
         customEndDate,
       })
-      // Fallback: clamp to last 12 months to avoid backend date/time errors
-      startDate.setDate(startDate.getDate() - 365)
+      // Fallback: 1st of current month
+      startDate.setDate(1)
       startDate.setHours(0, 0, 0, 0)
       return { startDate, endDate }
     }
   }
 
+  // monthsBack: how many months before the current month to start from
+  // '1month' = current month only (0 months back), '2months' = 1 month back, etc.
+  let monthsBack = 0
   switch (period) {
-    case '1month':
-      startDate.setDate(startDate.getDate() - 30)
-      break
-    case '2months':
-      startDate.setDate(startDate.getDate() - 60)
-      break
-    case '3months':
-      startDate.setDate(startDate.getDate() - 90)
-      break
-    case '4months':
-      startDate.setDate(startDate.getDate() - 120)
-      break
-    case '6months':
-      startDate.setDate(startDate.getDate() - 180)
-      break
-    case '12months':
-      startDate.setDate(startDate.getDate() - 365)
-      break
-    default:
-      startDate.setDate(startDate.getDate() - 30)
+    case '1month':  monthsBack = 0;  break
+    case '2months': monthsBack = 1;  break
+    case '3months': monthsBack = 2;  break
+    case '4months': monthsBack = 3;  break
+    case '6months': monthsBack = 5;  break
+    case '12months': monthsBack = 11; break
+    default:        monthsBack = 0;
   }
 
+  startDate.setDate(1)
+  startDate.setMonth(startDate.getMonth() - monthsBack)
   startDate.setHours(0, 0, 0, 0)
   return { startDate, endDate }
 }
@@ -368,14 +366,14 @@ export const getDateRangeForPeriod = (period: PeriodType, customStartDate?: stri
 // Get period label for display
 export const getPeriodLabel = (period: PeriodType): string => {
   switch (period) {
-    case '1month': return '1 Month'
+    case '1month': return 'Current Month'
     case '2months': return '2 Months'
     case '3months': return '3 Months'
     case '4months': return '4 Months'
     case '6months': return '6 Months'
     case '12months': return '1 Year'
     case 'custom': return 'Custom'
-    default: return '1 Month'
+    default: return 'Current Month'
   }
 }
 
@@ -461,12 +459,12 @@ export const getProviderCostDetails = async (
 
       return {
         ...providerData,
-        chartData1Month: sliceDailyData(sortedDaily, 30),
-        chartData2Months: sliceDailyData(sortedDaily, 60),
-        chartData3Months: sliceDailyData(sortedDaily, 90),
-        chartData4Months: sliceDailyData(sortedDaily, 120),
-        chartData6Months: sliceDailyData(sortedDaily, 180),
-        chartData12Months: sliceDailyData(sortedDaily, 365),
+        chartData1Month: sliceByMonths(sortedDaily, 0),
+        chartData2Months: sliceByMonths(sortedDaily, 1),
+        chartData3Months: sliceByMonths(sortedDaily, 2),
+        chartData4Months: sliceByMonths(sortedDaily, 3),
+        chartData6Months: sliceByMonths(sortedDaily, 5),
+        chartData12Months: sliceByMonths(sortedDaily, 11),
         allHistoricalData: sortedDaily,
       }
     } catch (dailyError) {
@@ -475,12 +473,12 @@ export const getProviderCostDetails = async (
       const allHistoricalData = generateHistoricalData(providerData.currentMonth, 365, 0.15)
       return {
         ...providerData,
-        chartData1Month: sliceDailyData(allHistoricalData, 30),
-        chartData2Months: sliceDailyData(allHistoricalData, 60),
-        chartData3Months: sliceDailyData(allHistoricalData, 90),
-        chartData4Months: sliceDailyData(allHistoricalData, 120),
-        chartData6Months: sliceDailyData(allHistoricalData, 180),
-        chartData12Months: sliceDailyData(allHistoricalData, 365),
+        chartData1Month: sliceByMonths(allHistoricalData, 0),
+        chartData2Months: sliceByMonths(allHistoricalData, 1),
+        chartData3Months: sliceByMonths(allHistoricalData, 2),
+        chartData4Months: sliceByMonths(allHistoricalData, 3),
+        chartData6Months: sliceByMonths(allHistoricalData, 5),
+        chartData12Months: sliceByMonths(allHistoricalData, 11),
         allHistoricalData,
       }
     }

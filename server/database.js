@@ -1142,13 +1142,23 @@ export const getCostDataForUser = async (userId, month, year) => {
 
     const costData = result.rows
 
-    // Get service costs for each cost data entry
-    for (const cost of costData) {
+    // Fetch all service costs in a single query instead of N+1
+    const costDataIds = costData.map(c => c.id)
+    if (costDataIds.length > 0) {
       const servicesResult = await client.query(
-        'SELECT * FROM service_costs WHERE cost_data_id = $1',
-        [cost.id]
+        'SELECT * FROM service_costs WHERE cost_data_id = ANY($1::int[])',
+        [costDataIds]
       )
-      cost.services = servicesResult.rows
+      const servicesMap = new Map()
+      for (const row of servicesResult.rows) {
+        if (!servicesMap.has(row.cost_data_id)) servicesMap.set(row.cost_data_id, [])
+        servicesMap.get(row.cost_data_id).push(row)
+      }
+      for (const cost of costData) {
+        cost.services = servicesMap.get(cost.id) || []
+      }
+    } else {
+      for (const cost of costData) cost.services = []
     }
 
     return costData
@@ -1874,43 +1884,55 @@ export const saveBulkDailyCostData = async (userId, providerId, dailyData, accou
     await client.query('BEGIN')
     
     try {
-      let savedCount = 0
-      for (const { date, cost } of dailyData) {
-        // Ensure date is in YYYY-MM-DD format
+      // Normalize all dates and costs upfront
+      const normalized = dailyData.map(({ date, cost }) => {
         let dateStr
         if (date instanceof Date) {
           dateStr = date.toISOString().split('T')[0]
         } else if (typeof date === 'string') {
-          // If it's already in YYYY-MM-DD format, use it; otherwise try to parse
-          if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            dateStr = date
-          } else {
-            dateStr = new Date(date).toISOString().split('T')[0]
-          }
+          dateStr = date.match(/^\d{4}-\d{2}-\d{2}$/) ? date : new Date(date).toISOString().split('T')[0]
         } else {
           dateStr = String(date).split('T')[0]
         }
-        
-        const costValue = parseFloat(cost) || 0
-        
+        return { dateStr, costValue: parseFloat(cost) || 0 }
+      })
+
+      // Batch insert in chunks to stay within PG parameter limits
+      const BATCH_SIZE = 200
+      let savedCount = 0
+      for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
+        const batch = normalized.slice(i, i + BATCH_SIZE)
+        const values = []
+        const params = []
+
         if (accountId) {
+          batch.forEach(({ dateStr, costValue }, idx) => {
+            const offset = idx * 5
+            values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}::date, $${offset + 5}, CURRENT_TIMESTAMP)`)
+            params.push(userId, providerId, accountId, dateStr, costValue)
+          })
           await client.query(
             `INSERT INTO daily_cost_data (user_id, provider_id, account_id, date, cost, updated_at)
-             VALUES ($1, $2, $3, $4::date, $5, CURRENT_TIMESTAMP)
+             VALUES ${values.join(', ')}
              ON CONFLICT (user_id, provider_id, date)
              DO UPDATE SET cost = EXCLUDED.cost, account_id = EXCLUDED.account_id, updated_at = CURRENT_TIMESTAMP`,
-            [userId, providerId, accountId, dateStr, costValue]
+            params
           )
         } else {
+          batch.forEach(({ dateStr, costValue }, idx) => {
+            const offset = idx * 4
+            values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}::date, $${offset + 4}, CURRENT_TIMESTAMP)`)
+            params.push(userId, providerId, dateStr, costValue)
+          })
           await client.query(
             `INSERT INTO daily_cost_data (user_id, provider_id, date, cost, updated_at)
-             VALUES ($1, $2, $3::date, $4, CURRENT_TIMESTAMP)
+             VALUES ${values.join(', ')}
              ON CONFLICT (user_id, provider_id, date)
              DO UPDATE SET cost = EXCLUDED.cost, updated_at = CURRENT_TIMESTAMP`,
-            [userId, providerId, dateStr, costValue]
+            params
           )
         }
-        savedCount++
+        savedCount += batch.length
       }
       await client.query('COMMIT')
       logger.info('Successfully saved bulk daily cost data', { userId, providerId, accountId, savedCount })

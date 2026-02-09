@@ -29,6 +29,171 @@ router.use(authenticateToken)
 router.use(syncLimiter)
 
 /**
+ * Sync a single account — extracted for parallel execution.
+ * Returns { result } on success or { error } on failure.
+ */
+async function syncSingleAccount({ account, userId, requestId, startDate, endDate, currentMonth, currentYear, forceRefresh }) {
+  const accountLabel = account.account_alias || `${account.provider_id} (${account.id})`
+  logger.info('Processing account', { requestId, userId, accountId: account.id, accountLabel })
+
+  try {
+    const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
+
+    if (!accountData) {
+      logger.warn('No account data found', { requestId, userId, accountId: account.id, accountLabel })
+      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Account not found' } }
+    }
+
+    // Handle automated AWS connections (role-based)
+    let credentialsToUse = accountData.credentials || {}
+    if (account.provider_id === 'aws' && accountData.connectionType?.startsWith('automated')) {
+      logger.info('Automated AWS connection detected', { requestId, userId, accountId: account.id, accountLabel })
+
+      if (!accountData.roleArn || !accountData.externalId) {
+        logger.warn('Missing roleArn or externalId for automated connection', { requestId, userId, accountId: account.id, accountLabel })
+        return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Automated connection missing role ARN or external ID' } }
+      }
+
+      try {
+        const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+        const stsClient = new STSClient({ region: 'us-east-1' })
+        const assumeRoleCommand = new AssumeRoleCommand({
+          RoleArn: accountData.roleArn,
+          RoleSessionName: `costra-sync-${account.id}-${Date.now()}`,
+          ExternalId: accountData.externalId,
+          DurationSeconds: 3600,
+        })
+
+        logger.info('Assuming role for automated connection', { requestId, userId, accountId: account.id, accountLabel, roleArn: accountData.roleArn })
+        const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
+
+        if (!assumeRoleResponse.Credentials) {
+          throw new Error('Failed to assume role: No credentials returned')
+        }
+
+        credentialsToUse = {
+          accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
+          secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
+          sessionToken: assumeRoleResponse.Credentials.SessionToken,
+          region: 'us-east-1',
+        }
+        logger.info('Successfully assumed role', { requestId, userId, accountId: account.id, accountLabel })
+      } catch (assumeError) {
+        logger.error('Failed to assume role for automated connection', { requestId, userId, accountId: account.id, accountLabel, error: assumeError.message, stack: assumeError.stack, code: assumeError.code })
+        let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
+        if (assumeError.message?.includes('Could not load credentials') || assumeError.code === 'CredentialsError') {
+          errorMessage = 'Server AWS credentials not configured. The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials.'
+        } else if (assumeError.code === 'AccessDenied') {
+          errorMessage = 'Access denied when assuming role. Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra\'s AWS account has permission to assume the role.'
+        } else if (assumeError.code === 'InvalidClientTokenId') {
+          errorMessage = 'Invalid AWS credentials. Please check that the server\'s AWS credentials are valid and have permission to assume roles.'
+        }
+        return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: errorMessage } }
+      }
+    } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 ||
+               !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
+      logger.warn('No valid credentials found', { requestId, userId, accountId: account.id, accountLabel })
+      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Credentials not found or invalid' } }
+    }
+
+    logger.debug('Using credentials for account', { requestId, userId, accountId: account.id, accountLabel, connectionType: accountData.connectionType || 'manual' })
+
+    // Check cache first (unless force refresh is requested)
+    const cacheKey = `account-${account.id}-${startDate}-${endDate}`
+    let costData = forceRefresh ? null : await getCachedCostData(userId, account.provider_id, cacheKey)
+
+    if (costData && !forceRefresh) {
+      logger.debug('Using cached data', { requestId, userId, accountId: account.id, accountLabel })
+    } else {
+      if (forceRefresh) {
+        logger.debug('Force refresh requested', { requestId, userId, accountId: account.id, accountLabel })
+      }
+      logger.info('Fetching fresh data', { requestId, userId, accountId: account.id, accountLabel })
+      costData = await fetchProviderCostData(account.provider_id, credentialsToUse, startDate, endDate)
+
+      logger.info('Fetched data for account', {
+        requestId, userId, accountId: account.id, accountLabel,
+        currentMonth: costData.currentMonth?.toFixed(2) || 0,
+        lastMonth: costData.lastMonth?.toFixed(2) || 0,
+        dailyDataPoints: costData.dailyData?.length || 0,
+        servicesCount: costData.services?.length || 0,
+      })
+
+      await setCachedCostData(userId, account.provider_id, cacheKey, costData, 60)
+    }
+
+    // Validate and sanitize cost data
+    const validation = validateCostDataResponse(costData)
+    if (!validation.valid) {
+      logger.warn('Cost data validation failed, but continuing', { requestId, userId, accountId: account.id, errors: validation.errors })
+    }
+
+    const enhancedData = await enhanceCostData(costData, account.provider_id, credentialsToUse, currentYear, currentMonth, costData.dailyData)
+    const sanitizedData = sanitizeCostData(enhancedData)
+
+    // Save monthly cost data
+    logger.debug('Saving monthly cost data', { requestId, userId, accountId: account.id, accountLabel })
+    await saveCostData(userId, account.provider_id, currentMonth, currentYear, {
+      providerName: account.provider_name,
+      accountAlias: account.account_alias,
+      accountId: account.id,
+      icon: getProviderIcon(account.provider_id),
+      currentMonth: sanitizedData.currentMonth,
+      lastMonth: sanitizedData.lastMonth,
+      forecast: sanitizedData.forecast,
+      forecastConfidence: sanitizedData.forecastConfidence,
+      credits: sanitizedData.credits || 0,
+      savings: sanitizedData.savings || 0,
+      services: sanitizedData.services || [],
+    })
+
+    // Save daily cost data for historical tracking
+    if (costData.dailyData && costData.dailyData.length > 0) {
+      logger.debug('Saving daily data points', { requestId, userId, accountId: account.id, accountLabel, dailyDataCount: costData.dailyData.length })
+      await saveBulkDailyCostData(userId, account.provider_id, costData.dailyData, account.id)
+    }
+
+    // Calculate anomaly baselines (async, non-blocking)
+    calculateBaselinesForServices(userId, account.provider_id, account.id, costData)
+      .catch(err => logger.error('Baseline calculation failed', { requestId, userId, accountId: account.id, accountLabel, error: err.message, stack: err.stack }))
+
+    await updateCloudProviderSyncTime(userId, account.id)
+
+    await createNotification(userId, {
+      type: 'sync',
+      title: `Sync Completed: ${accountLabel}`,
+      message: `Successfully synced cost data. Current month: $${costData.currentMonth.toFixed(2)}`,
+      link: `/provider/${account.provider_id}`,
+      linkText: 'View Details',
+      metadata: { accountId: account.id, providerId: account.provider_id, currentMonth: costData.currentMonth }
+    }).catch(err => logger.error('Failed to create notification', { requestId, userId, error: err.message, stack: err.stack }))
+
+    return {
+      result: {
+        accountId: account.id,
+        accountAlias: account.account_alias,
+        providerId: account.provider_id,
+        status: 'success',
+        costData: { currentMonth: costData.currentMonth, lastMonth: costData.lastMonth },
+      }
+    }
+  } catch (error) {
+    logger.error('Error syncing account', { requestId, userId, accountId: account.id, accountLabel, error: error.message, stack: error.stack })
+
+    await createNotification(userId, {
+      type: 'warning',
+      title: `Sync Failed: ${accountLabel}`,
+      message: error.message || 'Failed to sync cost data',
+      link: `/provider/${account.provider_id}`,
+      linkText: 'View Details',
+      metadata: { accountId: account.id, providerId: account.provider_id, error: error.message }
+    }).catch(err => logger.error('Failed to create error notification', { requestId, userId, error: err.message, stack: err.stack }))
+
+    return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: error.message } }
+  }
+}
+
+/**
  * Sync cost data from all active cloud provider accounts
  * POST /api/sync
  */
@@ -69,263 +234,32 @@ router.post('/', async (req, res) => {
     const { startDate, endDate } = getDateRange(365)
     logger.debug('Sync date range', { requestId: req.requestId, userId, startDate, endDate })
 
-    for (const account of accounts) {
-      const accountLabel = account.account_alias || `${account.provider_id} (${account.id})`
-      logger.info('Processing account', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-      
-      try {
-        // Skip if account is not active
-        if (account.is_active === false) {
-          logger.debug('Skipping inactive account', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          continue
-        }
+    const forceRefresh = req.query.force === 'true'
+    const activeAccounts = accounts.filter(a => a.is_active !== false)
 
-        // Get decrypted credentials using account ID
-        const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
-        
-        if (!accountData) {
-          logger.warn('No account data found', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          errors.push({
-            accountId: account.id,
-            accountAlias: account.account_alias,
-            providerId: account.provider_id,
-            error: 'Account not found',
-          })
-          continue
-        }
-        
-        // Handle automated AWS connections (role-based)
-        let credentialsToUse = accountData.credentials || {}
-        if (account.provider_id === 'aws' && accountData.connectionType?.startsWith('automated')) {
-          logger.info('Automated AWS connection detected', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          
-          if (!accountData.roleArn || !accountData.externalId) {
-            logger.warn('Missing roleArn or externalId for automated connection', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-            errors.push({
-              accountId: account.id,
-              accountAlias: account.account_alias,
-              providerId: account.provider_id,
-              error: 'Automated connection missing role ARN or external ID',
-            })
-            continue
-          }
-          
-          try {
-            // Assume the role to get temporary credentials
-            // Note: The server needs AWS credentials (from environment variables, IAM instance profile, etc.)
-            // to assume the role in the user's account
-            const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
-            
-            // Check if we have AWS credentials available
-            // AWS SDK will automatically check: environment variables, IAM instance profile, etc.
-            const stsClient = new STSClient({ 
-              region: 'us-east-1',
-              // Don't specify credentials - let SDK use default credential chain
-            })
-            
-            const assumeRoleCommand = new AssumeRoleCommand({
-              RoleArn: accountData.roleArn,
-              RoleSessionName: `costra-sync-${account.id}-${Date.now()}`,
-              ExternalId: accountData.externalId,
-              DurationSeconds: 3600, // 1 hour
-            })
-            
-            logger.info('Assuming role for automated connection', { requestId: req.requestId, userId, accountId: account.id, accountLabel, roleArn: accountData.roleArn })
-            const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
-            
-            if (!assumeRoleResponse.Credentials) {
-              throw new Error('Failed to assume role: No credentials returned')
-            }
-            
-            // Use temporary credentials from role assumption
-            credentialsToUse = {
-              accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
-              secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
-              sessionToken: assumeRoleResponse.Credentials.SessionToken,
-              region: 'us-east-1',
-            }
-            
-            logger.info('Successfully assumed role', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          } catch (assumeError) {
-            logger.error('Failed to assume role for automated connection', { requestId: req.requestId, userId, accountId: account.id, accountLabel, error: assumeError.message, stack: assumeError.stack, code: assumeError.code })
-            
-            // Provide helpful error message
-            let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
-            if (assumeError.message?.includes('Could not load credentials') || 
-                assumeError.code === 'CredentialsError') {
-              errorMessage = `Server AWS credentials not configured. The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials.`
-            } else if (assumeError.code === 'AccessDenied') {
-              errorMessage = `Access denied when assuming role. Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra's AWS account has permission to assume the role.`
-            } else if (assumeError.code === 'InvalidClientTokenId') {
-              errorMessage = `Invalid AWS credentials. Please check that the server's AWS credentials are valid and have permission to assume roles.`
-            }
-            
-            errors.push({
-              accountId: account.id,
-              accountAlias: account.account_alias,
-              providerId: account.provider_id,
-              error: errorMessage,
-            })
-            continue
-          }
-        } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 || 
-                   !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
-          // For non-automated connections, validate credentials exist
-          logger.warn('No valid credentials found', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          errors.push({
-            accountId: account.id,
-            accountAlias: account.account_alias,
-            providerId: account.provider_id,
-            error: 'Credentials not found or invalid',
-          })
-          continue
-        }
-        
-        logger.debug('Using credentials for account', { requestId: req.requestId, userId, accountId: account.id, accountLabel, connectionType: accountData.connectionType || 'manual' })
+    // Process all accounts in parallel for faster sync
+    const syncResults = await Promise.allSettled(
+      activeAccounts.map(account => syncSingleAccount({
+        account, userId, requestId: req.requestId,
+        startDate, endDate, currentMonth, currentYear, forceRefresh,
+      }))
+    )
 
-        // Check cache first (unless force refresh is requested)
-        // Use account ID in cache key to support multiple accounts
-        const cacheKey = `account-${account.id}-${startDate}-${endDate}`
-        const forceRefresh = req.query.force === 'true'
-        let costData = forceRefresh ? null : await getCachedCostData(userId, account.provider_id, cacheKey)
-        
-        if (costData && !forceRefresh) {
-          logger.debug('Using cached data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
+    for (let i = 0; i < syncResults.length; i++) {
+      const settled = syncResults[i]
+      if (settled.status === 'fulfilled') {
+        if (settled.value.error) {
+          errors.push(settled.value.error)
         } else {
-          if (forceRefresh) {
-            logger.debug('Force refresh requested', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          }
-          logger.info('Fetching fresh data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-          // Fetch cost data from provider API using the appropriate credentials
-          costData = await fetchProviderCostData(
-            account.provider_id,
-            credentialsToUse,
-            startDate,
-            endDate
-          )
-          
-          logger.info('Fetched data for account', {
-            requestId: req.requestId,
-            userId,
-            accountId: account.id,
-            accountLabel,
-            currentMonth: costData.currentMonth?.toFixed(2) || 0,
-            lastMonth: costData.lastMonth?.toFixed(2) || 0,
-            dailyDataPoints: costData.dailyData?.length || 0,
-            servicesCount: costData.services?.length || 0,
-          })
-          
-          // Cache the result for 60 minutes
-          await setCachedCostData(userId, account.provider_id, cacheKey, costData, 60)
+          results.push(settled.value.result)
         }
-
-        // Validate and sanitize cost data
-        const validation = validateCostDataResponse(costData)
-        if (!validation.valid) {
-          logger.warn('Cost data validation failed, but continuing', {
-            requestId: req.requestId,
-            userId,
-            accountId: account.id,
-            errors: validation.errors,
-          })
-        }
-
-        // Enhance cost data with accurate lastMonth and forecast
-        const enhancedData = await enhanceCostData(
-          costData,
-          account.provider_id,
-          credentialsToUse,
-          currentYear,
-          currentMonth,
-          costData.dailyData
-        )
-
-        // Sanitize data before saving
-        const sanitizedData = sanitizeCostData(enhancedData)
-
-        // Save monthly cost data to database
-        logger.debug('Saving monthly cost data', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-        await saveCostData(
-          userId,
-          account.provider_id,
-          currentMonth,
-          currentYear,
-          {
-            providerName: account.provider_name,
-            accountAlias: account.account_alias,
-            accountId: account.id,
-            icon: getProviderIcon(account.provider_id),
-            currentMonth: sanitizedData.currentMonth,
-            lastMonth: sanitizedData.lastMonth, // No fallback - use actual data or null
-            forecast: sanitizedData.forecast,
-            forecastConfidence: sanitizedData.forecastConfidence,
-            credits: sanitizedData.credits || 0,
-            savings: sanitizedData.savings || 0,
-            services: sanitizedData.services || [],
-          }
-        )
-
-        // Save daily cost data for historical tracking (include account ID)
-        if (costData.dailyData && costData.dailyData.length > 0) {
-          logger.debug('Saving daily data points', { requestId: req.requestId, userId, accountId: account.id, accountLabel, dailyDataCount: costData.dailyData.length })
-          await saveBulkDailyCostData(userId, account.provider_id, costData.dailyData, account.id)
-        } else {
-          logger.debug('No daily data to save', { requestId: req.requestId, userId, accountId: account.id, accountLabel })
-        }
-
-        // Calculate anomaly baselines for all services (async, non-blocking)
-        calculateBaselinesForServices(userId, account.provider_id, account.id, costData)
-          .catch(err => logger.error('Baseline calculation failed', { requestId: req.requestId, userId, accountId: account.id, accountLabel, error: err.message, stack: err.stack }))
-
-        // Update last sync time for this account
-        await updateCloudProviderSyncTime(userId, account.id)
-
-        // Create success notification
-        await createNotification(userId, {
-          type: 'sync',
-          title: `Sync Completed: ${accountLabel}`,
-          message: `Successfully synced cost data. Current month: $${costData.currentMonth.toFixed(2)}`,
-          link: `/provider/${account.provider_id}`,
-          linkText: 'View Details',
-          metadata: {
-            accountId: account.id,
-            providerId: account.provider_id,
-            currentMonth: costData.currentMonth
-          }
-        }).catch(err => logger.error('Failed to create notification', { requestId: req.requestId, userId, error: err.message, stack: err.stack }))
-
-        results.push({
-          accountId: account.id,
-          accountAlias: account.account_alias,
-          providerId: account.provider_id,
-          status: 'success',
-          costData: {
-            currentMonth: costData.currentMonth,
-            lastMonth: costData.lastMonth,
-          },
-        })
-      } catch (error) {
-        logger.error('Error syncing account', { requestId: req.requestId, userId, accountId: account.id, accountLabel, error: error.message, stack: error.stack })
-        
-        // Create error notification
-        await createNotification(userId, {
-          type: 'warning',
-          title: `Sync Failed: ${accountLabel}`,
-          message: error.message || 'Failed to sync cost data',
-          link: `/provider/${account.provider_id}`,
-          linkText: 'View Details',
-          metadata: {
-            accountId: account.id,
-            providerId: account.provider_id,
-            error: error.message
-          }
-        }).catch(err => logger.error('Failed to create error notification', { requestId: req.requestId, userId, error: err.message, stack: err.stack }))
-        
+      } else {
+        const account = activeAccounts[i]
         errors.push({
           accountId: account.id,
           accountAlias: account.account_alias,
           providerId: account.provider_id,
-          error: error.message,
+          error: settled.reason?.message || 'Unknown sync error',
         })
       }
     }

@@ -75,8 +75,17 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       clientCache.set(cacheKey, client)
     }
 
-    // Fetch costs grouped by SERVICE (excludes taxes, support, etc. by default)
-    // This matches AWS console's "Month-to-date" view which shows service costs only
+    // Fetch costs grouped by SERVICE — include only actual usage record types
+    // This shows gross charges (before credits/negations), matching the AWS bill's "Charges" total
+    // Excluded: Tax, Credit, Refund, Fee, SavingsPlanNegation, SavingsPlanRecurringFee,
+    //           SavingsPlanUpfrontFee, RIFee (these are adjustments, not usage charges)
+    const usageFilter = {
+      Dimensions: {
+        Key: 'RECORD_TYPE',
+        Values: ['Usage', 'DiscountedUsage', 'SavingsPlanCoveredUsage'],
+      },
+    }
+
     const command = new GetCostAndUsageCommand({
       TimePeriod: {
         Start: startDate,
@@ -90,15 +99,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
           Key: 'SERVICE',
         },
       ],
-      // Filter out Tax, Support, Refund, Credit to match AWS console month-to-date
-      Filter: {
-        Not: {
-          Dimensions: {
-            Key: 'RECORD_TYPE',
-            Values: ['Tax', 'Support', 'Refund', 'Credit'],
-          },
-        },
-      },
+      Filter: usageFilter,
     })
 
     logger.debug('Sending GetCostAndUsage command with SERVICE grouping', { startDate, endDate })
@@ -121,7 +122,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       })
     }
 
-    // Also fetch totals for daily data (but still exclude Tax/Support/Refund/Credit)
+    // Also fetch totals for daily data (same usage-only filter)
     const totalCommand = new GetCostAndUsageCommand({
       TimePeriod: {
         Start: startDate,
@@ -129,14 +130,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       },
       Granularity: 'DAILY',
       Metrics: ['UnblendedCost'],
-      Filter: {
-        Not: {
-          Dimensions: {
-            Key: 'RECORD_TYPE',
-            Values: ['Tax', 'Support', 'Refund', 'Credit'],
-          },
-        },
-      },
+      Filter: usageFilter,
     })
 
     logger.debug('Sending GetCostAndUsage command for daily totals', { startDate, endDate })
@@ -190,16 +184,20 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
 
   logger.debug('Processing AWS data', { totalPeriods: totalResultsByTime.length, groupedPeriods: groupedResultsByTime.length })
 
-  // Log first few totals to debug what AWS is returning
-  let totalSum = 0
-  totalResultsByTime.slice(0, 10).forEach((result, idx) => {
+  // Log monthly totals to verify data matches AWS bill
+  const monthlyTotals = new Map()
+  totalResultsByTime.forEach((result) => {
     const date = result.TimePeriod?.Start
-    const unblended = result.Total?.UnblendedCost?.Amount
-    const unblendedNum = parseFloat(unblended || 0)
-    logger.debug('Processing day', { dayIndex: idx, date, unblendedCost: unblendedNum.toFixed(2) })
-    totalSum += unblendedNum
+    const amount = parseFloat(result.Total?.UnblendedCost?.Amount || 0)
+    if (date) {
+      const monthKey = date.substring(0, 7) // YYYY-MM
+      monthlyTotals.set(monthKey, (monthlyTotals.get(monthKey) || 0) + amount)
+    }
   })
-  logger.debug('First 10 days total calculated', { totalSum: totalSum.toFixed(2) })
+  const monthSummary = Object.fromEntries(
+    [...monthlyTotals.entries()].map(([k, v]) => [k, v.toFixed(2)])
+  )
+  logger.info('AWS Cost Explorer monthly totals (usage records only)', { monthSummary })
 
   // Create a map of grouped data by date for service breakdown
   const groupedByDate = new Map()
@@ -210,12 +208,11 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
     }
   })
 
-  // Process daily data using totals (excludes Tax/Support/Refund/Credit)
-  // This matches AWS console's month-to-date view
+  // Process daily data using totals (usage record types only)
   totalResultsByTime.forEach((result) => {
     const date = result.TimePeriod?.Start
-    
-    // Use UnblendedCost (already filtered to exclude Tax/Support/Refund/Credit)
+
+    // Use UnblendedCost (filtered to usage record types only — no credits/negations/fees)
     const dailyTotal = parseFloat(result.Total?.UnblendedCost?.Amount || 0)
     
     // Get service breakdown for this date
@@ -266,35 +263,39 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate) => {
   const services = filterOutTaxServices(allServices)
   logger.debug('Services after tax filter', { servicesCount: services.length })
 
-  // Calculate month-to-date more accurately
-  // Sum only days from the 1st of current month to today
+  // Recalculate currentMonth and lastMonth accurately from daily data
   const now = new Date()
   const currentYear = now.getFullYear()
-  const currentMonthNum = now.getMonth() + 1
+  const currentMonthIdx = now.getMonth()
   const currentDay = now.getDate()
-  
-  // Recalculate currentMonth from daily data for accuracy
+
+  // Previous calendar month boundaries
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
   let monthToDate = 0
+  let prevMonthTotal = 0
   dailyData.forEach((day) => {
-    const dayDate = new Date(day.date)
-    if (dayDate.getFullYear() === currentYear && 
-        dayDate.getMonth() === now.getMonth() &&
-        dayDate.getDate() <= currentDay) {
+    const d = new Date(day.date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    if (y === currentYear && m === currentMonthIdx && d.getDate() <= currentDay) {
       monthToDate += day.cost
+    } else if (y === prevMonthYear && m === prevMonthIdx) {
+      prevMonthTotal += day.cost
     }
   })
 
-  logger.debug('Billing summary for period', { 
-    startDate, 
-    endDate,
-    currentMonth: currentMonth.toFixed(2),
-    monthToDate: monthToDate.toFixed(2),
+  logger.info('Billing summary', {
+    currentMonth: monthToDate.toFixed(2),
+    lastMonth: prevMonthTotal.toFixed(2),
     currentDay,
-    lastMonth: lastMonth.toFixed(2)
+    prevMonthName: `${prevMonthYear}-${String(prevMonthIdx + 1).padStart(2, '0')}`,
   })
-  
-  // Use month-to-date for currentMonth to match AWS console
+
   currentMonth = monthToDate
+  lastMonth = prevMonthTotal
 
   return {
     currentMonth,
@@ -329,6 +330,7 @@ export const fetchAWSServiceDetails = async (credentials, serviceName, startDate
     }
 
     // Fetch costs grouped by USAGE_TYPE for the specific service
+    // Use AND filter: service name + usage record types only
     const command = new GetCostAndUsageCommand({
       TimePeriod: {
         Start: startDate,
@@ -340,10 +342,20 @@ export const fetchAWSServiceDetails = async (credentials, serviceName, startDate
         { Type: 'DIMENSION', Key: 'USAGE_TYPE' },
       ],
       Filter: {
-        Dimensions: {
-          Key: 'SERVICE',
-          Values: [serviceName],
-        },
+        And: [
+          {
+            Dimensions: {
+              Key: 'SERVICE',
+              Values: [serviceName],
+            },
+          },
+          {
+            Dimensions: {
+              Key: 'RECORD_TYPE',
+              Values: ['Usage', 'DiscountedUsage', 'SavingsPlanCoveredUsage'],
+            },
+          },
+        ],
       },
     })
 
@@ -1384,13 +1396,6 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
       const existing = dailyMap.get(dateStr) || 0
       dailyMap.set(dateStr, existing + cost)
 
-      // Determine if current or last month
-      const rowDate = new Date(dateStr)
-      if (rowDate.getMonth() === now.getMonth() && rowDate.getFullYear() === now.getFullYear()) {
-        currentMonth += cost
-      } else {
-        lastMonth += cost
-      }
     }
   })
 
@@ -1424,6 +1429,27 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
     .sort((a, b) => b.cost - a.cost)
 
   const services = filterOutTaxServices(allServices)
+
+  // Recalculate currentMonth and lastMonth accurately from daily data
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const currentDay = now.getDate()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
+  currentMonth = 0
+  lastMonth = 0
+  dailyData.forEach((day) => {
+    const d = new Date(day.date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    if (y === currentYear && m === currentMonthIdx && d.getDate() <= currentDay) {
+      currentMonth += day.cost
+    } else if (y === prevMonthYear && m === prevMonthIdx) {
+      lastMonth += day.cost
+    }
+  })
 
   logger.info('Azure Transform: Processed data', {
     dailyDataPoints: dailyData.length,
@@ -1688,13 +1714,6 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
       const serviceExisting = serviceMap.get(serviceName) || 0
       serviceMap.set(serviceName, serviceExisting + cost)
 
-      // Monthly totals
-      const rowDate = new Date(date)
-      if (rowDate.getMonth() === now.getMonth() && rowDate.getFullYear() === now.getFullYear()) {
-        currentMonth += cost
-      } else {
-        lastMonth += cost
-      }
     }
   })
 
@@ -1707,6 +1726,27 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
     .sort((a, b) => b.cost - a.cost)
 
   const services = filterOutTaxServices(allServices)
+
+  // Recalculate currentMonth and lastMonth accurately from daily data
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const currentDay = now.getDate()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
+  currentMonth = 0
+  lastMonth = 0
+  dailyData.forEach((day) => {
+    const d = new Date(day.date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    if (y === currentYear && m === currentMonthIdx && d.getDate() <= currentDay) {
+      currentMonth += day.cost
+    } else if (y === prevMonthYear && m === prevMonthIdx) {
+      lastMonth += day.cost
+    }
+  })
 
   logger.info('GCP Transform: Processed data', {
     dailyDataPoints: dailyData.length,
@@ -1838,12 +1878,6 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
         cost,
       })
 
-      if (invoiceDate.getMonth() === now.getMonth() && invoiceDate.getFullYear() === now.getFullYear()) {
-        currentMonth += cost
-      } else {
-        lastMonth += cost
-      }
-
       // Track invoice items for service breakdown
       if (invoice.invoice_items) {
         invoice.invoice_items.forEach((item) => {
@@ -1853,6 +1887,25 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
           serviceMap.set(serviceName, existing + itemCost)
         })
       }
+    }
+  })
+
+  // Recalculate currentMonth and lastMonth accurately from daily data
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const currentDay = now.getDate()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
+  dailyData.forEach((day) => {
+    const d = new Date(day.date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    if (y === currentYear && m === currentMonthIdx && d.getDate() <= currentDay) {
+      currentMonth += day.cost
+    } else if (y === prevMonthYear && m === prevMonthIdx) {
+      lastMonth += day.cost
     }
   })
 
@@ -1994,17 +2047,32 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
 
   const now = new Date()
 
+  // Calculate previous calendar month boundaries
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
   // Process account summary
   if (accountSummary) {
-    // Extract billing totals
-    currentMonth = parseFloat(accountSummary.billable_cost || 0)
+    const billableCost = parseFloat(accountSummary.billable_cost || 0)
 
     // Add as a single monthly data point
     const summaryDate = new Date(accountSummary.month || startDate)
     dailyData.push({
       date: summaryDate.toISOString().split('T')[0],
-      cost: currentMonth,
+      cost: billableCost,
     })
+
+    // Assign to correct month bucket
+    const summaryYear = summaryDate.getFullYear()
+    const summaryMonth = summaryDate.getMonth()
+    if (summaryYear === currentYear && summaryMonth === currentMonthIdx) {
+      currentMonth = billableCost
+    } else if (summaryYear === prevMonthYear && summaryMonth === prevMonthIdx) {
+      lastMonth = billableCost
+    }
 
     // Process resources for service breakdown
     if (accountSummary.resources) {
@@ -2156,21 +2224,14 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
   // Process historical invoices
   invoices.forEach((invoice) => {
     const invoiceDate = new Date(invoice.date)
-    
+
     if (invoiceDate >= start && invoiceDate <= end) {
       const cost = parseFloat(invoice.total || 0)
-      
+
       dailyData.push({
         date: invoiceDate.toISOString().split('T')[0],
         cost,
       })
-
-      // If this month
-      if (invoiceDate.getMonth() === now.getMonth() && invoiceDate.getFullYear() === now.getFullYear()) {
-        // Current month is calculated from invoice items above
-      } else {
-        lastMonth += cost
-      }
     }
   })
 
@@ -2182,6 +2243,24 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
 
   // Sort daily data
   dailyData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+  // Recalculate lastMonth accurately — only previous calendar month
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const currentDay = now.getDate()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
+  lastMonth = 0
+  dailyData.forEach((day) => {
+    const d = new Date(day.date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    if (y === prevMonthYear && m === prevMonthIdx) {
+      lastMonth += day.cost
+    }
+  })
 
   // If no service breakdown, create a default one
   if (serviceMap.size === 0 && (currentMonth > 0 || lastMonth > 0)) {
@@ -2312,12 +2391,6 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
           cost: amount,
         })
 
-        if (entryDate.getMonth() === now.getMonth() && entryDate.getFullYear() === now.getFullYear()) {
-          // Current month handled by pending_charges
-        } else {
-          lastMonth += amount
-        }
-
         // Track by description for service breakdown
         const serviceName = entry.description || 'Vultr Services'
         const existing = serviceMap.get(serviceName) || 0
@@ -2329,10 +2402,10 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
   // Process invoices for additional data
   invoices.forEach((invoice) => {
     const invoiceDate = new Date(invoice.date)
-    
+
     if (invoiceDate >= start && invoiceDate <= end) {
       const amount = parseFloat(invoice.amount || 0)
-      
+
       // Check if we already have this date in dailyData
       const existingDay = dailyData.find(d => d.date === invoiceDate.toISOString().split('T')[0])
       if (!existingDay && amount > 0) {
@@ -2346,6 +2419,23 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
 
   // Sort daily data
   dailyData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
+  // Recalculate lastMonth accurately — only previous calendar month
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
+  lastMonth = 0
+  dailyData.forEach((day) => {
+    const d = new Date(day.date)
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    if (y === prevMonthYear && m === prevMonthIdx) {
+      lastMonth += day.cost
+    }
+  })
 
   // If no service breakdown, create a default one
   if (serviceMap.size === 0 && (currentMonth > 0 || lastMonth > 0)) {

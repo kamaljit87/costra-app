@@ -67,7 +67,7 @@ export default function TotalBillSummary({
         <h2 className="text-5xl font-bold text-gray-900 mb-1.5">
           Total Spend
         </h2>
-        <p className="text-xs text-gray-500 mb-3">Overview across all cloud providers</p>
+        <p className="text-xs text-gray-500 mb-3">Overview across all cloud providers (before tax)</p>
         {changePercent !== 0 && (
           <div className={`flex items-center px-4 py-1.5 rounded-xl text-xs ${
             changePercent >= 0

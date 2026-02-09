@@ -633,15 +633,22 @@ router.get('/:providerId/daily', limitHistoricalData, async (req, res) => {
     }
 
     logger.debug('Daily Cost Data: Fetching data', { userId, providerId, startDate, endDate })
-    
-    const dailyData = await getDailyCostData(userId, providerId, startDate, endDate)
-    
-    logger.debug('Daily Cost Data: Found data points', { 
-      userId, 
-      providerId, 
-      count: dailyData.length 
+
+    // Cache daily cost data with 5-minute TTL (same as cost summary)
+    // Key uses user: prefix so clearUserCache() invalidates it on sync
+    const dailyCacheKey = `user:${userId}:daily_cost:${providerId}:${startDate}:${endDate}`
+    const dailyData = await cached(
+      dailyCacheKey,
+      async () => await getDailyCostData(userId, providerId, startDate, endDate),
+      300
+    )
+
+    logger.debug('Daily Cost Data: Found data points', {
+      userId,
+      providerId,
+      count: dailyData.length
     })
-    
+
     res.json({ dailyData })
   } catch (error) {
     logger.error('Get daily cost data error', { 
