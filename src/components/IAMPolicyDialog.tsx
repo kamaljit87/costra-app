@@ -20,7 +20,7 @@ interface PolicyTemplate {
 
 export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerName }: IAMPolicyDialogProps) {
   const [copied, setCopied] = useState<string | null>(null)
-  const [awsConnectionType, setAwsConnectionType] = useState<'simple' | 'advanced'>('simple')
+  const [awsConnectionType, setAwsConnectionType] = useState<'simple' | 'automated'>('simple')
 
   if (!isOpen) return null
 
@@ -191,9 +191,6 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
 
   // AWS-specific content with two connection types
   const renderAWSContent = () => {
-    const costraAccountId = '061190967865'
-    const costraExternalId = 'GPZAuIfia9uhu0hHNxGaP3NJ9sCqT3ZO'
-    
     const simplePolicy = JSON.stringify({
       Version: '2012-10-17',
       Statement: [
@@ -221,23 +218,6 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
       ]
     }, null, 2)
 
-    const generateCURPolicy = (bucketName: string) => JSON.stringify({
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Effect: 'Allow',
-          Action: [
-            's3:GetObject',
-            's3:ListBucket'
-          ],
-          Resource: [
-            `arn:aws:s3:::${bucketName}`,
-            `arn:aws:s3:::${bucketName}/*`
-          ]
-        }
-      ]
-    }, null, 2)
-
     return (
       <div className="space-y-6">
         {/* Connection Type Tabs */}
@@ -254,15 +234,15 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             Simple (API Keys)
           </button>
           <button
-            onClick={() => setAwsConnectionType('advanced')}
+            onClick={() => setAwsConnectionType('automated')}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              awsConnectionType === 'advanced'
+              awsConnectionType === 'automated'
                 ? 'border-accent-500 text-accent-500'
                 : 'border-transparent text-gray-500 hover:text-gray-900'
             }`}
           >
             <Database className="h-4 w-4 inline mr-2" />
-            Advanced (CUR + IAM Role)
+            Automated + CUR (Recommended)
           </button>
         </div>
 
@@ -348,202 +328,116 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           </div>
         )}
 
-        {/* Advanced (CUR + IAM Role) Content */}
-        {awsConnectionType === 'advanced' && (
+        {/* Automated + CUR Content */}
+        {awsConnectionType === 'automated' && (
           <div className="space-y-6">
-            <div className="bg-[#FEF3C7] border-2 border-[#F59E0B] rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <svg className="w-5 h-5 text-[#F59E0B]" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#92400E] mb-1">🚧 Coming Soon</p>
-                  <p className="text-sm text-[#92400E] mb-2">
-                    CUR (Cost & Usage Reports) support is currently under development. 
-                    For now, please use <strong>"Simple (API Keys)"</strong> or <strong>"Automated (CloudFormation)"</strong> connection methods.
-                  </p>
-                  <p className="text-xs text-[#92400E] opacity-90">
-                    CUR support will enable reading detailed billing data directly from S3, providing more granular cost insights and resource-level tracking.
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-xl p-4 opacity-60">
-              <p className="text-sm text-gray-900 font-medium mb-2">💼 For enterprise users with existing CUR setup</p>
-              <p className="text-sm text-gray-900 mb-3">
-                Use AWS Cost & Usage Reports (CUR) stored in S3 for more detailed billing data. 
-                Requires setting up a CUR report and cross-account IAM role.
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <p className="text-sm text-green-900 font-medium mb-2">Recommended for penny-perfect accuracy</p>
+              <p className="text-sm text-green-800">
+                One-click CloudFormation setup that automatically creates a cross-account IAM role,
+                an S3 bucket, and configures Cost & Usage Reports (CUR). CUR provides the exact billing
+                data that appears on your AWS invoice — down to the penny.
               </p>
-              <div className="bg-white rounded-lg p-3 mt-3 border border-[#DBEAFE]">
-                <div className="flex items-start gap-2">
-                  <DollarSign className="h-4 w-4 text-accent-700 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-gray-500">
-                    <p className="font-medium text-gray-900 mb-1">Cost Impact:</p>
-                    <p>Expected additional AWS cost is usually <strong>well under $5/month</strong> for most accounts, and often just a few cents. Only compressed billing files are stored in S3. There is no extra charge for the IAM role or CloudFormation stack.</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* Step 1: Enable CUR */}
+            {/* How it works */}
             <div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 1: Enable Cost & Usage Reports</h4>
-              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-3">
-                <ol className="space-y-2 list-decimal list-inside text-sm text-gray-500">
-                  <li className="pl-2">Log into your <strong>payer account</strong> via AWS Console</li>
-                  <li className="pl-2">Open <a href="https://console.aws.amazon.com/billing/home?#/reports" target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">Billing → Cost & Usage Reports</a></li>
-                  <li className="pl-2">Click <strong>"Create report"</strong> or reconfigure an existing one</li>
-                  <li className="pl-2">Use these settings:
-                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                      <li><strong>S3 bucket name:</strong> <code className="bg-white px-1 rounded">your-company-billing</code> (create a dedicated bucket)</li>
-                      <li><strong>Time granularity:</strong> Hourly</li>
-                      <li><strong>Report versioning:</strong> Create New Report Version</li>
-                      <li><strong>Compression:</strong> GZIP</li>
-                      <li><strong>Include resource IDs:</strong> ON</li>
-                      <li><strong>Data Refresh settings:</strong> AUTOMATIC</li>
-                      <li><strong>Split Cost Allocation Data:</strong> OFF</li>
-                    </ul>
-                  </li>
-                  <li className="pl-2">Save the report and wait for AWS to start delivering data (can take a few hours)</li>
-                </ol>
-                <a
-                  href="https://console.aws.amazon.com/billing/home?#/reports"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-[#1a2f4d] transition-colors text-sm font-medium mt-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open AWS Billing Console
-                </a>
-              </div>
-            </div>
-
-            {/* Step 2: Create Cross-Account Role */}
-            <div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 2: Create Cross-Account IAM Role</h4>
-              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-4">
-                <ol className="space-y-2 list-decimal list-inside text-sm text-gray-500">
-                  <li className="pl-2">In AWS IAM, go to <strong>Roles → Create role</strong></li>
-                  <li className="pl-2">Select <strong>"Another AWS account"</strong></li>
-                  <li className="pl-2">Enter Costra Account ID:
-                    <div className="mt-2 flex items-center gap-2">
-                      <code className="bg-white px-3 py-1.5 rounded border border-surface-200 text-gray-900 font-mono text-sm">{costraAccountId}</code>
-                      <button
-                        onClick={() => handleCopy(costraAccountId, 'account-id')}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-accent-500 hover:bg-accent-50 rounded transition-colors"
-                      >
-                        {copied === 'account-id' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                        Copy
-                      </button>
-                    </div>
-                  </li>
-                  <li className="pl-2">Check <strong>"Require external ID"</strong> and enter:
-                    <div className="mt-2 flex items-center gap-2">
-                      <code className="bg-white px-3 py-1.5 rounded border border-surface-200 text-gray-900 font-mono text-sm">{costraExternalId}</code>
-                      <button
-                        onClick={() => handleCopy(costraExternalId, 'external-id')}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-accent-500 hover:bg-accent-50 rounded transition-colors"
-                      >
-                        {copied === 'external-id' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                        Copy
-                      </button>
-                    </div>
-                  </li>
-                  <li className="pl-2">Attach these managed policies:
-                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                      <li><code className="bg-white px-1 rounded text-xs">AWSBillingReadOnlyAccess</code></li>
-                      <li><code className="bg-white px-1 rounded text-xs">ViewOnlyAccess</code></li>
-                      <li><code className="bg-white px-1 rounded text-xs">ComputeOptimizerReadOnlyAccess</code></li>
-                    </ul>
-                  </li>
-                  <li className="pl-2">Attach a custom policy for S3 access (see below)</li>
-                  <li className="pl-2">Name the role (e.g., <code className="bg-white px-1 rounded text-xs">CostraReadOnlyRole</code>) and create it</li>
-                  <li className="pl-2">Copy the <strong>Role ARN</strong> (looks like <code className="bg-white px-1 rounded text-xs">arn:aws:iam::123456789012:role/CostraReadOnlyRole</code>)</li>
-                </ol>
-                <a
-                  href="https://console.aws.amazon.com/iam/home#/roles"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-[#1a2f4d] transition-colors text-sm font-medium mt-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open IAM Console
-                </a>
-              </div>
-            </div>
-
-            {/* Step 3: Custom S3 Policy */}
-            <div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 3: Generate S3 Access Policy</h4>
-              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-3">
-                <p className="text-sm text-gray-500">
-                  Enter your S3 billing bucket name to generate the custom IAM policy:
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    id="bucket-name"
-                    placeholder="your-company-billing"
-                    className="flex-1 px-3 py-2 border border-surface-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        const bucketName = (e.target as HTMLInputElement).value.trim()
-                        if (bucketName) {
-                          const policy = generateCURPolicy(bucketName)
-                          handleCopy(policy, 'cur-policy')
-                        }
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      const bucketName = (document.getElementById('bucket-name') as HTMLInputElement)?.value.trim()
-                      if (bucketName) {
-                        const policy = generateCURPolicy(bucketName)
-                        handleCopy(policy, 'cur-policy')
-                      } else {
-                        alert('Please enter your S3 bucket name first')
-                      }
-                    }}
-                    className="px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-[#1ea088] transition-colors text-sm font-medium"
-                  >
-                    Generate & Copy Policy
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  This policy grants read-only access to your CUR files in S3. Paste it as a custom policy when creating the IAM role.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 4: Connect in Costra */}
-            <div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">Step 4: Connect in Costra</h4>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent-500" />
+                How It Works
+              </h4>
               <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
-                <p className="text-sm text-gray-500 mb-3">
-                  When adding your AWS account in Costra, you'll need to provide:
-                </p>
-                <ul className="space-y-2 text-sm text-gray-500">
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent-500 mt-1">•</span>
-                    <span><strong>Connection name:</strong> A friendly name to identify this account (e.g., "Production AWS")</span>
+                <ol className="space-y-3 list-decimal list-inside text-sm text-gray-600">
+                  <li className="pl-2">You provide a <strong>connection name</strong> and your <strong>12-digit AWS Account ID</strong></li>
+                  <li className="pl-2">Costra generates a <strong>CloudFormation Quick Create URL</strong> with pre-filled parameters</li>
+                  <li className="pl-2">You click the link to open the AWS CloudFormation Console and create the stack</li>
+                  <li className="pl-2">CloudFormation automatically provisions:
+                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-gray-500">
+                      <li>A cross-account <strong>IAM role</strong> with read-only billing permissions</li>
+                      <li>An <strong>S3 bucket</strong> for Cost & Usage Report delivery (encrypted, private)</li>
+                      <li>A <strong>bucket policy</strong> allowing AWS to write CUR data and Costra to read it</li>
+                    </ul>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent-500 mt-1">•</span>
-                    <span><strong>S3 billing bucket name:</strong> The bucket where your CUR files are stored</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent-500 mt-1">•</span>
-                    <span><strong>Cost & Usage Report name:</strong> The name of your CUR report (found in AWS Billing Console)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-accent-500 mt-1">•</span>
-                    <span><strong>Cross-account Role ARN:</strong> The ARN of the role you created in Step 2</span>
-                  </li>
-                </ul>
+                  <li className="pl-2">You return to Costra and click <strong>"Verify Connection"</strong></li>
+                  <li className="pl-2">Costra automatically creates a <strong>CUR Data Export</strong> via the BCM Data Exports API</li>
+                  <li className="pl-2">AWS delivers the first CUR data within <strong>~24 hours</strong> as Parquet files to S3</li>
+                  <li className="pl-2">Costra polls every 6 hours, ingests new CUR data, and replaces approximate Cost Explorer data with penny-perfect totals</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* What gets created */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <Shield className="h-5 w-5 text-accent-500" />
+                What Gets Created in Your AWS Account
+              </h4>
+              <div className="space-y-3">
+                <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
+                  <p className="text-sm font-medium text-gray-900 mb-2">IAM Role</p>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Read-only cross-account role that Costra assumes via STS. Permissions include:
+                  </p>
+                  <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside ml-2">
+                    <li>Cost Explorer read access (<code className="bg-white px-1 rounded">ce:GetCostAndUsage</code>, etc.)</li>
+                    <li>CUR / BCM Data Exports management (<code className="bg-white px-1 rounded">bcm-data-exports:*</code>)</li>
+                    <li>S3 read access scoped to the CUR bucket only</li>
+                    <li>Organizations read access (for multi-account visibility)</li>
+                    <li>AWS managed <code className="bg-white px-1 rounded">Billing</code> policy</li>
+                  </ul>
+                </div>
+                <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
+                  <p className="text-sm font-medium text-gray-900 mb-2">S3 Bucket</p>
+                  <p className="text-sm text-gray-500 mb-2">
+                    Private, encrypted bucket for CUR delivery:
+                  </p>
+                  <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside ml-2">
+                    <li>Name format: <code className="bg-white px-1 rounded">costra-cur-{'<account-id>'}-{'<connection-name>'}</code></li>
+                    <li>AES-256 server-side encryption</li>
+                    <li>All public access blocked</li>
+                    <li>400-day lifecycle policy (old reports auto-expire)</li>
+                    <li>Retained on stack deletion (your data is never lost)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Data accuracy */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-accent-500" />
+                Data Accuracy
+              </h4>
+              <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
+                <div className="space-y-3 text-sm text-gray-600">
+                  <div className="flex items-start gap-3">
+                    <span className="text-green-600 font-bold mt-0.5">Historical months</span>
+                    <span>CUR data (penny-perfect, matches your AWS invoice exactly)</span>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-blue-600 font-bold mt-0.5">Current month</span>
+                    <span>Cost Explorer MONTHLY granularity (real-time, accurate for in-progress billing)</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Once CUR data is ingested for a finalized month, it permanently replaces the Cost Explorer estimate.
+                    Daily sync will never overwrite CUR data with approximate values.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Cost impact */}
+            <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-xl p-4">
+              <div className="flex items-start gap-2">
+                <DollarSign className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-blue-900">
+                  <p className="font-medium mb-1">Cost Impact</p>
+                  <p className="text-blue-800">
+                    Expected additional AWS cost is usually <strong>well under $5/month</strong> for most accounts,
+                    and often just a few cents. Only compressed Parquet billing files are stored in S3 with a 400-day
+                    expiry. There is no extra charge for the IAM role or CloudFormation stack.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

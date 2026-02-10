@@ -636,13 +636,35 @@ router.post('/aws/:accountId/verify', async (req, res) => {
         })
       }
 
+      // Auto-setup CUR (Cost and Usage Reports) for penny-perfect billing data
+      let curStatus = null
+      try {
+        const { setupCURExport } = await import('../services/curService.js')
+        const { sanitizeConnectionName: sanitizeName } = await import('../services/awsConnectionService.js')
+        const connectionName = sanitizeName(account.accountAlias || account.providerName || 'default')
+        const curResult = await setupCURExport(
+          userId,
+          accountId,
+          roleArn,
+          externalId,
+          account.awsAccountId,
+          connectionName
+        )
+        curStatus = curResult.status
+        logger.info('CUR export setup initiated after verification', { userId, accountId, curStatus })
+      } catch (curError) {
+        // CUR setup failure should NOT fail connection verification
+        logger.error('CUR setup failed (non-blocking)', { userId, accountId, error: curError.message })
+      }
+
       res.json({
-        message: verification.skipActualTest 
+        message: verification.skipActualTest
           ? 'Connection format validated. The role will be tested during the first cost sync.'
           : 'Connection verified successfully',
         status: 'healthy',
         roleArn,
         skipActualTest: verification.skipActualTest || false,
+        curStatus,
       })
     } else {
       // Update status to error
@@ -708,6 +730,62 @@ router.get('/aws/:accountId/health', async (req, res) => {
       stack: error.stack 
     })
     res.status(500).json({ error: error.message || 'Internal server error' })
+  }
+})
+
+// Get CUR status for an AWS account
+router.get('/aws/:accountId/cur-status', async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const accountId = parseInt(req.params.accountId, 10)
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    const { getCURStatus } = await import('../services/curService.js')
+    const status = await getCURStatus(userId, accountId)
+    res.json(status)
+  } catch (error) {
+    logger.error('Get CUR status error', { userId: req.user?.userId, accountId: req.params?.accountId, error: error.message })
+    res.status(500).json({ error: 'Failed to get CUR status' })
+  }
+})
+
+// Manually trigger CUR setup (for existing connections or retry after error)
+router.post('/aws/:accountId/cur-setup', async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const accountId = parseInt(req.params.accountId, 10)
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    const account = await getCloudProviderCredentialsByAccountId(userId, accountId)
+    if (!account) {
+      return res.status(404).json({ error: 'Connection not found' })
+    }
+
+    if (!account.roleArn || !account.externalId) {
+      return res.status(400).json({ error: 'CUR requires an automated (IAM role) connection. Manual access key connections do not support CUR.' })
+    }
+
+    const { setupCURExport } = await import('../services/curService.js')
+    const { sanitizeConnectionName } = await import('../services/awsConnectionService.js')
+    const connectionName = sanitizeConnectionName(account.accountAlias || account.providerName || 'default')
+
+    const result = await setupCURExport(
+      userId,
+      accountId,
+      account.roleArn,
+      account.externalId,
+      account.awsAccountId,
+      connectionName
+    )
+
+    res.json({ message: 'CUR setup initiated', ...result })
+  } catch (error) {
+    logger.error('CUR setup error', { userId: req.user?.userId, accountId: req.params?.accountId, error: error.message })
+    res.status(500).json({ error: error.message || 'Failed to set up CUR' })
   }
 })
 

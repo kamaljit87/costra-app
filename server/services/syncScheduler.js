@@ -93,6 +93,26 @@ export const initScheduledSyncs = () => {
   cron.schedule('0 2 * * *', async () => {
     await runScheduledSyncs()
   })
-  
+
   logger.info('Scheduled sync cron job initialized (runs daily at 2 AM UTC)')
+}
+
+/**
+ * Initialize CUR polling cron job
+ * Polls every 6 hours for new CUR data across all accounts with CUR enabled
+ */
+export const initCURPolling = () => {
+  // Run every 6 hours at minute 30 (offset from sync to avoid overlap)
+  cron.schedule('30 */6 * * *', async () => {
+    try {
+      logger.info('Starting CUR polling cycle')
+      const { pollCURDataForAllAccounts } = await import('./curService.js')
+      await pollCURDataForAllAccounts()
+      logger.info('CUR polling cycle completed')
+    } catch (error) {
+      logger.error('CUR polling cycle failed', { error: error.message, stack: error.stack })
+    }
+  })
+
+  logger.info('CUR polling cron job initialized (runs every 6 hours at :30)')
 }

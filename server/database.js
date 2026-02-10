@@ -900,6 +900,84 @@ export const initDatabase = async () => {
         )
       `)
 
+      // CUR (Cost and Usage Reports) tables
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cur_export_config (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          account_id INTEGER NOT NULL REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE,
+          export_name TEXT NOT NULL,
+          export_arn TEXT,
+          s3_bucket TEXT NOT NULL,
+          s3_prefix TEXT DEFAULT 'costra-cur',
+          cur_status TEXT DEFAULT 'pending',
+          status_message TEXT,
+          last_manifest_key TEXT,
+          last_successful_ingestion TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, account_id)
+        )
+      `)
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cur_ingestion_log (
+          id SERIAL PRIMARY KEY,
+          cur_config_id INTEGER NOT NULL REFERENCES cur_export_config(id) ON DELETE CASCADE,
+          billing_period TEXT NOT NULL,
+          manifest_key TEXT NOT NULL,
+          data_files_count INTEGER DEFAULT 0,
+          rows_ingested INTEGER DEFAULT 0,
+          total_cost DECIMAL(15, 2),
+          ingestion_status TEXT DEFAULT 'pending',
+          error_message TEXT,
+          started_at TIMESTAMP,
+          completed_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(cur_config_id, billing_period, manifest_key)
+        )
+      `)
+
+      // CUR-related column additions
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'cost_data' AND column_name = 'data_source'
+          ) THEN
+            ALTER TABLE cost_data ADD COLUMN data_source TEXT DEFAULT 'cost_explorer';
+          END IF;
+        END $$;
+      `)
+
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'daily_cost_data' AND column_name = 'data_source'
+          ) THEN
+            ALTER TABLE daily_cost_data ADD COLUMN data_source TEXT DEFAULT 'cost_explorer';
+          END IF;
+        END $$;
+      `)
+
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'cur_enabled'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN cur_enabled BOOLEAN DEFAULT false;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'cloud_provider_credentials' AND column_name = 'cur_bucket_name'
+          ) THEN
+            ALTER TABLE cloud_provider_credentials ADD COLUMN cur_bucket_name TEXT;
+          END IF;
+        END $$;
+      `)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -1209,14 +1287,24 @@ export const saveCostData = async (userId, providerId, month, year, costData) =>
       
       // Check if record exists first, then update or insert
       const existingResult = await client.query(
-        `SELECT id FROM cost_data 
+        `SELECT id, data_source FROM cost_data
          WHERE user_id = $1 AND provider_id = $2 AND month = $4 AND year = $5
            AND (account_id = $3 OR (account_id IS NULL AND $3 IS NULL))`,
         [userId, providerId, accountId, month, year]
       )
-      
+
       let finalCostDataId
       if (existingResult.rows.length > 0) {
+        // Guard: don't overwrite CUR data with Cost Explorer data for finalized months
+        const existingSource = existingResult.rows[0].data_source
+        const now = new Date()
+        const isCurrentMonth = (month === now.getMonth() + 1 && year === now.getFullYear())
+        if (existingSource === 'cur' && !isCurrentMonth) {
+          // CUR is authoritative for finalized months — skip CE overwrite
+          await client.query('COMMIT')
+          return existingResult.rows[0].id
+        }
+
         // Update existing record
         const updateResult = await client.query(
           `UPDATE cost_data SET

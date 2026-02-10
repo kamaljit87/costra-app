@@ -38,6 +38,66 @@ const filterOutTaxServices = (services) => {
 }
 
 /**
+ * Fetch the accurate monthly total for a specific month directly from AWS Cost Explorer.
+ * Uses MONTHLY granularity for a single API call — matches the AWS bill exactly.
+ */
+export const fetchAWSMonthlyTotal = async (credentials, month, year) => {
+  const { accessKeyId, secretAccessKey, sessionToken, region = 'us-east-1' } = credentials
+
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('AWS credentials are missing')
+  }
+
+  const cacheKey = `aws-${accessKeyId}-${region}-${sessionToken ? 'temp' : 'perm'}`
+  let client = clientCache.get(cacheKey)
+
+  if (!client) {
+    const clientConfig = {
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    }
+    if (sessionToken) {
+      clientConfig.credentials.sessionToken = sessionToken
+    }
+    client = new CostExplorerClient(clientConfig)
+    clientCache.set(cacheKey, client)
+  }
+
+  // AWS Cost Explorer TimePeriod End is exclusive, so use first day of next month
+  const startMonth = `${year}-${String(month).padStart(2, '0')}-01`
+  const nextMonth = month === 12 ? 1 : month + 1
+  const nextYear = month === 12 ? year + 1 : year
+  const endMonth = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+
+  const usageFilter = {
+    Dimensions: {
+      Key: 'RECORD_TYPE',
+      Values: ['Usage', 'DiscountedUsage', 'SavingsPlanCoveredUsage'],
+    },
+  }
+
+  const command = new GetCostAndUsageCommand({
+    TimePeriod: { Start: startMonth, End: endMonth },
+    Granularity: 'MONTHLY',
+    Metrics: ['UnblendedCost'],
+    Filter: usageFilter,
+  })
+
+  const response = await retryWithBackoff(
+    () => client.send(command),
+    { maxAttempts: 3, timeout: 15000 },
+    'aws',
+    { month, year, operation: 'getMonthlyTotal' }
+  )
+
+  const amount = parseFloat(
+    response.ResultsByTime?.[0]?.Total?.UnblendedCost?.Amount || '0'
+  )
+
+  return { total: amount, month, year }
+}
+
+/**
  * AWS Cost Explorer API Integration using official SDK
  */
 export const fetchAWSCostData = async (credentials, startDate, endDate) => {

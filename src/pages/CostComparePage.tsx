@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
@@ -12,8 +12,9 @@ import {
   RefreshCw,
   TrendingUp,
   TrendingDown,
-  Minus,
   BarChart3,
+  Plus,
+  X,
 } from 'lucide-react'
 import {
   BarChart,
@@ -32,6 +33,7 @@ interface ServiceCost {
 }
 
 interface PanelData {
+  id: string
   providerId: string
   month: number
   year: number
@@ -78,25 +80,9 @@ export default function CostComparePage() {
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
 
-  const [panelA, setPanelA] = useState<PanelData>({
-    providerId: '',
-    month: currentMonth,
-    year: currentYear,
-    totalCost: 0,
-    services: [],
-    dailyData: [],
-    isLoading: false,
-  })
-
-  const [panelB, setPanelB] = useState<PanelData>({
-    providerId: '',
-    month: currentMonth,
-    year: currentYear,
-    totalCost: 0,
-    services: [],
-    dailyData: [],
-    isLoading: false,
-  })
+  const [panels, setPanels] = useState<PanelData[]>([])
+  const nextPanelId = useRef(0)
+  const createPanelId = () => `panel-${nextPanelId.current++}`
 
   const monthOptions = getMonthOptions()
 
@@ -131,14 +117,33 @@ export default function CostComparePage() {
         const providerList = Array.from(providerMap.entries()).map(([id, name]) => ({ id, name }))
         setProviders(providerList)
 
-        // Auto-select first two providers if available
-        if (providerList.length >= 2) {
-          setPanelA((p) => ({ ...p, providerId: providerList[0].id }))
-          setPanelB((p) => ({ ...p, providerId: providerList[1].id }))
-        } else if (providerList.length === 1) {
-          setPanelA((p) => ({ ...p, providerId: providerList[0].id }))
-          setPanelB((p) => ({ ...p, providerId: providerList[0].id }))
+        // Auto-create one panel per provider
+        const initialPanels: PanelData[] = providerList.map((provider) => ({
+          id: createPanelId(),
+          providerId: provider.id,
+          month: currentMonth,
+          year: currentYear,
+          totalCost: 0,
+          services: [],
+          dailyData: [],
+          isLoading: false,
+        }))
+
+        // Fallback: if fewer than 2 providers, pad with empty panels
+        while (initialPanels.length < 2) {
+          initialPanels.push({
+            id: createPanelId(),
+            providerId: '',
+            month: currentMonth,
+            year: currentYear,
+            totalCost: 0,
+            services: [],
+            dailyData: [],
+            isLoading: false,
+          })
         }
+
+        setPanels(initialPanels)
       } catch (error) {
         console.error('Failed to load providers:', error)
         showError('Load Failed', 'Could not load cloud provider data.')
@@ -151,15 +156,12 @@ export default function CostComparePage() {
 
   // Fetch data for a panel
   const fetchPanelData = useCallback(
-    async (
-      providerId: string,
-      month: number,
-      year: number,
-      setPanel: React.Dispatch<React.SetStateAction<PanelData>>
-    ) => {
+    async (panelId: string, providerId: string, month: number, year: number) => {
       if (!providerId) return
 
-      setPanel((p) => ({ ...p, isLoading: true }))
+      setPanels((prev) =>
+        prev.map((p) => (p.id === panelId ? { ...p, isLoading: true } : p))
+      )
 
       try {
         const { startDate, endDate } = getMonthDateRange(month, year)
@@ -174,28 +176,46 @@ export default function CostComparePage() {
               date: d.date,
               cost: d.cost * monthFactor,
             }))
-            setPanel((p) => ({
-              ...p,
-              totalCost: providerData.currentMonth * monthFactor,
-              services: providerData.services.map((s) => ({
-                ...s,
-                cost: s.cost * monthFactor,
-              })),
-              dailyData,
-              isLoading: false,
-            }))
+            setPanels((prev) =>
+              prev.map((p) =>
+                p.id === panelId
+                  ? {
+                      ...p,
+                      totalCost: providerData.currentMonth * monthFactor,
+                      services: providerData.services.map((s) => ({
+                        ...s,
+                        cost: s.cost * monthFactor,
+                      })),
+                      dailyData,
+                      isLoading: false,
+                    }
+                  : p
+              )
+            )
           } else {
-            setPanel((p) => ({ ...p, isLoading: false }))
+            setPanels((prev) =>
+              prev.map((p) => (p.id === panelId ? { ...p, isLoading: false } : p))
+            )
           }
           return
         }
 
-        // Fetch cost data for the selected month/year
-        const [costResponse, dailyResponse, servicesResponse] = await Promise.all([
+        // Fetch daily data, services, cost data, and (for historical months) the accurate
+        // monthly total directly from the cloud provider API.
+        const fetchList: [Promise<any>, Promise<any>, Promise<any>, Promise<any>?] = [
           costDataAPI.getCostData(month, year),
           costDataAPI.getDailyCostData(providerId, startDate, endDate),
           costDataAPI.getServicesForDateRange(providerId, startDate, endDate),
-        ])
+        ]
+        if (!isCurrentMonth) {
+          // Fetch the accurate monthly total directly from AWS Cost Explorer
+          fetchList.push(
+            costDataAPI.getMonthlyTotal(providerId, year, month).catch(() => null)
+          )
+        }
+
+        const [costResponse, dailyResponse, servicesResponse, monthlyTotalResponse] =
+          await Promise.all(fetchList)
 
         const costData = costResponse.costData || []
         const providerCost = costData.find(
@@ -210,37 +230,79 @@ export default function CostComparePage() {
           change: s.change || 0,
         }))
 
-        const totalCost = providerCost
-          ? providerCost.currentMonth
-          : dailyData.reduce((sum: number, d: any) => sum + (d.cost || 0), 0)
+        let totalCost: number
+        if (isCurrentMonth && providerCost) {
+          // Current month: use the stored current_month_cost
+          totalCost = providerCost.currentMonth
+        } else if (monthlyTotalResponse?.total != null) {
+          // Historical month: use the accurate total from AWS Cost Explorer
+          totalCost = monthlyTotalResponse.total
+        } else {
+          // Fallback: sum daily data
+          totalCost = dailyData.reduce((sum: number, d: any) => sum + (d.cost || 0), 0)
+        }
 
-        setPanel((p) => ({
-          ...p,
-          totalCost,
-          services,
-          dailyData,
-          isLoading: false,
-        }))
+        setPanels((prev) =>
+          prev.map((p) =>
+            p.id === panelId
+              ? { ...p, totalCost, services, dailyData, isLoading: false }
+              : p
+          )
+        )
       } catch (error) {
         console.error('Failed to fetch panel data:', error)
-        setPanel((p) => ({ ...p, isLoading: false }))
+        setPanels((prev) =>
+          prev.map((p) => (p.id === panelId ? { ...p, isLoading: false } : p))
+        )
       }
     },
     [isDemoMode, allCostData, currentMonth, currentYear]
   )
 
   // Fetch data when panel selections change
-  useEffect(() => {
-    if (panelA.providerId) {
-      fetchPanelData(panelA.providerId, panelA.month, panelA.year, setPanelA)
-    }
-  }, [panelA.providerId, panelA.month, panelA.year, fetchPanelData])
+  const prevPanelSelections = useRef<Record<string, string>>({})
 
   useEffect(() => {
-    if (panelB.providerId) {
-      fetchPanelData(panelB.providerId, panelB.month, panelB.year, setPanelB)
-    }
-  }, [panelB.providerId, panelB.month, panelB.year, fetchPanelData])
+    panels.forEach((panel) => {
+      const key = `${panel.providerId}-${panel.month}-${panel.year}`
+      if (panel.providerId && prevPanelSelections.current[panel.id] !== key) {
+        prevPanelSelections.current[panel.id] = key
+        fetchPanelData(panel.id, panel.providerId, panel.month, panel.year)
+      }
+    })
+    // Clean up old entries
+    const activeIds = new Set(panels.map((p) => p.id))
+    Object.keys(prevPanelSelections.current).forEach((id) => {
+      if (!activeIds.has(id)) delete prevPanelSelections.current[id]
+    })
+  }, [panels, fetchPanelData])
+
+  // Panel management
+  const addPanel = () => {
+    setPanels((prev) => [
+      ...prev,
+      {
+        id: createPanelId(),
+        providerId: '',
+        month: currentMonth,
+        year: currentYear,
+        totalCost: 0,
+        services: [],
+        dailyData: [],
+        isLoading: false,
+      },
+    ])
+  }
+
+  const removePanel = (panelId: string) => {
+    setPanels((prev) => prev.filter((p) => p.id !== panelId))
+  }
+
+  const updatePanel = (panelId: string, updates: Partial<PanelData>) => {
+    setPanels((prev) =>
+      prev.map((p) => (p.id === panelId ? { ...p, ...updates } : p))
+    )
+  }
 
   const getCurrencySymbol = () => {
     const symbols: Record<string, string> = {
@@ -250,33 +312,31 @@ export default function CostComparePage() {
     return symbols[selectedCurrency] || '$'
   }
 
-  // Cost difference
-  const costDiff = panelA.totalCost - panelB.totalCost
-  const costDiffPercent =
-    panelB.totalCost > 0 ? ((costDiff) / panelB.totalCost) * 100 : 0
+  // Loaded panels for comparison summary
+  const loadedPanels = panels.filter((p) => p.providerId && !p.isLoading)
 
-  // Build service comparison data
+  // Build service comparison data for N panels
   const serviceComparison = (() => {
-    const serviceMap = new Map<string, { a: number; b: number }>()
-    panelA.services.forEach((s) => {
-      const existing = serviceMap.get(s.name) || { a: 0, b: 0 }
-      existing.a = s.cost
-      serviceMap.set(s.name, existing)
-    })
-    panelB.services.forEach((s) => {
-      const existing = serviceMap.get(s.name) || { a: 0, b: 0 }
-      existing.b = s.cost
-      serviceMap.set(s.name, existing)
-    })
-    return Array.from(serviceMap.entries())
-      .map(([name, costs]) => ({ name, costA: costs.a, costB: costs.b, diff: costs.a - costs.b }))
-      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
-  })()
+    if (loadedPanels.length < 2) return []
 
-  const providerAName = providers.find((p) => p.id === panelA.providerId)?.name || 'Provider A'
-  const providerBName = providers.find((p) => p.id === panelB.providerId)?.name || 'Provider B'
-  const monthALabel = monthOptions.find((m) => m.month === panelA.month && m.year === panelA.year)?.label || ''
-  const monthBLabel = monthOptions.find((m) => m.month === panelB.month && m.year === panelB.year)?.label || ''
+    const serviceMap = new Map<string, Map<string, number>>()
+
+    loadedPanels.forEach((panel) => {
+      panel.services.forEach((s) => {
+        if (!serviceMap.has(s.name)) {
+          serviceMap.set(s.name, new Map())
+        }
+        serviceMap.get(s.name)!.set(panel.id, s.cost)
+      })
+    })
+
+    return Array.from(serviceMap.entries())
+      .map(([name, costsByPanel]) => {
+        const maxCost = Math.max(...Array.from(costsByPanel.values()))
+        return { name, costsByPanel, maxCost }
+      })
+      .sort((a, b) => b.maxCost - a.maxCost)
+  })()
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -294,25 +354,33 @@ export default function CostComparePage() {
     return null
   }
 
-  const renderPanel = (
-    panel: PanelData,
-    setPanel: React.Dispatch<React.SetStateAction<PanelData>>,
-    label: string,
-    color: string
-  ) => {
+  const renderPanel = (panel: PanelData, index: number) => {
     const providerColor = panel.providerId ? getProviderColor(panel.providerId) : '#6B7280'
+    const label = providers.find((p) => p.id === panel.providerId)?.name || `Panel ${index + 1}`
 
     return (
-      <div className="card flex-1 min-w-0">
-        <div className="flex items-center space-x-2 mb-4">
-          <div className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0">
-            {panel.providerId ? (
-              <ProviderIcon providerId={panel.providerId} size={20} />
-            ) : (
-              <BarChart3 className="h-5 w-5 text-gray-400" />
-            )}
+      <div className="card h-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0">
+              {panel.providerId ? (
+                <ProviderIcon providerId={panel.providerId} size={20} />
+              ) : (
+                <BarChart3 className="h-5 w-5 text-gray-400" />
+              )}
+            </div>
+            <span className="text-sm font-semibold text-gray-700">{label}</span>
           </div>
-          <span className="text-sm font-semibold text-gray-700">{label}</span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              removePanel(panel.id)
+            }}
+            className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+            title="Remove this panel"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Provider Selector */}
@@ -320,7 +388,7 @@ export default function CostComparePage() {
           <label className="label text-xs">Cloud Provider</label>
           <select
             value={panel.providerId}
-            onChange={(e) => setPanel((p) => ({ ...p, providerId: e.target.value }))}
+            onChange={(e) => updatePanel(panel.id, { providerId: e.target.value })}
             className="input text-sm"
           >
             <option value="">Select provider...</option>
@@ -339,7 +407,7 @@ export default function CostComparePage() {
             value={`${panel.month}-${panel.year}`}
             onChange={(e) => {
               const [m, y] = e.target.value.split('-').map(Number)
-              setPanel((p) => ({ ...p, month: m, year: y }))
+              updatePanel(panel.id, { month: m, year: y })
             }}
             className="input text-sm"
           >
@@ -404,7 +472,7 @@ export default function CostComparePage() {
                       }}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: `${providerColor}10` }} />
-                    <Bar dataKey="cost" fill={color} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="cost" fill={providerColor} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -441,13 +509,26 @@ export default function CostComparePage() {
 
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center space-x-3 mb-1">
-            <ArrowLeftRight className="h-6 w-6 text-accent-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Cost Comparison</h1>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-3 mb-1">
+                <ArrowLeftRight className="h-6 w-6 text-accent-600" />
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Cost Comparison</h1>
+              </div>
+              <p className="text-xs text-gray-500 ml-9">
+                Compare costs across all your cloud providers and months
+              </p>
+            </div>
+            {!isInitialLoading && providers.length > 0 && (
+              <button
+                onClick={addPanel}
+                className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-accent-600 hover:text-accent-700 bg-accent-50 hover:bg-accent-100 rounded-lg transition-all duration-150"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add</span>
+              </button>
+            )}
           </div>
-          <p className="text-xs text-gray-500 ml-9">
-            Compare costs between cloud providers and across different months
-          </p>
         </div>
 
         {isInitialLoading ? (
@@ -467,69 +548,98 @@ export default function CostComparePage() {
           </div>
         ) : (
           <>
-            {/* Side-by-side Panels */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-              {renderPanel(panelA, setPanelA, 'Side A', getProviderColor(panelA.providerId || 'default'))}
-              {renderPanel(panelB, setPanelB, 'Side B', getProviderColor(panelB.providerId || 'default'))}
-            </div>
+            {/* Provider Panels — horizontal scroll */}
+            {panels.length > 0 ? (
+              <div className="flex gap-4 lg:gap-6 mb-6 overflow-x-auto pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+                {panels.map((panel, index) => (
+                  <div key={panel.id} className="min-w-[320px] max-w-[400px] flex-shrink-0">
+                    {renderPanel(panel, index)}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="card text-center py-12 mb-6">
+                <BarChart3 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm mb-3">No comparison panels</p>
+                <button
+                  onClick={addPanel}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 text-sm font-medium text-accent-600 bg-accent-50 hover:bg-accent-100 rounded-lg transition-all duration-150"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Panel</span>
+                </button>
+              </div>
+            )}
 
             {/* Comparison Summary */}
-            {panelA.providerId && panelB.providerId && !panelA.isLoading && !panelB.isLoading && (
+            {loadedPanels.length >= 2 && (
               <div className="card animate-fade-in">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
                   <ArrowLeftRight className="h-5 w-5 text-accent-600" />
                   <span>Comparison Summary</span>
                 </h2>
 
-                {/* Overall Difference */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-surface-50 rounded-xl p-4 border border-surface-200 text-center">
-                    <div className="text-xs font-medium text-gray-500 mb-1">
-                      {providerAName} ({monthALabel})
-                    </div>
-                    <div className="text-xl font-bold text-gray-900">
-                      {formatCurrency(panelA.totalCost)}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <div className={`rounded-xl px-4 py-3 text-center ${
-                      costDiff > 0 ? 'bg-red-50 border border-red-200' :
-                      costDiff < 0 ? 'bg-green-50 border border-green-200' :
-                      'bg-gray-50 border border-gray-200'
-                    }`}>
-                      <div className="flex items-center justify-center space-x-1 mb-0.5">
-                        {costDiff > 0 ? (
-                          <TrendingUp className="h-4 w-4 text-red-500" />
-                        ) : costDiff < 0 ? (
-                          <TrendingDown className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Minus className="h-4 w-4 text-gray-400" />
-                        )}
-                        <span className={`text-sm font-bold ${
-                          costDiff > 0 ? 'text-red-600' : costDiff < 0 ? 'text-green-600' : 'text-gray-500'
-                        }`}>
-                          {costDiff > 0 ? '+' : ''}{formatCurrency(Math.abs(costDiff))}
-                        </span>
-                      </div>
-                      {costDiffPercent !== 0 && (
-                        <div className={`text-xs font-medium ${
-                          costDiff > 0 ? 'text-red-500' : 'text-green-500'
-                        }`}>
-                          {costDiff > 0 ? '+' : ''}{costDiffPercent.toFixed(1)}%
+                {/* Overall Costs per Provider */}
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${
+                  loadedPanels.length > 2 ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-2'
+                } gap-3 mb-6`}>
+                  {loadedPanels.map((panel) => {
+                    const providerName = providers.find((p) => p.id === panel.providerId)?.name || panel.providerId
+                    const monthLabel = monthOptions.find((m) => m.month === panel.month && m.year === panel.year)?.label || ''
+                    const pColor = getProviderColor(panel.providerId)
+                    return (
+                      <div
+                        key={panel.id}
+                        className="rounded-xl p-4 border text-center"
+                        style={{ backgroundColor: `${pColor}08`, borderColor: `${pColor}25` }}
+                      >
+                        <div className="flex items-center justify-center space-x-2 mb-1">
+                          <ProviderIcon providerId={panel.providerId} size={16} />
+                          <span className="text-xs font-medium text-gray-500">{providerName}</span>
                         </div>
-                      )}
-                      <div className="text-[10px] text-gray-400 mt-0.5">A vs B</div>
-                    </div>
-                  </div>
-                  <div className="bg-surface-50 rounded-xl p-4 border border-surface-200 text-center">
-                    <div className="text-xs font-medium text-gray-500 mb-1">
-                      {providerBName} ({monthBLabel})
-                    </div>
-                    <div className="text-xl font-bold text-gray-900">
-                      {formatCurrency(panelB.totalCost)}
-                    </div>
-                  </div>
+                        <div className="text-[10px] text-gray-400 mb-1">{monthLabel}</div>
+                        <div className="text-xl font-bold text-gray-900">
+                          {formatCurrency(panel.totalCost)}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
+
+                {/* Cost Range Summary */}
+                {(() => {
+                  const sorted = [...loadedPanels].sort((a, b) => a.totalCost - b.totalCost)
+                  const cheapest = sorted[0]
+                  const mostExpensive = sorted[sorted.length - 1]
+                  const spread = mostExpensive.totalCost - cheapest.totalCost
+                  const cheapestName = providers.find((p) => p.id === cheapest.providerId)?.name || cheapest.providerId
+                  const expensiveName = providers.find((p) => p.id === mostExpensive.providerId)?.name || mostExpensive.providerId
+
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                      <div className="bg-green-50 rounded-xl p-3 border border-green-200 text-center">
+                        <div className="flex items-center justify-center space-x-1 mb-1">
+                          <TrendingDown className="h-3.5 w-3.5 text-green-600" />
+                          <span className="text-xs text-green-600 font-medium">Lowest Cost</span>
+                        </div>
+                        <div className="text-sm font-bold text-green-700">{cheapestName}</div>
+                        <div className="text-lg font-bold text-green-800">{formatCurrency(cheapest.totalCost)}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 text-center flex flex-col justify-center">
+                        <div className="text-xs text-gray-500 font-medium mb-1">Cost Spread</div>
+                        <div className="text-lg font-bold text-gray-900">{formatCurrency(spread)}</div>
+                      </div>
+                      <div className="bg-red-50 rounded-xl p-3 border border-red-200 text-center">
+                        <div className="flex items-center justify-center space-x-1 mb-1">
+                          <TrendingUp className="h-3.5 w-3.5 text-red-600" />
+                          <span className="text-xs text-red-600 font-medium">Highest Cost</span>
+                        </div>
+                        <div className="text-sm font-bold text-red-700">{expensiveName}</div>
+                        <div className="text-lg font-bold text-red-800">{formatCurrency(mostExpensive.totalCost)}</div>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Service-Level Comparison */}
                 {serviceComparison.length > 0 && (
@@ -539,43 +649,51 @@ export default function CostComparePage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-surface-200">
-                            <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide sticky left-0 bg-white z-10">
                               Service
                             </th>
-                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                              {providerAName}
-                            </th>
-                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                              {providerBName}
-                            </th>
-                            <th className="text-right py-2 pl-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                              Difference
-                            </th>
+                            {loadedPanels.map((panel) => {
+                              const name = providers.find((p) => p.id === panel.providerId)?.name || panel.providerId
+                              return (
+                                <th key={panel.id} className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                                  <div className="flex items-center justify-end space-x-1">
+                                    <ProviderIcon providerId={panel.providerId} size={12} />
+                                    <span>{name}</span>
+                                  </div>
+                                </th>
+                              )
+                            })}
                           </tr>
                         </thead>
                         <tbody>
-                          {serviceComparison.slice(0, 10).map((row) => (
-                            <tr key={row.name} className="border-b border-surface-100">
-                              <td className="py-2.5 pr-4 text-gray-700 font-medium">{row.name}</td>
-                              <td className="py-2.5 px-4 text-right text-gray-900 font-semibold">
-                                {row.costA > 0 ? formatCurrency(row.costA) : '-'}
-                              </td>
-                              <td className="py-2.5 px-4 text-right text-gray-900 font-semibold">
-                                {row.costB > 0 ? formatCurrency(row.costB) : '-'}
-                              </td>
-                              <td className={`py-2.5 pl-4 text-right font-semibold ${
-                                row.diff > 0 ? 'text-red-600' : row.diff < 0 ? 'text-green-600' : 'text-gray-400'
-                              }`}>
-                                {row.diff !== 0 ? (
-                                  <>
-                                    {row.diff > 0 ? '+' : ''}{formatCurrency(row.diff)}
-                                  </>
-                                ) : (
-                                  '-'
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                          {serviceComparison.slice(0, 15).map((row) => {
+                            const costs = Array.from(row.costsByPanel.values()).filter((v) => v > 0)
+                            const minCost = costs.length > 0 ? Math.min(...costs) : 0
+                            const maxCost = costs.length > 0 ? Math.max(...costs) : 0
+
+                            return (
+                              <tr key={row.name} className="border-b border-surface-100">
+                                <td className="py-2.5 pr-4 text-gray-700 font-medium sticky left-0 bg-white z-10">
+                                  {row.name}
+                                </td>
+                                {loadedPanels.map((panel) => {
+                                  const cost = row.costsByPanel.get(panel.id) || 0
+                                  const isMin = cost > 0 && cost === minCost && costs.length > 1
+                                  const isMax = cost > 0 && cost === maxCost && costs.length > 1
+                                  return (
+                                    <td
+                                      key={panel.id}
+                                      className={`py-2.5 px-3 text-right font-semibold whitespace-nowrap ${
+                                        isMin ? 'text-green-600' : isMax ? 'text-red-600' : 'text-gray-900'
+                                      }`}
+                                    >
+                                      {cost > 0 ? formatCurrency(cost) : '-'}
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Costra AWS Billing Connection - Grants Costra read-only access to AWS billing and cost data'
+Description: 'Costra AWS Billing Connection - Grants Costra read-only access to AWS billing and cost data with CUR support'
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -13,6 +13,10 @@ Metadata:
         default: Security
       Parameters:
       - ExternalId
+    - Label:
+        default: Cost and Usage Reports
+      Parameters:
+      - EnableCUR
     ParameterLabels:
       ConnectionName:
         default: 'Connection Name (descriptive alias for this AWS account)'
@@ -20,6 +24,8 @@ Metadata:
         default: 'Costra AWS Account ID'
       ExternalId:
         default: 'External ID (for secure cross-account access)'
+      EnableCUR:
+        default: 'Enable Cost and Usage Reports (recommended for penny-perfect billing data)'
 
 Parameters:
   ConnectionName:
@@ -30,13 +36,13 @@ Parameters:
     ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only (3-64 characters)'
     MinLength: 3
     MaxLength: 64
-  
+
   CostraAccountId:
     Type: String
     Description: 'Costra AWS Account ID (provided by Costra)'
     AllowedPattern: '^[0-9]{12}$'
     ConstraintDescription: 'Must be a valid 12-digit AWS account ID'
-  
+
   ExternalId:
     Type: String
     Description: 'External ID for secure cross-account access (provided by Costra)'
@@ -46,8 +52,17 @@ Parameters:
     AllowedPattern: '^[a-zA-Z0-9+/=._-]+$'
     ConstraintDescription: 'External ID must contain only alphanumeric characters and safe special characters'
 
+  EnableCUR:
+    Type: String
+    Description: 'Enable CUR (Cost and Usage Reports) for penny-perfect historical billing data. Creates an S3 bucket for CUR delivery.'
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+
 Conditions:
   HasConnectionName: !Not [!Equals [!Ref ConnectionName, '']]
+  CUREnabled: !Equals [!Ref EnableCUR, 'true']
 
 Resources:
   CostraAccessRole:
@@ -101,6 +116,24 @@ Resources:
                   - 'cur:ModifyReportDefinition'
                   - 'cur:DeleteReportDefinition'
                 Resource: '*'
+              - Sid: BCMDataExportsAccess
+                Effect: Allow
+                Action:
+                  - 'bcm-data-exports:CreateExport'
+                  - 'bcm-data-exports:GetExport'
+                  - 'bcm-data-exports:ListExports'
+                  - 'bcm-data-exports:UpdateExport'
+                  - 'bcm-data-exports:DeleteExport'
+                Resource: '*'
+              - Sid: CURBucketReadAccess
+                Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                  - 's3:GetBucketLocation'
+                Resource:
+                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-*'
+                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-*/*'
               - Sid: OrganizationsAccess
                 Effect: Allow
                 Action:
@@ -143,19 +176,81 @@ Resources:
         - Key: CostraAccountId
           Value: !Ref CostraAccountId
 
+  # S3 Bucket for CUR data delivery (in customer's account)
+  CostraCURBucket:
+    Type: AWS::S3::Bucket
+    Condition: CUREnabled
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldReports
+            Status: Enabled
+            ExpirationInDays: 400
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: ManagedBy
+          Value: Costra
+        - Key: Purpose
+          Value: CostAndUsageReports
+
+  # Bucket policy: allow BCM Data Exports to write, allow Costra to read cross-account
+  CostraCURBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: CUREnabled
+    Properties:
+      Bucket: !Ref CostraCURBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBCMDataExportsWrite
+            Effect: Allow
+            Principal:
+              Service: bcm-data-exports.amazonaws.com
+            Action:
+              - 's3:PutObject'
+              - 's3:GetBucketPolicy'
+            Resource:
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}'
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref 'AWS::AccountId'
+          - Sid: AllowCostraCrossAccountRead
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${CostraAccountId}:root'
+            Action:
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:GetBucketLocation'
+            Resource:
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}'
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}/*'
+
 Outputs:
   RoleArn:
     Description: 'ARN of the IAM role that Costra will use to access your AWS account'
     Value: !GetAtt CostraAccessRole.Arn
     Export:
       Name: !Sub '${AWS::StackName}-RoleArn'
-  
+
   ExternalId:
     Description: 'External ID used for secure access (save this for reference)'
     Value: !Ref ExternalId
     Export:
       Name: !Sub '${AWS::StackName}-ExternalId'
-  
+
   ConnectionName:
     Description: 'Name of this connection'
     Value: !If
@@ -164,21 +259,35 @@ Outputs:
       - !Ref AWS::StackName
     Export:
       Name: !Sub '${AWS::StackName}-ConnectionName'
-  
+
   AccountId:
     Description: 'AWS Account ID where this stack is deployed'
     Value: !Ref AWS::AccountId
     Export:
       Name: !Sub '${AWS::StackName}-AccountId'
-  
+
   StackName:
     Description: 'CloudFormation stack name'
     Value: !Ref AWS::StackName
     Export:
       Name: !Sub '${AWS::StackName}-StackName'
-  
+
   Region:
     Description: 'AWS Region where this stack is deployed'
     Value: !Ref AWS::Region
     Export:
       Name: !Sub '${AWS::StackName}-Region'
+
+  CURBucketName:
+    Condition: CUREnabled
+    Description: 'S3 bucket where CUR data is delivered'
+    Value: !Ref CostraCURBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-CURBucket'
+
+  CURBucketArn:
+    Condition: CUREnabled
+    Description: 'ARN of the CUR S3 bucket'
+    Value: !GetAtt CostraCURBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CURBucketArn'

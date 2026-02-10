@@ -11,17 +11,19 @@ import {
   getDailyCostData,
   getServiceCostsForDateRange,
   getCloudProviderCredentials,
+  getCloudProviderCredentialsByAccountId,
   createNotification,
 } from '../database.js'
 import { cached, cacheKeys, clearUserCache } from '../utils/cache.js'
-import { 
-  fetchAWSServiceDetails, 
+import {
+  fetchAWSServiceDetails,
   fetchAzureServiceDetails,
   fetchGCPServiceDetails,
   fetchDigitalOceanServiceDetails,
   fetchIBMServiceDetails,
   fetchLinodeServiceDetails,
-  fetchVultrServiceDetails
+  fetchVultrServiceDetails,
+  fetchAWSMonthlyTotal,
 } from '../services/cloudProviderIntegrations.js'
 import { generateCSVReport, generatePDFReport } from '../utils/reportGenerator.js'
 import { 
@@ -81,6 +83,7 @@ router.get('/', async (req, res) => {
       savings: parseFloat(cost.savings) || 0,
       taxCurrentMonth: parseFloat(cost.tax_current_month) || 0,
       taxLastMonth: parseFloat(cost.tax_last_month) || 0,
+      dataSource: cost.data_source || 'cost_explorer',
       // Transform service_name to name and change_percent to change for frontend compatibility
       // Filter out Tax entries - they are not services
       services: (cost.services || [])
@@ -1740,5 +1743,72 @@ async function generatePDFReportBuffer(reportData) {
     doc.end()
   })
 }
+
+// Get accurate monthly total for a provider by querying cloud API directly
+// Supports both manual (access key) and automated (IAM role) connections
+router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { providerId } = req.params
+    const month = parseInt(req.params.month, 10)
+    const year = parseInt(req.params.year, 10)
+    const accountId = req.query.accountId ? parseInt(req.query.accountId, 10) : null
+
+    if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+      return res.status(400).json({ error: 'Invalid month or year' })
+    }
+
+    // Resolve credentials — handle both manual and automated connections
+    let credentials
+    if (accountId) {
+      // Specific account requested
+      const accountData = await getCloudProviderCredentialsByAccountId(userId, accountId)
+      if (!accountData) {
+        return res.status(404).json({ error: 'Account not found' })
+      }
+      if (accountData.connectionType?.startsWith('automated') && accountData.roleArn && accountData.externalId) {
+        const { getAssumedRoleCredentials } = await import('../services/awsAuth.js')
+        credentials = await getAssumedRoleCredentials(accountData.roleArn, accountData.externalId, `costra-monthly-total-${accountId}-${Date.now()}`)
+      } else {
+        credentials = accountData.credentials
+      }
+    } else {
+      // Legacy: use first active account for this provider
+      credentials = await getCloudProviderCredentials(userId, providerId)
+    }
+
+    if (!credentials) {
+      return res.status(404).json({ error: 'Provider not configured' })
+    }
+
+    // Cache for 10 minutes — historical months rarely change
+    const cacheKey = `user:${userId}:monthly_total:${providerId}:${year}:${month}:${accountId || 'default'}`
+    const result = await cached(
+      cacheKey,
+      async () => {
+        switch (providerId) {
+          case 'aws':
+            return await fetchAWSMonthlyTotal(credentials, month, year)
+          default:
+            return null
+        }
+      },
+      600
+    )
+
+    if (!result) {
+      return res.status(400).json({ error: 'Monthly total fetch not supported for this provider' })
+    }
+
+    res.json(result)
+  } catch (error) {
+    logger.error('Get monthly total error', {
+      userId: req.user?.userId,
+      providerId: req.params?.providerId,
+      error: error.message,
+    })
+    res.status(500).json({ error: 'Failed to fetch monthly total' })
+  }
+})
 
 export default router

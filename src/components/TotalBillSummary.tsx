@@ -29,8 +29,10 @@ export default function TotalBillSummary({
 }: TotalBillSummaryProps) {
   const { formatCurrency } = useCurrency()
 
-  const changePercent = totalLastMonth > 0
-    ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100
+  const currentWithTax = totalCurrent + totalTaxCurrent
+  const lastMonthWithTax = totalLastMonth + totalTaxLastMonth
+  const changePercent = lastMonthWithTax > 0
+    ? ((currentWithTax - lastMonthWithTax) / lastMonthWithTax) * 100
     : 0
 
   void totalSavings
@@ -42,23 +44,21 @@ export default function TotalBillSummary({
   const stats = [
     {
       label: 'Current Month',
-      value: formatCurrency(totalCurrent),
+      value: formatCurrency(hasTax ? totalCurrent + totalTaxCurrent : totalCurrent),
       icon: Wallet,
       highlight: true,
       subtitle: null as string | null,
       subtitleColor: '',
-      taxValue: hasTax ? formatCurrency(totalCurrent + totalTaxCurrent) : null,
-      taxAmount: hasTax ? formatCurrency(totalTaxCurrent) : null,
+      taxBreakdown: hasTax ? `${formatCurrency(totalCurrent)} + ${formatCurrency(totalTaxCurrent)} tax` : null,
     },
     {
       label: 'Last Month',
-      value: formatCurrency(totalLastMonth),
+      value: formatCurrency(hasTax ? totalLastMonth + totalTaxLastMonth : totalLastMonth),
       icon: Target,
       highlight: false,
       subtitle: null as string | null,
       subtitleColor: '',
-      taxValue: hasTax ? formatCurrency(totalLastMonth + totalTaxLastMonth) : null,
-      taxAmount: hasTax ? formatCurrency(totalTaxLastMonth) : null,
+      taxBreakdown: hasTax ? `${formatCurrency(totalLastMonth)} + ${formatCurrency(totalTaxLastMonth)} tax` : null,
     },
     {
       label: 'Forecast',
@@ -67,8 +67,7 @@ export default function TotalBillSummary({
       highlight: false,
       subtitle: confidenceLabel?.text || null,
       subtitleColor: confidenceLabel?.color || '',
-      taxValue: null,
-      taxAmount: null,
+      taxBreakdown: null,
     },
   ]
 
@@ -79,7 +78,7 @@ export default function TotalBillSummary({
         <h2 className="text-5xl font-bold text-gray-900 mb-1.5">
           Total Spend
         </h2>
-        <p className="text-xs text-gray-500 mb-3">Overview across all cloud providers (before tax)</p>
+        <p className="text-xs text-gray-500 mb-3">Overview across all cloud providers{hasTax ? '' : ' (before tax)'}</p>
         {changePercent !== 0 && (
           <div className={`flex items-center px-4 py-1.5 rounded-xl text-xs ${
             changePercent >= 0
@@ -138,11 +137,9 @@ export default function TotalBillSummary({
                   {stat.value}
                 </div>
 
-                {stat.taxValue && (
-                  <div className="text-[10px] mt-1.5 text-gray-500">
-                    <span className="font-medium text-gray-700">{stat.taxValue}</span>
-                    {' '}incl. tax
-                    <span className="text-gray-400 ml-1">({stat.taxAmount} tax)</span>
+                {stat.taxBreakdown && (
+                  <div className="text-[10px] mt-1.5 text-gray-400">
+                    {stat.taxBreakdown}
                   </div>
                 )}
 

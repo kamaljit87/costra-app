@@ -178,8 +178,9 @@ if (process.env.NODE_ENV === 'production') {
 
 // Initialize scheduled syncs (in production)
 if (process.env.NODE_ENV === 'production') {
-  import('./services/syncScheduler.js').then(({ initScheduledSyncs }) => {
+  import('./services/syncScheduler.js').then(({ initScheduledSyncs, initCURPolling }) => {
     initScheduledSyncs()
+    initCURPolling()
   }).catch((error) => {
     logger.warn('Failed to initialize scheduled syncs', { error: error.message })
   })

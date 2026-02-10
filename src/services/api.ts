@@ -173,6 +173,11 @@ export const costDataAPI = {
     return response.json()
   },
 
+  getMonthlyTotal: async (providerId: string, year: number, month: number) => {
+    const response = await apiRequest(`/cost-data/${providerId}/monthly-total/${year}/${month}`)
+    return response.json()
+  },
+
   getCreditsDetail: async (providerId: string, startDate: string, endDate: string, accountId?: number) => {
     const params = new URLSearchParams()
     params.append('startDate', startDate)
@@ -292,6 +297,20 @@ export const cloudProvidersAPI = {
     const response = await apiRequest(`/cloud-providers/${providerId}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ isActive }),
+    })
+    return response.json()
+  },
+
+  // Get CUR status for an AWS account
+  getCurStatus: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/aws/${accountId}/cur-status`)
+    return response.json()
+  },
+
+  // Manually trigger CUR setup for an AWS account
+  setupCur: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/aws/${accountId}/cur-setup`, {
+      method: 'POST',
     })
     return response.json()
   },
