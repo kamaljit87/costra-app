@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 import { useNotification } from '../contexts/NotificationContext'
@@ -13,7 +13,6 @@ import SavingsPlansList from '../components/SavingsPlansList'
 import { Sparkles, RefreshCw, Plus, Cloud } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ProviderIcon } from '../components/CloudProviderIcons'
-import CloudProviderManager from '../components/CloudProviderManager'
 
 interface ConfiguredProvider {
   id: number
@@ -26,6 +25,7 @@ interface ConfiguredProvider {
 
 export default function Dashboard() {
   const { isDemoMode } = useAuth()
+  const navigate = useNavigate()
 
   const { showSuccess, showError, showWarning } = useNotification()
   const [costData, setCostData] = useState<CostData[]>([])
@@ -34,7 +34,6 @@ export default function Dashboard() {
   const [providerBudgetCounts, setProviderBudgetCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [showAddProvider, setShowAddProvider] = useState(false)
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null)
 
   const loadData = async () => {
@@ -157,7 +156,7 @@ export default function Dashboard() {
           {!isDemoMode && (
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-3 sm:space-y-0">
               <button
-                onClick={() => setShowAddProvider(true)}
+                onClick={() => navigate('/settings?tab=providers')}
                 className="btn-secondary flex items-center justify-center space-x-2 min-h-[44px]"
                 title="Add a new cloud provider account"
               >
@@ -252,7 +251,7 @@ export default function Dashboard() {
                       Connect your cloud provider accounts to start tracking costs and managing your cloud spending.
                     </p>
                     <button
-                      onClick={() => setShowAddProvider(true)}
+                      onClick={() => navigate('/settings?tab=providers')}
                       className="btn-primary flex items-center space-x-2"
                     >
                       <Plus className="h-4 w-4" />
@@ -334,7 +333,7 @@ export default function Dashboard() {
                       </div>
                       <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
                       <Link
-                        to="/settings"
+                        to="/settings?tab=providers"
                         className="btn-primary inline-flex"
                       >
                         Add Cloud Provider
@@ -352,20 +351,6 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* Add Provider Modal */}
-        {showAddProvider && (
-          <CloudProviderManager
-            modalMode={true}
-            onProviderChange={() => {
-              loadData()
-              setShowAddProvider(false)
-            }}
-            onClose={() => {
-              setShowAddProvider(false)
-              loadData()
-            }}
-          />
-        )}
       </div>
     </Layout>
   )

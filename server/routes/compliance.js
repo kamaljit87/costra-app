@@ -15,6 +15,7 @@ import {
   submitGrievance,
   getUserGrievances,
   getUserById,
+  addMarketingLead,
 } from '../database.js'
 import logger from '../utils/logger.js'
 
@@ -95,14 +96,28 @@ router.post('/delete-account/:requestId/confirm', authenticateToken, async (req,
   try {
     const userId = req.user.userId || req.user.id
     const requestId = parseInt(req.params.requestId, 10)
+    const { keepForMarketing } = req.body || {}
 
     if (isNaN(requestId)) {
       return res.status(400).json({ error: 'Invalid request ID' })
     }
 
+    // If user opted in to marketing emails, save their email before deletion
+    if (keepForMarketing) {
+      try {
+        const user = await getUserById(userId)
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress
+        await addMarketingLead(user.email, user.name, 'account_deletion', ipAddress)
+        logger.info('User opted in to marketing emails before deletion', { userId, email: user.email })
+      } catch (marketingError) {
+        // Non-critical — proceed with deletion even if marketing save fails
+        logger.warn('Failed to save marketing lead before deletion', { userId, error: marketingError.message })
+      }
+    }
+
     await confirmDeletionRequest(userId, requestId)
 
-    logger.info('Account deletion confirmed and executed', { userId, requestId })
+    logger.info('Account deletion confirmed and executed', { userId, requestId, keepForMarketing: !!keepForMarketing })
 
     res.json({
       message: 'Your account and all associated data have been permanently deleted.',

@@ -829,6 +829,23 @@ export const initDatabase = async () => {
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_grievance_records_status ON grievance_records(status, submitted_at)`)
 
+      // Marketing leads table — stores emails securely for users who opt in to marketing/blog emails
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS marketing_leads (
+          id SERIAL PRIMARY KEY,
+          email TEXT NOT NULL,
+          name TEXT,
+          source TEXT NOT NULL DEFAULT 'account_deletion' CHECK (source IN ('account_deletion', 'signup', 'landing_page', 'blog', 'other')),
+          subscribed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          unsubscribed_at TIMESTAMP,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          ip_address TEXT,
+          UNIQUE(email)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_marketing_leads_active ON marketing_leads(is_active, subscribed_at)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_marketing_leads_email ON marketing_leads(email)`)
+
       // Add auto_sync columns to cloud_provider_credentials
       await client.query(`
         DO $$ 
@@ -5573,6 +5590,33 @@ export const cancelDeletionRequest = async (userId, requestId) => {
        WHERE id = $1 AND user_id = $2 AND status = 'pending'
        RETURNING *`,
       [requestId, userId]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// Marketing Leads
+// ==========================================
+
+/**
+ * Add a marketing lead (upsert — reactivates if previously unsubscribed)
+ */
+export const addMarketingLead = async (email, name, source = 'account_deletion', ipAddress = null) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO marketing_leads (email, name, source, ip_address)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email) DO UPDATE SET
+         name = COALESCE(EXCLUDED.name, marketing_leads.name),
+         is_active = true,
+         unsubscribed_at = NULL,
+         subscribed_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [email, name, source, ipAddress]
     )
     return result.rows[0]
   } finally {

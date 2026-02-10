@@ -352,12 +352,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       // Clear local state immediately
       setProviders(prev => prev.filter(p => p.accountId !== accountId))
       await loadProviders()
-      // Trigger full data refresh in parent components
+      // Trigger full data refresh in parent components (dashboard, etc.)
       onProviderChange?.()
-      // Force a page reload to clear any cached cost data
-      if (window.location.pathname === '/') {
-        window.location.reload()
-      }
     } catch (error: any) {
       setError(error.message || 'Failed to delete cloud provider account')
     }

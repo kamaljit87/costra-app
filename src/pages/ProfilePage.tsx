@@ -1,26 +1,31 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import { useAuth } from '../contexts/AuthContext'
-import { profileAPI } from '../services/api'
-import { 
-  User, 
-  Mail, 
-  Camera, 
-  Shield, 
-  Key, 
-  Check, 
-  X, 
+import { profileAPI, complianceAPI } from '../services/api'
+import {
+  User,
+  Mail,
+  Camera,
+  Shield,
+  Key,
+  Check,
+  X,
   Loader2,
   AlertCircle,
   Eye,
   EyeOff,
   Upload,
-  Trash2
+  Trash2,
+  Download,
+  FileText,
+  Lock
 } from 'lucide-react'
 
 export default function ProfilePage() {
-  const { user, updateUser } = useAuth()
+  const { user, updateUser, logout } = useAuth()
+  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Basic info state
@@ -48,6 +53,17 @@ export default function ProfilePage() {
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState('')
+
+  // Data management state
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteReason, setDeleteReason] = useState('')
+  const [keepForMarketing, setKeepForMarketing] = useState(true)
+  const [deletionRequestId, setDeletionRequestId] = useState<number | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteStep, setDeleteStep] = useState<'initial' | 'confirm'>('initial')
 
   useEffect(() => {
     if (user) {
@@ -177,6 +193,72 @@ export default function ProfilePage() {
     } finally {
       setPasswordLoading(false)
     }
+  }
+
+  const handleExportData = async () => {
+    setIsExporting(true)
+    setExportError('')
+    try {
+      const data = await complianceAPI.exportData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `costra-data-export-${new Date().toISOString().split('T')[0]}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error: any) {
+      setExportError(error.message || 'Failed to export data')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleRequestDeletion = async () => {
+    setDeleteLoading(true)
+    setDeleteError('')
+    try {
+      const result = await complianceAPI.requestDeletion(deleteReason || undefined)
+      setDeletionRequestId(result.request.id)
+      setDeleteStep('confirm')
+    } catch (error: any) {
+      setDeleteError(error.message || 'Failed to create deletion request')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleConfirmDeletion = async () => {
+    if (!deletionRequestId) return
+    setDeleteLoading(true)
+    setDeleteError('')
+    try {
+      await complianceAPI.confirmDeletion(deletionRequestId, keepForMarketing)
+      logout()
+      navigate('/login')
+    } catch (error: any) {
+      setDeleteError(error.message || 'Failed to delete account')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleCancelDeletion = async () => {
+    if (deletionRequestId) {
+      try {
+        await complianceAPI.cancelDeletion(deletionRequestId)
+      } catch {
+        // Ignore cancel errors
+      }
+    }
+    setShowDeleteConfirm(false)
+    setDeleteStep('initial')
+    setDeletionRequestId(null)
+    setDeleteReason('')
+    setDeleteError('')
+    setKeepForMarketing(true)
   }
 
   const getPasswordStrength = (password: string) => {
@@ -597,6 +679,205 @@ export default function ProfilePage() {
                 <p className="text-gray-900 font-medium mt-1">January 2025</p>
               </div>
             </div>
+          </section>
+
+          {/* Data Management Section */}
+          <section className="card">
+            <div className="flex items-center mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 flex items-center justify-center">
+                <FileText className="h-5 w-5 text-accent-700" />
+              </div>
+              <div className="ml-3">
+                <h2 className="text-lg font-semibold text-gray-900">Your Data</h2>
+                <p className="text-sm text-gray-500">Download or manage your personal data</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Data Export */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-surface-50 rounded-xl border border-surface-100">
+                <div className="mb-3 sm:mb-0">
+                  <h3 className="font-medium text-gray-900">Download Your Data</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Export all your data including profile, cloud providers, cost data, budgets, and preferences in JSON format.
+                  </p>
+                </div>
+                <button
+                  onClick={handleExportData}
+                  disabled={isExporting}
+                  className="btn-secondary flex items-center space-x-2 shrink-0"
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span>{isExporting ? 'Exporting...' : 'Download Data'}</span>
+                </button>
+              </div>
+
+              {exportError && (
+                <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{exportError}</span>
+                </div>
+              )}
+
+              {/* Data Security Note */}
+              <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <Lock className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium">Your data is stored securely</p>
+                  <p className="mt-1 text-blue-700">
+                    All credentials are encrypted with AES-256-GCM. Email addresses are stored securely and never shared with third parties.
+                    We comply with GDPR and DPDPA data protection regulations.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Delete Account Section */}
+          <section className="card border-red-200">
+            <div className="flex items-center mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-100 to-red-50 flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div className="ml-3">
+                <h2 className="text-lg font-semibold text-gray-900">Delete Account</h2>
+                <p className="text-sm text-gray-500">Permanently remove your account and all data</p>
+              </div>
+            </div>
+
+            {!showDeleteConfirm ? (
+              <div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Once you delete your account, all your data will be permanently removed. This includes your profile,
+                  cloud provider credentials, cost data, budgets, reports, and all associated records. This action cannot be undone.
+                </p>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 border border-red-200 rounded-xl font-medium flex items-center space-x-2 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete My Account</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {deleteStep === 'initial' ? (
+                  <>
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-sm text-red-800 font-medium mb-2">Are you sure you want to delete your account?</p>
+                      <p className="text-sm text-red-700">
+                        This will permanently delete all your data including cloud provider connections,
+                        cost history, budgets, and reports. You will not be able to recover any of this data.
+                      </p>
+                    </div>
+
+                    {/* Reason (optional) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Reason for leaving (optional)
+                      </label>
+                      <textarea
+                        value={deleteReason}
+                        onChange={(e) => setDeleteReason(e.target.value)}
+                        className="input-field"
+                        placeholder="Help us improve by sharing why you're leaving..."
+                        rows={2}
+                      />
+                    </div>
+
+                    {/* Marketing opt-in */}
+                    <div className="flex items-start gap-3 p-4 bg-surface-50 rounded-xl border border-surface-100">
+                      <input
+                        type="checkbox"
+                        id="keepForMarketing"
+                        checked={keepForMarketing}
+                        onChange={(e) => setKeepForMarketing(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-accent-600 focus:ring-accent-500"
+                      />
+                      <label htmlFor="keepForMarketing" className="text-sm text-gray-700 cursor-pointer">
+                        <span className="font-medium">Keep me updated</span>
+                        <p className="mt-0.5 text-gray-500">
+                          I'd like to receive occasional product updates, blog posts, and tips about cloud cost optimization.
+                          You can unsubscribe at any time.
+                        </p>
+                      </label>
+                    </div>
+
+                    {deleteError && (
+                      <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <span>{deleteError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleRequestDeletion}
+                        disabled={deleteLoading}
+                        className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium flex items-center space-x-2 transition-colors disabled:opacity-50"
+                      >
+                        {deleteLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        <span>{deleteLoading ? 'Processing...' : 'Continue with Deletion'}</span>
+                      </button>
+                      <button
+                        onClick={handleCancelDeletion}
+                        className="btn-secondary"
+                        disabled={deleteLoading}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-sm text-red-800 font-medium mb-2">Final Confirmation</p>
+                      <p className="text-sm text-red-700">
+                        Click "Permanently Delete" below to irreversibly delete your account and all associated data.
+                        {keepForMarketing && ' Your email will be saved for marketing communications as requested.'}
+                      </p>
+                    </div>
+
+                    {deleteError && (
+                      <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                        <span>{deleteError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleConfirmDeletion}
+                        disabled={deleteLoading}
+                        className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium flex items-center space-x-2 transition-colors disabled:opacity-50"
+                      >
+                        {deleteLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        <span>{deleteLoading ? 'Deleting...' : 'Permanently Delete'}</span>
+                      </button>
+                      <button
+                        onClick={handleCancelDeletion}
+                        className="btn-secondary"
+                        disabled={deleteLoading}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </section>
         </div>
       </div>

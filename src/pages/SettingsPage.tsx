@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import CurrencySelector from '../components/CurrencySelector'
@@ -6,7 +7,17 @@ import CloudProviderManager from '../components/CloudProviderManager'
 import { Settings, Globe, Cloud } from 'lucide-react'
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'general' | 'providers'>('general')
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<'general' | 'providers'>(
+    tabParam === 'providers' ? 'providers' : 'general'
+  )
+
+  useEffect(() => {
+    if (tabParam === 'providers') {
+      setActiveTab('providers')
+    }
+  }, [tabParam])
 
   return (
     <Layout>

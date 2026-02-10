@@ -971,9 +971,10 @@ export const complianceAPI = {
     return response.json()
   },
 
-  confirmDeletion: async (requestId: number) => {
+  confirmDeletion: async (requestId: number, keepForMarketing?: boolean) => {
     const response = await apiRequest(`/compliance/delete-account/${requestId}/confirm`, {
       method: 'POST',
+      body: JSON.stringify({ keepForMarketing }),
     })
     return response.json()
   },
