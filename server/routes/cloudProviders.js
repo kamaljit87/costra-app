@@ -15,6 +15,7 @@ import {
   createNotification,
   addAutomatedAWSConnection,
   updateAWSConnectionStatus,
+  getExistingAWSConnection,
   pool,
 } from '../database.js'
 import {
@@ -23,8 +24,10 @@ import {
   verifyAWSConnection,
   healthCheckAWSConnection,
   extractAccountIdFromRoleArn,
+  computeRoleArn,
 } from '../services/awsConnectionService.js'
 import { getMaxProviderAccounts } from '../services/subscriptionService.js'
+import { verifyConnectionLimiter } from '../middleware/rateLimiter.js'
 
 const router = express.Router()
 
@@ -426,17 +429,21 @@ router.post('/aws/automated',
       const { sanitizeConnectionName } = await import('../services/awsConnectionService.js')
       const sanitizedConnectionName = sanitizeConnectionName(connectionName)
 
+      // Check if this AWS account is already connected
+      const existingConnection = await getExistingAWSConnection(userId, awsAccountId)
+      if (existingConnection) {
+        return res.status(409).json({
+          error: `An active connection for AWS account ${awsAccountId} already exists ("${existingConnection.account_alias}").`,
+          code: 'DUPLICATE_ACCOUNT',
+        })
+      }
+
       // Generate external ID for secure access
       const externalId = generateExternalId()
 
-      // Create pending connection record (store sanitized name for CloudFormation)
-      const connection = await addAutomatedAWSConnection(
-        userId,
-        sanitizedConnectionName, // Use sanitized name for consistency
-        awsAccountId,
-        externalId,
-        connectionType
-      )
+      // Compute the role ARN without creating a database record
+      // The record will be created only after successful verification
+      const roleArn = computeRoleArn(awsAccountId, sanitizedConnectionName)
 
       // Generate CloudFormation Quick Create URL
       // The template must be hosted at a publicly accessible HTTPS URL
@@ -482,20 +489,20 @@ router.post('/aws/automated',
       // Use sanitized connection name for CloudFormation (already sanitized above)
       const quickCreateUrl = generateCloudFormationQuickCreateUrl(
         templateUrl,
-        sanitizedConnectionName, // Use sanitized name for CloudFormation stack and parameters
+        sanitizedConnectionName,
         costraAccountId,
         externalId,
-        awsAccountId
       )
 
       res.json({
-        message: 'Automated connection initiated',
-        connectionId: connection.id,
-        connectionName: sanitizedConnectionName, // Return sanitized name
-        originalConnectionName: connectionName, // Also return original for display
+        message: 'Automated connection ready for CloudFormation deployment',
+        connectionName: sanitizedConnectionName,
+        originalConnectionName: connectionName,
         quickCreateUrl,
-        externalId, // For reference, user can copy if needed
-        roleArn: connection.roleArn,
+        externalId,
+        roleArn,
+        awsAccountId,
+        connectionType: `automated-${connectionType}`,
         instructions: {
           step1: 'Click the link above to open AWS CloudFormation Console',
           step2: 'Review the stack parameters (they are pre-filled)',
@@ -519,7 +526,132 @@ router.post('/aws/automated',
   }
 )
 
-// Verify AWS connection after CloudFormation stack is created
+// Verify and create automated AWS connection (new flow: no DB record until verification succeeds)
+router.post('/aws/automated/verify',
+  verifyConnectionLimiter,
+  [
+    body('connectionName').notEmpty().withMessage('Connection name is required'),
+    body('awsAccountId').matches(/^\d{12}$/).withMessage('AWS Account ID must be 12 digits'),
+    body('roleArn').matches(/^arn:aws:iam::\d{12}:role\/.+$/).withMessage('Invalid role ARN'),
+    body('externalId').isLength({ min: 16 }).withMessage('Invalid external ID'),
+    body('connectionType').optional().isIn(['automated-billing', 'automated-resource']).withMessage('Invalid connection type'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() })
+      }
+
+      const userId = req.user.userId || req.user.id
+      const { connectionName, awsAccountId, roleArn, externalId, connectionType = 'automated-billing' } = req.body
+
+      // Check for duplicate AWS account
+      const existingConnection = await getExistingAWSConnection(userId, awsAccountId)
+      if (existingConnection) {
+        return res.status(409).json({
+          error: `An active connection for AWS account ${awsAccountId} already exists ("${existingConnection.account_alias}").`,
+          code: 'DUPLICATE_ACCOUNT',
+        })
+      }
+
+      // Check provider account limit
+      const existingProviders = await getUserCloudProviders(userId)
+      const maxAccounts = await getMaxProviderAccounts(userId)
+      if (existingProviders.length >= maxAccounts) {
+        return res.status(403).json({
+          error: `Your current plan allows up to ${maxAccounts} cloud provider account${maxAccounts !== 1 ? 's' : ''}. Please upgrade to Pro for unlimited accounts.`,
+          code: 'ACCOUNT_LIMIT_REACHED',
+        })
+      }
+
+      // Actually verify the role via STS AssumeRole
+      const verification = await verifyAWSConnection(roleArn, externalId, 'us-east-1')
+
+      if (!verification.success) {
+        return res.status(400).json({
+          error: verification.message || 'Connection verification failed. Please ensure the CloudFormation stack has completed successfully.',
+          status: 'error',
+          details: verification.error,
+        })
+      }
+
+      // Verification succeeded — now create the database record
+      const billingType = connectionType.replace('automated-', '')
+      const connection = await addAutomatedAWSConnection(
+        userId,
+        connectionName,
+        awsAccountId,
+        externalId,
+        billingType
+      )
+
+      // Update status to healthy with temporary credentials
+      await updateAWSConnectionStatus(
+        userId,
+        connection.id,
+        'healthy',
+        {
+          roleArn,
+          externalId,
+          temporaryCredentials: verification.credentials,
+        }
+      )
+
+      // Create success notification
+      try {
+        await createNotification(userId, {
+          type: 'success',
+          title: 'AWS Connection Verified',
+          message: `AWS account "${connectionName}" is now connected and ready to sync cost data.`,
+          link: '/settings',
+          linkText: 'View Settings',
+        })
+      } catch (notifError) {
+        logger.error('AWS Connection: Failed to create notification', {
+          userId,
+          error: notifError.message,
+        })
+      }
+
+      // Auto-setup CUR export
+      let curStatus = null
+      try {
+        const { setupCURExport } = await import('../services/curService.js')
+        const { sanitizeConnectionName: sanitizeName } = await import('../services/awsConnectionService.js')
+        const sanitizedName = sanitizeName(connectionName)
+        const curResult = await setupCURExport(
+          userId,
+          connection.id,
+          roleArn,
+          externalId,
+          awsAccountId,
+          sanitizedName
+        )
+        curStatus = curResult.status
+        logger.info('CUR export setup initiated after verification', { userId, accountId: connection.id, curStatus })
+      } catch (curError) {
+        logger.error('CUR setup failed (non-blocking)', { userId, accountId: connection.id, error: curError.message })
+      }
+
+      res.json({
+        message: 'Connection verified and created successfully',
+        accountId: connection.id,
+        status: 'healthy',
+        roleArn,
+        curStatus,
+      })
+    } catch (error) {
+      logger.error('Verify and create automated AWS connection error', {
+        error: error.message,
+        stack: error.stack,
+      })
+      res.status(500).json({ error: error.message || 'Internal server error' })
+    }
+  }
+)
+
+// Verify existing AWS connection (re-verification / legacy pending records)
 router.post('/aws/:accountId/verify', async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
@@ -575,10 +707,8 @@ router.post('/aws/:accountId/verify', async (req, res) => {
       })
     }
 
-    // For automated connections, skip actual role assumption test (server doesn't have AWS credentials)
-    // Just validate the format - the role will be tested during the first cost sync
-    const isAutomatedConnection = account.connectionType?.startsWith('automated')
-    const verification = await verifyAWSConnection(roleArn, externalId, 'us-east-1', isAutomatedConnection)
+    // Always perform real STS role assumption test
+    const verification = await verifyAWSConnection(roleArn, externalId, 'us-east-1')
     
     // If role ARN was fixed (e.g., had spaces), update it in the database
     if (verification.fixedRoleArn && verification.fixedRoleArn !== roleArn) {
@@ -658,12 +788,9 @@ router.post('/aws/:accountId/verify', async (req, res) => {
       }
 
       res.json({
-        message: verification.skipActualTest
-          ? 'Connection format validated. The role will be tested during the first cost sync.'
-          : 'Connection verified successfully',
+        message: 'Connection verified successfully',
         status: 'healthy',
         roleArn,
-        skipActualTest: verification.skipActualTest || false,
         curStatus,
       })
     } else {

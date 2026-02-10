@@ -229,10 +229,25 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
-  // Verify AWS connection after CloudFormation stack is created
+  // Verify AWS connection after CloudFormation stack is created (legacy / re-verification)
   verifyAWSConnection: async (accountId: number) => {
     const response = await apiRequest(`/cloud-providers/aws/${accountId}/verify`, {
       method: 'POST',
+    })
+    return response.json()
+  },
+
+  // Verify and create automated AWS connection (no DB record until verification succeeds)
+  verifyAndCreateAWSConnection: async (params: {
+    connectionName: string
+    awsAccountId: string
+    roleArn: string
+    externalId: string
+    connectionType: string
+  }) => {
+    const response = await apiRequest('/cloud-providers/aws/automated/verify', {
+      method: 'POST',
+      body: JSON.stringify(params),
     })
     return response.json()
   },

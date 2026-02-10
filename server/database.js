@@ -1520,6 +1520,23 @@ export const addCloudProvider = async (
   }
 }
 
+// Check if an active AWS connection already exists for the given account
+export const getExistingAWSConnection = async (userId, awsAccountId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT id, connection_status, account_alias
+       FROM cloud_provider_credentials
+       WHERE user_id = $1 AND aws_account_id = $2 AND is_active = true
+       LIMIT 1`,
+      [userId, awsAccountId]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
 // Add automated AWS connection (pending state, before CloudFormation stack is created)
 export const addAutomatedAWSConnection = async (
   userId,

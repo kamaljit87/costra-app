@@ -37,8 +37,9 @@ export const sanitizeConnectionName = (connectionName) => {
     sanitized = `costra-${sanitized}`
   }
   
-  // Limit length to 128 chars (CloudFormation max) but keep reasonable for IAM roles too
-  sanitized = sanitized.substring(0, 50) || 'costra-connection'
+  // Limit to 39 chars so S3 bucket name stays under 63 chars
+  // (costra-cur- = 11 + 12-digit account + - + name = 24 + name)
+  sanitized = sanitized.substring(0, 39) || 'costra-connection'
   
   // Final check: ensure it starts with a letter
   if (!/^[a-z]/.test(sanitized)) {
@@ -61,29 +62,36 @@ export const generateCloudFormationQuickCreateUrl = (
   connectionName,
   costraAccountId,
   externalId,
-  awsAccountId = null
 ) => {
   const baseUrl = 'https://console.aws.amazon.com/cloudformation/home'
   const region = 'us-east-1' // Default region, user can change in console
-  
+
   // Sanitize connection name for CloudFormation stack name (must be alphanumeric + hyphens)
   const sanitizedStackName = sanitizeConnectionName(connectionName)
-  // For the ConnectionName parameter, also sanitize it
   const sanitizedConnectionName = sanitizeConnectionName(connectionName)
-  
+
   const params = new URLSearchParams({
     templateURL: templateUrl,
     stackName: sanitizedStackName,
     param_CostraAccountId: costraAccountId,
     param_ExternalId: externalId,
     param_ConnectionName: sanitizedConnectionName,
+    param_EnableCUR: 'true',
   })
-  
-  if (awsAccountId) {
-    params.append('param_AwsAccountId', awsAccountId)
-  }
-  
+
   return `${baseUrl}?region=${region}#/stacks/create/review?${params.toString()}`
+}
+
+/**
+ * Compute the expected IAM role ARN for an automated AWS connection
+ * @param {string} awsAccountId - 12-digit AWS account ID
+ * @param {string} connectionName - Sanitized connection name
+ * @returns {string} The full role ARN
+ */
+export const computeRoleArn = (awsAccountId, connectionName) => {
+  const sanitized = sanitizeConnectionNameForRole(connectionName)
+  const roleName = `CostraAccessRole-${sanitized}`
+  return `arn:aws:iam::${awsAccountId}:role/${roleName}`
 }
 
 /**
@@ -91,9 +99,8 @@ export const generateCloudFormationQuickCreateUrl = (
  * @param {string} roleArn - ARN of the IAM role to assume
  * @param {string} externalId - External ID for secure access
  * @param {string} region - AWS region (default: us-east-1)
- * @param {boolean} skipActualTest - If true, only validate format without actually assuming role (for automated connections)
  */
-export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east-1', skipActualTest = false) => {
+export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east-1') => {
   try {
     // Validate role ARN is provided
     if (!roleArn || typeof roleArn !== 'string') {
@@ -143,19 +150,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
       }
     }
 
-    // For automated connections, we can't test the role assumption from the server
-    // because we don't have AWS credentials. We'll just validate the format
-    // and mark it as verified. The actual connection will be tested during the first sync.
-    if (skipActualTest) {
-      logger.debug('AWS Connection: Skipping actual role assumption test (automated connection)')
-      return {
-        success: true,
-        message: 'Connection format validated. Role will be tested during first cost sync.',
-        skipActualTest: true,
-      }
-    }
-
-    // For manual connections, try to actually assume the role if credentials are available
+    // Actually assume the role via STS to verify the connection works
     try {
       // Create STS client with default credentials (for initial connection test)
       const stsClient = new STSClient({ region })
@@ -211,14 +206,13 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
         },
       }
     } catch (credentialError) {
-      // If we can't assume the role (no credentials on server), that's okay for automated connections
-      // The role will be tested when we actually use it for cost syncing
+      // If server AWS credentials are not configured, return a clear failure
       if (credentialError.message?.includes('credentials') || credentialError.code === 'CredentialsError') {
-        logger.debug('AWS Connection: Cannot test role assumption from server (no credentials). Connection will be tested during first sync.')
+        logger.error('AWS Connection: Server AWS credentials not configured, cannot verify role assumption')
         return {
-          success: true,
-          message: 'Connection format validated. Role will be tested during first cost sync.',
-          skipActualTest: true,
+          success: false,
+          message: 'Server AWS credentials are not configured. Cannot verify cross-account role assumption.',
+          error: 'ServerCredentialsMissing',
         }
       }
       throw credentialError
@@ -284,7 +278,7 @@ export const sanitizeConnectionNameForRole = (connectionName) => {
     .replace(/[^a-z0-9-]/g, '-') // Replace invalid chars with hyphens
     .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
     .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-    .substring(0, 50) || 'costra-connection' // Limit length, ensure not empty
+    .substring(0, 39) || 'costra-connection' // Limit to 39 chars for S3 bucket name limits
 }
 
 /**

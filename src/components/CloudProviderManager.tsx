@@ -60,10 +60,12 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
   const [showIAMDialog, setShowIAMDialog] = useState(false)
   const [awsConnectionType, setAwsConnectionType] = useState<'simple' | 'automated'>('simple')
   const [automatedConnectionData, setAutomatedConnectionData] = useState<{
-    connectionId?: number
     quickCreateUrl?: string
     externalId?: string
     roleArn?: string
+    connectionName?: string
+    awsAccountId?: string
+    connectionType?: string
   } | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [curStatuses, setCurStatuses] = useState<Record<number, CurStatusInfo>>({})
@@ -181,44 +183,18 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         setIsSubmitting(true)
         setError('')
         const result = await cloudProvidersAPI.initiateAutomatedAWSConnection(
-          sanitizedAlias, // Use sanitized name for CloudFormation
+          sanitizedAlias,
           awsAccountId,
           'billing'
         )
-        // Validate connectionId is a number before storing
-        // Log the full response for debugging
-        console.log('[CloudProviderManager] Initiate response:', {
-          connectionId: result.connectionId,
-          connectionIdType: typeof result.connectionId,
-          hasQuickCreateUrl: !!result.quickCreateUrl,
-          hasExternalId: !!result.externalId,
-          hasRoleArn: !!result.roleArn,
-        })
-        
-        // Check if connectionId looks like an encrypted string (contains colons)
-        const connectionIdStr = String(result.connectionId)
-        if (connectionIdStr.includes(':')) {
-          console.error('[CloudProviderManager] connectionId appears to be encrypted credentials:', connectionIdStr.substring(0, 50) + '...')
-          setError('Invalid response from server: connection ID is corrupted. Please refresh and try again.')
-          return
-        }
-        
-        const connectionId = typeof result.connectionId === 'number' 
-          ? result.connectionId 
-          : parseInt(connectionIdStr, 10)
-        
-        if (isNaN(connectionId) || connectionId <= 0) {
-          console.error('[CloudProviderManager] Invalid connectionId received:', result.connectionId, 'Type:', typeof result.connectionId)
-          setError('Invalid connection ID received from server. Please refresh and try again.')
-          return
-        }
-        
-        console.log('[CloudProviderManager] Storing connectionId:', connectionId)
+        // No database record is created yet — store params for verification
         setAutomatedConnectionData({
-          connectionId,
           quickCreateUrl: result.quickCreateUrl,
           externalId: result.externalId,
           roleArn: result.roleArn,
+          connectionName: result.connectionName,
+          awsAccountId: result.awsAccountId || awsAccountId,
+          connectionType: result.connectionType || 'automated-billing',
         })
         // Don't close modal yet - user needs to complete CloudFormation
       } catch (error: any) {
@@ -275,71 +251,35 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
   }
 
   const handleVerifyConnection = async () => {
-    if (!automatedConnectionData?.connectionId) {
-      setError('Connection ID not found')
+    if (!automatedConnectionData?.roleArn || !automatedConnectionData?.externalId) {
+      setError('Connection data not found. Please start over.')
       return
     }
 
-    // Log the connectionId before validation
-    const connectionIdValue = automatedConnectionData.connectionId
-    const connectionIdValueStr = String(connectionIdValue)
-    console.log('[CloudProviderManager] Verify connection - connectionId:', {
-      value: connectionIdValue,
-      type: typeof connectionIdValue,
-      isString: typeof connectionIdValue === 'string',
-      length: connectionIdValueStr.length,
-      looksEncrypted: connectionIdValueStr.includes(':'),
-    })
-
-    // Check if connectionId looks like an encrypted string (contains colons)
-    const connectionIdStr = String(automatedConnectionData.connectionId)
-    if (connectionIdStr.includes(':')) {
-      console.error('[CloudProviderManager] connectionId appears to be encrypted credentials. Clearing state.')
-      setError('Connection ID is corrupted. Please refresh the page and create a new connection.')
-      setAutomatedConnectionData(null)
-      return
-    }
-
-    // Validate connectionId is a number before making API call
-    const connectionId = typeof automatedConnectionData.connectionId === 'number'
-      ? automatedConnectionData.connectionId
-      : parseInt(String(automatedConnectionData.connectionId), 10)
-    
-    if (isNaN(connectionId) || connectionId <= 0) {
-      console.error('[CloudProviderManager] Invalid connectionId after parsing:', {
-        original: automatedConnectionData.connectionId,
-        parsed: connectionId,
-        type: typeof automatedConnectionData.connectionId,
+    try {
+      setIsVerifying(true)
+      setError('')
+      await cloudProvidersAPI.verifyAndCreateAWSConnection({
+        connectionName: automatedConnectionData.connectionName!,
+        awsAccountId: automatedConnectionData.awsAccountId!,
+        roleArn: automatedConnectionData.roleArn,
+        externalId: automatedConnectionData.externalId,
+        connectionType: automatedConnectionData.connectionType || 'automated-billing',
       })
-      setError('Invalid connection ID. Please refresh the page and try again.')
-      return
+      setShowAddModal(false)
+      setSelectedProvider('')
+      setAccountAlias('')
+      setCredentials({})
+      setAutomatedConnectionData(null)
+      await loadProviders()
+      onProviderChange?.()
+      // Auto-sync data for the newly verified provider
+      syncAPI.syncAll().catch(() => {})
+    } catch {
+      setError('Connection is still pending. Please ensure the CloudFormation stack has completed successfully in AWS Console, then try again.')
+    } finally {
+      setIsVerifying(false)
     }
-
-    console.log('[CloudProviderManager] Calling verifyAWSConnection with accountId:', connectionId)
-      try {
-        setIsVerifying(true)
-        setError('')
-        const result = await cloudProvidersAPI.verifyAWSConnection(connectionId)
-        // Show success message
-        if (result.skipActualTest) {
-          // For automated connections, we can't test from server, but format is validated
-          setError('') // Clear any errors
-          // Still close modal and refresh - connection is ready
-        }
-        setShowAddModal(false)
-        setSelectedProvider('')
-        setAccountAlias('')
-        setCredentials({})
-        setAutomatedConnectionData(null)
-        await loadProviders()
-        onProviderChange?.()
-        // Auto-sync data for the newly verified provider
-        syncAPI.syncAll().catch(() => {})
-      } catch (error: any) {
-        setError(error.message || error.error || 'Failed to verify connection')
-      } finally {
-        setIsVerifying(false)
-      }
   }
 
   const handleDeleteProvider = async (accountId: number, accountAlias: string) => {
@@ -918,7 +858,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                               disabled={isVerifying}
                               className="w-full px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-[#1F9A8A] transition-colors font-medium disabled:opacity-50"
                             >
-                              {isVerifying ? 'Verifying...' : 'Verify Connection'}
+                              {isVerifying ? 'Checking connection...' : 'Verify Connection'}
                             </button>
                           </div>
                         </div>
@@ -1013,7 +953,11 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                 )}
 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  <div className={`px-4 py-3 rounded-lg text-sm ${
+                    error.includes('pending')
+                      ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                      : 'bg-red-50 border border-red-200 text-red-700'
+                  }`}>
                     {error}
                   </div>
                 )}

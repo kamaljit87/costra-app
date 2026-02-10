@@ -33,9 +33,9 @@ Parameters:
     Description: 'Descriptive name for this connection (used to identify your account in Costra)'
     Default: 'costra-billing-connection'
     AllowedPattern: '^[a-z0-9-]+$'
-    ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only (3-64 characters)'
+    ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only (3-39 characters). Kept short to fit S3 bucket naming limits.'
     MinLength: 3
-    MaxLength: 64
+    MaxLength: 39
 
   CostraAccountId:
     Type: String
@@ -132,8 +132,8 @@ Resources:
                   - 's3:ListBucket'
                   - 's3:GetBucketLocation'
                 Resource:
-                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-*'
-                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-*/*'
+                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}'
+                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}/*'
               - Sid: OrganizationsAccess
                 Effect: Allow
                 Action:
@@ -177,6 +177,8 @@ Resources:
           Value: !Ref CostraAccountId
 
   # S3 Bucket for CUR data delivery (in customer's account)
+  # Bucket name: costra-cur-{12-digit-account}-{connection-name}
+  # Max: 11 (prefix) + 12 (account) + 1 (hyphen) + 39 (name) = 63 chars (S3 limit)
   CostraCURBucket:
     Type: AWS::S3::Bucket
     Condition: CUREnabled
@@ -221,8 +223,8 @@ Resources:
               - 's3:PutObject'
               - 's3:GetBucketPolicy'
             Resource:
-              - !Sub 'arn:aws:s3:::${CostraCURBucket}'
-              - !Sub 'arn:aws:s3:::${CostraCURBucket}/*'
+              - !GetAtt CostraCURBucket.Arn
+              - !Sub '${CostraCURBucket.Arn}/*'
             Condition:
               StringEquals:
                 'aws:SourceAccount': !Ref 'AWS::AccountId'
@@ -235,8 +237,8 @@ Resources:
               - 's3:ListBucket'
               - 's3:GetBucketLocation'
             Resource:
-              - !Sub 'arn:aws:s3:::${CostraCURBucket}'
-              - !Sub 'arn:aws:s3:::${CostraCURBucket}/*'
+              - !GetAtt CostraCURBucket.Arn
+              - !Sub '${CostraCURBucket.Arn}/*'
 
 Outputs:
   RoleArn:

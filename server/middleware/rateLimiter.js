@@ -130,9 +130,42 @@ export const aiLimiter = rateLimit({
   },
 })
 
+/**
+ * Rate limiter for AWS connection verification endpoints
+ * Restricts STS AssumeRole calls to prevent abuse
+ */
+export const verifyConnectionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 10 : 50,
+  message: {
+    error: 'Too many verification attempts. Please wait before trying again.',
+    code: 'VERIFY_RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.user?.userId || req.user?.id || req.ip
+  },
+  handler: (req, res) => {
+    logger.warn('Rate limit exceeded for verify endpoint', {
+      requestId: req.requestId,
+      userId: req.user?.userId || req.user?.id || 'N/A',
+      ip: req.ip,
+      path: req.path,
+    })
+    res.status(429).json({
+      error: 'Too many verification attempts. Please wait before trying again.',
+      code: 'VERIFY_RATE_LIMIT_EXCEEDED',
+      requestId: req.requestId,
+      timestamp: new Date().toISOString(),
+    })
+  },
+})
+
 export default {
   authLimiter,
   syncLimiter,
   apiLimiter,
   aiLimiter,
+  verifyConnectionLimiter,
 }
