@@ -229,6 +229,15 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
+  // Clean up orphaned AWS resources (S3 bucket, stack, role) before re-creating a connection
+  cleanupOrphanedResources: async (awsAccountId: string, connectionName: string) => {
+    const response = await apiRequest('/cloud-providers/aws/cleanup-orphaned', {
+      method: 'POST',
+      body: JSON.stringify({ awsAccountId, connectionName }),
+    })
+    return response.json()
+  },
+
   // Verify AWS connection after CloudFormation stack is created (legacy / re-verification)
   verifyAWSConnection: async (accountId: number) => {
     const response = await apiRequest(`/cloud-providers/aws/${accountId}/verify`, {
@@ -252,6 +261,12 @@ export const cloudProvidersAPI = {
     return response.json()
   },
 
+  // Check if CloudFormation callback has activated a pending connection (lightweight, no STS)
+  checkAutomatedConnectionStatus: async (externalId: string) => {
+    const response = await apiRequest(`/cloud-providers/aws/automated/status/${externalId}`)
+    return response.json()
+  },
+
   // Health check for AWS connection
   checkAWSConnectionHealth: async (accountId: number) => {
     const response = await apiRequest(`/cloud-providers/aws/${accountId}/health`)
@@ -259,8 +274,9 @@ export const cloudProvidersAPI = {
   },
 
   // Delete specific account by account ID
-  deleteCloudProviderAccount: async (accountId: number) => {
-    const response = await apiRequest(`/cloud-providers/account/${accountId}`, {
+  deleteCloudProviderAccount: async (accountId: number, cleanupAWS = false) => {
+    const query = cleanupAWS ? '?cleanupAWS=true' : ''
+    const response = await apiRequest(`/cloud-providers/account/${accountId}${query}`, {
       method: 'DELETE',
     })
     return response.json()

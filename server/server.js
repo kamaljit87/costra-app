@@ -23,6 +23,7 @@ import billingRoutes from './routes/billing.js'
 import emailPreferencesRoutes from './routes/emailPreferences.js'
 import complianceRoutes from './routes/compliance.js'
 import contactRoutes from './routes/contact.js'
+import awsCallbackRoutes from './routes/awsCallback.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import logger from './utils/logger.js'
@@ -210,6 +211,7 @@ app.use('/api/profile', profileRoutes)
 app.use('/api/cost-data', costDataRoutes)
 app.use('/api/savings-plans', savingsPlansRoutes)
 app.use('/api/cloud-providers', cloudProvidersRoutes)
+app.use('/api/aws-callback', awsCallbackRoutes) // Public (no auth) — called by CloudFormation Lambda
 app.use('/api/sync', syncRoutes)
 app.use('/api/sync', syncPreferencesRoutes)
 app.use('/api/ai', aiRoutes)

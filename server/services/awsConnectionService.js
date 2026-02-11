@@ -62,6 +62,7 @@ export const generateCloudFormationQuickCreateUrl = (
   connectionName,
   costraAccountId,
   externalId,
+  callbackUrl = '',
 ) => {
   const baseUrl = 'https://console.aws.amazon.com/cloudformation/home'
   const region = 'us-east-1' // Default region, user can change in console
@@ -76,8 +77,12 @@ export const generateCloudFormationQuickCreateUrl = (
     param_CostraAccountId: costraAccountId,
     param_ExternalId: externalId,
     param_ConnectionName: sanitizedConnectionName,
-    param_EnableCUR: 'true',
   })
+
+  // Pass callback URL so the Lambda can notify Costra when stack is ready
+  if (callbackUrl) {
+    params.set('param_CallbackUrl', callbackUrl)
+  }
 
   return `${baseUrl}?region=${region}#/stacks/create/review?${params.toString()}`
 }

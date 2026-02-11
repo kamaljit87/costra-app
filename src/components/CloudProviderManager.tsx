@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { cloudProvidersAPI, syncAPI } from '../services/api'
-import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check, HelpCircle } from 'lucide-react'
+import { Plus, Trash2, CheckCircle, XCircle, Cloud, Edit2, X, Check, HelpCircle, AlertTriangle } from 'lucide-react'
 import { ProviderIcon } from './CloudProviderIcons'
 import IAMPolicyDialog from './IAMPolicyDialog'
 
@@ -66,9 +66,20 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
     connectionName?: string
     awsAccountId?: string
     connectionType?: string
+    hasCallback?: boolean
   } | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
+  const [pollAttempts, setPollAttempts] = useState(0)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [curStatuses, setCurStatuses] = useState<Record<number, CurStatusInfo>>({})
+  const [deleteModal, setDeleteModal] = useState<{
+    accountId: number
+    accountAlias: string
+    isAutomated: boolean
+    cleanupAWS: boolean
+  } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     loadProviders()
@@ -80,6 +91,100 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setShowAddModal(true)
     }
   }, [modalMode, showAddModal])
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+        pollIntervalRef.current = null
+      }
+    }
+  }, [])
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+    setIsPolling(false)
+    setPollAttempts(0)
+  }, [])
+
+  const startPolling = useCallback(() => {
+    if (pollIntervalRef.current) return // Already polling
+    setIsPolling(true)
+    setPollAttempts(0)
+    setError('')
+
+    const MAX_ATTEMPTS = 36 // 6 minutes at 10s intervals
+    let attempts = 0
+
+    pollIntervalRef.current = setInterval(async () => {
+      attempts++
+      setPollAttempts(attempts)
+
+      if (attempts > MAX_ATTEMPTS) {
+        stopPolling()
+        setError('Auto-detection timed out. If your stack is still creating, click "Verify Connection" below.')
+        return
+      }
+
+      if (!automatedConnectionData?.externalId) return
+
+      try {
+        // Use lightweight status check first (no STS call — just checks Redis)
+        const status = await cloudProvidersAPI.checkAutomatedConnectionStatus(automatedConnectionData.externalId)
+
+        if (status.status === 'connected') {
+          // Callback has created the connection — done!
+          stopPolling()
+          setShowAddModal(false)
+          setSelectedProvider('')
+          setAccountAlias('')
+          setCredentials({})
+          setAutomatedConnectionData(null)
+          await loadProviders()
+          onProviderChange?.()
+          syncAPI.syncAll().catch(() => {})
+          return
+        }
+
+        if (status.status === 'error') {
+          stopPolling()
+          setError(status.error || 'Connection verification failed.')
+          return
+        }
+
+        // Still pending — if no callback support, fall back to full STS verify every 30s
+        if (!automatedConnectionData.hasCallback && attempts % 3 === 0 && automatedConnectionData.roleArn) {
+          try {
+            await cloudProvidersAPI.verifyAndCreateAWSConnection({
+              connectionName: automatedConnectionData.connectionName!,
+              awsAccountId: automatedConnectionData.awsAccountId!,
+              roleArn: automatedConnectionData.roleArn,
+              externalId: automatedConnectionData.externalId,
+              connectionType: automatedConnectionData.connectionType || 'automated-billing',
+            })
+            // Success via fallback
+            stopPolling()
+            setShowAddModal(false)
+            setSelectedProvider('')
+            setAccountAlias('')
+            setCredentials({})
+            setAutomatedConnectionData(null)
+            await loadProviders()
+            onProviderChange?.()
+            syncAPI.syncAll().catch(() => {})
+          } catch {
+            // Expected to fail until stack is ready
+          }
+        }
+      } catch {
+        // Status check failed — keep polling silently
+      }
+    }, 10000) // Poll every 10 seconds
+  }, [automatedConnectionData, stopPolling, onProviderChange])
 
   const loadProviders = async () => {
     try {
@@ -182,6 +287,15 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       try {
         setIsSubmitting(true)
         setError('')
+
+        // Pre-flight: attempt to clean up orphaned AWS resources from a previous connection
+        // This prevents "AlreadyExists" errors in CloudFormation
+        try {
+          await cloudProvidersAPI.cleanupOrphanedResources(awsAccountId, sanitizedAlias)
+        } catch {
+          // Non-blocking — cleanup may fail if no old connection exists
+        }
+
         const result = await cloudProvidersAPI.initiateAutomatedAWSConnection(
           sanitizedAlias,
           awsAccountId,
@@ -195,6 +309,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
           connectionName: result.connectionName,
           awsAccountId: result.awsAccountId || awsAccountId,
           connectionType: result.connectionType || 'automated-billing',
+          hasCallback: result.hasCallback || false,
         })
         // Don't close modal yet - user needs to complete CloudFormation
       } catch (error: any) {
@@ -259,6 +374,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
     try {
       setIsVerifying(true)
       setError('')
+      stopPolling()
       await cloudProvidersAPI.verifyAndCreateAWSConnection({
         connectionName: automatedConnectionData.connectionName!,
         awsAccountId: automatedConnectionData.awsAccountId!,
@@ -273,7 +389,6 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setAutomatedConnectionData(null)
       await loadProviders()
       onProviderChange?.()
-      // Auto-sync data for the newly verified provider
       syncAPI.syncAll().catch(() => {})
     } catch {
       setError('Connection is still pending. Please ensure the CloudFormation stack has completed successfully in AWS Console, then try again.')
@@ -282,20 +397,26 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
     }
   }
 
-  const handleDeleteProvider = async (accountId: number, accountAlias: string) => {
-    if (!confirm(`Are you sure you want to remove "${accountAlias}"? This will permanently delete all associated credentials, cost data, and historical records.`)) {
-      return
-    }
+  const handleDeleteProvider = (accountId: number, accountAlias: string) => {
+    const provider = providers.find(p => p.accountId === accountId)
+    const isAutomated = !!provider?.connectionType?.startsWith('automated')
+    setDeleteModal({ accountId, accountAlias, isAutomated, cleanupAWS: isAutomated })
+  }
 
+  const confirmDelete = async () => {
+    if (!deleteModal) return
+    setIsDeleting(true)
     try {
-      await cloudProvidersAPI.deleteCloudProviderAccount(accountId)
-      // Clear local state immediately
-      setProviders(prev => prev.filter(p => p.accountId !== accountId))
+      await cloudProvidersAPI.deleteCloudProviderAccount(deleteModal.accountId, deleteModal.cleanupAWS)
+      setProviders(prev => prev.filter(p => p.accountId !== deleteModal.accountId))
+      setDeleteModal(null)
       await loadProviders()
-      // Trigger full data refresh in parent components (dashboard, etc.)
       onProviderChange?.()
     } catch (error: any) {
       setError(error.message || 'Failed to delete cloud provider account')
+      setDeleteModal(null)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -653,6 +774,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
+              stopPolling()
               setShowAddModal(false)
               setSelectedProvider('')
               setAccountAlias('')
@@ -674,6 +796,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                 <h3 className="text-xl font-semibold text-gray-900">Add Cloud Provider Account</h3>
                 <button
                   onClick={() => {
+                    stopPolling()
                     setShowAddModal(false)
                     setSelectedProvider('')
                     setAccountAlias('')
@@ -832,35 +955,51 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                     {selectedProvider === 'aws' && awsConnectionType === 'automated' && automatedConnectionData ? (
                       <div className="space-y-4 pt-4 border-t border-gray-200">
                         <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-xl p-4">
-                          <h4 className="font-semibold text-[#92400E] mb-2">✅ Connection Initiated</h4>
-                          <p className="text-sm text-[#92400E] mb-4">
-                            Your CloudFormation stack is ready to be created. Follow these steps:
-                          </p>
-                          <ol className="text-sm text-[#92400E] space-y-2 list-decimal list-inside mb-4">
-                            <li>Click the button below to open AWS CloudFormation Console</li>
-                            <li>Review the stack parameters (they are pre-filled)</li>
-                            <li>Scroll to the bottom, check the two capability checkboxes</li>
-                            <li>Click "Create stack"</li>
-                            <li>Wait for stack creation to complete (~2-5 minutes)</li>
-                            <li>Return here and click "Verify Connection"</li>
-                          </ol>
-                          <div className="space-y-2">
-                            <a
-                              href={automatedConnectionData.quickCreateUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block w-full px-4 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-[#D97706] transition-colors text-center font-medium"
-                            >
-                              Open AWS CloudFormation Console →
-                            </a>
-                            <button
-                              onClick={handleVerifyConnection}
-                              disabled={isVerifying}
-                              className="w-full px-4 py-2 bg-accent-500 text-white rounded-lg hover:bg-[#1F9A8A] transition-colors font-medium disabled:opacity-50"
-                            >
-                              {isVerifying ? 'Checking connection...' : 'Verify Connection'}
-                            </button>
-                          </div>
+                          {!isPolling ? (
+                            <>
+                              <h4 className="font-semibold text-[#92400E] mb-2">Step 1: Create Stack in AWS</h4>
+                              <p className="text-sm text-[#92400E] mb-3">
+                                Click below to open AWS CloudFormation. Review the pre-filled parameters, check the capability boxes at the bottom, then click "Create stack".
+                              </p>
+                              <a
+                                href={automatedConnectionData.quickCreateUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  // Start auto-polling after user opens the CloudFormation console
+                                  setTimeout(() => startPolling(), 2000)
+                                }}
+                                className="block w-full px-4 py-2 bg-[#F59E0B] text-white rounded-lg hover:bg-[#D97706] transition-colors text-center font-medium"
+                              >
+                                Open AWS CloudFormation Console →
+                              </a>
+                            </>
+                          ) : (
+                            <>
+                              <h4 className="font-semibold text-[#92400E] mb-2">Step 2: Waiting for Stack...</h4>
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="h-5 w-5 border-2 border-[#F59E0B] border-t-transparent rounded-full animate-spin" />
+                                <p className="text-sm text-[#92400E]">
+                                  Auto-detecting your CloudFormation stack... ({Math.floor(pollAttempts * 10 / 60)}:{String(pollAttempts * 10 % 60).padStart(2, '0')})
+                                </p>
+                              </div>
+                              <p className="text-xs text-[#92400E]/70 mb-3">
+                                Stack creation typically takes 2-5 minutes. This will automatically connect once the stack is ready.
+                              </p>
+                            </>
+                          )}
+                          {/* Manual verify fallback — always available */}
+                          <button
+                            onClick={handleVerifyConnection}
+                            disabled={isVerifying}
+                            className={`w-full px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                              isPolling
+                                ? 'bg-white/80 text-[#92400E] border border-[#FDE68A] hover:bg-white'
+                                : 'bg-accent-500 text-white hover:bg-[#1F9A8A] mt-2'
+                            }`}
+                          >
+                            {isVerifying ? 'Checking connection...' : isPolling ? 'Verify Manually' : 'Verify Connection'}
+                          </button>
                         </div>
                       </div>
                     ) : (
@@ -965,6 +1104,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                 <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 mt-6">
                   <button
                     onClick={() => {
+                      stopPolling()
                       setShowAddModal(false)
                       setSelectedProvider('')
                       setAccountAlias('')
@@ -1088,6 +1228,66 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
           providerId={selectedProvider}
           providerName={AVAILABLE_PROVIDERS.find(p => p.id === selectedProvider)?.name || selectedProvider}
         />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isDeleting) setDeleteModal(null)
+          }}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full animate-fade-in ring-1 ring-black/5">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-red-100 rounded-full">
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Remove "{deleteModal.accountAlias}"?</h3>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-4">
+                This will permanently delete all cost data, credentials, and historical records from Costra.
+              </p>
+
+              {deleteModal.isAutomated && (
+                <label className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer mb-4">
+                  <input
+                    type="checkbox"
+                    checked={deleteModal.cleanupAWS}
+                    onChange={(e) => setDeleteModal({ ...deleteModal, cleanupAWS: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Also delete AWS resources</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Removes the CloudFormation stack, IAM role, and CUR export from your AWS account. The S3 bucket with billing data is preserved.
+                    </p>
+                  </div>
+                </label>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteModal(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

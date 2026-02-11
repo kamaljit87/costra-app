@@ -224,6 +224,14 @@ router.post('/', async (req, res) => {
 
     logger.info('Found accounts to sync', { requestId: req.requestId, userId, accountCount: accounts.length })
 
+    if (accounts.length === 0) {
+      return res.status(200).json({
+        message: 'No cloud providers connected. Add a cloud provider to start syncing cost data.',
+        results: [],
+        noProviders: true,
+      })
+    }
+
     const results = []
     const errors = []
 

@@ -488,7 +488,12 @@ export default function ProviderDetailPage() {
     setIsSyncing(true)
     try {
       const result = await syncAPI.syncAll()
-      if (result.errors && result.errors.length > 0) {
+      if (result.noProviders) {
+        showWarning(
+          'No Providers Connected',
+          'Add a cloud provider in Settings to start syncing cost data.'
+        )
+      } else if (result.errors && result.errors.length > 0) {
         showWarning(
           'Sync Completed with Errors',
           result.errors.map((e: any) => `${e.providerId || e.accountAlias}: ${e.error}`).join('\n')

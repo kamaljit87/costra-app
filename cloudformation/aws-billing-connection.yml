@@ -14,9 +14,9 @@ Metadata:
       Parameters:
       - ExternalId
     - Label:
-        default: Cost and Usage Reports
+        default: Callback (Auto-filled)
       Parameters:
-      - EnableCUR
+      - CallbackUrl
     ParameterLabels:
       ConnectionName:
         default: 'Connection Name (descriptive alias for this AWS account)'
@@ -24,8 +24,8 @@ Metadata:
         default: 'Costra AWS Account ID'
       ExternalId:
         default: 'External ID (for secure cross-account access)'
-      EnableCUR:
-        default: 'Enable Cost and Usage Reports (recommended for penny-perfect billing data)'
+      CallbackUrl:
+        default: 'Costra Callback URL (do not modify)'
 
 Parameters:
   ConnectionName:
@@ -52,26 +52,19 @@ Parameters:
     AllowedPattern: '^[a-zA-Z0-9+/=._-]+$'
     ConstraintDescription: 'External ID must contain only alphanumeric characters and safe special characters'
 
-  EnableCUR:
+  CallbackUrl:
     Type: String
-    Description: 'Enable CUR (Cost and Usage Reports) for penny-perfect historical billing data. Creates an S3 bucket for CUR delivery.'
-    Default: 'true'
-    AllowedValues:
-      - 'true'
-      - 'false'
+    Description: 'Costra API callback URL (auto-filled, do not modify)'
+    Default: ''
 
 Conditions:
-  HasConnectionName: !Not [!Equals [!Ref ConnectionName, '']]
-  CUREnabled: !Equals [!Ref EnableCUR, 'true']
+  HasCallbackUrl: !Not [!Equals [!Ref CallbackUrl, '']]
 
 Resources:
   CostraAccessRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !If
-        - HasConnectionName
-        - !Sub 'CostraAccessRole-${ConnectionName}'
-        - !Sub 'CostraAccessRole-${AWS::StackName}'
+      RoleName: !Sub 'CostraAccessRole-${ConnectionName}'
       Description: !Sub 'Role for Costra to access AWS billing and cost data for ${ConnectionName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -125,15 +118,56 @@ Resources:
                   - 'bcm-data-exports:UpdateExport'
                   - 'bcm-data-exports:DeleteExport'
                 Resource: '*'
-              - Sid: CURBucketReadAccess
+        - PolicyName: CostraCURBucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CURBucketManage
+                Effect: Allow
+                Action:
+                  - 's3:CreateBucket'
+                  - 's3:PutBucketPolicy'
+                  - 's3:PutBucketTagging'
+                  - 's3:PutEncryptionConfiguration'
+                  - 's3:PutLifecycleConfiguration'
+                  - 's3:PutBucketPublicAccessBlock'
+                  - 's3:GetBucketLocation'
+                  - 's3:GetBucketPolicy'
+                Resource:
+                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}'
+              - Sid: CURBucketReadWrite
                 Effect: Allow
                 Action:
                   - 's3:GetObject'
                   - 's3:ListBucket'
                   - 's3:GetBucketLocation'
+                  - 's3:DeleteObject'
                 Resource:
                   - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}'
                   - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}/*'
+        - PolicyName: CostraStackSelfCleanup
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CloudFormationSelfDelete
+                Effect: Allow
+                Action:
+                  - 'cloudformation:DeleteStack'
+                  - 'cloudformation:DescribeStacks'
+                Resource: !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/${ConnectionName}/*'
+              - Sid: IAMRoleSelfDelete
+                Effect: Allow
+                Action:
+                  - 'iam:DeleteRole'
+                  - 'iam:DeleteRolePolicy'
+                  - 'iam:DetachRolePolicy'
+                  - 'iam:ListRolePolicies'
+                  - 'iam:ListAttachedRolePolicies'
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CostraAccessRole-${ConnectionName}'
+        - PolicyName: CostraOrganizationsAndMonitoring
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
               - Sid: OrganizationsAccess
                 Effect: Allow
                 Action:
@@ -167,78 +201,119 @@ Resources:
         - Key: Purpose
           Value: BillingDataAccess
         - Key: ConnectionName
-          Value: !If
-            - HasConnectionName
-            - !Ref ConnectionName
-            - !Ref AWS::StackName
+          Value: !Ref ConnectionName
         - Key: CreatedBy
           Value: CloudFormation
         - Key: CostraAccountId
           Value: !Ref CostraAccountId
 
-  # S3 Bucket for CUR data delivery (in customer's account)
-  # Bucket name: costra-cur-{12-digit-account}-{connection-name}
-  # Max: 11 (prefix) + 12 (account) + 1 (hyphen) + 39 (name) = 63 chars (S3 limit)
-  CostraCURBucket:
-    Type: AWS::S3::Bucket
-    Condition: CUREnabled
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+  # Lambda function that notifies Costra API when the stack is created
+  CostraCallbackRole:
+    Type: AWS::IAM::Role
+    Condition: HasCallbackUrl
     Properties:
-      BucketName: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
-      LifecycleConfiguration:
-        Rules:
-          - Id: ExpireOldReports
-            Status: Enabled
-            ExpirationInDays: 400
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+      RoleName: !Sub 'CostraCallbackRole-${ConnectionName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Tags:
         - Key: ManagedBy
           Value: Costra
-        - Key: Purpose
-          Value: CostAndUsageReports
 
-  # Bucket policy: allow BCM Data Exports to write, allow Costra to read cross-account
-  CostraCURBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Condition: CUREnabled
+  CostraCallbackFunction:
+    Type: AWS::Lambda::Function
+    Condition: HasCallbackUrl
     Properties:
-      Bucket: !Ref CostraCURBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowBCMDataExportsWrite
-            Effect: Allow
-            Principal:
-              Service: bcm-data-exports.amazonaws.com
-            Action:
-              - 's3:PutObject'
-              - 's3:GetBucketPolicy'
-            Resource:
-              - !GetAtt CostraCURBucket.Arn
-              - !Sub '${CostraCURBucket.Arn}/*'
-            Condition:
-              StringEquals:
-                'aws:SourceAccount': !Ref 'AWS::AccountId'
-          - Sid: AllowCostraCrossAccountRead
-            Effect: Allow
-            Principal:
-              AWS: !Sub 'arn:aws:iam::${CostraAccountId}:root'
-            Action:
-              - 's3:GetObject'
-              - 's3:ListBucket'
-              - 's3:GetBucketLocation'
-            Resource:
-              - !GetAtt CostraCURBucket.Arn
-              - !Sub '${CostraCURBucket.Arn}/*'
+      FunctionName: !Sub 'costra-callback-${ConnectionName}'
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 30
+      MemorySize: 128
+      Role: !GetAtt CostraCallbackRole.Arn
+      Tags:
+        - Key: ManagedBy
+          Value: Costra
+      Code:
+        ZipFile: |
+          import json
+          import urllib.request
+          import urllib.error
+
+          def send_cfn_response(event, context, status, reason=""):
+              body = json.dumps({
+                  "Status": status,
+                  "Reason": reason or f"See CloudWatch Log Stream: {context.log_stream_name}",
+                  "PhysicalResourceId": context.log_stream_name,
+                  "StackId": event["StackId"],
+                  "RequestId": event["RequestId"],
+                  "LogicalResourceId": event["LogicalResourceId"],
+              }).encode("utf-8")
+              req = urllib.request.Request(
+                  event["ResponseURL"],
+                  data=body,
+                  headers={"Content-Type": ""},
+                  method="PUT",
+              )
+              urllib.request.urlopen(req)
+
+          def handler(event, context):
+              print(json.dumps({"RequestType": event["RequestType"], "Props": event.get("ResourceProperties", {})}))
+              # Only notify on Create (not Update/Delete)
+              if event["RequestType"] != "Create":
+                  send_cfn_response(event, context, "SUCCESS", "Skipped (not a Create)")
+                  return
+
+              props = event["ResourceProperties"]
+              callback_url = props.get("CallbackUrl", "")
+              if not callback_url:
+                  send_cfn_response(event, context, "SUCCESS", "No callback URL")
+                  return
+
+              payload = json.dumps({
+                  "accountId": props.get("AccountId", ""),
+                  "externalId": props.get("ExternalId", ""),
+                  "roleArn": props.get("RoleArn", ""),
+                  "connectionName": props.get("ConnectionName", ""),
+                  "region": props.get("Region", "us-east-1"),
+                  "stackName": props.get("StackName", ""),
+              }).encode("utf-8")
+
+              try:
+                  req = urllib.request.Request(
+                      callback_url,
+                      data=payload,
+                      headers={"Content-Type": "application/json"},
+                      method="POST",
+                  )
+                  resp = urllib.request.urlopen(req, timeout=25)
+                  result = resp.read().decode("utf-8")
+                  print(f"Callback success: {resp.status} {result}")
+              except urllib.error.HTTPError as e:
+                  print(f"Callback HTTP error: {e.code} {e.read().decode('utf-8', errors='replace')}")
+              except Exception as e:
+                  print(f"Callback error: {e}")
+              # Always succeed — callback failure should not roll back the stack
+              send_cfn_response(event, context, "SUCCESS", "Callback sent")
+
+  NotifyCostra:
+    Type: Custom::CostraCallback
+    Condition: HasCallbackUrl
+    DependsOn: CostraAccessRole
+    Properties:
+      ServiceToken: !GetAtt CostraCallbackFunction.Arn
+      CallbackUrl: !Ref CallbackUrl
+      AccountId: !Ref AWS::AccountId
+      ExternalId: !Ref ExternalId
+      RoleArn: !GetAtt CostraAccessRole.Arn
+      ConnectionName: !Ref ConnectionName
+      Region: !Ref AWS::Region
+      StackName: !Ref AWS::StackName
 
 Outputs:
   RoleArn:
@@ -247,18 +322,9 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-RoleArn'
 
-  ExternalId:
-    Description: 'External ID used for secure access (save this for reference)'
-    Value: !Ref ExternalId
-    Export:
-      Name: !Sub '${AWS::StackName}-ExternalId'
-
   ConnectionName:
     Description: 'Name of this connection'
-    Value: !If
-      - HasConnectionName
-      - !Ref ConnectionName
-      - !Ref AWS::StackName
+    Value: !Ref ConnectionName
     Export:
       Name: !Sub '${AWS::StackName}-ConnectionName'
 
@@ -281,15 +347,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-Region'
 
   CURBucketName:
-    Condition: CUREnabled
-    Description: 'S3 bucket where CUR data is delivered'
-    Value: !Ref CostraCURBucket
+    Description: 'Expected S3 bucket name for CUR data (created by Costra after verification)'
+    Value: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
     Export:
       Name: !Sub '${AWS::StackName}-CURBucket'
-
-  CURBucketArn:
-    Condition: CUREnabled
-    Description: 'ARN of the CUR S3 bucket'
-    Value: !GetAtt CostraCURBucket.Arn
-    Export:
-      Name: !Sub '${AWS::StackName}-CURBucketArn'

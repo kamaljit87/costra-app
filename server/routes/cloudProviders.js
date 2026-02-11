@@ -28,6 +28,7 @@ import {
 } from '../services/awsConnectionService.js'
 import { getMaxProviderAccounts } from '../services/subscriptionService.js'
 import { verifyConnectionLimiter } from '../middleware/rateLimiter.js'
+import * as cache from '../utils/cache.js'
 
 const router = express.Router()
 
@@ -138,18 +139,49 @@ router.post('/',
 )
 
 // Delete a cloud provider account by account ID
+// Pass ?cleanupAWS=true to also delete CloudFormation stack, S3 bucket, and BCM export
 router.delete('/account/:accountId', async (req, res) => {
   try {
     const userId = req.user.userId
     const accountId = parseInt(req.params.accountId, 10)
+    const cleanupAWS = req.query.cleanupAWS === 'true'
 
     if (isNaN(accountId)) {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 
-    // Get account info before deletion for notification
+    // Get account info before deletion for cleanup and notification
     const account = await getCloudProviderCredentialsByAccountId(userId, accountId)
-    const accountLabel = account?.accountAlias || account?.providerName || 'Cloud Provider Account'
+    if (!account) {
+      return res.status(404).json({ error: 'Cloud provider account not found' })
+    }
+
+    const accountLabel = account.accountAlias || account.providerName || 'Cloud Provider Account'
+    let cleanupResults = null
+
+    // If requested, clean up AWS resources before deleting from DB
+    if (cleanupAWS && account.roleArn && account.externalId && account.awsAccountId) {
+      try {
+        const { cleanupAWSResources } = await import('../services/curService.js')
+        const { sanitizeConnectionName } = await import('../services/awsConnectionService.js')
+        const sanitizedName = sanitizeConnectionName(account.accountAlias || '')
+
+        logger.info('Starting AWS resource cleanup', { userId, accountId, sanitizedName, awsAccountId: account.awsAccountId })
+        cleanupResults = await cleanupAWSResources(
+          account.roleArn,
+          account.externalId,
+          account.awsAccountId,
+          sanitizedName
+        )
+        logger.info('AWS resource cleanup completed', { userId, accountId, results: cleanupResults })
+      } catch (cleanupError) {
+        logger.error('AWS resource cleanup failed (proceeding with DB deletion)', {
+          userId, accountId,
+          error: cleanupError.message || String(cleanupError),
+        })
+        cleanupResults = { results: [], errors: [{ step: 'cleanup', error: cleanupError.message || String(cleanupError) }] }
+      }
+    }
 
     const deleted = await deleteCloudProviderByAccountId(userId, accountId)
 
@@ -159,27 +191,31 @@ router.delete('/account/:accountId', async (req, res) => {
 
     // Create notification for provider deletion
     try {
+      const cleanupNote = cleanupAWS ? ' AWS resources are being cleaned up.' : ''
       await createNotification(userId, {
         type: 'info',
         title: 'Cloud Provider Removed',
-        message: `${accountLabel} has been removed from your account`,
+        message: `${accountLabel} has been removed from your account.${cleanupNote}`,
         link: '/settings',
         linkText: 'View Settings'
       })
     } catch (notifError) {
-      logger.error('CloudProviders: Failed to create notification', { 
-        userId, 
-        error: notifError.message 
+      logger.error('CloudProviders: Failed to create notification', {
+        userId,
+        error: notifError.message
       })
     }
 
-    res.json({ message: 'Cloud provider account deleted successfully' })
+    res.json({
+      message: 'Cloud provider account deleted successfully',
+      cleanup: cleanupResults,
+    })
   } catch (error) {
-    logger.error('Delete cloud provider account error', { 
-      userId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Delete cloud provider account error', {
+      userId: req.user?.userId,
+      accountId: req.params?.accountId,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Internal server error' })
   }
@@ -486,12 +522,27 @@ router.post('/aws/automated',
       
       const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID || '061190967865' // Example, replace with your account ID
       
+      // Store pending connection in Redis so the callback can look it up
+      const pendingData = {
+        userId,
+        connectionName: sanitizedConnectionName,
+        awsAccountId,
+        connectionType: `automated-${connectionType}`,
+        roleArn,
+        createdAt: new Date().toISOString(),
+      }
+      await cache.set(`pending-aws-connection:${externalId}`, pendingData, 1800) // 30 min TTL
+
+      // Build callback URL for the CloudFormation Lambda
+      const callbackBaseUrl = process.env.COSTRA_API_URL || process.env.API_BASE_URL || ''
+
       // Use sanitized connection name for CloudFormation (already sanitized above)
       const quickCreateUrl = generateCloudFormationQuickCreateUrl(
         templateUrl,
         sanitizedConnectionName,
         costraAccountId,
         externalId,
+        callbackBaseUrl ? `${callbackBaseUrl}/api/aws-callback` : '',
       )
 
       res.json({
@@ -503,13 +554,14 @@ router.post('/aws/automated',
         roleArn,
         awsAccountId,
         connectionType: `automated-${connectionType}`,
+        hasCallback: !!callbackBaseUrl,
         instructions: {
           step1: 'Click the link above to open AWS CloudFormation Console',
           step2: 'Review the stack parameters (they are pre-filled)',
-          step3: 'Scroll to the bottom, check the two capability checkboxes',
+          step3: 'Scroll to the bottom, check the capability checkboxes',
           step4: 'Click "Create stack"',
           step5: 'Wait for stack creation to complete (~2-5 minutes)',
-          step6: 'Return here and click "Verify Connection"',
+          step6: callbackBaseUrl ? 'Your connection will be verified automatically!' : 'Return here and click "Verify Connection"',
         },
       })
     } catch (error) {
@@ -631,7 +683,13 @@ router.post('/aws/automated/verify',
         curStatus = curResult.status
         logger.info('CUR export setup initiated after verification', { userId, accountId: connection.id, curStatus })
       } catch (curError) {
-        logger.error('CUR setup failed (non-blocking)', { userId, accountId: connection.id, error: curError.message })
+        logger.error('CUR setup failed (non-blocking)', {
+          userId,
+          accountId: connection.id,
+          error: curError.message || curError.Code || String(curError),
+          code: curError.name || curError.Code,
+          stack: curError.stack,
+        })
       }
 
       res.json({
@@ -650,6 +708,35 @@ router.post('/aws/automated/verify',
     }
   }
 )
+
+// Check if a pending automated connection has been activated by the Lambda callback
+// Lightweight — just checks Redis, no STS call
+router.get('/aws/automated/status/:externalId', async (req, res) => {
+  try {
+    const externalId = req.params.externalId
+    if (!externalId || externalId.length < 16) {
+      return res.status(400).json({ error: 'Invalid external ID' })
+    }
+
+    // Check if the callback has created the connection
+    const status = await cache.get(`aws-connection-status:${externalId}`)
+    if (status) {
+      return res.json(status)
+    }
+
+    // Check if the pending connection still exists (not yet processed)
+    const pending = await cache.get(`pending-aws-connection:${externalId}`)
+    if (pending) {
+      return res.json({ status: 'pending' })
+    }
+
+    // Neither found — expired or never existed
+    return res.json({ status: 'unknown' })
+  } catch (error) {
+    logger.error('AWS connection status check error', { error: error.message })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
 
 // Verify existing AWS connection (re-verification / legacy pending records)
 router.post('/aws/:accountId/verify', async (req, res) => {
@@ -915,5 +1002,54 @@ router.post('/aws/:accountId/cur-setup', async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to set up CUR' })
   }
 })
+
+// Clean up orphaned AWS resources (stack, role, export) before re-creating a connection
+// S3 bucket is always preserved — it may contain valuable CUR data and will be reused
+router.post('/aws/cleanup-orphaned',
+  [
+    body('awsAccountId').matches(/^\d{12}$/).withMessage('AWS Account ID must be 12 digits'),
+    body('connectionName').notEmpty().withMessage('Connection name is required'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() })
+      }
+
+      const userId = req.user.userId || req.user.id
+      const { awsAccountId, connectionName } = req.body
+      const { sanitizeConnectionName } = await import('../services/awsConnectionService.js')
+      const sanitizedName = sanitizeConnectionName(connectionName)
+
+      // Try to find an old connection for this AWS account to get the old role/externalId
+      // We look at all the user's providers for a matching awsAccountId
+      const allProviders = await getUserCloudProviders(userId)
+      const oldConnection = allProviders.find(p => p.aws_account_id === awsAccountId)
+
+      if (oldConnection) {
+        // We have old credentials — try full cleanup
+        const account = await getCloudProviderCredentialsByAccountId(userId, oldConnection.id)
+        if (account?.roleArn && account?.externalId) {
+          const { cleanupAWSResources } = await import('../services/curService.js')
+          const result = await cleanupAWSResources(account.roleArn, account.externalId, awsAccountId, sanitizedName)
+          logger.info('Orphaned resource cleanup with old credentials', { userId, awsAccountId, result })
+          return res.json({ message: 'Cleanup completed', ...result })
+        }
+      }
+
+      // No old credentials available — just return ok, stack will be created fresh
+      // The S3 bucket (if it exists) will be reused by setupCURExport
+      res.json({
+        message: 'No previous connection found. S3 bucket will be reused if it exists.',
+        results: [],
+        errors: [],
+      })
+    } catch (error) {
+      logger.error('Orphaned resource cleanup error', { error: error.message, stack: error.stack })
+      res.status(500).json({ error: error.message || 'Cleanup failed' })
+    }
+  }
+)
 
 export default router

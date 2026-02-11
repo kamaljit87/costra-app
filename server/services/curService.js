@@ -4,8 +4,15 @@
  * Uses the hybrid approach: CUR for finalized months, Cost Explorer for current month.
  */
 
-import { S3Client, ListObjectsV2Command, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
-import { BCMDataExportsClient, CreateExportCommand, ListExportsCommand } from '@aws-sdk/client-bcm-data-exports'
+import {
+  S3Client,
+  ListObjectsV2Command, GetObjectCommand, HeadObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand, PutBucketPolicyCommand, PutBucketTaggingCommand,
+  PutBucketEncryptionCommand, PutBucketLifecycleConfigurationCommand,
+  PutPublicAccessBlockCommand,
+} from '@aws-sdk/client-s3'
+import { BCMDataExportsClient, CreateExportCommand, ListExportsCommand, DeleteExportCommand } from '@aws-sdk/client-bcm-data-exports'
 import { getAssumedRoleCredentials } from './awsAuth.js'
 import { pool } from '../database.js'
 import { clearUserCache, clearCostExplanationsCache, createNotification } from '../database.js'
@@ -87,20 +94,108 @@ const checkIfPeriodIngested = async (curConfigId, billingPeriod) => {
 export const setupCURExport = async (userId, accountId, roleArn, externalId, awsAccountId, connectionName) => {
   const creds = await getAssumedRoleCredentials(roleArn, externalId, `costra-cur-setup-${accountId}-${Date.now()}`)
 
-  // Deterministic bucket name matching CloudFormation
   const s3Bucket = `costra-cur-${awsAccountId}-${connectionName}`
   const exportName = `costra-export-${connectionName}`
+  const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID
 
-  const bcmClient = new BCMDataExportsClient({
-    region: 'us-east-1',
-    credentials: {
-      accessKeyId: creds.accessKeyId,
-      secretAccessKey: creds.secretAccessKey,
-      sessionToken: creds.sessionToken,
+  const credentialConfig = {
+    accessKeyId: creds.accessKeyId,
+    secretAccessKey: creds.secretAccessKey,
+    sessionToken: creds.sessionToken,
+  }
+
+  const s3Client = new S3Client({ region: 'us-east-1', credentials: credentialConfig })
+
+  // 1. Ensure S3 bucket exists (create if not, reuse if already there)
+  let bucketCreated = false
+  try {
+    await s3Client.send(new HeadBucketCommand({ Bucket: s3Bucket }))
+    logger.info('CUR bucket already exists, reusing', { s3Bucket })
+  } catch (headErr) {
+    if (headErr.name === 'NotFound' || headErr.$metadata?.httpStatusCode === 404 || headErr.name === 'NoSuchBucket') {
+      logger.info('CUR bucket does not exist, creating', { s3Bucket })
+      await s3Client.send(new CreateBucketCommand({ Bucket: s3Bucket }))
+      bucketCreated = true
+    } else {
+      throw headErr
+    }
+  }
+
+  // 2. Apply bucket settings (idempotent — safe to run on existing bucket)
+  // Block public access
+  await s3Client.send(new PutPublicAccessBlockCommand({
+    Bucket: s3Bucket,
+    PublicAccessBlockConfiguration: {
+      BlockPublicAcls: true,
+      BlockPublicPolicy: true,
+      IgnorePublicAcls: true,
+      RestrictPublicBuckets: true,
     },
-  })
+  }))
 
-  // Check if export already exists (idempotent)
+  // Enable AES256 encryption
+  await s3Client.send(new PutBucketEncryptionCommand({
+    Bucket: s3Bucket,
+    ServerSideEncryptionConfiguration: {
+      Rules: [{ ApplyServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' } }],
+    },
+  }))
+
+  // Lifecycle rule: expire old reports after 400 days
+  await s3Client.send(new PutBucketLifecycleConfigurationCommand({
+    Bucket: s3Bucket,
+    LifecycleConfiguration: {
+      Rules: [{
+        ID: 'ExpireOldReports',
+        Status: 'Enabled',
+        Expiration: { Days: 400 },
+        Filter: { Prefix: '' },
+      }],
+    },
+  }))
+
+  // Tags
+  await s3Client.send(new PutBucketTaggingCommand({
+    Bucket: s3Bucket,
+    Tagging: {
+      TagSet: [
+        { Key: 'ManagedBy', Value: 'Costra' },
+        { Key: 'Purpose', Value: 'CostAndUsageReports' },
+      ],
+    },
+  }))
+
+  // 3. Set bucket policy: allow BCM Data Exports to write + Costra cross-account read
+  const bucketPolicy = {
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Sid: 'AllowBCMDataExportsWrite',
+        Effect: 'Allow',
+        Principal: { Service: 'bcm-data-exports.amazonaws.com' },
+        Action: ['s3:PutObject', 's3:GetBucketPolicy'],
+        Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
+        Condition: { StringEquals: { 'aws:SourceAccount': awsAccountId } },
+      },
+      ...(costraAccountId ? [{
+        Sid: 'AllowCostraCrossAccountRead',
+        Effect: 'Allow',
+        Principal: { AWS: `arn:aws:iam::${costraAccountId}:root` },
+        Action: ['s3:GetObject', 's3:ListBucket', 's3:GetBucketLocation'],
+        Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
+      }] : []),
+    ],
+  }
+  await s3Client.send(new PutBucketPolicyCommand({
+    Bucket: s3Bucket,
+    Policy: JSON.stringify(bucketPolicy),
+  }))
+
+  logger.info('CUR bucket configured', { s3Bucket, bucketCreated })
+
+  // 4. Check if BCM export already exists (idempotent)
+  const bcmClient = new BCMDataExportsClient({ region: 'us-east-1', credentials: credentialConfig })
+
   let existingArn = null
   try {
     const listResp = await bcmClient.send(new ListExportsCommand({}))
@@ -122,7 +217,7 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
     return { exportArn: existingArn, s3Bucket, status: 'active' }
   }
 
-  // Create the Data Export
+  // 5. Create the Data Export
   const createResp = await bcmClient.send(new CreateExportCommand({
     Export: {
       Name: exportName,
@@ -577,4 +672,77 @@ export const getCURStatus = async (userId, accountId) => {
       ingestedAt: r.completed_at,
     })),
   }
+}
+
+// ─── AWS Resource Cleanup ────────────────────────────────────────────
+
+/**
+ * Clean up AWS resources created by Costra for a connection.
+ * Deletes: BCM Data Export and CloudFormation stack (which includes the IAM role).
+ * Preserves the S3 bucket and its data — it may contain valuable CUR data
+ * and will be reused if the customer reconnects.
+ *
+ * @param {string} roleArn - IAM role ARN to assume
+ * @param {string} externalId - External ID for role assumption
+ * @param {string} awsAccountId - 12-digit AWS account ID
+ * @param {string} connectionName - Sanitized connection name
+ * @returns {Promise<{results: object[], errors: object[]}>}
+ */
+export const cleanupAWSResources = async (roleArn, externalId, awsAccountId, connectionName) => {
+  const results = []
+  const errors = []
+
+  let creds
+  try {
+    creds = await getAssumedRoleCredentials(roleArn, externalId, `costra-cleanup-${Date.now()}`)
+  } catch (err) {
+    logger.error('Cleanup: Failed to assume role', { roleArn, error: err.message })
+    return {
+      results,
+      errors: [{ step: 'assumeRole', error: err.message || String(err) }],
+    }
+  }
+
+  const credentialConfig = {
+    accessKeyId: creds.accessKeyId,
+    secretAccessKey: creds.secretAccessKey,
+    sessionToken: creds.sessionToken,
+  }
+
+  // 1. Delete BCM Data Export
+  const exportName = `costra-export-${connectionName}`
+  try {
+    const bcmClient = new BCMDataExportsClient({ region: 'us-east-1', credentials: credentialConfig })
+    const listResp = await bcmClient.send(new ListExportsCommand({}))
+    const existing = (listResp.Exports || []).find(e => e.ExportName === exportName)
+    if (existing) {
+      await bcmClient.send(new DeleteExportCommand({ ExportArn: existing.ExportArn }))
+      results.push({ step: 'deleteExport', exportName, status: 'deleted' })
+      logger.info('Cleanup: Deleted BCM export', { exportName, exportArn: existing.ExportArn })
+    } else {
+      results.push({ step: 'deleteExport', exportName, status: 'not_found' })
+    }
+  } catch (err) {
+    logger.error('Cleanup: Failed to delete BCM export', { exportName, error: err.message || String(err) })
+    errors.push({ step: 'deleteExport', error: err.message || String(err) })
+  }
+
+  // 2. S3 bucket is preserved (may contain valuable CUR data, will be reused on reconnect)
+  const bucketName = `costra-cur-${awsAccountId}-${connectionName}`
+  results.push({ step: 'preserveBucket', bucketName, status: 'preserved' })
+  logger.info('Cleanup: S3 bucket preserved', { bucketName })
+
+  // 3. Delete CloudFormation stack (this also deletes the IAM role)
+  try {
+    const { CloudFormationClient, DeleteStackCommand } = await import('@aws-sdk/client-cloudformation')
+    const cfnClient = new CloudFormationClient({ region: 'us-east-1', credentials: credentialConfig })
+    await cfnClient.send(new DeleteStackCommand({ StackName: connectionName }))
+    results.push({ step: 'deleteStack', stackName: connectionName, status: 'deleting' })
+    logger.info('Cleanup: Initiated CloudFormation stack deletion', { stackName: connectionName })
+  } catch (err) {
+    logger.error('Cleanup: Failed to delete CloudFormation stack', { stackName: connectionName, error: err.message || String(err) })
+    errors.push({ step: 'deleteStack', error: err.message || String(err) })
+  }
+
+  return { results, errors }
 }
