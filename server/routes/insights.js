@@ -213,7 +213,8 @@ router.get('/cost-summary/:providerId/:month/:year', authenticateToken, async (r
     }
     
     if (!explanation) {
-      return res.status(404).json({ explanation: null })
+      // No cost data for this period - return 200 with null (avoids 404 in console)
+      return res.json({ explanation: null })
     }
     
     // Return the full explanation object (includes explanation, costChange, contributingFactors)
@@ -249,7 +250,7 @@ router.post('/cost-summary/:providerId/:month/:year/regenerate', authenticateTok
     )
     
     if (!explanation) {
-      return res.status(404).json({ explanation: null })
+      return res.json({ explanation: null })
     }
     
     // Return the full explanation object (includes explanation, costChange, contributingFactors)
@@ -319,7 +320,7 @@ router.post('/cost-summary-range/:providerId', authenticateToken, async (req, re
     )
     
     if (!explanation) {
-      return res.status(404).json({ explanation: null })
+      return res.json({ explanation: null })
     }
     
     res.json(explanation)
@@ -833,12 +834,16 @@ router.get('/team/:teamName/services', authenticateToken, async (req, res) => {
  */
 router.get('/recommendations', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId
-    const { category, provider_id, priority, status, limit, offset, sort_by } = req.query
+    const userId = req.user.userId || req.user.id
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID not found in token' })
+    }
+    const { category, provider_id, account_id, accountId, priority, status, limit, offset, sort_by } = req.query
 
     const filters = {
       category: category || undefined,
       provider_id: provider_id || undefined,
+      account_id: (account_id || accountId) ? parseInt(account_id || accountId, 10) : undefined,
       priority: priority || undefined,
       status: status || 'active',
       limit: limit ? parseInt(limit) : 50,
@@ -862,7 +867,7 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
  */
 router.get('/optimization-summary', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const summary = await getOptimizationSummary(userId)
     res.json(summary)
   } catch (error) {
@@ -876,7 +881,7 @@ router.get('/optimization-summary', authenticateToken, async (req, res) => {
  */
 router.post('/recommendations/:id/dismiss', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { id } = req.params
     const { reason } = req.body
 
@@ -896,7 +901,7 @@ router.post('/recommendations/:id/dismiss', authenticateToken, async (req, res) 
  */
 router.post('/recommendations/:id/implemented', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { id } = req.params
 
     const result = await markRecommendationImplemented(userId, parseInt(id))
@@ -916,7 +921,7 @@ router.post('/recommendations/:id/implemented', authenticateToken, async (req, r
  */
 router.post('/recommendations/refresh', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
 
     // Fire-and-forget
     runOptimizationForUser(userId)

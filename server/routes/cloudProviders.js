@@ -38,7 +38,7 @@ router.use(authenticateToken)
 // Get all cloud providers for current user
 router.get('/', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const providers = await getUserCloudProviders(userId)
 
     // Format response (don't include encrypted credentials)
@@ -69,10 +69,12 @@ router.get('/', async (req, res) => {
   }
 })
 
+const ALLOWED_PROVIDER_IDS = ['aws', 'azure', 'gcp', 'digitalocean', 'ibm', 'linode', 'vultr']
+
 // Add a new cloud provider (supports multiple accounts per provider)
 router.post('/',
   [
-    body('providerId').notEmpty().withMessage('Provider ID is required'),
+    body('providerId').notEmpty().withMessage('Provider ID is required').isIn(ALLOWED_PROVIDER_IDS).withMessage('Invalid provider ID'),
     body('providerName').notEmpty().withMessage('Provider name is required'),
     body('credentials').isObject().withMessage('Credentials must be an object'),
   ],
@@ -83,7 +85,7 @@ router.post('/',
         return res.status(400).json({ errors: errors.array() })
       }
 
-      const userId = req.user.userId
+      const userId = req.user.userId || req.user.id
       const { providerId, providerName, credentials, accountAlias } = req.body
 
       // Check provider account limit for user's plan
@@ -142,7 +144,7 @@ router.post('/',
 // Pass ?cleanupAWS=true to also delete CloudFormation stack, S3 bucket, and BCM export
 router.delete('/account/:accountId', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const accountId = parseInt(req.params.accountId, 10)
     const cleanupAWS = req.query.cleanupAWS === 'true'
 
@@ -224,7 +226,7 @@ router.delete('/account/:accountId', async (req, res) => {
 // Legacy: Delete all accounts of a provider type
 router.delete('/:providerId', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
 
     const deleted = await deleteCloudProvider(userId, providerId)
@@ -248,7 +250,7 @@ router.delete('/:providerId', async (req, res) => {
 // Toggle account active status by account ID
 router.patch('/account/:accountId/status', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const accountId = parseInt(req.params.accountId, 10)
     const { isActive } = req.body
 
@@ -280,7 +282,7 @@ router.patch('/account/:accountId/status', async (req, res) => {
 // Update account alias
 router.patch('/account/:accountId/alias', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const accountId = parseInt(req.params.accountId, 10)
     const { accountAlias } = req.body
 
@@ -313,7 +315,7 @@ router.patch('/account/:accountId/alias', async (req, res) => {
 // Get account credentials (for editing)
 router.get('/account/:accountId/credentials', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const accountId = parseInt(req.params.accountId, 10)
 
     if (isNaN(accountId)) {
@@ -356,7 +358,7 @@ router.patch('/account/:accountId/credentials',
         return res.status(400).json({ errors: errors.array() })
       }
 
-      const userId = req.user.userId
+      const userId = req.user.userId || req.user.id
       const accountId = parseInt(req.params.accountId, 10)
       const { credentials } = req.body
 
@@ -404,7 +406,7 @@ router.patch('/account/:accountId/credentials',
 // Legacy: Toggle provider active status by provider ID
 router.patch('/:providerId/status', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
     const { isActive } = req.body
 

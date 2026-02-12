@@ -170,7 +170,9 @@ POST /api/cloud-providers
 }
 ```
 
-**Note:** For GCP, you'll need to install the Google Cloud Billing SDK:
+**Note:** GCP cost data requires BigQuery billing export. Without `bigQueryDataset` in credentials, Costra will show $0. Enable Billing Export to BigQuery in GCP Console and add the dataset path.
+
+For GCP, you'll need to install the Google Cloud Billing SDK:
 ```bash
 cd server
 npm install @google-cloud/billing

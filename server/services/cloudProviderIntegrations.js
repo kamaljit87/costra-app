@@ -1947,7 +1947,28 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
       logger.warn('DO Fetch: Could not fetch billing history', { error: historyError.message })
     }
 
-    return transformDigitalOceanCostData(invoicesData, billingHistory, startDate, endDate)
+    // Fetch balance for month-to-date usage (accrued charges before invoice)
+    let balanceData = null
+    try {
+      logger.debug('DO Fetch: Fetching balance')
+      const balanceResponse = await fetch('https://api.digitalocean.com/v2/customers/my/balance', {
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (balanceResponse.ok) {
+        balanceData = await balanceResponse.json()
+        logger.info('DO Fetch: Balance retrieved', {
+          monthToDateUsage: balanceData.balance?.month_to_date_usage ?? balanceData.month_to_date_usage,
+          accountBalance: balanceData.balance?.account_balance ?? balanceData.account_balance,
+        })
+      }
+    } catch (balanceError) {
+      logger.warn('DO Fetch: Could not fetch balance', { error: balanceError.message })
+    }
+
+    return transformDigitalOceanCostData(invoicesData, billingHistory, balanceData, startDate, endDate)
   } catch (error) {
     // Map DigitalOcean-specific errors to user-friendly messages
     let userMessage = error.message
@@ -1974,7 +1995,7 @@ export const fetchDigitalOceanCostData = async (credentials, startDate, endDate)
 /**
  * Transform DigitalOcean response to our format
  */
-const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, endDate) => {
+const transformDigitalOceanCostData = (invoicesData, billingHistory, balanceData, startDate, endDate) => {
   const invoices = invoicesData.invoices || []
   const dailyData = []
   const serviceMap = new Map()
@@ -1985,11 +2006,11 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
   const start = new Date(startDate)
   const end = new Date(endDate)
 
-  // Process invoices
+  // Process invoices (support amount, total, invoice_total)
   invoices.forEach((invoice) => {
     const invoiceDate = new Date(invoice.invoice_period || invoice.invoice_date)
     if (invoiceDate >= start && invoiceDate <= end) {
-      const cost = parseFloat(invoice.amount || 0)
+      const cost = parseFloat(invoice.amount || invoice.total || invoice.invoice_total || 0)
       
       dailyData.push({
         date: invoiceDate.toISOString().split('T')[0],
@@ -2026,6 +2047,18 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, startDate, 
       lastMonth += day.cost
     }
   })
+
+  // If no invoices for current month, use balance API month-to-date usage (accrued charges)
+  if (currentMonth === 0 && balanceData) {
+    const balance = balanceData.balance || balanceData
+    const monthToDateUsage = parseFloat(
+      balance.month_to_date_usage ?? balance.MonthToDateUsage ?? balance.month_to_date_balance ?? balance.MonthToDateBalance ?? 0
+    )
+    if (monthToDateUsage > 0) {
+      currentMonth = monthToDateUsage
+      serviceMap.set('DigitalOcean Services', monthToDateUsage)
+    }
+  }
 
   // If no service breakdown, create a default one
   if (serviceMap.size === 0 && (currentMonth > 0 || lastMonth > 0)) {
@@ -2174,9 +2207,12 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
   const prevMonthIdx = prevMonthDate.getMonth()
   const prevMonthYear = prevMonthDate.getFullYear()
 
-  // Process account summary
+  // Process account summary (support billable_cost, total_cost, cost, unbilled_cost)
   if (accountSummary) {
-    const billableCost = parseFloat(accountSummary.billable_cost || 0)
+    const billableCost = parseFloat(
+      accountSummary.billable_cost ?? accountSummary.total_cost ?? accountSummary.cost ?? 0
+    )
+    const unbilledCost = parseFloat(accountSummary.unbilled_cost ?? accountSummary.unbilled ?? 0)
 
     // Add as a single monthly data point
     const summaryDate = new Date(accountSummary.month || startDate)
@@ -2185,11 +2221,11 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
       cost: billableCost,
     })
 
-    // Assign to correct month bucket
+    // Assign to correct month bucket; include unbilled for current month
     const summaryYear = summaryDate.getFullYear()
     const summaryMonth = summaryDate.getMonth()
     if (summaryYear === currentYear && summaryMonth === currentMonthIdx) {
-      currentMonth = billableCost
+      currentMonth = billableCost + unbilledCost
     } else if (summaryYear === prevMonthYear && summaryMonth === prevMonthIdx) {
       lastMonth = billableCost
     }
@@ -2198,7 +2234,7 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
     if (accountSummary.resources) {
       accountSummary.resources.forEach((resource) => {
         const serviceName = resource.resource_name || 'IBM Cloud Services'
-        const cost = parseFloat(resource.billable_cost || 0)
+        const cost = parseFloat(resource.billable_cost ?? resource.total_cost ?? resource.cost ?? 0)
         if (cost > 0) {
           const existing = serviceMap.get(serviceName) || 0
           serviceMap.set(serviceName, existing + cost)
@@ -2211,7 +2247,7 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
   if (usageData && usageData.resources) {
     usageData.resources.forEach((resource) => {
       const serviceName = resource.resource_name || resource.resource_id || 'IBM Cloud Services'
-      const cost = parseFloat(resource.billable_cost || 0)
+      const cost = parseFloat(resource.billable_cost ?? resource.total_cost ?? resource.cost ?? 0)
       if (cost > 0 && !serviceMap.has(serviceName)) {
         serviceMap.set(serviceName, cost)
       }
@@ -2278,7 +2314,9 @@ export const fetchLinodeCostData = async (credentials, startDate, endDate) => {
     const accountData = await accountResponse.json()
     logger.info('Linode Fetch: Account info retrieved', { 
       email: accountData.email, 
-      balance: accountData.balance || 0 
+      balance: accountData.balance ?? 0,
+      balance_uninvoiced: accountData.balance_uninvoiced ?? 0,
+      uninvoiced_balance: accountData.uninvoiced_balance ?? 0
     })
 
     // Fetch invoices for historical data
@@ -2331,17 +2369,32 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
   const start = new Date(startDate)
   const end = new Date(endDate)
 
-  // Process current invoice items for this month's breakdown
+  // Process current invoice items for this month's breakdown (accrued charges since last invoice)
   currentInvoiceItems.forEach((item) => {
     const serviceName = item.label || item.type || 'Linode Services'
-    const cost = parseFloat(item.total || item.amount || 0)
-    
+    // Linode API may use total, amount, or unit_price * quantity
+    let cost = parseFloat(item.total || item.amount || 0)
+    if (cost === 0 && (item.unit_price != null || item.quantity != null)) {
+      cost = parseFloat(item.unit_price || 0) * parseFloat(item.quantity || 1)
+    }
     if (cost > 0) {
       const existing = serviceMap.get(serviceName) || 0
       serviceMap.set(serviceName, existing + cost)
       currentMonth += cost
     }
   })
+
+  // If no current invoice items sum to a value, use account's accrued/uninvoiced balance
+  // (matches "Accrued Charges" / "Since last invoice" on Linode billing page)
+  if (currentMonth === 0) {
+    const accrued = parseFloat(
+      accountData.balance_uninvoiced ?? accountData.uninvoiced_balance ?? accountData.accrued ?? 0
+    )
+    if (accrued > 0) {
+      currentMonth = accrued
+      serviceMap.set('Linode Services', accrued)
+    }
+  }
 
   // Process historical invoices
   invoices.forEach((invoice) => {
@@ -2356,12 +2409,6 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
       })
     }
   })
-
-  // If no current invoice items, use account's uninvoiced balance
-  if (currentMonth === 0 && accountData.uninvoiced_balance) {
-    currentMonth = parseFloat(accountData.uninvoiced_balance)
-    serviceMap.set('Linode Services', currentMonth)
-  }
 
   // Sort daily data
   dailyData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -2498,8 +2545,10 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
   const start = new Date(startDate)
   const end = new Date(endDate)
 
-  // Current month from pending charges
-  currentMonth = parseFloat(account.pending_charges || 0)
+  // Current month from pending charges (accrued/unbilled)
+  currentMonth = parseFloat(
+    account.pending_charges ?? account.pending_charges_amount ?? account.pendingCharges ?? 0
+  )
 
   // Process billing history
   billingHistory.forEach((entry) => {

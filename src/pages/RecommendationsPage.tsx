@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { insightsAPI } from '../services/api'
 import { useNotification } from '../contexts/NotificationContext'
@@ -68,6 +68,7 @@ export default function RecommendationsPage() {
   const [sortBy, setSortBy] = useState('savings')
   const [page, setPage] = useState(0)
   const pageSize = 20
+  const hasAutoTriggered = useRef(false)
 
   const loadRecommendations = async () => {
     try {
@@ -96,6 +97,25 @@ export default function RecommendationsPage() {
   useEffect(() => {
     loadRecommendations()
   }, [category, priority, sortBy, page, providerIdFromUrl, accountIdFromUrl])
+
+  // Auto-trigger analysis when page loads with no recommendations (once per session)
+  useEffect(() => {
+    if (
+      !isLoading &&
+      total === 0 &&
+      recommendations.length === 0 &&
+      !isFilteredByAccount &&
+      !category &&
+      !priority &&
+      !hasAutoTriggered.current
+    ) {
+      hasAutoTriggered.current = true
+      insightsAPI.refreshRecommendations().then(() => {
+        showSuccess('Analysis Started', 'Optimization analysis is running. Results will appear in a few seconds.')
+        setTimeout(loadRecommendations, 5000)
+      }).catch(() => { /* ignore - user can click Refresh manually */ })
+    }
+  }, [isLoading, total, recommendations.length, isFilteredByAccount, category, priority, showSuccess])
 
   const handleRefresh = async () => {
     try {
@@ -271,7 +291,7 @@ export default function RecommendationsPage() {
           {/* Content */}
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Spinner size="lg" />
+              <Spinner size={32} />
             </div>
           ) : recommendations.length === 0 ? (
             <div className="card p-12 text-center">

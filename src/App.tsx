@@ -32,26 +32,26 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AuthProvider>
+    <AuthProvider>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <CurrencyProvider>
           <FilterProvider>
             <NotificationProvider>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginTravelPage />} />
-            <Route path="/signup" element={<SignupTravelPage />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/terms" element={<TermsOfServicePage />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route
-              path="/chat-demo"
-              element={
-                <ProtectedRoute>
-                  <ChatBubbleDemoPage />
-                </ProtectedRoute>
-              }
-            />
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<LoginTravelPage />} />
+                <Route path="/signup" element={<SignupTravelPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsOfServicePage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route
+                  path="/chat-demo"
+                  element={
+                    <ProtectedRoute>
+                      <ChatBubbleDemoPage />
+                    </ProtectedRoute>
+                  }
+                />
             <Route
               path="/dashboard"
               element={
@@ -149,13 +149,13 @@ function App() {
               }
             />
             <Route path="*" element={<NotFound />} />
-          </Routes>
-          <CookieConsent />
+              </Routes>
+              <CookieConsent />
             </NotificationProvider>
           </FilterProvider>
         </CurrencyProvider>
-      </AuthProvider>
-    </Router>
+      </Router>
+    </AuthProvider>
   )
 }
 

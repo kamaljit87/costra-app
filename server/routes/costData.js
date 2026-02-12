@@ -51,7 +51,7 @@ router.use(authenticateToken)
 // Supports optional ?month=X&year=Y query params (defaults to current month/year)
 router.get('/', async (req, res) => {
   try {
-    const userId = req.user.userId // Tenant isolation: only get data for this user
+    const userId = req.user.userId || req.user.id // Tenant isolation: only get data for this user
     const now = new Date()
     const month = req.query.month ? parseInt(req.query.month, 10) : (now.getMonth() + 1)
     const year = req.query.year ? parseInt(req.query.year, 10) : now.getFullYear()
@@ -112,7 +112,7 @@ router.get('/', async (req, res) => {
 // Save cost data for current user
 router.post('/', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId, costData } = req.body
 
     if (!providerId || !costData) {
@@ -143,7 +143,7 @@ router.post('/', async (req, res) => {
 // Get aggregated service costs for a date range
 router.get('/services/:providerId', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
     const { startDate, endDate } = req.query
 
@@ -194,7 +194,7 @@ router.get('/services/:providerId', async (req, res) => {
 // Get sub-service details for a specific service (e.g., EC2 -> compute, storage, etc.)
 router.get('/services/:providerId/:serviceName/details', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId, serviceName } = req.params
     const { startDate, endDate } = req.query
 
@@ -454,7 +454,7 @@ router.get('/preferences', async (req, res) => {
 // Update user currency preference
 router.put('/preferences/currency', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { currency } = req.body
 
     if (!currency) {
@@ -498,7 +498,7 @@ router.put('/preferences/currency', async (req, res) => {
 // Update credits for a provider
 router.put('/:providerId/credits', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
     const { credits, month, year } = req.body
 
@@ -614,7 +614,7 @@ router.get('/:providerId/credits', async (req, res) => {
 // Get daily cost data for a provider within a date range
 router.get('/:providerId/daily', limitHistoricalData, async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
     let { startDate, endDate } = req.query
 
@@ -1748,7 +1748,7 @@ async function generatePDFReportBuffer(reportData) {
 // Supports both manual (access key) and automated (IAM role) connections
 router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
     const month = parseInt(req.params.month, 10)
     const year = parseInt(req.params.year, 10)

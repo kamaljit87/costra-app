@@ -1232,6 +1232,15 @@ export default function ProviderDetailPage() {
               <div className="space-y-5">
                 {/* Cost Summary - Plain-English Explanation */}
                 {providerId && (() => {
+                  // Resolve accountId: URL param when viewing specific account, or single account
+                  const accountFromUrl = searchParams.get('account')
+                  const parsedAccountId = accountFromUrl ? parseInt(accountFromUrl, 10) : NaN
+                  const costSummaryAccountId = !isNaN(parsedAccountId)
+                    ? parsedAccountId
+                    : providerAccounts.length === 1
+                      ? providerAccounts[0].accountId
+                      : undefined
+
                   // Calculate the date range for the selected period
                   const range = selectedPeriod === 'custom' && customStartDate && customEndDate
                     ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
@@ -1256,6 +1265,7 @@ export default function ProviderDetailPage() {
                           providerId={providerId}
                           startDate={startDateStr}
                           endDate={endDateStr}
+                          accountId={costSummaryAccountId}
                         />
                       </div>
                     )
@@ -1271,6 +1281,7 @@ export default function ProviderDetailPage() {
                           providerId={providerId}
                           month={summaryMonth}
                           year={summaryYear}
+                          accountId={costSummaryAccountId}
                         />
                       </div>
                     )

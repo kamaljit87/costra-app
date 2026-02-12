@@ -32,15 +32,9 @@ interface CloudProviderManagerProps {
   onClose?: () => void // Callback when modal should close
 }
 
-const AVAILABLE_PROVIDERS = [
-  { id: 'aws', name: 'Amazon Web Services' },
-  { id: 'azure', name: 'Microsoft Azure' },
-  { id: 'gcp', name: 'Google Cloud Platform' },
-  { id: 'digitalocean', name: 'DigitalOcean' },
-  { id: 'linode', name: 'Linode (Akamai)' },
-  { id: 'vultr', name: 'Vultr' },
-  { id: 'ibm', name: 'IBM Cloud' },
-]
+import { SUPPORTED_PROVIDERS } from '../constants/providers'
+
+const AVAILABLE_PROVIDERS = SUPPORTED_PROVIDERS
 
 export default function CloudProviderManager({ onProviderChange, modalMode = false, onClose }: CloudProviderManagerProps) {
   const [providers, setProviders] = useState<CloudProvider[]>([])
@@ -146,6 +140,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
           setAutomatedConnectionData(null)
           await loadProviders()
           onProviderChange?.()
+          window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
           syncAPI.syncAll().catch(() => {})
           return
         }
@@ -175,6 +170,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
             setAutomatedConnectionData(null)
             await loadProviders()
             onProviderChange?.()
+            window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
             syncAPI.syncAll().catch(() => {})
           } catch {
             // Expected to fail until stack is ready
@@ -353,6 +349,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setCredentials({})
       await loadProviders()
       onProviderChange?.()
+      window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
       if (modalMode && onClose) {
         onClose()
       }
@@ -389,6 +386,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setAutomatedConnectionData(null)
       await loadProviders()
       onProviderChange?.()
+      window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
       syncAPI.syncAll().catch(() => {})
     } catch {
       setError('Connection is still pending. Please ensure the CloudFormation stack has completed successfully in AWS Console, then try again.')
@@ -412,6 +410,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setDeleteModal(null)
       await loadProviders()
       onProviderChange?.()
+      window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
     } catch (error: any) {
       setError(error.message || 'Failed to delete cloud provider account')
       setDeleteModal(null)
@@ -425,6 +424,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       await cloudProvidersAPI.updateAccountStatus(accountId, !currentStatus)
       await loadProviders()
       onProviderChange?.()
+      window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
     } catch (error: any) {
       setError(error.message || 'Failed to update account status')
     }
@@ -473,7 +473,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
   const handleSaveEdit = async () => {
     if (!editingAccount) return
 
-    const requiredFields = getRequiredFields(editingAccount.providerId)
+    const requiredFields = getRequiredFields(editingAccount.providerId, editingAccount)
     const missingFields = requiredFields.filter(field => !editCredentials[field])
     
     if (missingFields.length > 0) {
@@ -490,6 +490,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setEditCredentials({})
       await loadProviders()
       onProviderChange?.()
+      window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
     } catch (error: any) {
       setError(error.message || 'Failed to update account credentials')
     } finally {
@@ -504,16 +505,16 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
     setError('')
   }
 
-  const getRequiredFields = (providerId: string): string[] => {
+  const getRequiredFields = (providerId: string, account?: CloudProvider): string[] => {
     switch (providerId) {
       case 'aws':
-        // Return different fields based on connection type
-        if (awsConnectionType === 'simple') {
-          return ['accessKeyId', 'secretAccessKey', 'region']
-        } else {
-          // automated — credentials handled via CloudFormation
+        // Return different fields based on connection type (use account's type when editing)
+        const isAutomated = account?.connectionType?.startsWith('automated') ?? (awsConnectionType === 'automated')
+        if (isAutomated) {
+          // automated — credentials handled via CloudFormation, not editable
           return []
         }
+        return ['accessKeyId', 'secretAccessKey', 'region']
       case 'azure':
         return ['subscriptionId', 'clientId', 'clientSecret', 'tenantId']
       case 'gcp':
@@ -1174,7 +1175,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                 ) : (
                   <>
                     <h4 className="font-medium text-gray-900 pt-2">Credentials</h4>
-                    {getRequiredFields(editingAccount.providerId).map((field) => (
+                    {getRequiredFields(editingAccount.providerId, editingAccount).map((field) => (
                       <div key={field}>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')}

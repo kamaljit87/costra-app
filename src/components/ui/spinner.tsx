@@ -238,6 +238,12 @@ const Infinite = ({ size = 24, ...props }: SpinnerVariantProps) => (
   </svg>
 );
 
+const SIZE_MAP: Record<string, number> = {
+  sm: 16,
+  md: 24,
+  lg: 32,
+}
+
 export type SpinnerProps = LucideProps & {
   variant?:
     | 'default'
@@ -250,23 +256,25 @@ export type SpinnerProps = LucideProps & {
     | 'infinite';
 };
 
-export const Spinner = ({ variant, ...props }: SpinnerProps) => {
+export const Spinner = ({ variant, size, ...props }: SpinnerProps) => {
+  const resolvedSize = typeof size === 'string' ? (SIZE_MAP[size] ?? 24) : (size ?? 24)
+  const spinnerProps = { ...props, size: resolvedSize }
   switch (variant) {
     case 'circle':
-      return <Circle {...props} />;
+      return <Circle {...spinnerProps} />;
     case 'pinwheel':
-      return <Pinwheel {...props} />;
+      return <Pinwheel {...spinnerProps} />;
     case 'circle-filled':
-      return <CircleFilled {...props} />;
+      return <CircleFilled {...spinnerProps} />;
     case 'ellipsis':
-      return <Ellipsis {...props} />;
+      return <Ellipsis {...spinnerProps} />;
     case 'ring':
-      return <Ring {...props} />;
+      return <Ring {...spinnerProps} />;
     case 'bars':
-      return <Bars {...props} />;
+      return <Bars {...spinnerProps} />;
     case 'infinite':
-      return <Infinite {...props} />;
+      return <Infinite {...spinnerProps} />;
     default:
-      return <Default {...props} />;
+      return <Default {...spinnerProps} />;
   }
 };

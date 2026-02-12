@@ -119,21 +119,8 @@ const Sidebar = ({
   const toggleSidebar = isControlled ? onToggle! : () => setInternalOpen((o) => !o)
   const location = useLocation()
 
-  useEffect(() => {
-    if (isDemoMode) {
-      cloudFetchedRef.current = false
-      cloudProvidersCache = null
-      setCloudAccounts([])
-      setExpandedProviders(new Set())
-      return
-    }
-    // If we have cached data, use it and skip fetch (avoids refetch on remount)
-    if (cloudProvidersCache?.providers?.length) {
-      cloudFetchedRef.current = true
-      return
-    }
-    if (cloudFetchedRef.current) return
-    cloudFetchedRef.current = true
+  const fetchCloudAccounts = () => {
+    if (isDemoMode) return
     cloudProvidersAPI.getCloudProviders().then((res) => {
       const providers = res.providers || []
       const expandedIds =
@@ -147,6 +134,36 @@ const Sidebar = ({
       console.error('Failed to load cloud accounts', err)
       cloudFetchedRef.current = false
     })
+  }
+
+  useEffect(() => {
+    if (isDemoMode) {
+      cloudFetchedRef.current = false
+      cloudProvidersCache = null
+      setCloudAccounts([])
+      setExpandedProviders(new Set())
+      return
+    }
+    // If we have cached data, use it and skip fetch (avoids refetch on remount)
+    if (cloudProvidersCache?.providers?.length && !cloudFetchedRef.current) {
+      cloudFetchedRef.current = true
+      return
+    }
+    if (cloudFetchedRef.current) return
+    cloudFetchedRef.current = true
+    fetchCloudAccounts()
+  }, [isDemoMode])
+
+  // Refetch when providers change (add/delete/update from Settings)
+  useEffect(() => {
+    if (isDemoMode) return
+    const onProvidersChanged = () => {
+      cloudProvidersCache = null
+      cloudFetchedRef.current = false
+      fetchCloudAccounts()
+    }
+    window.addEventListener('cloud-providers-changed', onProvidersChanged)
+    return () => window.removeEventListener('cloud-providers-changed', onProvidersChanged)
   }, [isDemoMode])
 
   const toggleProviderExpand = (providerId: string) => {

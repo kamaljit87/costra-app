@@ -45,7 +45,7 @@ export const runOptimizationForUser = async (userId) => {
       return
     }
 
-    const recommendations = [
+    let recommendations = [
       ...analyzeCostTrends(context),
       ...analyzeIdleResources(context),
       ...analyzeRightsizing(context),
@@ -55,6 +55,27 @@ export const runOptimizationForUser = async (userId) => {
       ...analyzeServiceBestPractices(context),
       ...analyzeCrossProvider(context),
     ]
+
+    // Fallback: when we have data but no specific findings, add a general cost-awareness tip
+    if (recommendations.length === 0 && context.providers?.length > 0) {
+      const providerNames = context.providers.map(p => p.provider_name || p.provider_id?.toUpperCase() || 'cloud').join(', ')
+      recommendations = [{
+        provider_id: context.providers[0]?.provider_id || 'aws',
+        account_id: null,
+        category: 'service_best_practice',
+        subcategory: 'cost_awareness',
+        service_name: null,
+        resource_id: null,
+        title: 'Review your cloud spending regularly',
+        description: `Your cost data for ${providerNames} looks stable. Set up budgets and alerts to stay on track and catch unexpected increases early.`,
+        action: 'Create a budget in the Budgets section and enable cost anomaly alerts to get notified of unusual spending patterns.',
+        estimated_monthly_savings: 0,
+        estimated_savings_percent: 0,
+        confidence: 'low',
+        current_cost: null,
+        evidence: null,
+      }]
+    }
 
     // Score and set priorities
     recommendations.forEach(rec => {
@@ -122,8 +143,8 @@ function analyzeCostTrends(context) {
     const [providerId, accountId] = key.split(':')
     if (data.length < 14) continue
 
-    // Sort by date ascending
-    const sorted = data.sort((a, b) => a.date.localeCompare(b.date))
+    // Sort by date ascending (pg returns DATE as YYYY-MM-DD string via type parser)
+    const sorted = data.sort((a, b) => (a.date || '').localeCompare(b.date || ''))
 
     // Compute 7-day moving averages
     const movingAvgs = []
@@ -242,7 +263,7 @@ function analyzeIdleResources(context) {
     if (metrics.length < 7) continue
 
     const recent7 = metrics
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
       .slice(0, 7)
 
     const allZeroUsage = recent7.every(m => parseFloat(m.usage_quantity || 0) === 0)

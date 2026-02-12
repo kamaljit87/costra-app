@@ -1,6 +1,15 @@
 import pkg from 'pg'
-const { Pool } = pkg
+const { Pool, types } = pkg
 import logger from './utils/logger.js'
+
+// Parse DATE (1082) as YYYY-MM-DD string for consistent behavior across the app
+const DATE_OID = 1082
+types.setTypeParser(DATE_OID, (val) => {
+  if (val == null) return null
+  if (typeof val === 'string') return val.split('T')[0]
+  if (val instanceof Date) return val.toISOString().split('T')[0]
+  return String(val).split('T')[0]
+})
 
 // Create PostgreSQL connection pool with optimized settings
 const pool = new Pool({
@@ -5908,7 +5917,7 @@ export const bulkUpsertRecommendations = async (userId, recommendations) => {
 }
 
 export const getOptimizationRecommendations = async (userId, filters = {}) => {
-  const { category, provider_id, priority, status = 'active', limit = 50, offset = 0, sort_by = 'savings' } = filters
+  const { category, provider_id, account_id, priority, status = 'active', limit = 50, offset = 0, sort_by = 'savings' } = filters
   const conditions = ['user_id = $1', 'status = $2']
   const params = [userId, status]
   let paramIdx = 3
@@ -5920,6 +5929,11 @@ export const getOptimizationRecommendations = async (userId, filters = {}) => {
   if (provider_id) {
     conditions.push(`provider_id = $${paramIdx++}`)
     params.push(provider_id)
+  }
+  if (account_id !== undefined && account_id !== null && !isNaN(account_id)) {
+    conditions.push(`(account_id = $${paramIdx} OR account_id IS NULL)`)
+    params.push(account_id)
+    paramIdx++
   }
   if (priority) {
     conditions.push(`priority = $${paramIdx++}`)

@@ -11,7 +11,7 @@ import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
 import OptimizationSummary from '../components/OptimizationSummary'
-import { Sparkles, RefreshCw, Plus, Cloud } from 'lucide-react'
+import { Sparkles, RefreshCw, Plus, Cloud, ArrowRight } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ProviderIcon } from '../components/CloudProviderIcons'
 
@@ -207,11 +207,11 @@ export default function Dashboard() {
             {!isDemoMode && <OptimizationSummary />}
             {/* Provider Sections with Charts */}
             {(() => {
-              const allProviders = new Map<string, CostData>()
+              const providerDataMap = new Map<string, CostData>()
 
               // Add providers with cost data
               costData.forEach(data => {
-                allProviders.set(data.provider.id, data)
+                providerDataMap.set(data.provider.id, data)
               })
 
               // Add configured providers without cost data
@@ -219,8 +219,8 @@ export default function Dashboard() {
                 configuredProviders
                   .filter(p => p.isActive)
                   .forEach(provider => {
-                    if (!allProviders.has(provider.providerId)) {
-                      allProviders.set(provider.providerId, {
+                    if (!providerDataMap.has(provider.providerId)) {
+                      providerDataMap.set(provider.providerId, {
                         provider: {
                           id: provider.providerId,
                           name: provider.accountAlias || provider.providerName,
@@ -245,9 +245,9 @@ export default function Dashboard() {
                   })
               }
 
-              const providersToShow = Array.from(allProviders.values())
+              // Only show providers that have been added (have cost data or are configured)
+              const providersToShow = Array.from(providerDataMap.values())
 
-              // Show empty state if no providers exist
               if (providersToShow.length === 0 && !isDemoMode) {
                 return (
                   <div className="flex flex-col items-center justify-center py-16 px-4">
@@ -269,87 +269,67 @@ export default function Dashboard() {
                 )
               }
 
-              if (providersToShow.length > 0) {
-                return (
-                  <div className="mb-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">By Provider</h2>
-                    <div className="space-y-4">
-                      {providersToShow.map((data) => {
-                        const hasData = data.currentMonth > 0 || data.services.length > 0
-                        return (
-                          <div key={data.provider.id} className="animate-fade-in">
-                            {hasData ? (
-                              <ProviderSection
-                                providerId={data.provider.id}
-                                providerName={data.provider.name}
-                                currentMonth={data.currentMonth}
-                                lastMonth={data.lastMonth}
-                                forecast={data.forecast}
-                                credits={data.credits}
-                                savings={data.savings}
-                                budgetCount={providerBudgetCounts[data.provider.id] || 0}
-                                chartData1Month={data.chartData1Month}
-                                chartData2Months={data.chartData2Months}
-                                chartData3Months={data.chartData3Months}
-                                chartData4Months={data.chartData4Months}
-                                chartData6Months={data.chartData6Months}
-                                chartData12Months={data.chartData12Months}
-                                isExpanded={expandedProvider === data.provider.id}
-                                onToggle={() => setExpandedProvider(
-                                  expandedProvider === data.provider.id ? null : data.provider.id
-                                )}
+              return (
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">By Provider</h2>
+                  <div className="space-y-4">
+                    {providersToShow.map((data) => {
+                      const hasData = data.currentMonth > 0 || data.services.length > 0
+                      return (
+                        <div key={data.provider.id} className="animate-fade-in">
+                          {hasData ? (
+                            <ProviderSection
+                              providerId={data.provider.id}
+                              providerName={data.provider.name}
+                              currentMonth={data.currentMonth}
+                              lastMonth={data.lastMonth}
+                              forecast={data.forecast}
+                              credits={data.credits}
+                              savings={data.savings}
+                              budgetCount={providerBudgetCounts[data.provider.id] || 0}
+                              chartData1Month={data.chartData1Month}
+                              chartData2Months={data.chartData2Months}
+                              chartData3Months={data.chartData3Months}
+                              chartData4Months={data.chartData4Months}
+                              chartData6Months={data.chartData6Months}
+                              chartData12Months={data.chartData12Months}
+                              isExpanded={expandedProvider === data.provider.id}
+                              onToggle={() => setExpandedProvider(
+                                expandedProvider === data.provider.id ? null : data.provider.id
+                              )}
                               />
                             ) : (
-                              <div className="card">
-                                <div className="flex items-center justify-between mb-4">
+                              <div className="card group">
+                                <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-4">
                                     <div className="w-14 h-14 flex items-center justify-center rounded-2xl shrink-0">
                                       <ProviderIcon providerId={data.provider.id} size={32} />
                                     </div>
                                     <div>
-                                      <h2 className="text-xl font-bold text-gray-900">{data.provider.name}</h2>
-                                      <p className="text-sm text-gray-500">No cost data available yet</p>
+                                      <h2 className="text-lg font-bold text-gray-900">{data.provider.name}</h2>
+                                      <div className="flex items-center space-x-3 text-sm mt-1">
+                                        <span className="font-semibold text-gray-500">No cost data yet</span>
+                                        <span className="text-xs text-gray-400">Sync to fetch costs</span>
+                                      </div>
                                     </div>
                                   </div>
                                   <Link
                                     to={`/provider/${data.provider.id}`}
-                                    className="btn-secondary"
+                                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-accent-600 hover:text-accent-700 bg-accent-50 hover:bg-accent-100 rounded-lg transition-all duration-150"
                                     title="View provider details"
                                   >
-                                    View Details
+                                    <span>Details</span>
+                                    <ArrowRight className="h-3.5 w-3.5" />
                                   </Link>
-                                </div>
-                                <div className="bg-surface-50 rounded-xl p-6 text-center border border-surface-100">
-                                  <p className="text-gray-600 mb-2">Cost data will appear here once your provider is synced.</p>
-                                  <p className="text-sm text-gray-400">Click "Sync Data" to fetch the latest costs from your cloud provider.</p>
                                 </div>
                               </div>
                             )}
-                          </div>
-                        )
-                      })}
-                    </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              } else {
-                return (
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">By Provider</h2>
-                    <div className="card text-center py-16">
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
-                        <Cloud className="h-8 w-8 text-gray-400" />
-                      </div>
-                      <p className="text-gray-600 mb-4">No cloud providers configured yet.</p>
-                      <Link
-                        to="/settings?tab=providers"
-                        className="btn-primary inline-flex"
-                      >
-                        Add Cloud Provider
-                      </Link>
-                    </div>
-                  </div>
-                )
-              }
+                </div>
+              )
             })()}
 
             {/* Savings Plans */}

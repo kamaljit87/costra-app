@@ -91,10 +91,12 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
         }
         return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: errorMessage } }
       }
-    } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 ||
-               !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
-      logger.warn('No valid credentials found', { requestId, userId, accountId: account.id, accountLabel })
-      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Credentials not found or invalid' } }
+    } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0) {
+      logger.warn('No credentials found', { requestId, userId, accountId: account.id, accountLabel })
+      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Credentials not found' } }
+    } else if (account.provider_id === 'aws' && (!credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey)) {
+      logger.warn('AWS credentials incomplete (missing accessKeyId or secretAccessKey)', { requestId, userId, accountId: account.id, accountLabel })
+      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'AWS credentials invalid (missing Access Key ID or Secret Access Key)' } }
     }
 
     logger.debug('Using credentials for account', { requestId, userId, accountId: account.id, accountLabel, connectionType: accountData.connectionType || 'manual' })
@@ -206,7 +208,7 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
  */
 router.post('/', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { accountId } = req.body // Optional: sync specific account
 
     logger.info('Starting sync', { requestId: req.requestId, userId, accountId: accountId || 'ALL' })
@@ -308,7 +310,7 @@ router.post('/', async (req, res) => {
  */
 router.post('/account/:accountId', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const accountId = parseInt(req.params.accountId, 10)
 
     if (isNaN(accountId)) {
@@ -506,7 +508,7 @@ router.post('/account/:accountId', async (req, res) => {
  */
 router.post('/:providerId', async (req, res) => {
   try {
-    const userId = req.user.userId
+    const userId = req.user.userId || req.user.id
     const { providerId } = req.params
 
     // Get all accounts for this provider type
