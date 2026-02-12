@@ -283,6 +283,8 @@ export default function Dashboard() {
                               providerName={data.provider.name}
                               currentMonth={data.currentMonth}
                               lastMonth={data.lastMonth}
+                              taxCurrentMonth={data.taxCurrentMonth}
+                              taxLastMonth={data.taxLastMonth}
                               forecast={data.forecast}
                               credits={data.credits}
                               savings={data.savings}

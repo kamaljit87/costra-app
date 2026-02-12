@@ -3,7 +3,7 @@
  * Uses official Node.js SDKs to fetch cost data from various cloud providers
  */
 
-import { CostExplorerClient, GetCostAndUsageCommand } from '@aws-sdk/client-cost-explorer'
+import { CostExplorerClient, GetCostAndUsageCommand, GetRightsizingRecommendationCommand } from '@aws-sdk/client-cost-explorer'
 import logger from '../utils/logger.js'
 import { retryWithBackoff } from '../utils/retry.js'
 
@@ -95,6 +95,335 @@ export const fetchAWSMonthlyTotal = async (credentials, month, year) => {
   )
 
   return { total: amount, month, year }
+}
+
+/**
+ * Fetch rightsizing recommendations from AWS Cost Explorer GetRightsizingRecommendation API.
+ * Uses actual CPU/RAM utilization from CloudWatch and instance usage patterns.
+ */
+export const fetchAWSRightsizingRecommendations = async (credentials, options = {}) => {
+  const { accessKeyId, secretAccessKey, sessionToken, region = 'us-east-1' } = credentials
+  const { linkedAccountId } = options
+
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error('AWS credentials are missing')
+  }
+
+  const cacheKey = `aws-${accessKeyId}-${region}-${sessionToken ? 'temp' : 'perm'}`
+  let client = clientCache.get(cacheKey)
+  if (!client) {
+    const clientConfig = {
+      region,
+      credentials: { accessKeyId, secretAccessKey },
+    }
+    if (sessionToken) clientConfig.credentials.sessionToken = sessionToken
+    client = new CostExplorerClient(clientConfig)
+    clientCache.set(cacheKey, client)
+  }
+
+  const input = {
+    Service: 'AmazonEC2',
+    PageSize: 100,
+    Configuration: {
+      RecommendationTarget: 'SAME_INSTANCE_FAMILY',
+      BenefitsConsidered: true,
+    },
+  }
+
+  if (linkedAccountId) {
+    input.Filter = {
+      Dimensions: {
+        Key: 'LINKED_ACCOUNT',
+        Values: [String(linkedAccountId)],
+      },
+    }
+  }
+
+  const allRecs = []
+  let nextToken = null
+
+  do {
+    const command = new GetRightsizingRecommendationCommand({
+      ...input,
+      NextPageToken: nextToken,
+    })
+
+    const response = await retryWithBackoff(
+      () => client.send(command),
+      { maxAttempts: 3, timeout: 60000 },
+      'aws',
+      { operation: 'getRightsizingRecommendation' }
+    )
+
+    const recs = response.RightsizingRecommendations || []
+    for (const rec of recs) {
+      const current = rec.CurrentInstance
+      const resourceId = current?.ResourceId || 'unknown'
+      const resourceName = current?.InstanceName || resourceId
+      const currentCost = parseFloat(current?.MonthlyCost || '0') || 0
+      const util = current?.ResourceUtilization?.EC2ResourceUtilization
+      const cpuPct = util?.MaxCpuUtilizationPercentage ? parseFloat(util.MaxCpuUtilizationPercentage) : null
+      const memPct = util?.MaxMemoryUtilizationPercentage ? parseFloat(util.MaxMemoryUtilizationPercentage) : null
+      const findingCodes = rec.FindingReasonCodes || []
+
+      let recommendation = 'downsize'
+      let potentialSavings = 0
+      let savingsPercent = 0
+      let suggestedInstanceType = null
+      let reason = ''
+
+      if (rec.RightsizingType === 'Terminate') {
+        recommendation = 'terminate'
+        const term = rec.TerminateRecommendationDetail
+        potentialSavings = term ? parseFloat(term.EstimatedMonthlySavings || '0') || 0 : currentCost
+        savingsPercent = currentCost > 0 ? (potentialSavings / currentCost) * 100 : 100
+        reason = 'Instance appears idle or unused. Consider terminating to save costs.'
+      } else if (rec.ModifyRecommendationDetail?.TargetInstances?.length > 0) {
+        const targets = rec.ModifyRecommendationDetail.TargetInstances
+        const target = targets.find(t => t.DefaultTargetInstance) || targets[0]
+        potentialSavings = parseFloat(target?.EstimatedMonthlySavings || '0') || 0
+        savingsPercent = currentCost > 0 ? (potentialSavings / currentCost) * 100 : 0
+        suggestedInstanceType = target?.ResourceDetails?.EC2ResourceDetails?.InstanceType
+        const parts = []
+        if (findingCodes.includes('CPU_OVER_PROVISIONED')) parts.push('low CPU utilization')
+        if (findingCodes.includes('MEMORY_OVER_PROVISIONED')) parts.push('low memory utilization')
+        if (findingCodes.includes('EBS_IOPS_OVER_PROVISIONED') || findingCodes.includes('EBS_THROUGHPUT_OVER_PROVISIONED')) parts.push('low EBS usage')
+        if (parts.length) {
+          reason = `Based on CPU/RAM history: ${parts.join(', ')}. Consider downsizing to ${suggestedInstanceType || 'a smaller instance'}.`
+        } else {
+          reason = suggestedInstanceType
+            ? `AWS recommends downsizing to ${suggestedInstanceType} based on utilization.`
+            : 'Underutilized. Consider a smaller instance type.'
+        }
+      }
+
+      const instanceType = current?.ResourceDetails?.EC2ResourceDetails?.InstanceType
+      const priority = savingsPercent >= 30 ? 'high' : savingsPercent >= 15 ? 'medium' : 'low'
+
+      allRecs.push({
+        resourceId,
+        resourceName,
+        serviceName: 'Amazon EC2',
+        resourceType: instanceType || 'EC2',
+        region: current?.ResourceDetails?.EC2ResourceDetails?.Region || null,
+        currentCost,
+        utilization: {
+          estimated: (cpuPct != null ? cpuPct : memPct != null ? memPct : 0),
+          usageQuantity: cpuPct ?? memPct ?? 0,
+          usageUnit: '%',
+          cpuUtilization: cpuPct,
+          memoryUtilization: memPct,
+        },
+        recommendation,
+        potentialSavings,
+        savingsPercent,
+        priority,
+        reason,
+        findingReasonCodes: findingCodes,
+        suggestedInstanceType,
+        source: 'aws',
+      })
+    }
+
+    nextToken = response.NextPageToken
+  } while (nextToken)
+
+  allRecs.sort((a, b) => b.potentialSavings - a.potentialSavings)
+  const totalPotentialSavings = allRecs.reduce((sum, r) => sum + r.potentialSavings, 0)
+
+  return {
+    recommendations: allRecs.slice(0, 50),
+    totalPotentialSavings,
+    recommendationCount: allRecs.length,
+    source: 'aws',
+  }
+}
+
+/**
+ * Fetch rightsizing recommendations from Azure Advisor API.
+ * Uses Cost category recommendations (VM resize, shutdown underutilized).
+ */
+export const fetchAzureRightsizingRecommendations = async (credentials) => {
+  const { tenantId, clientId, clientSecret, subscriptionId } = credentials
+
+  if (!tenantId || !clientId || !clientSecret || !subscriptionId) {
+    throw new Error('Azure credentials are missing')
+  }
+
+  const token = await getAzureAccessToken(tenantId, clientId, clientSecret)
+  const url = `https://management.azure.com/subscriptions/${subscriptionId}/providers/Microsoft.Advisor/recommendations?api-version=2025-01-01&$filter=Category eq 'Cost'&$top=100`
+
+  const response = await retryWithBackoff(
+    async () => {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error?.message || res.statusText)
+      }
+      return res
+    },
+    { maxAttempts: 3, timeout: 30000 },
+    'azure',
+    { operation: 'advisor-recommendations' }
+  )
+
+  const result = await response.json()
+  const items = result.value || []
+  const allRecs = []
+
+  for (const rec of items) {
+    const props = rec.properties || {}
+    const resourceId = props.resourceMetadata?.resourceId || rec.id || ''
+    const impactedField = props.impactedField || ''
+    const isVM = impactedField.includes('virtualMachines') || impactedField.includes('VirtualMachineScaleSets')
+
+    if (!isVM && !resourceId.toLowerCase().includes('virtualmachine')) continue
+
+    const resourceName = props.impactedValue || resourceId.split('/').pop() || resourceId
+    const shortDesc = props.shortDescription || {}
+    const reason = shortDesc.solution || shortDesc.problem || props.description || 'Consider resizing or shutting down underutilized instance.'
+    const ext = props.extendedProperties || {}
+    const cpuPct = ext.MaxCpuP95 != null ? parseFloat(ext.MaxCpuP95) : null
+    const memPct = ext.MaxMemoryP95 != null ? parseFloat(ext.MaxMemoryP95) : null
+    const potentialBenefits = props.potentialBenefits || ''
+    const savingsMatch = potentialBenefits.match(/[\d,.]+/)
+    const potentialSavings = savingsMatch ? parseFloat(savingsMatch[0].replace(/,/g, '')) : 0
+    const impact = props.impact || 'Medium'
+    const priority = impact === 'High' ? 'high' : impact === 'Medium' ? 'medium' : 'low'
+
+    allRecs.push({
+      resourceId,
+      resourceName,
+      serviceName: 'Azure Virtual Machines',
+      resourceType: impactedField.split('/').pop() || 'VM',
+      region: null,
+      currentCost: 0,
+      utilization: {
+        estimated: cpuPct ?? memPct ?? 0,
+        usageQuantity: cpuPct ?? memPct ?? 0,
+        usageUnit: '%',
+        cpuUtilization: cpuPct,
+        memoryUtilization: memPct,
+      },
+      recommendation: reason.toLowerCase().includes('shut') ? 'terminate' : 'downsize',
+      potentialSavings,
+      savingsPercent: 0,
+      priority,
+      reason,
+      source: 'azure',
+    })
+  }
+
+  allRecs.sort((a, b) => b.potentialSavings - a.potentialSavings)
+  const totalPotentialSavings = allRecs.reduce((sum, r) => sum + r.potentialSavings, 0)
+
+  return {
+    recommendations: allRecs.slice(0, 50),
+    totalPotentialSavings,
+    recommendationCount: allRecs.length,
+    source: 'azure',
+  }
+}
+
+/**
+ * Fetch rightsizing recommendations from GCP Recommender API.
+ * Uses compute.instance.MachineTypeRecommender for VM rightsizing.
+ */
+export const fetchGCPRightsizingRecommendations = async (credentials) => {
+  const { projectId, serviceAccountKey } = credentials
+  const keyData = typeof serviceAccountKey === 'string' ? JSON.parse(serviceAccountKey || '{}') : (serviceAccountKey || credentials)
+  const project = projectId || keyData.project_id
+
+  if (!project || !keyData.private_key) {
+    throw new Error('GCP credentials are missing (projectId/project_id and serviceAccountKey with private_key)')
+  }
+  const token = await getGCPAccessToken(keyData)
+
+  const recommenderId = 'google.compute.instance.MachineTypeRecommender'
+  const zones = ['us-central1-a', 'us-east1-b', 'us-west1-b', 'europe-west1-b', 'asia-east1-a']
+
+  const allRecs = []
+  for (const zone of zones) {
+    const url = `https://recommender.googleapis.com/v1/projects/${project}/locations/${zone}/recommenders/${recommenderId}/recommendations`
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 403) continue
+      const err = await response.json()
+      throw new Error(err.error?.message || response.statusText)
+    }
+
+    const result = await response.json()
+    const items = result.recommendations || []
+
+    for (const rec of items) {
+      const content = rec.content || {}
+      const overview = content.overview || {}
+      const resource = overview.resource || rec.name || ''
+      const resourceName = resource.split('/').pop() || resource
+      const targetInstance = overview.recommendedMachineType || overview.targetMachineType
+      const primaryImpact = rec.primaryImpact || {}
+      const costProj = primaryImpact.costProjection || {}
+      const costVal = costProj.cost
+      let potentialSavings = 0
+      if (costVal && typeof costVal === 'object') {
+        const units = parseFloat(costVal.units || 0) || 0
+        const nanos = parseFloat(costVal.nanos || 0) / 1e9 || 0
+        potentialSavings = Math.abs(units + nanos)
+      } else {
+        potentialSavings = Math.abs(parseFloat(costProj.costDelta || costProj.cost || 0) || 0)
+      }
+      const state = rec.stateInfo?.state || 'ACTIVE'
+      if (state !== 'ACTIVE') continue
+
+      const recs = rec.content?.operationGroups || []
+      let suggestedType = targetInstance
+      if (!suggestedType && recs[0]?.operations?.[0]?.path) {
+        const path = recs[0].operations[0].path
+        if (path.includes('machineType')) {
+          suggestedType = path.split('/').pop()
+        }
+      }
+
+      allRecs.push({
+        resourceId: resource,
+        resourceName,
+        serviceName: 'Compute Engine',
+        resourceType: overview.currentMachineType || 'VM',
+        region: zone,
+        currentCost: 0,
+        utilization: {
+          estimated: 0,
+          usageQuantity: 0,
+          usageUnit: '%',
+          cpuUtilization: null,
+          memoryUtilization: null,
+        },
+        recommendation: 'downsize',
+        potentialSavings,
+        savingsPercent: 0,
+        priority: potentialSavings > 50 ? 'high' : potentialSavings > 20 ? 'medium' : 'low',
+        reason: `GCP recommends downsizing to ${suggestedType || 'a smaller machine type'} based on utilization.`,
+        suggestedInstanceType: suggestedType,
+        source: 'gcp',
+      })
+    }
+  }
+
+  allRecs.sort((a, b) => b.potentialSavings - a.potentialSavings)
+  const totalPotentialSavings = allRecs.reduce((sum, r) => sum + r.potentialSavings, 0)
+
+  return {
+    recommendations: allRecs.slice(0, 50),
+    totalPotentialSavings,
+    recommendationCount: allRecs.length,
+    source: 'gcp',
+  }
 }
 
 /**
@@ -1717,7 +2046,7 @@ const getGCPAccessToken = async (keyData) => {
 
   const claims = {
     iss: keyData.client_email,
-    scope: 'https://www.googleapis.com/auth/cloud-billing.readonly https://www.googleapis.com/auth/bigquery.readonly',
+    scope: 'https://www.googleapis.com/auth/cloud-billing.readonly https://www.googleapis.com/auth/bigquery.readonly https://www.googleapis.com/auth/cloud-platform',
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: expiry,
@@ -1735,7 +2064,7 @@ const getGCPAccessToken = async (keyData) => {
     },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: createGCPJWT(header, claims, keyData.private_key),
+      assertion: await createGCPJWT(header, claims, keyData.private_key),
     }),
   })
 
@@ -1749,12 +2078,15 @@ const getGCPAccessToken = async (keyData) => {
 }
 
 /**
- * Create JWT for GCP authentication (simplified)
+ * Create JWT for GCP authentication
  */
-const createGCPJWT = (header, claims, privateKey) => {
-  // Note: This is a placeholder. In production, use a proper JWT library like jsonwebtoken
-  // For now, throw an error indicating the need for proper implementation
-  throw new Error('GCP JWT signing requires jsonwebtoken library. Install with: npm install jsonwebtoken')
+const createGCPJWT = async (header, claims, privateKey) => {
+  const jwt = await import('jsonwebtoken')
+  const privateKeyPem = typeof privateKey === 'string' ? privateKey : privateKey
+  return jwt.default.sign(claims, privateKeyPem, {
+    header: { alg: 'RS256', typ: 'JWT' },
+    expiresIn: 3600,
+  })
 }
 
 /**

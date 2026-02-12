@@ -559,8 +559,12 @@ export default function ProviderDetailPage() {
   const currentServices = periodServices.length > 0 ? periodServices : providerData.services
   const hasNoData = providerData.currentMonth === 0 && currentServices.length === 0
 
-  const changePercent = providerData.lastMonth > 0
-    ? ((providerData.currentMonth - providerData.lastMonth) / providerData.lastMonth) * 100
+  const hasTax = (providerData.taxCurrentMonth ?? 0) > 0 || (providerData.taxLastMonth ?? 0) > 0
+  const displayCurrent = hasTax ? providerData.currentMonth + (providerData.taxCurrentMonth ?? 0) : providerData.currentMonth
+  const displayLast = hasTax ? providerData.lastMonth + (providerData.taxLastMonth ?? 0) : providerData.lastMonth
+
+  const changePercent = displayLast > 0
+    ? ((displayCurrent - displayLast) / displayLast) * 100
     : 0
 
   const getDailyChartData = (): CostDataPoint[] => {
@@ -747,8 +751,13 @@ export default function ProviderDetailPage() {
             <div className="card p-4" title="Total cost for the current billing month">
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Current Month</div>
               <div className="text-xl font-bold text-gray-900 mb-1">
-                {formatCurrency(providerData.currentMonth)}
+                {formatCurrency(displayCurrent)}
               </div>
+              {hasTax && (
+                <div className="text-[10px] text-gray-400 mb-1">
+                  {formatCurrency(providerData.currentMonth)} + {formatCurrency(providerData.taxCurrentMonth ?? 0)} tax
+                </div>
+              )}
               {changePercent !== 0 && (
                 <div className={`text-xs mt-1 flex items-center ${
                   changePercent >= 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'
@@ -1339,8 +1348,8 @@ export default function ProviderDetailPage() {
                       providerId={providerData.provider.id}
                       providerName={providerData.provider.name}
                       data={chartData}
-                      currentMonth={providerData.currentMonth}
-                      lastMonth={providerData.lastMonth}
+                      currentMonth={displayCurrent}
+                      lastMonth={displayLast}
                       period={viewMode === 'monthly' ? 'monthly' : selectedPeriod}
                       isMonthlyView={viewMode === 'monthly'}
                     />

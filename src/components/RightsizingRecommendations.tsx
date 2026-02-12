@@ -7,6 +7,8 @@ interface Utilization {
   estimated: number
   usageQuantity: number
   usageUnit: string
+  cpuUtilization?: number | null
+  memoryUtilization?: number | null
 }
 
 interface RightsizingRecommendation {
@@ -17,11 +19,13 @@ interface RightsizingRecommendation {
   region: string | null
   currentCost: number
   utilization: Utilization
-  recommendation: 'downsize' | 'upsize'
+  recommendation: 'downsize' | 'upsize' | 'terminate'
   potentialSavings: number
   savingsPercent: number
   priority: 'high' | 'medium' | 'low'
   reason: string
+  findingReasonCodes?: string[]
+  suggestedInstanceType?: string | null
 }
 
 interface RightsizingRecommendationsProps {
@@ -181,6 +185,10 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-accent-600 mt-0.5">•</span>
+                        <span><strong>Terminate:</strong> Idle or unused instances can be terminated to save costs</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-accent-600 mt-0.5">•</span>
                         <span>Recommendations are prioritized by potential savings and impact</span>
                       </li>
                     </ul>
@@ -196,11 +204,20 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                     </ul>
                   </div>
                   
+                  <div className="bg-green-50 rounded-2xl p-5 border border-green-200/50">
+                    <h4 className="font-semibold text-green-800 mb-2">📊 Cloud Provider APIs:</h4>
+                    <ul className="space-y-1 text-sm text-green-700">
+                      <li><strong>AWS:</strong> CPU/RAM from CloudWatch via Cost Explorer GetRightsizingRecommendation</li>
+                      <li><strong>Azure:</strong> Cost category VM rightsizing from Advisor API</li>
+                      <li><strong>GCP:</strong> Machine type recommendations from Recommender API</li>
+                      <li><strong>DigitalOcean, Linode, Vultr, IBM:</strong> Database-based heuristics when resource data is available</li>
+                    </ul>
+                  </div>
+                  
                   <div className="bg-yellow-50 rounded-2xl p-5 border border-yellow-200/50">
                     <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Important:</h4>
                     <p className="text-sm text-yellow-700">
-                      These recommendations are based on estimated utilization. Always verify actual resource 
-                      metrics and test changes in a safe environment before applying to production.
+                      Always verify actual resource metrics and test changes in a safe environment before applying to production.
                     </p>
                   </div>
                 </div>
@@ -269,6 +286,26 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   
                   <p className="text-sm text-gray-700 mb-3">{rec.reason}</p>
                   
+                  {(rec.utilization.cpuUtilization != null || rec.utilization.memoryUtilization != null) && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {rec.utilization.cpuUtilization != null && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          CPU: {rec.utilization.cpuUtilization.toFixed(0)}% max
+                        </span>
+                      )}
+                      {rec.utilization.memoryUtilization != null && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                          RAM: {rec.utilization.memoryUtilization.toFixed(0)}% max
+                        </span>
+                      )}
+                      {rec.suggestedInstanceType && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                          → {rec.suggestedInstanceType}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Current Cost</div>
@@ -277,7 +314,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Utilization</div>
                       <div className="font-medium text-gray-900">
-                        {rec.utilization.estimated.toFixed(1)}%
+                        {rec.utilization.estimated > 0 ? rec.utilization.estimated.toFixed(1) + '%' : '—'}
                       </div>
                     </div>
                     <div>
@@ -309,7 +346,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   <span className="capitalize font-medium">{rec.priority}</span>
                   <span>priority</span>
                   <span>•</span>
-                  <span>Recommendation: {rec.recommendation === 'downsize' ? 'Downsize' : 'Upsize'}</span>
+                  <span>Recommendation: {rec.recommendation === 'terminate' ? 'Terminate' : rec.recommendation === 'downsize' ? 'Downsize' : 'Upsize'}</span>
                 </div>
               </div>
             </div>
@@ -367,6 +404,10 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-accent-600 mt-0.5">•</span>
+                      <span><strong>Terminate:</strong> Idle or unused instances can be terminated to save costs</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-accent-600 mt-0.5">•</span>
                       <span>Recommendations are prioritized by potential savings and impact</span>
                     </li>
                   </ul>
@@ -382,11 +423,20 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   </ul>
                 </div>
                 
+                <div className="bg-green-50 rounded-2xl p-5 border border-green-200/50">
+                  <h4 className="font-semibold text-green-800 mb-2">📊 Cloud Provider APIs:</h4>
+                  <ul className="space-y-1 text-sm text-green-700">
+                    <li><strong>AWS:</strong> CPU/RAM from CloudWatch via Cost Explorer GetRightsizingRecommendation</li>
+                    <li><strong>Azure:</strong> Cost category VM rightsizing from Advisor API</li>
+                    <li><strong>GCP:</strong> Machine type recommendations from Recommender API</li>
+                    <li><strong>DigitalOcean, Linode, Vultr, IBM:</strong> Database-based heuristics when resource data is available</li>
+                  </ul>
+                </div>
+                
                 <div className="bg-yellow-50 rounded-2xl p-5 border border-yellow-200/50">
                   <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Important:</h4>
                   <p className="text-sm text-yellow-700">
-                    These recommendations are based on estimated utilization. Always verify actual resource 
-                    metrics and test changes in a safe environment before applying to production.
+                    Always verify actual resource metrics and test changes in a safe environment before applying to production.
                   </p>
                 </div>
               </div>

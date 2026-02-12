@@ -24,9 +24,16 @@ import {
   getOptimizationSummary,
   dismissOptimizationRecommendation,
   markRecommendationImplemented,
+  getCloudProviderCredentialsByAccountId,
+  pool,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { runOptimizationForUser } from '../services/optimizationEngine.js'
+import {
+  fetchAWSRightsizingRecommendations,
+  fetchAzureRightsizingRecommendations,
+  fetchGCPRightsizingRecommendations,
+} from '../services/cloudProviderIntegrations.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -572,27 +579,173 @@ router.get('/cost-efficiency', authenticateToken, async (req, res) => {
 
 /**
  * GET /api/insights/rightsizing-recommendations
- * Get rightsizing recommendations based on resource utilization
+ * Get rightsizing recommendations based on resource utilization.
+ * For AWS: uses GetRightsizingRecommendation API with actual CPU/RAM history.
+ * For others: falls back to database-based heuristics.
  */
 router.get('/rightsizing-recommendations', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, accountId } = req.query
-    
+    const parsedAccountId = accountId ? parseInt(accountId, 10) : null
+
+    // For AWS, try Cost Explorer GetRightsizingRecommendation API (uses actual CPU/RAM metrics)
+    if (providerId?.toLowerCase() === 'aws') {
+      try {
+        const accountsToProcess = []
+
+        if (parsedAccountId) {
+          const accountData = await getCloudProviderCredentialsByAccountId(userId, parsedAccountId)
+          if (accountData) accountsToProcess.push({ id: accountData.accountId, ...accountData })
+        } else {
+          const result = await pool.query(
+            'SELECT id FROM cloud_provider_credentials WHERE user_id = $1 AND provider_id = $2 AND is_active = true ORDER BY created_at ASC',
+            [userId, 'aws']
+          )
+          for (const row of result.rows || []) {
+            const accountData = await getCloudProviderCredentialsByAccountId(userId, row.id)
+            if (accountData) accountsToProcess.push({ id: accountData.accountId, ...accountData })
+          }
+        }
+
+        const allRecs = []
+        let totalPotentialSavings = 0
+
+        for (const account of accountsToProcess) {
+          let credentials = account.credentials || {}
+          if (account.connectionType?.startsWith('automated') && account.roleArn && account.externalId) {
+            try {
+              const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+              const stsClient = new STSClient({ region: 'us-east-1' })
+              const assumeRes = await stsClient.send(new AssumeRoleCommand({
+                RoleArn: account.roleArn,
+                RoleSessionName: `costra-rightsizing-${account.id}-${Date.now()}`,
+                ExternalId: account.externalId,
+                DurationSeconds: 3600,
+              }))
+              if (assumeRes.Credentials) {
+                credentials = {
+                  accessKeyId: assumeRes.Credentials.AccessKeyId,
+                  secretAccessKey: assumeRes.Credentials.SecretAccessKey,
+                  sessionToken: assumeRes.Credentials.SessionToken,
+                  region: 'us-east-1',
+                }
+              }
+            } catch (assumeErr) {
+              logger.warn('Failed to assume role for rightsizing', { accountId: account.id, error: assumeErr.message })
+              continue
+            }
+          }
+
+          if (!credentials?.accessKeyId || !credentials?.secretAccessKey) {
+            logger.debug('Skipping account without valid credentials', { accountId: account.id })
+            continue
+          }
+
+          const awsResult = await fetchAWSRightsizingRecommendations(credentials, {
+            linkedAccountId: account.awsAccountId || undefined,
+          })
+          allRecs.push(...(awsResult.recommendations || []))
+          totalPotentialSavings += awsResult.totalPotentialSavings || 0
+        }
+
+        if (allRecs.length > 0) {
+          const merged = [...allRecs].sort((a, b) => b.potentialSavings - a.potentialSavings)
+          return res.json({
+            data: {
+              recommendations: merged.slice(0, 50),
+              totalPotentialSavings,
+              recommendationCount: merged.length,
+              source: 'aws',
+            },
+          })
+        }
+      } catch (awsErr) {
+        logger.warn('AWS rightsizing API failed, falling back to database', {
+          userId,
+          providerId,
+          error: awsErr.message,
+        })
+      }
+    }
+
+    if (providerId?.toLowerCase() === 'azure') {
+      try {
+        let accountData = null
+        if (parsedAccountId) {
+          accountData = await getCloudProviderCredentialsByAccountId(userId, parsedAccountId)
+        } else {
+          const rows = (await pool.query(
+            'SELECT id FROM cloud_provider_credentials WHERE user_id = $1 AND provider_id = $2 AND is_active = true ORDER BY created_at ASC LIMIT 1',
+            [userId, 'azure']
+          )).rows
+          if (rows[0]) accountData = await getCloudProviderCredentialsByAccountId(userId, rows[0].id)
+        }
+        const creds = accountData?.credentials
+        if (creds?.tenantId && creds?.clientId && creds?.clientSecret && creds?.subscriptionId) {
+          const azureResult = await fetchAzureRightsizingRecommendations(creds)
+          if (azureResult.recommendations?.length > 0) {
+            return res.json({
+              data: {
+                recommendations: azureResult.recommendations,
+                totalPotentialSavings: azureResult.totalPotentialSavings,
+                recommendationCount: azureResult.recommendationCount,
+                source: 'azure',
+              },
+            })
+          }
+        }
+      } catch (azureErr) {
+        logger.warn('Azure rightsizing API failed, falling back to database', { userId, providerId, error: azureErr.message })
+      }
+    }
+
+    if (providerId?.toLowerCase() === 'gcp' || providerId?.toLowerCase() === 'google') {
+      try {
+        let accountData = null
+        if (parsedAccountId) {
+          accountData = await getCloudProviderCredentialsByAccountId(userId, parsedAccountId)
+        } else {
+          const rows = (await pool.query(
+            'SELECT id FROM cloud_provider_credentials WHERE user_id = $1 AND provider_id IN ($2, $3) AND is_active = true ORDER BY created_at ASC LIMIT 1',
+            [userId, 'gcp', 'google']
+          )).rows
+          if (rows[0]) accountData = await getCloudProviderCredentialsByAccountId(userId, rows[0].id)
+        }
+        const creds = accountData?.credentials
+        if (creds && (creds.projectId || creds.serviceAccountKey)) {
+          const gcpResult = await fetchGCPRightsizingRecommendations(creds)
+          if (gcpResult.recommendations?.length > 0) {
+            return res.json({
+              data: {
+                recommendations: gcpResult.recommendations,
+                totalPotentialSavings: gcpResult.totalPotentialSavings,
+                recommendationCount: gcpResult.recommendationCount,
+                source: 'gcp',
+              },
+            })
+          }
+        }
+      } catch (gcpErr) {
+        logger.warn('GCP rightsizing API failed, falling back to database', { userId, providerId, error: gcpErr.message })
+      }
+    }
+
+    // Fallback: database-based recommendations (works for all providers including DigitalOcean, Linode, Vultr, IBM Cloud)
     const data = await getRightsizingRecommendations(
       userId,
       providerId || null,
-      accountId ? parseInt(accountId) : null
+      parsedAccountId
     )
-    
+
     res.json({ data })
   } catch (error) {
-    logger.error('Rightsizing recommendations error', { 
-      userId: req.user?.id, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Rightsizing recommendations error', {
+      userId: req.user?.userId || req.user?.id,
+      providerId,
+      accountId,
+      error: error.message,
+      stack: error.stack,
     })
     res.status(500).json({ error: 'Failed to fetch rightsizing recommendations' })
   }

@@ -16,6 +16,7 @@ interface PolicyTemplate {
   roles?: string[]
   permissions?: string[]
   links?: Array<{ label: string; url: string }>
+  rightsizing?: { note: string; extraSteps?: string[] }
 }
 
 export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerName }: IAMPolicyDialogProps) {
@@ -47,7 +48,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           ],
           roles: [
             'Cost Management Reader (required for cost data)',
-            'Reader (optional, for resource metadata)'
+            'Reader or Advisor Reader (required for rightsizing VM recommendations)'
           ],
           permissions: [
             'Microsoft.CostManagement/*/read',
@@ -56,7 +57,11 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           links: [
             { label: 'Azure Portal', url: 'https://portal.azure.com/' },
             { label: 'App Registrations', url: 'https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade' }
-          ]
+          ],
+          rightsizing: {
+            note: 'For rightsizing recommendations (VM resize, shutdown underutilized), add Reader or Advisor Reader role on the subscription.',
+            extraSteps: ['Go to Subscriptions → Your subscription → Access control (IAM)', 'Add role assignment → Reader or Advisor Reader → Assign to your app']
+          }
         }
       case 'gcp':
         return {
@@ -81,13 +86,18 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           roles: [
             'Billing Account Costs Viewer (billing.accounts.getCosts)',
             'Billing Account Viewer (billing.accounts.get)',
-            'Cloud Billing Viewer (cloudbilling.billingAccounts.get)'
+            'Cloud Billing Viewer (cloudbilling.billingAccounts.get)',
+            'Recommender Viewer (for VM rightsizing recommendations)'
           ],
           links: [
             { label: 'GCP Console', url: 'https://console.cloud.google.com/' },
             { label: 'Service Accounts', url: 'https://console.cloud.google.com/iam-admin/serviceaccounts' },
             { label: 'Billing Accounts', url: 'https://console.cloud.google.com/billing' }
-          ]
+          ],
+          rightsizing: {
+            note: 'For rightsizing recommendations (VM machine type suggestions), add Recommender Viewer role to your service account.',
+            extraSteps: ['Go to IAM & Admin → IAM', 'Find your service account → Edit', 'Add role "Recommender Viewer" (or roles/recommender.viewer)', 'Save']
+          }
         }
       case 'digitalocean':
         return {
@@ -105,7 +115,10 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           ],
           links: [
             { label: 'DigitalOcean API Tokens', url: 'https://cloud.digitalocean.com/account/api/tokens' }
-          ]
+          ],
+          rightsizing: {
+            note: 'DigitalOcean does not have a native rightsizing API. Rightsizing recommendations use database heuristics when resource data is available.'
+          }
         }
       case 'linode':
         return {
@@ -124,7 +137,10 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           ],
           links: [
             { label: 'Linode API Tokens', url: 'https://cloud.linode.com/profile/tokens' }
-          ]
+          ],
+          rightsizing: {
+            note: 'Linode does not have a native rightsizing API. Rightsizing recommendations use database heuristics when resource data is available.'
+          }
         }
       case 'vultr':
         return {
@@ -143,7 +159,10 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           ],
           links: [
             { label: 'Vultr API Settings', url: 'https://my.vultr.com/settings/#settingsapi' }
-          ]
+          ],
+          rightsizing: {
+            note: 'Vultr does not have a native rightsizing API. Rightsizing recommendations use database heuristics when resource data is available.'
+          }
         }
       case 'ibm':
         return {
@@ -170,7 +189,10 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           links: [
             { label: 'IBM Cloud IAM', url: 'https://cloud.ibm.com/iam/users' },
             { label: 'Service IDs', url: 'https://cloud.ibm.com/iam/serviceids' }
-          ]
+          ],
+          rightsizing: {
+            note: 'IBM Cloud does not have a native rightsizing API. Rightsizing recommendations use database heuristics when resource data is available.'
+          }
         }
       default:
         return {
@@ -302,6 +324,14 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
               </pre>
             </div>
 
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-green-800 mb-2">📊 Rightsizing Recommendations</h4>
+              <p className="text-sm text-green-700">
+                The policy above includes <code className="bg-white/60 px-1 rounded">ce:GetRightsizingRecommendation</code> for VM rightsizing.
+                Costra uses CPU/RAM utilization from CloudWatch to suggest downsizing or terminating underutilized EC2 instances.
+              </p>
+            </div>
+
             <div>
               <h4 className="text-lg font-semibold text-gray-900 mb-3">Helpful Links</h4>
               <div className="space-y-2">
@@ -379,12 +409,20 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                     Read-only cross-account role that Costra assumes via STS. Permissions include:
                   </p>
                   <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside ml-2">
-                    <li>Cost Explorer read access (<code className="bg-white px-1 rounded">ce:GetCostAndUsage</code>, etc.)</li>
+                    <li>Cost Explorer read access (<code className="bg-white px-1 rounded">ce:GetCostAndUsage</code>, <code className="bg-white px-1 rounded">ce:GetRightsizingRecommendation</code>, etc.)</li>
                     <li>CUR / BCM Data Exports management (<code className="bg-white px-1 rounded">bcm-data-exports:*</code>)</li>
                     <li>S3 read access scoped to the CUR bucket only</li>
                     <li>Organizations read access (for multi-account visibility)</li>
+                    <li>CloudWatch metrics (for CPU/RAM in rightsizing)</li>
                     <li>AWS managed <code className="bg-white px-1 rounded">Billing</code> policy</li>
                   </ul>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-3">
+                  <h4 className="text-sm font-semibold text-green-800 mb-2">📊 Rightsizing Recommendations</h4>
+                  <p className="text-sm text-green-700">
+                    The CloudFormation role includes <code className="bg-white/60 px-1 rounded">ce:GetRightsizingRecommendation</code> and CloudWatch read access.
+                    Costra uses CPU/RAM utilization to suggest downsizing or terminating underutilized EC2 instances.
+                  </p>
                 </div>
                 <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
                   <p className="text-sm font-medium text-gray-900 mb-2">S3 Bucket</p>
@@ -575,6 +613,21 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   </a>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Rightsizing Recommendations */}
+          {template.rightsizing && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-green-800 mb-2">📊 Rightsizing Recommendations</h4>
+              <p className="text-sm text-green-700 mb-2">{template.rightsizing.note}</p>
+              {template.rightsizing.extraSteps && template.rightsizing.extraSteps.length > 0 && (
+                <ol className="text-sm text-green-700 list-decimal list-inside space-y-1">
+                  {template.rightsizing.extraSteps.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ol>
+              )}
             </div>
           )}
 

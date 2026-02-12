@@ -17,6 +17,8 @@ interface ProviderSectionProps {
   providerName: string
   currentMonth: number
   lastMonth: number
+  taxCurrentMonth?: number
+  taxLastMonth?: number
   forecast: number
   credits: number
   savings: number
@@ -36,6 +38,8 @@ export default function ProviderSection({
   providerName,
   currentMonth,
   lastMonth,
+  taxCurrentMonth = 0,
+  taxLastMonth = 0,
   forecast,
   credits: _credits,
   savings: _savings,
@@ -59,8 +63,12 @@ export default function ProviderSection({
   const { formatCurrency } = useCurrency()
   const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>('6months')
 
-  const changePercent = lastMonth > 0
-    ? ((currentMonth - lastMonth) / lastMonth) * 100
+  const hasTax = taxCurrentMonth > 0 || taxLastMonth > 0
+  const displayCurrent = hasTax ? currentMonth + taxCurrentMonth : currentMonth
+  const displayLast = hasTax ? lastMonth + taxLastMonth : lastMonth
+
+  const changePercent = displayLast > 0
+    ? ((displayCurrent - displayLast) / displayLast) * 100
     : 0
 
   const monthlyData = useMemo(() => {
@@ -107,9 +115,16 @@ export default function ProviderSection({
                 )}
               </div>
               <div className="flex items-center space-x-3 text-sm">
-                <span className="font-semibold text-gray-900">
-                  {formatCurrency(currentMonth)}
-                </span>
+                <div>
+                  <div className="font-semibold text-gray-900">
+                    {formatCurrency(displayCurrent)}
+                  </div>
+                  {hasTax && (
+                    <div className="text-[10px] text-gray-400">
+                      {formatCurrency(currentMonth)} + {formatCurrency(taxCurrentMonth)} tax
+                    </div>
+                  )}
+                </div>
                 {changePercent !== 0 && (
                   <span className={`flex items-center font-medium text-xs ${
                     changePercent >= 0 ? 'text-red-600' : 'text-green-600'
@@ -187,8 +202,8 @@ export default function ProviderSection({
                     providerId={providerId}
                     providerName={providerName}
                     data={getChartData()}
-                    currentMonth={currentMonth}
-                    lastMonth={lastMonth}
+                    currentMonth={displayCurrent}
+                    lastMonth={displayLast}
                     period="monthly"
                     isMonthlyView={true}
                   />

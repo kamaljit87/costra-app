@@ -96,10 +96,16 @@ Resources:
                   - 'ce:GetRightsizingRecommendation'
                   - 'ce:GetSavingsPlansCoverage'
                   - 'ce:GetSavingsPlansPurchaseRecommendation'
+                  - 'ce:GetSavingsPlansPurchaseRecommendationDetails'
                   - 'ce:GetSavingsPlansUtilization'
+                  - 'ce:GetSavingsPlansUtilizationDetails'
                   - 'ce:GetUsageReport'
                   - 'ce:ListCostCategoryDefinitions'
                   - 'ce:DescribeCostCategoryDefinition'
+                  - 'ce:GetCostForecast'
+                  - 'ce:GetAnomalies'
+                  - 'ce:GetAnomalyMonitors'
+                  - 'ce:GetAnomalySubscriptions'
                 Resource: '*'
               - Sid: CostAndUsageReportsAccess
                 Effect: Allow
