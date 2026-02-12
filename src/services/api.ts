@@ -33,12 +33,14 @@ const apiRequest = async (
         throw new Error(`404: ${response.statusText || 'Not Found'}`)
       }
       
-      let error
+      let error: string
       try {
         const errorData = await response.json()
-        error = errorData.error || errorData.message || `HTTP error! status: ${response.status}`
+        const validationMessages = errorData.errors?.map((e: { message?: string }) => e.message || '').filter(Boolean)
+        error = validationMessages?.length
+          ? validationMessages.join('. ')
+          : (errorData.error || errorData.message || `HTTP error! status: ${response.status}`)
       } catch (e) {
-        // If response is not JSON, get text
         const text = await response.text().catch(() => 'Request failed')
         error = text || `HTTP error! status: ${response.status}`
       }

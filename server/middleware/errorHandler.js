@@ -102,14 +102,15 @@ export const errorHandler = (err, req, res, next) => {
     timestamp: new Date().toISOString(),
   }
   
-  // Include stack trace in development
-  if (process.env.NODE_ENV === 'development' && errorStack) {
-    errorResponse.stack = errorStack
+  // Include validation/field errors for VALIDATION_ERROR (always - helps user fix form)
+  if (errorCode === 'VALIDATION_ERROR' && err.details?.errors) {
+    errorResponse.errors = err.details.errors
+  } else if (process.env.NODE_ENV === 'development' && err.details) {
+    errorResponse.details = err.details
   }
   
-  // Include additional details in development
-  if (process.env.NODE_ENV === 'development' && err.details) {
-    errorResponse.details = err.details
+  if (process.env.NODE_ENV === 'development' && errorStack) {
+    errorResponse.stack = errorStack
   }
   
   res.status(mappedStatusCode).json(errorResponse)
@@ -126,16 +127,17 @@ export const asyncHandler = (fn) => {
 }
 
 /**
- * Create custom error with status code
+ * Create custom error with status code and optional details
  */
 export class AppError extends Error {
-  constructor(message, statusCode = 500, code = null) {
+  constructor(message, statusCode = 500, code = null, details = null) {
     super(message)
     this.statusCode = statusCode
     this.status = statusCode
     this.code = code || `HTTP_${statusCode}`
+    this.details = details
     this.isOperational = true
-    
+
     Error.captureStackTrace(this, this.constructor)
   }
 }
