@@ -25,8 +25,9 @@ Costra containers use maximum security hardening following OWASP and Docker best
 ### 5. Pinned Base Images
 - `node:20.21-alpine3.20` (not `latest`)
 - `nginx:1.27-alpine3.20`
-- `postgres:15-alpine3.20`
 - `redis:7-alpine3.20`
+
+(PostgreSQL: use managed DB - RDS, Cloud SQL, etc. - not in Docker)
 
 ### 6. Multi-Stage Frontend Build
 - Build stage: Node.js (full toolchain)

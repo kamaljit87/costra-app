@@ -59,15 +59,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3002"
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@costra-db:5432/costra}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required - use your managed PostgreSQL connection string}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-this-in-production-min-32-chars}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       REDIS_URL: ${REDIS_URL:-redis://costra-redis:6379}
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
-      costra-db:
-        condition: service_healthy
       costra-redis:
         condition: service_started
     restart: unless-stopped
@@ -99,35 +97,6 @@ services:
     networks:
       - costra-network
 
-  costra-db:
-    image: postgres:15-alpine3.20
-    container_name: costra-db
-    security_opt:
-      - no-new-privileges:true
-    # Drop capabilities; postgres needs minimal caps
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - DAC_OVERRIDE
-      - SETGID
-      - SETUID
-    environment:
-      POSTGRES_DB: costra
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - costra-network
-
   costra-redis:
     image: redis:7-alpine3.20
     container_name: costra-redis
@@ -148,7 +117,6 @@ services:
       - costra-network
 
 volumes:
-  postgres-data:
   redis-data:
 
 networks:
