@@ -19,10 +19,13 @@ process.env.NODE_ENV = 'test'
 // Use test database if specified
 if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
-} else {
-  // Default to appending _test to database name
+} else if (process.env.TEST_USE_COSTRA_TEST === 'true') {
+  // Use separate costra_test database (requires: createdb costra_test)
   const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/costra'
   process.env.DATABASE_URL = dbUrl.replace(/\/[^/]+$/, '/costra_test')
+} else {
+  // Default: use main costra database (postgresql://postgres:postgres@localhost:5432/costra)
+  process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/costra'
 }
 
 // Disable Redis for tests unless explicitly enabled

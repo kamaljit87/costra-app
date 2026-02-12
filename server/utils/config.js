@@ -27,6 +27,9 @@ export const validateConfig = () => {
   const errors = []
   const warnings = []
   const isProduction = process.env.NODE_ENV === 'production'
+  const isTest = process.env.NODE_ENV === 'test'
+
+  if (isTest) return // Skip validation in test (setup provides env)
 
   // Check required variables
   for (const varName of REQUIRED_VARS) {

@@ -80,7 +80,8 @@ router.post('/signup',
       const passwordHash = await bcrypt.hash(password, 10)
 
       // Create user
-      const userId = await createUser(name, email, passwordHash)
+      const createdUser = await createUser(name, email, passwordHash)
+      const userId = createdUser.id
 
       // Record consent (GDPR/DPDPA compliance)
       try {

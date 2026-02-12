@@ -1,38 +1,36 @@
-# Backend Dockerfile - Node.js API
-FROM node:18-alpine
+# Backend Dockerfile - Node.js API with maximum security hardening
+# Stage 1: Build (if needed for native deps - backend has none, so single stage)
+FROM node:20.21-alpine3.20 AS base
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Security: Run as non-root
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
 
 WORKDIR /app
 
-# Install production dependencies only
+# Install production dependencies only (no dev deps)
 COPY server/package*.json ./
 RUN npm ci --only=production && \
     npm cache clean --force && \
-    rm -rf /tmp/*
+    rm -rf /tmp/* /var/cache/apk/*
 
 # Copy backend source
 COPY server/ ./
 
-# Create necessary directories with proper permissions
+# Create writable directories (only these will be writable at runtime)
 RUN mkdir -p uploads/avatars logs && \
-    chown -R nodejs:nodejs /app
+    chown -R appuser:appgroup /app
 
-# Switch to non-root user
-USER nodejs
+USER appuser
 
-# Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3002
 
-# Expose port 3002
 EXPOSE 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3002/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Use exec form for proper signal handling
+# Exec form for proper signal handling (SIGTERM propagation)
 CMD ["node", "server.js"]

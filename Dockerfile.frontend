@@ -1,31 +1,38 @@
-# Frontend Dockerfile - Vite preview serving React app
-FROM node:18-alpine
+# Frontend Dockerfile - Multi-stage with nginx for maximum security
+# Stage 1: Build
+FROM node:20.21-alpine3.20 AS builder
+
+ARG VITE_API_URL=http://localhost:3002/api
+ENV VITE_API_URL=$VITE_API_URL
 
 WORKDIR /app
 
-# Copy package files
+# Install dependencies
 COPY package*.json ./
 COPY vite.config.ts tsconfig.json tsconfig.node.json ./
-COPY tailwind.config.js postcss.config.js ./
+COPY tailwind.config.js postcss.config.js components.json ./
+COPY src ./src
+COPY index.html public ./
 
-# Install dependencies
 RUN npm ci && npm cache clean --force
 
-# Copy source files
-COPY src ./src
-COPY index.html ./
-COPY public ./public
-
-# Build frontend
 ENV NODE_ENV=production
 RUN npm run build
 
-# Expose port 3001
-EXPOSE 3001
+# Stage 2: Serve with nginx (minimal, no Node runtime in production)
+FROM nginx:1.27-alpine3.20 AS runtime
+
+# Remove default config and static content
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/*
+
+# Copy built assets and custom config
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3001 || exit 1
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/ || exit 1
 
-# Serve using Vite preview on port 3001
-CMD ["npm", "run", "preview", "--", "--port", "3001", "--host", "0.0.0.0"]
+CMD ["nginx", "-g", "daemon off;"]

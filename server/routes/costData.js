@@ -14,7 +14,7 @@ import {
   getCloudProviderCredentialsByAccountId,
   createNotification,
 } from '../database.js'
-import { cached, cacheKeys, clearUserCache } from '../utils/cache.js'
+import { cached, cacheKeys, clearUserCache, del as cacheDel } from '../utils/cache.js'
 import {
   fetchAWSServiceDetails,
   fetchAzureServiceDetails,

@@ -1062,18 +1062,19 @@ export const createUser = async (name, email, passwordHash) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id',
+      'INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, name, email',
       [name, email, passwordHash]
     )
-    const userId = result.rows[0].id
-    
+    const user = result.rows[0]
+    const userId = user.id
+
     // Create default preferences
     await client.query(
       'INSERT INTO user_preferences (user_id, currency) VALUES ($1, $2)',
       [userId, 'USD']
     )
-    
-    return userId
+
+    return user
   } finally {
     client.release()
   }
@@ -1163,7 +1164,7 @@ export const getUserById = async (id) => {
     )
     return result.rows[0] || null
   } catch (error) {
-    logger.error('getUserById error', { userId, error: error.message, stack: error.stack })
+    logger.error('getUserById error', { id, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()
@@ -1171,6 +1172,25 @@ export const getUserById = async (id) => {
 }
 
 // User preferences operations
+export const createUserPreferences = async (userId, currency = 'USD') => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO user_preferences (user_id, currency)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET currency = $2, updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [userId, currency]
+    )
+    return result.rows[0]
+  } catch (error) {
+    logger.error('createUserPreferences error', { userId, error: error.message, stack: error.stack })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 export const getUserPreferences = async (userId) => {
   const client = await pool.connect()
   try {
@@ -1181,16 +1201,19 @@ export const getUserPreferences = async (userId) => {
     if (result.rows[0]) {
       return result.rows[0]
     }
-    // If no preferences exist, create default ones
+    // If no preferences exist, create default ones (only if user exists)
     const insertResult = await client.query(
       'INSERT INTO user_preferences (user_id, currency) VALUES ($1, $2) RETURNING *',
       [userId, 'USD']
     )
     return insertResult.rows[0]
   } catch (error) {
+    // Foreign key violation or missing user - return null
+    if (error.code === '23503' || error.message?.includes('violates foreign key')) {
+      return null
+    }
     logger.error('getUserPreferences error', { userId, error: error.message, stack: error.stack })
-    // Return default preferences if table doesn't exist or other error
-    return { user_id: userId, currency: 'USD' }
+    return null
   } finally {
     client.release()
   }
@@ -2369,6 +2392,9 @@ export const updateUserProfile = async (userId, { name, email }) => {
     client.release()
   }
 }
+
+// Update user (name, email) - alias for updateUserProfile used by tests
+export const updateUser = updateUserProfile
 
 // Update user avatar
 export const updateUserAvatar = async (userId, avatarUrl) => {
