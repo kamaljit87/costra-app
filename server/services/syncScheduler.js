@@ -116,3 +116,34 @@ export const initCURPolling = () => {
 
   logger.info('CUR polling cron job initialized (runs every 6 hours at :30)')
 }
+
+/**
+ * Initialize daily optimization analysis cron job
+ * Runs at 4 AM UTC (after syncs at 2 AM and CUR polling at :30)
+ */
+export const initOptimizationSchedule = () => {
+  cron.schedule('0 4 * * *', async () => {
+    try {
+      logger.info('Starting daily optimization analysis')
+      const { runOptimizationForUser } = await import('./optimizationEngine.js')
+
+      const result = await pool.query(
+        `SELECT DISTINCT user_id FROM cloud_provider_credentials WHERE is_active = true`
+      )
+
+      for (const row of result.rows) {
+        try {
+          await runOptimizationForUser(row.user_id)
+        } catch (err) {
+          logger.error('Daily optimization failed for user', { userId: row.user_id, error: err.message })
+        }
+      }
+
+      logger.info('Daily optimization analysis completed', { userCount: result.rows.length })
+    } catch (error) {
+      logger.error('Daily optimization cycle failed', { error: error.message, stack: error.stack })
+    }
+  })
+
+  logger.info('Optimization analysis cron initialized (daily at 4 AM UTC)')
+}

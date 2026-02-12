@@ -1,23 +1,11 @@
 import express from 'express'
-import Anthropic from '@anthropic-ai/sdk'
 import { authenticateToken } from '../middleware/auth.js'
 import { aiLimiter } from '../middleware/rateLimiter.js'
 import { getCostDataForUser, getDailyCostData, getServiceCostsForDateRange, pool } from '../database.js'
 import logger from '../utils/logger.js'
+import { getAnthropicClient } from '../utils/aiClient.js'
 
 const router = express.Router()
-
-// Initialize Anthropic client
-let anthropicClient = null
-
-const getAnthropicClient = () => {
-  if (!anthropicClient && process.env.ANTHROPIC_API_KEY) {
-    anthropicClient = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    })
-  }
-  return anthropicClient
-}
 
 // All routes require authentication
 router.use(authenticateToken)

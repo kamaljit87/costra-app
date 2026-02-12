@@ -83,6 +83,10 @@ export default function Breadcrumbs() {
             crumbs.push({ label: 'Reports' })
             break
 
+          case 'recommendations':
+            crumbs.push({ label: 'Recommendations' })
+            break
+
           default:
             crumbs.push({ label: first.charAt(0).toUpperCase() + first.slice(1) })
         }

@@ -351,6 +351,7 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
     // Aggregation accumulators
     const dailyTotals = new Map()
     const serviceTotals = new Map()
+    const resourceAccumulator = new Map() // keyed by resource_id for resource-level data
     let totalCost = 0
     let totalTax = 0
     let rowCount = 0
@@ -415,6 +416,36 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
             if (service) {
               serviceTotals.set(service, (serviceTotals.get(service) || 0) + cost)
             }
+
+            // Accumulate resource-level data for optimization engine
+            const resourceId = row.line_item_resource_id
+            if (resourceId) {
+              const usageType = row.line_item_usage_type || ''
+              const usageAmount = parseFloat(row.line_item_usage_amount || 0)
+              const pricingTerm = row.pricing_term || 'OnDemand'
+              const instanceType = row.product_instance_type || ''
+              const productRegion = row.product_region || ''
+
+              if (!resourceAccumulator.has(resourceId)) {
+                resourceAccumulator.set(resourceId, {
+                  resource_id: resourceId,
+                  resource_type: instanceType || usageType.split(':').pop() || 'unknown',
+                  service_name: service,
+                  region: productRegion || null,
+                  cost: 0,
+                  usage_quantity: 0,
+                  usage_unit: usageType,
+                  usage_type: pricingTerm,
+                  first_seen_date: date,
+                  last_seen_date: date,
+                })
+              }
+              const res = resourceAccumulator.get(resourceId)
+              res.cost += cost
+              res.usage_quantity += usageAmount
+              if (date && date < res.first_seen_date) res.first_seen_date = date
+              if (date && date > res.last_seen_date) res.last_seen_date = date
+            }
           }
         },
       })
@@ -444,6 +475,16 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
       tax: totalTax,
     })
 
+    // Save resource-level data from CUR for optimization engine
+    if (resourceAccumulator.size > 0) {
+      try {
+        await saveResourcesFromCUR(userId, accountId, account.provider_id, resourceAccumulator)
+        logger.info('CUR resources saved', { userId, accountId, resourceCount: resourceAccumulator.size })
+      } catch (resErr) {
+        logger.warn('Failed to save CUR resources (non-fatal)', { userId, accountId, error: resErr.message })
+      }
+    }
+
     await completeIngestionLog(logId, rowCount, totalCost)
 
     // Update cur_export_config
@@ -463,6 +504,13 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
     }
 
     logger.info('CUR data ingested successfully', { userId, accountId, billingPeriod, totalCost, totalTax, rowCount, services: services.length })
+
+    // Trigger optimization analysis with fresh CUR data (async, non-blocking)
+    import('./optimizationEngine.js').then(({ runOptimizationForUser }) => {
+      runOptimizationForUser(userId)
+        .catch(err => logger.error('Optimization analysis failed after CUR ingestion', { userId, error: err.message }))
+    }).catch(() => {}) // ignore import errors
+
     return { totalCost, dailyData, services, tax: totalTax, rowCount }
   } catch (error) {
     await failIngestionLog(logId, error.message)
@@ -550,6 +598,61 @@ const saveCostDataFromCUR = async (userId, accountId, providerId, month, year, d
 
     await client.query('COMMIT')
     logger.info('CUR data saved to database', { userId, accountId, month, year, totalCost: data.totalCost })
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+// ─── Save CUR Resources to Database ─────────────────────────────────
+
+/**
+ * Batch-upsert resource-level data from CUR into the resources table.
+ */
+const saveResourcesFromCUR = async (userId, accountId, providerId, resourceAccumulator) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    const resources = [...resourceAccumulator.values()]
+    const BATCH_SIZE = 100
+
+    for (let i = 0; i < resources.length; i += BATCH_SIZE) {
+      const batch = resources.slice(i, i + BATCH_SIZE)
+      const values = []
+      const params = []
+
+      batch.forEach((res, idx) => {
+        const offset = idx * 14
+        values.push(`($${offset+1},$${offset+2},$${offset+3},$${offset+4},$${offset+5},$${offset+6},$${offset+7},$${offset+8},$${offset+9},$${offset+10},$${offset+11},$${offset+12}::date,$${offset+13}::date,CURRENT_TIMESTAMP)`)
+        params.push(
+          userId, accountId, providerId, res.resource_id,
+          res.resource_id.split('/').pop() || res.resource_id, // resource_name from ARN
+          res.resource_type, res.service_name, res.region,
+          Math.round(res.cost * 100) / 100, res.usage_quantity, res.usage_unit,
+          res.first_seen_date, res.last_seen_date
+        )
+      })
+
+      // usage_type stores pricing_term from CUR for the optimization engine
+      await client.query(
+        `INSERT INTO resources (user_id, account_id, provider_id, resource_id, resource_name, resource_type, service_name, region, cost, usage_quantity, usage_unit, first_seen_date, last_seen_date, updated_at)
+         VALUES ${values.join(', ')}
+         ON CONFLICT (user_id, provider_id, resource_id, last_seen_date)
+         DO UPDATE SET
+           cost = EXCLUDED.cost,
+           usage_quantity = EXCLUDED.usage_quantity,
+           usage_unit = EXCLUDED.usage_unit,
+           resource_type = EXCLUDED.resource_type,
+           resource_name = EXCLUDED.resource_name,
+           updated_at = CURRENT_TIMESTAMP`,
+        params
+      )
+    }
+
+    await client.query('COMMIT')
   } catch (error) {
     await client.query('ROLLBACK')
     throw error

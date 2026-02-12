@@ -20,8 +20,13 @@ import {
   getTeamCostTrends,
   getProductServiceBreakdown,
   getTeamServiceBreakdown,
+  getOptimizationRecommendations,
+  getOptimizationSummary,
+  dismissOptimizationRecommendation,
+  markRecommendationImplemented,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
+import { runOptimizationForUser } from '../services/optimizationEngine.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -817,6 +822,110 @@ router.get('/team/:teamName/services', authenticateToken, async (req, res) => {
       stack: error.stack 
     })
     res.json({ services: [] })
+  }
+})
+
+// ─── Optimization Recommendations ────────────────────────────────────
+
+/**
+ * GET /api/insights/recommendations
+ * Get optimization recommendations with filters
+ */
+router.get('/recommendations', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { category, provider_id, priority, status, limit, offset, sort_by } = req.query
+
+    const filters = {
+      category: category || undefined,
+      provider_id: provider_id || undefined,
+      priority: priority || undefined,
+      status: status || 'active',
+      limit: limit ? parseInt(limit) : 50,
+      offset: offset ? parseInt(offset) : 0,
+      sort_by: sort_by || 'savings',
+    }
+
+    const result = await getOptimizationRecommendations(userId, filters)
+    const summary = await getOptimizationSummary(userId)
+
+    res.json({ ...result, summary })
+  } catch (error) {
+    logger.error('Get recommendations error', { userId: req.user?.userId, error: error.message, stack: error.stack })
+    res.status(500).json({ error: 'Failed to get recommendations' })
+  }
+})
+
+/**
+ * GET /api/insights/optimization-summary
+ * Dashboard widget data
+ */
+router.get('/optimization-summary', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const summary = await getOptimizationSummary(userId)
+    res.json(summary)
+  } catch (error) {
+    logger.error('Get optimization summary error', { userId: req.user?.userId, error: error.message, stack: error.stack })
+    res.status(500).json({ error: 'Failed to get optimization summary' })
+  }
+})
+
+/**
+ * POST /api/insights/recommendations/:id/dismiss
+ */
+router.post('/recommendations/:id/dismiss', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { id } = req.params
+    const { reason } = req.body
+
+    const result = await dismissOptimizationRecommendation(userId, parseInt(id), reason || null)
+    if (!result) {
+      return res.status(404).json({ error: 'Recommendation not found or already dismissed' })
+    }
+    res.json({ success: true })
+  } catch (error) {
+    logger.error('Dismiss recommendation error', { userId: req.user?.userId, id: req.params.id, error: error.message })
+    res.status(500).json({ error: 'Failed to dismiss recommendation' })
+  }
+})
+
+/**
+ * POST /api/insights/recommendations/:id/implemented
+ */
+router.post('/recommendations/:id/implemented', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const { id } = req.params
+
+    const result = await markRecommendationImplemented(userId, parseInt(id))
+    if (!result) {
+      return res.status(404).json({ error: 'Recommendation not found or already handled' })
+    }
+    res.json({ success: true })
+  } catch (error) {
+    logger.error('Mark implemented error', { userId: req.user?.userId, id: req.params.id, error: error.message })
+    res.status(500).json({ error: 'Failed to mark recommendation as implemented' })
+  }
+})
+
+/**
+ * POST /api/insights/recommendations/refresh
+ * Trigger re-computation of optimization recommendations
+ */
+router.post('/recommendations/refresh', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId
+
+    // Fire-and-forget
+    runOptimizationForUser(userId)
+      .catch(err => logger.error('Manual optimization refresh failed', { userId, error: err.message }))
+
+    res.json({ success: true, message: 'Optimization analysis started' })
+  } catch (error) {
+    logger.error('Refresh recommendations error', { userId: req.user?.userId, error: error.message })
+    res.status(500).json({ error: 'Failed to start optimization analysis' })
   }
 })
 

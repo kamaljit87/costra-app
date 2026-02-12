@@ -995,6 +995,49 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // Optimization recommendations table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS optimization_recommendations (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          account_id INTEGER,
+          provider_id TEXT NOT NULL,
+          category TEXT NOT NULL,
+          subcategory TEXT,
+          service_name TEXT,
+          resource_id TEXT,
+          resource_name TEXT,
+          resource_type TEXT,
+          region TEXT,
+          title TEXT NOT NULL,
+          description TEXT NOT NULL,
+          action TEXT NOT NULL,
+          priority TEXT NOT NULL,
+          estimated_monthly_savings DECIMAL(15, 2) DEFAULT 0,
+          estimated_savings_percent DECIMAL(5, 2) DEFAULT 0,
+          confidence TEXT NOT NULL,
+          current_cost DECIMAL(15, 2),
+          current_usage DECIMAL(15, 4),
+          usage_unit TEXT,
+          evidence JSONB,
+          status TEXT DEFAULT 'active',
+          dismissed_at TIMESTAMP,
+          dismissed_reason TEXT,
+          first_detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          last_validated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (account_id) REFERENCES cloud_provider_credentials(id) ON DELETE CASCADE
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_opt_recs_user_status ON optimization_recommendations(user_id, status)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_opt_recs_user_category ON optimization_recommendations(user_id, category, status)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_opt_recs_user_provider ON optimization_recommendations(user_id, provider_id, status)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_opt_recs_savings ON optimization_recommendations(user_id, estimated_monthly_savings DESC) WHERE status = 'active'`)
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_opt_recs_dedup ON optimization_recommendations(user_id, provider_id, category, COALESCE(subcategory, ''), COALESCE(service_name, ''), COALESCE(resource_id, '')) WHERE status = 'active'`)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -5799,6 +5842,255 @@ export const createContactSubmission = async (data) => {
   } finally {
     client.release()
   }
+}
+
+// ─── Optimization Recommendations ────────────────────────────────────
+
+export const bulkUpsertRecommendations = async (userId, recommendations) => {
+  if (!recommendations || recommendations.length === 0) return []
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const results = []
+
+    for (const rec of recommendations) {
+      const result = await client.query(
+        `INSERT INTO optimization_recommendations (
+          user_id, account_id, provider_id, category, subcategory,
+          service_name, resource_id, resource_name, resource_type, region,
+          title, description, action, priority,
+          estimated_monthly_savings, estimated_savings_percent, confidence,
+          current_cost, current_usage, usage_unit, evidence,
+          status, first_detected_at, last_validated_at, expires_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,$22)
+        ON CONFLICT (user_id, provider_id, category, COALESCE(subcategory,''), COALESCE(service_name,''), COALESCE(resource_id,''))
+        WHERE status = 'active'
+        DO UPDATE SET
+          account_id = EXCLUDED.account_id,
+          resource_name = EXCLUDED.resource_name,
+          resource_type = EXCLUDED.resource_type,
+          region = EXCLUDED.region,
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          action = EXCLUDED.action,
+          priority = EXCLUDED.priority,
+          estimated_monthly_savings = EXCLUDED.estimated_monthly_savings,
+          estimated_savings_percent = EXCLUDED.estimated_savings_percent,
+          confidence = EXCLUDED.confidence,
+          current_cost = EXCLUDED.current_cost,
+          current_usage = EXCLUDED.current_usage,
+          usage_unit = EXCLUDED.usage_unit,
+          evidence = EXCLUDED.evidence,
+          last_validated_at = CURRENT_TIMESTAMP,
+          expires_at = EXCLUDED.expires_at,
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING id`,
+        [
+          userId, rec.account_id || null, rec.provider_id, rec.category, rec.subcategory || null,
+          rec.service_name || null, rec.resource_id || null, rec.resource_name || null, rec.resource_type || null, rec.region || null,
+          rec.title, rec.description, rec.action, rec.priority,
+          rec.estimated_monthly_savings || 0, rec.estimated_savings_percent || 0, rec.confidence,
+          rec.current_cost || null, rec.current_usage || null, rec.usage_unit || null, JSON.stringify(rec.evidence || {}),
+          rec.expires_at || null
+        ]
+      )
+      results.push(result.rows[0])
+    }
+
+    await client.query('COMMIT')
+    return results
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getOptimizationRecommendations = async (userId, filters = {}) => {
+  const { category, provider_id, priority, status = 'active', limit = 50, offset = 0, sort_by = 'savings' } = filters
+  const conditions = ['user_id = $1', 'status = $2']
+  const params = [userId, status]
+  let paramIdx = 3
+
+  if (category) {
+    conditions.push(`category = $${paramIdx++}`)
+    params.push(category)
+  }
+  if (provider_id) {
+    conditions.push(`provider_id = $${paramIdx++}`)
+    params.push(provider_id)
+  }
+  if (priority) {
+    conditions.push(`priority = $${paramIdx++}`)
+    params.push(priority)
+  }
+
+  const orderMap = {
+    savings: 'estimated_monthly_savings DESC',
+    priority: `CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC, estimated_monthly_savings DESC`,
+    date: 'first_detected_at DESC',
+  }
+  const orderBy = orderMap[sort_by] || orderMap.savings
+
+  const whereClause = conditions.join(' AND ')
+
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(
+      `SELECT * FROM optimization_recommendations WHERE ${whereClause} ORDER BY ${orderBy} LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...params, limit, offset]
+    ),
+    pool.query(
+      `SELECT COUNT(*) as total FROM optimization_recommendations WHERE ${whereClause}`,
+      params
+    ),
+  ])
+
+  return {
+    recommendations: dataResult.rows,
+    total: parseInt(countResult.rows[0].total, 10),
+  }
+}
+
+export const getOptimizationSummary = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const [savingsResult, categoryResult, priorityResult, topResult, lastComputedResult] = await Promise.all([
+      client.query(
+        `SELECT COALESCE(SUM(estimated_monthly_savings), 0) as total_savings, COUNT(*) as active_count
+         FROM optimization_recommendations WHERE user_id = $1 AND status = 'active'`,
+        [userId]
+      ),
+      client.query(
+        `SELECT category, COUNT(*) as count FROM optimization_recommendations
+         WHERE user_id = $1 AND status = 'active' GROUP BY category`,
+        [userId]
+      ),
+      client.query(
+        `SELECT priority, COUNT(*) as count FROM optimization_recommendations
+         WHERE user_id = $1 AND status = 'active' GROUP BY priority`,
+        [userId]
+      ),
+      client.query(
+        `SELECT id, title, category, provider_id, estimated_monthly_savings, priority, confidence
+         FROM optimization_recommendations
+         WHERE user_id = $1 AND status = 'active'
+         ORDER BY estimated_monthly_savings DESC LIMIT 3`,
+        [userId]
+      ),
+      client.query(
+        `SELECT MAX(last_validated_at) as last_computed
+         FROM optimization_recommendations WHERE user_id = $1`,
+        [userId]
+      ),
+    ])
+
+    const countByCategory = {}
+    categoryResult.rows.forEach(r => { countByCategory[r.category] = parseInt(r.count, 10) })
+    const countByPriority = {}
+    priorityResult.rows.forEach(r => { countByPriority[r.priority] = parseInt(r.count, 10) })
+
+    return {
+      totalEstimatedSavings: parseFloat(savingsResult.rows[0].total_savings),
+      activeRecommendationCount: parseInt(savingsResult.rows[0].active_count, 10),
+      countByCategory,
+      countByPriority,
+      topRecommendations: topResult.rows,
+      lastComputedAt: lastComputedResult.rows[0]?.last_computed || null,
+    }
+  } finally {
+    client.release()
+  }
+}
+
+export const dismissOptimizationRecommendation = async (userId, recommendationId, reason = null) => {
+  const result = await pool.query(
+    `UPDATE optimization_recommendations
+     SET status = 'dismissed', dismissed_at = CURRENT_TIMESTAMP, dismissed_reason = $3, updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND user_id = $2 AND status = 'active'
+     RETURNING id`,
+    [recommendationId, userId, reason]
+  )
+  return result.rows[0] || null
+}
+
+export const markRecommendationImplemented = async (userId, recommendationId) => {
+  const result = await pool.query(
+    `UPDATE optimization_recommendations
+     SET status = 'implemented', updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND user_id = $2 AND status = 'active'
+     RETURNING id`,
+    [recommendationId, userId]
+  )
+  return result.rows[0] || null
+}
+
+export const expireStaleRecommendations = async () => {
+  const result = await pool.query(
+    `UPDATE optimization_recommendations
+     SET status = 'expired', updated_at = CURRENT_TIMESTAMP
+     WHERE status = 'active' AND last_validated_at < CURRENT_TIMESTAMP - INTERVAL '7 days'
+     RETURNING id`
+  )
+  return result.rowCount
+}
+
+export const getResourcesForUser = async (userId, providerId = null, limit = 1000) => {
+  let query = `SELECT * FROM resources WHERE user_id = $1`
+  const params = [userId]
+  if (providerId) {
+    query += ` AND provider_id = $2`
+    params.push(providerId)
+  }
+  query += ` ORDER BY cost DESC LIMIT $${params.length + 1}`
+  params.push(limit)
+  const result = await pool.query(query, params)
+  return result.rows
+}
+
+export const getServiceUsageMetricsForAnalysis = async (userId, days = 90) => {
+  const result = await pool.query(
+    `SELECT * FROM service_usage_metrics
+     WHERE user_id = $1 AND date >= CURRENT_DATE - $2::INTEGER
+     ORDER BY date DESC`,
+    [userId, days]
+  )
+  return result.rows
+}
+
+export const getDailyCostDataForAnalysis = async (userId, days = 90) => {
+  const result = await pool.query(
+    `SELECT * FROM daily_cost_data
+     WHERE user_id = $1 AND date >= CURRENT_DATE - $2::INTEGER
+     ORDER BY date ASC`,
+    [userId, days]
+  )
+  return result.rows
+}
+
+export const getServiceCostsHistory = async (userId, months = 3) => {
+  const result = await pool.query(
+    `SELECT sc.service_name, sc.cost, sc.change_percent, cd.provider_id, cd.account_id, cd.month, cd.year
+     FROM service_costs sc
+     INNER JOIN cost_data cd ON sc.cost_data_id = cd.id
+     WHERE cd.user_id = $1
+       AND (cd.year * 12 + cd.month) >= (EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::INTEGER - $2)
+     ORDER BY cd.year DESC, cd.month DESC, sc.cost DESC`,
+    [userId, months]
+  )
+  return result.rows
+}
+
+export const getAnomalyBaselinesForUser = async (userId) => {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (provider_id, service_name, account_id)
+       provider_id, service_name, account_id, baseline_cost, baseline_usage, rolling_30day_avg, baseline_date
+     FROM anomaly_baselines
+     WHERE user_id = $1
+     ORDER BY provider_id, service_name, account_id, baseline_date DESC`,
+    [userId]
+  )
+  return result.rows
 }
 
 // Close database connection pool

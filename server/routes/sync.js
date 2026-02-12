@@ -18,6 +18,7 @@ import {
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
 import { enhanceCostData } from '../utils/costCalculations.js'
 import { sanitizeCostData, validateCostDataResponse } from '../utils/dataValidator.js'
+import { runOptimizationForUser } from '../services/optimizationEngine.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -158,6 +159,10 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
     // Calculate anomaly baselines (async, non-blocking)
     calculateBaselinesForServices(userId, account.provider_id, account.id, costData)
       .catch(err => logger.error('Baseline calculation failed', { requestId, userId, accountId: account.id, accountLabel, error: err.message, stack: err.stack }))
+
+    // Run optimization analysis (async, non-blocking)
+    runOptimizationForUser(userId)
+      .catch(err => logger.error('Optimization analysis failed after sync', { userId, error: err.message }))
 
     await updateCloudProviderSyncTime(userId, account.id)
 

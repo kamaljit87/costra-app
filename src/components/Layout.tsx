@@ -6,6 +6,7 @@ import ContactChat from './ContactChat'
 import TrialBanner from './TrialBanner'
 import {
   LayoutDashboard,
+  Lightbulb,
   Wallet,
   FileText,
   ArrowLeftRight,
@@ -13,6 +14,7 @@ import {
 
 const APP_NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/recommendations', label: 'Recommendations', icon: Lightbulb },
   { to: '/budgets', label: 'Budgets', icon: Wallet },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/compare', label: 'Compare', icon: ArrowLeftRight },

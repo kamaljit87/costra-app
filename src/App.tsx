@@ -16,6 +16,7 @@ import TeamCostView from './pages/TeamCostView'
 import ReportsPage from './pages/ReportsPage'
 import BillingPage from './pages/BillingPage'
 import CostComparePage from './pages/CostComparePage'
+import RecommendationsPage from './pages/RecommendationsPage'
 import DebugPage from './pages/DebugPage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
@@ -120,6 +121,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CostComparePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recommendations"
+              element={
+                <ProtectedRoute>
+                  <RecommendationsPage />
                 </ProtectedRoute>
               }
             />

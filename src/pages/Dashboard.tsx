@@ -10,6 +10,7 @@ import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
+import OptimizationSummary from '../components/OptimizationSummary'
 import { Sparkles, RefreshCw, Plus, Cloud } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ProviderIcon } from '../components/CloudProviderIcons'
@@ -202,6 +203,8 @@ export default function Dashboard() {
                 totalTaxLastMonth={totalTaxLastMonth}
               />
             </div>
+            {/* Optimization Insights */}
+            {!isDemoMode && <OptimizationSummary />}
             {/* Provider Sections with Charts */}
             {(() => {
               const allProviders = new Map<string, CostData>()

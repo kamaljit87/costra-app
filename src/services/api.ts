@@ -633,8 +633,49 @@ export const insightsAPI = {
     const params = new URLSearchParams()
     if (providerId) params.append('providerId', providerId)
     if (accountId) params.append('accountId', accountId.toString())
-    
+
     const response = await apiRequest(`/insights/rightsizing-recommendations?${params.toString()}`)
+    return response.json()
+  },
+
+  getOptimizationRecommendations: async (filters?: {
+    category?: string; provider_id?: string; priority?: string;
+    status?: string; limit?: number; offset?: number; sort_by?: string;
+  }) => {
+    const params = new URLSearchParams()
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value))
+      })
+    }
+    const response = await apiRequest(`/insights/recommendations?${params.toString()}`)
+    return response.json()
+  },
+
+  getOptimizationSummary: async () => {
+    const response = await apiRequest('/insights/optimization-summary')
+    return response.json()
+  },
+
+  dismissRecommendation: async (id: number, reason?: string) => {
+    const response = await apiRequest(`/insights/recommendations/${id}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    })
+    return response.json()
+  },
+
+  markRecommendationImplemented: async (id: number) => {
+    const response = await apiRequest(`/insights/recommendations/${id}/implemented`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+
+  refreshRecommendations: async () => {
+    const response = await apiRequest('/insights/recommendations/refresh', {
+      method: 'POST',
+    })
     return response.json()
   },
 }
