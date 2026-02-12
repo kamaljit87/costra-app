@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { insightsAPI } from '../services/api'
 import { useNotification } from '../contexts/NotificationContext'
 import { useCurrency } from '../contexts/CurrencyContext'
@@ -8,7 +9,7 @@ import RecommendationCard, { type Recommendation } from '../components/Recommend
 import { Spinner } from '@/components/ui/spinner'
 import {
   Lightbulb, RefreshCw, CheckCircle, Filter,
-  AlertTriangle, AlertCircle,
+  AlertTriangle, AlertCircle, X,
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -46,6 +47,12 @@ interface Summary {
 }
 
 export default function RecommendationsPage() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const providerIdFromUrl = searchParams.get('providerId') || ''
+  const accountIdFromUrl = searchParams.get('accountId') || ''
+  const isFilteredByAccount = !!(providerIdFromUrl || accountIdFromUrl)
+
   const { showSuccess, showError } = useNotification()
   const { formatCurrency } = useCurrency()
 
@@ -72,6 +79,8 @@ export default function RecommendationsPage() {
       }
       if (category) filters.category = category
       if (priority) filters.priority = priority
+      if (providerIdFromUrl) filters.provider_id = providerIdFromUrl
+      if (accountIdFromUrl) filters.account_id = accountIdFromUrl
 
       const response = await insightsAPI.getOptimizationRecommendations(filters)
       setRecommendations(response.recommendations || [])
@@ -86,7 +95,7 @@ export default function RecommendationsPage() {
 
   useEffect(() => {
     loadRecommendations()
-  }, [category, priority, sortBy, page])
+  }, [category, priority, sortBy, page, providerIdFromUrl, accountIdFromUrl])
 
   const handleRefresh = async () => {
     try {
@@ -148,6 +157,20 @@ export default function RecommendationsPage() {
               <p className="text-gray-500 mt-1">
                 AI-powered suggestions to reduce your cloud costs
               </p>
+              {isFilteredByAccount && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-accent-50 text-accent-700">
+                    {providerIdFromUrl?.toUpperCase() || 'Provider'}{accountIdFromUrl ? ` · ${accountIdFromUrl}` : ''}
+                    <button
+                      onClick={() => navigate('/recommendations')}
+                      className="p-0.5 rounded hover:bg-accent-100"
+                      aria-label="Clear filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                </div>
+              )}
             </div>
             <button
               onClick={handleRefresh}
@@ -257,12 +280,12 @@ export default function RecommendationsPage() {
                 No optimization opportunities found
               </h3>
               <p className="text-gray-500 max-w-md mx-auto">
-                {total === 0 && !category && !priority
+                {total === 0 && !category && !priority && !isFilteredByAccount
                   ? 'Run an analysis to discover cost-saving opportunities across your cloud providers.'
                   : 'No recommendations match your current filters. Try adjusting them.'
                 }
               </p>
-              {total === 0 && !category && !priority && (
+              {total === 0 && !category && !priority && !isFilteredByAccount && (
                 <button onClick={handleRefresh} className="btn-primary mt-4">
                   <RefreshCw className="w-4 h-4 mr-2 inline" />
                   Run Analysis

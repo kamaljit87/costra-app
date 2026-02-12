@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Sparkles, Plus } from 'lucide-react'
+import { MessageCircle, Sparkles, Plus, Lightbulb } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { cloudProvidersAPI } from '../../services/api'
 import { ProviderIcon } from '../CloudProviderIcons'
@@ -283,22 +283,35 @@ const Sidebar = ({
               {expandedProviders.has(providerId) && (
                 <div className="ml-2 mt-1 space-y-0.5 pl-3 border-l border-surface-200">
                   {accounts.map((account) => (
-                    <Link
+                    <div
                       key={account.accountId}
-                      to={`/provider/${providerId}?account=${account.accountId}`}
-                      onClick={closeOnNav}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                        location.search.includes(`account=${account.accountId}`)
-                          ? 'bg-accent-50 text-accent-700 font-medium'
-                          : account.isActive
-                            ? 'text-gray-600 hover:bg-surface-200 hover:text-gray-900'
-                            : 'text-gray-400 hover:bg-surface-200 hover:text-gray-600'
-                      }`}
+                      className="flex items-center gap-1 group"
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${account.isActive ? 'bg-accent-400' : 'bg-gray-300'}`} />
-                      <span className="truncate flex-1">{account.accountAlias || `Account ${account.accountId}`}</span>
-                      {!account.isActive && <span className="text-[10px] text-gray-400 shrink-0">Inactive</span>}
-                    </Link>
+                      <Link
+                        to={`/provider/${providerId}?account=${account.accountId}`}
+                        onClick={closeOnNav}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors flex-1 min-w-0 ${
+                          location.search.includes(`account=${account.accountId}`)
+                            ? 'bg-accent-50 text-accent-700 font-medium'
+                            : account.isActive
+                              ? 'text-gray-600 hover:bg-surface-200 hover:text-gray-900'
+                              : 'text-gray-400 hover:bg-surface-200 hover:text-gray-600'
+                        }`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${account.isActive ? 'bg-accent-400' : 'bg-gray-300'}`} />
+                        <span className="truncate flex-1">{account.accountAlias || `Account ${account.accountId}`}</span>
+                        {!account.isActive && <span className="text-[10px] text-gray-400 shrink-0">Inactive</span>}
+                      </Link>
+                      <Link
+                        to={`/recommendations?providerId=${providerId}&accountId=${account.accountId}`}
+                        onClick={closeOnNav}
+                        className="p-1.5 rounded-md text-gray-400 hover:text-accent-600 hover:bg-accent-50 transition-colors shrink-0"
+                        title="Recommendations"
+                        aria-label={`Recommendations for ${account.accountAlias || account.accountId}`}
+                      >
+                        <Lightbulb className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      </Link>
+                    </div>
                   ))}
                 </div>
               )}

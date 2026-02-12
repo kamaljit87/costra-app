@@ -639,7 +639,7 @@ export const insightsAPI = {
   },
 
   getOptimizationRecommendations: async (filters?: {
-    category?: string; provider_id?: string; priority?: string;
+    category?: string; provider_id?: string; account_id?: string; priority?: string;
     status?: string; limit?: number; offset?: number; sort_by?: string;
   }) => {
     const params = new URLSearchParams()
