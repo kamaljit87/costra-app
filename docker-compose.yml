@@ -61,7 +61,7 @@ services:
       PORT: "3002"
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required - use your managed PostgreSQL connection string}
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-this-in-production-min-32-chars}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      FRONTEND_URL: ${FRONTEND_URL:-https://costra.app}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       REDIS_URL: ${REDIS_URL:-redis://costra-redis:6379}
       SENTRY_DSN: ${SENTRY_DSN:-}

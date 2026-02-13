@@ -26,7 +26,7 @@ docker compose run --rm costra-backend node scripts/migrate.js
 docker compose up -d --build
 
 # 4. Verify
-curl http://localhost/api/health
+curl https://costra.app/api/health
 ```
 
 ---
@@ -87,7 +87,7 @@ cp .env.docker.example .env
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `FRONTEND_URL` | CORS origin (URL users see) | `http://localhost` |
+| `FRONTEND_URL` | CORS origin (URL users see) | `https://costra.app` |
 | `VITE_API_URL` | API base URL for frontend | `/api` (use when behind nginx) |
 | `REDIS_URL` | Redis connection | `redis://costra-redis:6379` |
 | `SENTRY_DSN` | Error tracking | — |
@@ -103,7 +103,7 @@ JWT_SECRET=your-32-char-minimum-secret-from-openssl-rand
 ENCRYPTION_KEY=your-32-char-encryption-key-from-openssl-rand
 
 # CORS and API (adjust for your domain)
-FRONTEND_URL=https://costra.yourdomain.com
+FRONTEND_URL=https://costra.app
 VITE_API_URL=/api
 
 # Optional
@@ -185,8 +185,8 @@ docker compose logs -f costra-backend
 
 ### Access
 
-- **App**: `http://localhost` (or your server IP/domain)
-- **Health**: `http://localhost/health` or `http://localhost/api/health`
+- **App**: `https://costra.app` (or `http://localhost` for local dev)
+- **Health**: `https://costra.app/health` or `https://costra.app/api/health`
 
 ---
 
@@ -200,7 +200,7 @@ docker compose logs -f costra-backend
 | 4 | Set `FRONTEND_URL` to your production URL |
 | 5 | Run migration: `docker compose run --rm costra-backend node scripts/migrate.js` |
 | 6 | Start stack: `docker compose up -d --build` |
-| 7 | Verify: `curl http://localhost/api/health` |
+| 7 | Verify: `curl https://costra.app/api/health` |
 
 ---
 
