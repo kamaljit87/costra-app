@@ -1,6 +1,6 @@
 # Backend Dockerfile - Node.js API with maximum security hardening
 # Stage 1: Build (if needed for native deps - backend has none, so single stage)
-FROM node:20.21-alpine3.20 AS base
+FROM node:20-alpine AS base
 
 # Security: Run as non-root
 RUN addgroup -g 1001 -S appgroup && \
@@ -9,9 +9,8 @@ RUN addgroup -g 1001 -S appgroup && \
 WORKDIR /app
 
 # Install production dependencies only (no dev deps)
-COPY server/package*.json ./
-RUN npm ci --only=production && \
-    npm cache clean --force && \
+COPY package*.json ./
+RUN npm install --omit=dev && \
     rm -rf /tmp/* /var/cache/apk/*
 
 # Copy backend source
