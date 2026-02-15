@@ -160,22 +160,22 @@ export default function Dashboard() {
             </p>
           </div>
           {!isDemoMode && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:space-x-3 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
               <button
                 onClick={() => navigate('/settings?tab=providers')}
-                className="btn-secondary flex items-center justify-center space-x-2 min-h-[44px]"
+                className="btn-secondary"
                 title="Add a new cloud provider account"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 shrink-0" />
                 <span className="text-sm">Add Provider</span>
               </button>
               <button
                 onClick={handleSync}
                 disabled={isSyncing}
-                className="btn-primary flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                className="btn-primary"
                 title="Sync fresh data from all cloud providers (clears cache)"
               >
-                {isSyncing && <Spinner variant="bars" size={16} />}
+                {isSyncing && <Spinner variant="bars" size={16} className="shrink-0" />}
                 <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
               </button>
             </div>

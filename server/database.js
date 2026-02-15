@@ -119,6 +119,31 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // 2FA (TOTP) columns
+      await client.query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'totp_secret'
+          ) THEN
+            ALTER TABLE users ADD COLUMN totp_secret TEXT;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'totp_enabled_at'
+          ) THEN
+            ALTER TABLE users ADD COLUMN totp_enabled_at TIMESTAMP;
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'totp_secret_pending'
+          ) THEN
+            ALTER TABLE users ADD COLUMN totp_secret_pending TEXT;
+          END IF;
+        END $$;
+      `)
+
       // User preferences table (currency, email preferences, etc.)
       await client.query(`
         CREATE TABLE IF NOT EXISTS user_preferences (
@@ -1159,13 +1184,100 @@ export const getUserById = async (id) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at, totp_enabled_at FROM users WHERE id = $1',
       [id]
     )
     return result.rows[0] || null
   } catch (error) {
     logger.error('getUserById error', { id, error: error.message, stack: error.stack })
     throw error
+  } finally {
+    client.release()
+  }
+}
+
+/** Get 2FA status for a user (does not return secret). */
+export const get2FAStatus = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT totp_enabled_at IS NOT NULL AS enabled FROM users WHERE id = $1',
+      [userId]
+    )
+    const row = result.rows[0]
+    if (!row) return null
+    return { enabled: !!row.enabled }
+  } finally {
+    client.release()
+  }
+}
+
+/** Store pending TOTP secret during setup (before user confirms with a code). */
+export const setTOTPPending = async (userId, secret) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'UPDATE users SET totp_secret_pending = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [secret, userId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+/** Get pending TOTP secret for confirmation step. */
+export const getTOTPPending = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT totp_secret_pending FROM users WHERE id = $1',
+      [userId]
+    )
+    return result.rows[0]?.totp_secret_pending || null
+  } finally {
+    client.release()
+  }
+}
+
+/** After user confirms TOTP code: move pending secret to active and set enabled_at. */
+export const confirmTOTPAndEnable = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `UPDATE users
+       SET totp_secret = totp_secret_pending, totp_secret_pending = NULL, totp_enabled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND totp_secret_pending IS NOT NULL
+       RETURNING id`,
+      [userId]
+    )
+    return result.rowCount > 0
+  } finally {
+    client.release()
+  }
+}
+
+/** Disable 2FA and clear secret. */
+export const disableTOTP = async (userId) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'UPDATE users SET totp_secret = NULL, totp_secret_pending = NULL, totp_enabled_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [userId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+/** Get user's TOTP secret for verification (server-side only). Returns null if 2FA not enabled. */
+export const getUserTOTPSecret = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT totp_secret FROM users WHERE id = $1 AND totp_enabled_at IS NOT NULL',
+      [userId]
+    )
+    return result.rows[0]?.totp_secret || null
   } finally {
     client.release()
   }

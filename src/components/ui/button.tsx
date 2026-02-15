@@ -5,25 +5,25 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default: 'bg-accent-500 text-white hover:bg-accent-600 shadow-xs active:scale-[0.98]',
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
-          'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+          'border border-surface-300 bg-white text-gray-700 hover:bg-surface-200 hover:border-surface-400',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
+          'bg-white text-gray-700 border border-surface-300 hover:bg-surface-200 hover:border-surface-400 shadow-xs active:scale-[0.98]',
+        ghost: 'hover:bg-surface-200 hover:text-gray-900',
+        link: 'text-accent-600 underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 rounded-md px-3',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'h-10 w-10',
+        default: 'min-h-[44px] h-auto px-5 py-2.5',
+        sm: 'min-h-[36px] h-9 rounded-md px-3',
+        lg: 'min-h-[48px] h-auto px-8 py-3 rounded-lg',
+        icon: 'h-10 w-10 p-0',
       },
     },
     defaultVariants: {

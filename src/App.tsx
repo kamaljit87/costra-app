@@ -22,11 +22,19 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
 import ContactPage from './pages/ContactPage'
 import ChatBubbleDemoPage from './pages/ChatBubbleDemoPage'
+import GoogleCallbackPage from './pages/GoogleCallbackPage'
 import CookieConsent from './components/CookieConsent'
 import { NotFound } from './components/ui/ghost-404-page'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { authReady, isAuthenticated } = useAuth()
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+      </div>
+    )
+  }
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
@@ -41,6 +49,7 @@ function App() {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<LoginTravelPage />} />
                 <Route path="/signup" element={<SignupTravelPage />} />
+                <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
                 <Route path="/contact" element={<ContactPage />} />

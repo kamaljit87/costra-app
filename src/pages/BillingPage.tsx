@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Check, Loader2, CreditCard, Calendar, AlertCircle } from 'lucide-react'
+import Layout from '../components/Layout'
+import Breadcrumbs from '../components/Breadcrumbs'
 import { billingAPI } from '../services/api'
 
 interface Subscription {
@@ -163,16 +165,18 @@ export default function BillingPage() {
   }
 
   return (
+    <Layout>
     <div className="max-w-7xl mx-auto space-y-8">
+      <Breadcrumbs />
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Billing & Subscription</h1>
-        <p className="mt-2 text-gray-600">Manage your subscription and billing preferences</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Billing & Subscription</h1>
+        <p className="mt-2 text-gray-600 text-sm sm:text-base">Manage your subscription and billing preferences</p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2">
-          <AlertCircle className="h-5 w-5 text-red-600" />
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+          <p className="text-red-800 text-sm">{error}</p>
         </div>
       )}
 
@@ -212,9 +216,9 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5 text-gray-400" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-5 w-5 text-gray-400 shrink-0" />
             <div>
               <p className="text-sm text-gray-500">Plan</p>
               <p className="font-medium text-gray-900">{planInfo.name}</p>
@@ -222,8 +226,8 @@ export default function BillingPage() {
           </div>
           
           {!status?.isTrial && (
-            <div className="flex items-center space-x-2">
-              <CreditCard className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-gray-400 shrink-0" />
               <div>
                 <p className="text-sm text-gray-500">Billing Cycle</p>
                 <p className="font-medium text-gray-900 capitalize">{currentBillingPeriod}</p>
@@ -232,8 +236,8 @@ export default function BillingPage() {
           )}
           
           {status?.daysRemaining != null && (
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3">
+              <Calendar className="h-5 w-5 text-gray-400 shrink-0" />
               <div>
                 <p className="text-sm text-gray-500">
                   {status?.isTrial ? 'Trial ends in' : 'Next billing'}
@@ -250,8 +254,8 @@ export default function BillingPage() {
             </div>
           )}
           
-          <div className="flex items-center space-x-2">
-            <CreditCard className="h-5 w-5 text-gray-400" />
+          <div className="flex items-center gap-3">
+            <CreditCard className="h-5 w-5 text-gray-400 shrink-0" />
             <div>
               <p className="text-sm text-gray-500">History</p>
               <p className="font-medium text-gray-900">{status?.historicalDataMonths ?? 0} months</p>
@@ -280,16 +284,16 @@ export default function BillingPage() {
           <button
             onClick={handleManageBilling}
             disabled={isProcessing}
-            className="btn-secondary inline-flex items-center space-x-2"
+            className="btn-secondary"
           >
             {isProcessing ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
                 <span>Loading...</span>
               </>
             ) : (
               <>
-                <CreditCard className="h-4 w-4" />
+                <CreditCard className="h-4 w-4 shrink-0" />
                 <span>Manage Billing</span>
               </>
             )}
@@ -299,11 +303,11 @@ export default function BillingPage() {
 
       {/* Available Plans */}
       <div>
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Available Plans</h2>
           
           {/* Billing Period Toggle */}
-          <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
             <button
               onClick={() => setBillingPeriod('monthly')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -327,9 +331,9 @@ export default function BillingPage() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {/* Starter Plan */}
-          <div className={`bg-white rounded-xl border-2 p-6 ${
+          <div className={`bg-white rounded-xl border-2 p-6 sm:p-8 ${
             currentPlan === 'starter' 
               ? 'border-accent-500 shadow-lg' 
               : 'border-gray-200'
@@ -359,17 +363,17 @@ export default function BillingPage() {
               </div>
             </div>
 
-            <ul className="space-y-2 mb-6">
+            <ul className="space-y-2.5 mb-6">
               <li className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Includes:</li>
               {PLANS.starter.features.map((feature, idx) => (
-                <li key={idx} className="flex items-start space-x-2">
-                  <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                <li key={idx} className="flex items-start gap-2">
+                  <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{feature}</span>
                 </li>
               ))}
             </ul>
 
-            <div className="mb-6 pt-4 border-t border-gray-200">
+            <div className="mb-6 pt-5 border-t border-gray-200">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Who this is for:</p>
               <p className="text-sm text-gray-600">{PLANS.starter.whoThisIsFor}</p>
             </div>
@@ -382,7 +386,7 @@ export default function BillingPage() {
             <button
               onClick={() => handleUpgrade('starter')}
               disabled={isProcessing || currentPlan === 'starter'}
-              className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+              className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${
                 currentPlan === 'starter'
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'btn-primary'
@@ -393,7 +397,7 @@ export default function BillingPage() {
           </div>
 
           {/* Pro Plan */}
-          <div className={`bg-white rounded-xl border-2 p-6 ${
+          <div className={`bg-white rounded-xl border-2 p-6 sm:p-8 ${
             currentPlan === 'pro' 
               ? 'border-accent-500 shadow-lg' 
               : 'border-accent-300'
@@ -430,17 +434,17 @@ export default function BillingPage() {
               </div>
             </div>
 
-            <ul className="space-y-2 mb-6">
+            <ul className="space-y-2.5 mb-6">
               <li className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Includes:</li>
               {PLANS.pro.features.map((feature, idx) => (
-                <li key={idx} className="flex items-start space-x-2">
-                  <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                <li key={idx} className="flex items-start gap-2">
+                  <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                   <span className="text-sm text-gray-700">{feature}</span>
                 </li>
               ))}
             </ul>
 
-            <div className="mb-6 pt-4 border-t border-gray-200">
+            <div className="mb-6 pt-5 border-t border-gray-200">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Who this is for:</p>
               <p className="text-sm text-gray-600">{PLANS.pro.whoThisIsFor}</p>
             </div>
@@ -453,7 +457,7 @@ export default function BillingPage() {
             <button
               onClick={() => handleUpgrade('pro')}
               disabled={isProcessing || currentPlan === 'pro'}
-              className={`w-full py-2.5 rounded-lg font-medium transition-colors ${
+              className={`w-full py-3 rounded-lg font-semibold text-sm transition-colors ${
                 currentPlan === 'pro'
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'btn-primary'
@@ -465,5 +469,6 @@ export default function BillingPage() {
         </div>
       </div>
     </div>
+    </Layout>
   )
 }

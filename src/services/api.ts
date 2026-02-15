@@ -122,6 +122,64 @@ export const authAPI = {
     }
     return data
   },
+
+  /** Exchange Google authorization code (from redirect flow) for token and user. */
+  exchangeGoogleCode: async (code: string): Promise<{ token?: string; user?: unknown; error?: string }> => {
+    const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (response.ok && data.token) {
+      localStorage.setItem('authToken', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      return data
+    }
+    return { error: data.error || 'Google sign-in failed' }
+  },
+
+  /** After login when 2FA is required: verify TOTP code and get full token. */
+  verify2FALogin: async (tempToken: string, code: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/2fa/verify-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken, code }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (response.ok && data.token) {
+      localStorage.setItem('authToken', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      return data
+    }
+    throw new Error(data.error || 'Invalid code')
+  },
+
+  get2FAStatus: async (): Promise<{ enabled: boolean }> => {
+    const response = await apiRequest('/auth/2fa/status')
+    return response.json()
+  },
+
+  setup2FA: async (): Promise<{ secret: string; qrDataUrl: string }> => {
+    const response = await apiRequest('/auth/2fa/setup', { method: 'POST' })
+    return response.json()
+  },
+
+  confirm2FA: async (code: string): Promise<{ message: string }> => {
+    const response = await apiRequest('/auth/2fa/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+    return response.json()
+  },
+
+  disable2FA: async (password: string, code?: string): Promise<{ message: string }> => {
+    const response = await apiRequest('/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password, ...(code ? { code } : {}) }),
+    })
+    return response.json()
+  },
 }
 
 // Cost Data API
