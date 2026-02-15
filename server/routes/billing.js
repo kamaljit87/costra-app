@@ -1,22 +1,24 @@
 /**
  * Billing Routes
  * Handles subscription and billing operations
+ * Supports Stripe and Dodo Payments (Dodo preferred when configured)
  */
 
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
-import { 
-  getUserSubscription, 
-  getSubscriptionStatus,
-  upgradeSubscription,
-  cancelSubscription,
-} from '../services/subscriptionService.js'
+import { getUserSubscription, getSubscriptionStatus } from '../services/subscriptionService.js'
 import {
-  createCheckoutSession,
+  createCheckoutSession as createStripeCheckout,
   createPortalSession,
-  handleWebhook,
+  handleWebhook as handleStripeWebhook,
   cancelStripeSubscription,
 } from '../services/stripeService.js'
+import {
+  createCheckoutSession as createDodoCheckout,
+  handleWebhook as handleDodoWebhook,
+  cancelDodoSubscription,
+  isConfigured as isDodoConfigured,
+} from '../services/dodoService.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -55,56 +57,61 @@ router.get('/subscription', authenticateToken, async (req, res) => {
 
 /**
  * POST /api/billing/create-checkout-session
- * Create Stripe checkout session for subscription upgrade
+ * Create checkout session for subscription upgrade (Dodo or Stripe)
  */
 router.post('/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
     const { planType, billingPeriod = 'monthly' } = req.body
-    
+
     if (!planType || !['starter', 'pro'].includes(planType)) {
       return res.status(400).json({ error: 'Invalid plan type. Must be "starter" or "pro"' })
     }
-    
+
     if (!['monthly', 'annual'].includes(billingPeriod)) {
       return res.status(400).json({ error: 'Invalid billing period. Must be "monthly" or "annual"' })
     }
-    
-    // Get user email and name
+
     const userEmail = req.user.email || 'user@example.com'
     const userName = req.user.name || 'User'
-    
-    const session = await createCheckoutSession(userId, planType, userEmail, userName, billingPeriod)
-    
-    res.json({ 
+
+    const session = isDodoConfigured()
+      ? await createDodoCheckout(userId, planType, userEmail, userName, billingPeriod)
+      : await createStripeCheckout(userId, planType, userEmail, userName, billingPeriod)
+
+    res.json({
       sessionId: session.id,
       url: session.url,
     })
   } catch (error) {
-    logger.error('Error creating checkout session', { 
-      userId: req.user?.userId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Error creating checkout session', {
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack,
     })
-    res.status(500).json({ error: 'Failed to create checkout session' })
+    res.status(500).json({ error: error.message || 'Failed to create checkout session' })
   }
 })
 
 /**
  * POST /api/billing/create-portal-session
- * Create Stripe customer portal session
+ * Create customer portal session (Stripe only; Dodo has no portal)
  */
 router.post('/create-portal-session', authenticateToken, async (req, res) => {
+  if (isDodoConfigured()) {
+    return res.status(501).json({
+      error: 'Customer portal not available with Dodo Payments. Manage billing via Dodo Dashboard or contact support.',
+    })
+  }
   try {
     const userId = req.user.userId || req.user.id
     const session = await createPortalSession(userId)
-    
     res.json({ url: session.url })
   } catch (error) {
-    logger.error('Error creating portal session', { 
-      userId: req.user?.userId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Error creating portal session', {
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack,
     })
     res.status(500).json({ error: 'Failed to create portal session' })
   }
@@ -154,17 +161,44 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 router.post('/cancel', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    await cancelStripeSubscription(userId)
-    
+    if (isDodoConfigured()) {
+      await cancelDodoSubscription(userId)
+    } else {
+      await cancelStripeSubscription(userId)
+    }
     res.json({ message: 'Subscription cancelled successfully' })
   } catch (error) {
-    logger.error('Error cancelling subscription', { 
-      userId: req.user?.userId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Error cancelling subscription', {
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack,
     })
     res.status(500).json({ error: 'Failed to cancel subscription' })
   }
 })
+
+/**
+ * POST /api/billing/dodo-webhook
+ * Dodo Payments webhook (raw body required for signature verification)
+ */
+router.post(
+  '/dodo-webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    try {
+      const rawBody = req.body
+      const headers = {
+        'webhook-id': req.headers['webhook-id'],
+        'webhook-signature': req.headers['webhook-signature'],
+        'webhook-timestamp': req.headers['webhook-timestamp'],
+      }
+      await handleDodoWebhook(rawBody, headers)
+      res.json({ received: true })
+    } catch (error) {
+      logger.error('Dodo webhook error', { error: error.message })
+      res.status(400).json({ error: 'Webhook verification failed' })
+    }
+  }
+)
 
 export default router
