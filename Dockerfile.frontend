@@ -23,7 +23,7 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Stage 2: Serve with nginx
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.29-alpine AS runtime
 
 # Remove default config and static content
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/*
