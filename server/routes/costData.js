@@ -14,7 +14,6 @@ import {
   getCloudProviderCredentialsByAccountId,
   createNotification,
 } from '../database.js'
-import { requireFeature } from '../middleware/featureGate.js'
 import { cached, cacheKeys, clearUserCache, del as cacheDel } from '../utils/cache.js'
 import {
   fetchAWSServiceDetails,

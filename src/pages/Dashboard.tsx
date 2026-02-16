@@ -159,7 +159,7 @@ export default function Dashboard() {
       await goalsAPI.delete(id)
       setGoals((prev) => prev.filter((g) => g.id !== id))
       setGoalsProgress((prev) => { const next = { ...prev }; delete next[id]; return next })
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
   }
 
   const handleExport = async (format: 'csv' | 'pdf') => {
@@ -485,8 +485,5 @@ export default function Dashboard() {
 
       </div>
     </Layout>
-  )
-}
-
   )
 }

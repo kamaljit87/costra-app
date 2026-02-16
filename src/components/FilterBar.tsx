@@ -73,7 +73,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
     try {
       await savedViewsAPI.delete(id)
       setSavedViews((prev) => prev.filter((v) => v.id !== id))
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
   }
 
   const hasActiveFilters = selectedService !== null || showCreditsOnly

@@ -16,7 +16,7 @@ function getStoredTheme(): ThemeMode {
   try {
     const v = localStorage.getItem(STORAGE_KEY)
     if (v === 'light' || v === 'dark' || v === 'system') return v
-  } catch (_) {}
+  } catch (_) { /* ignore */ }
   return 'system'
 }
 
@@ -35,7 +35,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(next)
     try {
       localStorage.setItem(STORAGE_KEY, next)
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
   }, [])
 
   useEffect(() => {
@@ -52,7 +52,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (theme !== 'system') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => setEffectiveTheme(getEffectiveTheme('system'))
+    const handler = () => {
+      const effective = getEffectiveTheme('system')
+      setEffectiveTheme(effective)
+      if (effective === 'dark') document.documentElement.classList.add('dark')
+      else document.documentElement.classList.remove('dark')
+    }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [theme])

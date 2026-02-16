@@ -446,7 +446,7 @@ export default function SettingsPage() {
                       const res = await apiKeysAPI.create()
                       setApiKeys((prev) => [{ id: res.id, name: res.name, key_prefix: res.key_prefix, created_at: res.created_at }, ...prev])
                       if (res.key) setNewKeyShown(res.key)
-                    } catch (_) {}
+                    } catch (_) { /* ignore */ }
                     finally { setCreateKeyLoading(false) }
                   }}
                   disabled={createKeyLoading}
@@ -470,7 +470,7 @@ export default function SettingsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={async () => { try { await apiKeysAPI.delete(k.id); setApiKeys((prev) => prev.filter((x) => x.id !== k.id)) } catch (_) {} }}
+                        onClick={async () => { try { await apiKeysAPI.delete(k.id); setApiKeys((prev) => prev.filter((x) => x.id !== k.id)) } catch (_) { /* ignore */ } }}
                         className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded"
                         aria-label="Revoke key"
                       >
