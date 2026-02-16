@@ -30,7 +30,7 @@ export default function GoogleCallbackPage() {
       }
       if (result.token) {
         setSessionFromStorage()
-        navigate('/dashboard', { replace: true })
+        navigate('/auth/suggest-2fa', { replace: true })
         return
       }
       setErrorMessage(result.error || 'Sign-in failed')

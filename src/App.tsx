@@ -25,6 +25,7 @@ import ContactPage from './pages/ContactPage'
 import ChatBubbleDemoPage from './pages/ChatBubbleDemoPage'
 import GoogleCallbackPage from './pages/GoogleCallbackPage'
 import Verify2FAPage from './pages/Verify2FAPage'
+import Suggest2FAPage from './pages/Suggest2FAPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import CookieConsent from './components/CookieConsent'
 import { NotFound } from './components/ui/ghost-404-page'
@@ -71,6 +72,7 @@ function App() {
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />
+                <Route path="/auth/suggest-2fa" element={<ProtectedRoute><Suggest2FAPage /></ProtectedRoute>} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
                 <Route path="/contact" element={<ContactPage />} />
