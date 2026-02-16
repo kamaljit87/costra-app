@@ -552,7 +552,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     try {
       taxResponse = await retryWithBackoff(
         () => client.send(taxCommand),
-        { maxAttempts: 2, timeout: 15000 },
+        { maxAttempts: 3, timeout: 20000 },
         'aws',
         { startDate, endDate, operation: 'getCostAndUsage-tax' }
       )
@@ -736,6 +736,10 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxDat
       taxCurrentMonth: taxCurrentMonth.toFixed(2),
       taxLastMonth: taxLastMonth.toFixed(2),
     })
+  } else if (taxData === null) {
+    logger.info('AWS tax amounts skipped (tax query did not run or failed)', { taxCurrentMonth: 0, taxLastMonth: 0 })
+  } else if (!taxData.ResultsByTime?.length) {
+    logger.info('AWS tax amounts empty (no tax records in period)', { taxCurrentMonth: 0, taxLastMonth: 0 })
   }
 
   return {

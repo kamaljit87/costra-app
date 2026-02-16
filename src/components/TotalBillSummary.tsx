@@ -47,8 +47,8 @@ export default function TotalBillSummary({
       value: formatCurrency(hasTax ? totalCurrent + totalTaxCurrent : totalCurrent),
       icon: Wallet,
       highlight: true,
-      subtitle: null as string | null,
-      subtitleColor: '',
+      subtitle: !hasTax ? 'Before tax' : null,
+      subtitleColor: 'text-gray-500 dark:text-gray-400',
       taxBreakdown: hasTax ? `${formatCurrency(totalCurrent)} + ${formatCurrency(totalTaxCurrent)} tax` : null,
     },
     {
@@ -78,7 +78,9 @@ export default function TotalBillSummary({
         <h2 className="text-5xl font-bold text-gray-900 dark:text-gray-100 mb-1.5">
           Total Spend
         </h2>
-        <p className="text-xs text-gray-500 dark:text-gray-300 mb-3">Overview across all cloud providers{hasTax ? '' : ' (before tax)'}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-300 mb-3">
+          Overview across all cloud providers{hasTax ? ' (includes tax)' : ' — totals may be before tax; your bill can be higher'}
+        </p>
         {changePercent !== 0 && (
           <div className={`flex items-center px-4 py-1.5 rounded-xl text-xs ${
             changePercent >= 0
