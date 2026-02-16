@@ -166,6 +166,8 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
   }))
 
   // 3. Set bucket policy: allow BCM Data Exports to write + Costra cross-account read
+  // Per https://docs.aws.amazon.com/cur/latest/userguide/dataexports-s3-bucket.html both
+  // aws:SourceAccount and aws:SourceArn are required for Data Exports to deliver successfully.
   const bucketPolicy = {
     Version: '2012-10-17',
     Statement: [
@@ -175,7 +177,10 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
         Principal: { Service: 'bcm-data-exports.amazonaws.com' },
         Action: ['s3:PutObject', 's3:GetBucketPolicy'],
         Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
-        Condition: { StringEquals: { 'aws:SourceAccount': awsAccountId } },
+        Condition: {
+          StringEquals: { 'aws:SourceAccount': awsAccountId },
+          ArnLike: { 'aws:SourceArn': `arn:aws:bcm-data-exports:us-east-1:${awsAccountId}:export/*` },
+        },
       },
       ...(costraAccountId ? [{
         Sid: 'AllowCostraCrossAccountRead',
@@ -287,16 +292,17 @@ export const checkCURDataAvailability = async (userId, accountId) => {
     },
   })
 
+  // CUR 2.0 delivery path per AWS docs: {prefix}/{export-name}/data/BILLING_PERIOD=YYYY-MM/...parquet
+  const dataPrefix = `${config.s3_prefix}/${config.export_name}/data/`
   const resp = await s3Client.send(new ListObjectsV2Command({
     Bucket: config.s3_bucket,
-    Prefix: `${config.s3_prefix}/`,
+    Prefix: dataPrefix,
     MaxKeys: 1000,
   }))
 
   const parquetFiles = (resp.Contents || []).filter(obj => obj.Key.endsWith('.parquet'))
   const billingPeriods = [...new Set(parquetFiles.map(obj => {
-    // CUR 2.0 structure: {prefix}/{export-name}/data/{YYYY-MM}/...parquet
-    const match = obj.Key.match(/data\/(\d{4}-\d{2})\//)
+    const match = obj.Key.match(/\/data\/BILLING_PERIOD=(\d{4}-\d{2})\//)
     return match ? match[1] : null
   }).filter(Boolean))].sort()
 
@@ -328,8 +334,8 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
     },
   })
 
-  // List Parquet files for this billing period
-  const prefix = `${config.s3_prefix}/${config.export_name}/data/${billingPeriod}/`
+  // List Parquet files for this billing period (CUR 2.0 uses partition BILLING_PERIOD=YYYY-MM)
+  const prefix = `${config.s3_prefix}/${config.export_name}/data/BILLING_PERIOD=${billingPeriod}/`
   const listResp = await s3Client.send(new ListObjectsV2Command({
     Bucket: config.s3_bucket,
     Prefix: prefix,

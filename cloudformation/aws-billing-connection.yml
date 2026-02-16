@@ -118,6 +118,7 @@ Resources:
               - Sid: BCMDataExportsAccess
                 Effect: Allow
                 Action:
+                  - 'bcm-data-exports:ListTables'
                   - 'bcm-data-exports:CreateExport'
                   - 'bcm-data-exports:GetExport'
                   - 'bcm-data-exports:ListExports'

@@ -24,6 +24,8 @@ interface CurStatusInfo {
   curEnabled: boolean
   curStatus: string
   lastIngestion: string | null
+  statusMessage?: string | null
+  billingPeriods?: { period: string; totalCost: number; ingestedAt: string }[]
 }
 
 interface CloudProviderManagerProps {
@@ -188,34 +190,39 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       const response = await cloudProvidersAPI.getCloudProviders()
       const loadedProviders = response.providers || []
       setProviders(loadedProviders)
-      // Fetch CUR status for automated AWS connections
-      loadCurStatuses(loadedProviders)
+      setIsLoading(false)
+      // Fetch CUR status in background (parallel, non-blocking)
+      const automatedAws = loadedProviders.filter(
+        (p: CloudProvider) => p.providerId === 'aws' && p.connectionType?.startsWith('automated')
+      )
+      if (automatedAws.length > 0) {
+        const results = await Promise.allSettled(
+          automatedAws.map((p: CloudProvider) =>
+            cloudProvidersAPI.getCurStatus(p.accountId).then((result) => ({ accountId: p.accountId, result }))
+          )
+        )
+        setCurStatuses(prev => {
+          const next = { ...prev }
+          results.forEach((r) => {
+            if (r.status === 'fulfilled' && r.value) {
+              const { accountId, result } = r.value
+              next[accountId] = {
+                curEnabled: result.curEnabled,
+                curStatus: result.curStatus,
+                lastIngestion: result.lastIngestion,
+                statusMessage: result.statusMessage ?? null,
+                billingPeriods: result.billingPeriods,
+              }
+            }
+          })
+          return next
+        })
+      }
     } catch (error: any) {
       console.error('Failed to load providers:', error)
       setError(error.message || 'Failed to load cloud providers')
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const loadCurStatuses = async (providersList: CloudProvider[]) => {
-    const automatedAws = providersList.filter(
-      p => p.providerId === 'aws' && p.connectionType?.startsWith('automated')
-    )
-    for (const provider of automatedAws) {
-      try {
-        const result = await cloudProvidersAPI.getCurStatus(provider.accountId)
-        setCurStatuses(prev => ({
-          ...prev,
-          [provider.accountId]: {
-            curEnabled: result.curEnabled,
-            curStatus: result.curStatus,
-            lastIngestion: result.lastIngestion,
-          },
-        }))
-      } catch {
-        // CUR status fetch is non-critical
-      }
     }
   }
 
@@ -686,11 +693,11 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                       : 'bg-yellow-100 text-yellow-700'
                                   }`} title={
                                     curStatuses[provider.accountId].curStatus === 'active'
-                                      ? `CUR active${curStatuses[provider.accountId].lastIngestion ? ` - Last ingestion: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}`
+                                      ? `CUR active${curStatuses[provider.accountId].lastIngestion ? ` - Last ingestion: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}${curStatuses[provider.accountId].billingPeriods?.length ? ` • ${curStatuses[provider.accountId].billingPeriods!.length} period(s) ingested` : ''}`
                                       : curStatuses[provider.accountId].curStatus === 'provisioning'
                                       ? 'CUR export is being set up (data available within 24h)'
                                       : curStatuses[provider.accountId].curStatus === 'error'
-                                      ? 'CUR setup encountered an error'
+                                      ? (curStatuses[provider.accountId].statusMessage ? `CUR error: ${curStatuses[provider.accountId].statusMessage}` : 'CUR setup encountered an error')
                                       : 'CUR is pending setup'
                                   }>
                                     {curStatuses[provider.accountId].curStatus === 'active' ? 'CUR Active' :
