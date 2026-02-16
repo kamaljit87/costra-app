@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import { MessageCircle, Sparkles, Plus, Lightbulb } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { usePublicConfig } from '../../contexts/PublicConfigContext'
 import { cloudProvidersAPI } from '../../services/api'
 import { ProviderIcon } from '../CloudProviderIcons'
 
@@ -114,6 +115,7 @@ const Sidebar = ({
   )
   const cloudFetchedRef = useRef(false)
   const { isDemoMode } = useAuth()
+  const { signupDisabled } = usePublicConfig()
   const isControlled = controlledOpen !== undefined && onToggle !== undefined
   const isOpen = isControlled ? controlledOpen : internalOpen
   const toggleSidebar = isControlled ? onToggle! : () => setInternalOpen((o) => !o)
@@ -258,11 +260,11 @@ const Sidebar = ({
             </div>
             <p className="text-xs text-gray-500 mb-3 font-medium">Connect cloud providers to track costs</p>
             <Link
-              to="/signup"
+              to={signupDisabled ? '/login' : '/signup'}
               onClick={closeOnNav}
               className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs text-white bg-accent-500 hover:bg-accent-600 font-semibold transition-colors"
             >
-              Get started
+              {signupDisabled ? 'Sign in' : 'Get started'}
             </Link>
           </div>
         </div>

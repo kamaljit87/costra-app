@@ -1,6 +1,13 @@
 // Use relative URL to leverage Vite proxy in development, or absolute URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3002/api')
 
+/** Public auth config (no token). Signup disabled when DISABLE_SIGNUP env is set. */
+export const getAuthConfig = async (): Promise<{ signupDisabled: boolean }> => {
+  const res = await fetch(`${API_BASE_URL}/auth/config`)
+  const data = await res.json().catch(() => ({}))
+  return { signupDisabled: !!data.signupDisabled }
+}
+
 // Get auth token from localStorage
 const getToken = (): string | null => {
   return localStorage.getItem('authToken')
@@ -79,11 +86,55 @@ export const authAPI = {
       body: JSON.stringify({ email, password }),
     })
     const data = await response.json()
+    if (data.twoFactorRequired && data.temporaryToken) {
+      return data
+    }
     if (data.token) {
       localStorage.setItem('authToken', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
     }
     return data
+  },
+
+  verify2FA: async (temporaryToken: string, code: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/2fa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ temporaryToken, code }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'Verification failed')
+    if (data.token && data.user) {
+      localStorage.setItem('authToken', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+    }
+    return data
+  },
+
+  get2FAStatus: async () => {
+    const response = await apiRequest('/auth/2fa/status')
+    return response.json()
+  },
+
+  setup2FA: async () => {
+    const response = await apiRequest('/auth/2fa/setup', { method: 'POST' })
+    return response.json()
+  },
+
+  confirm2FA: async (code: string) => {
+    const response = await apiRequest('/auth/2fa/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+    return response.json()
+  },
+
+  disable2FA: async (code: string) => {
+    const response = await apiRequest('/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+    return response.json()
   },
 
   getCurrentUser: async () => {
@@ -110,28 +161,18 @@ export const authAPI = {
     localStorage.removeItem('user')
   },
 
-  googleLogin: async (credential: string) => {
-    const response = await apiRequest('/auth/google/callback', {
-      method: 'POST',
-      body: JSON.stringify({ credential }),
-    })
-    const data = await response.json()
-    if (data.token) {
-      localStorage.setItem('authToken', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-    }
-    return data
-  },
-
-  /** Exchange Google authorization code (from redirect flow) for token and user. */
-  exchangeGoogleCode: async (code: string): Promise<{ token?: string; user?: unknown; error?: string }> => {
+  googleLogin: async (credential: string): Promise<{ token?: string; user?: unknown; error?: string; twoFactorRequired?: boolean; temporaryToken?: string }> => {
     const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ credential }),
     })
     const data = await response.json().catch(() => ({}))
-    if (response.ok && data.token) {
+    if (!response.ok) return { error: data.error || 'Google sign-in failed' }
+    if (data.twoFactorRequired && data.temporaryToken && data.user) {
+      return data
+    }
+    if (data.token) {
       localStorage.setItem('authToken', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
       return data
@@ -139,46 +180,23 @@ export const authAPI = {
     return { error: data.error || 'Google sign-in failed' }
   },
 
-  /** After login when 2FA is required: verify TOTP code and get full token. */
-  verify2FALogin: async (tempToken: string, code: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth/2fa/verify-login`, {
+  exchangeGoogleCode: async (code: string): Promise<{ token?: string; user?: unknown; error?: string; twoFactorRequired?: boolean; temporaryToken?: string }> => {
+    const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tempToken, code }),
+      body: JSON.stringify({ code }),
     })
     const data = await response.json().catch(() => ({}))
-    if (response.ok && data.token) {
+    if (!response.ok) return { error: data.error || 'Google sign-in failed' }
+    if (data.twoFactorRequired && data.temporaryToken) {
+      return data
+    }
+    if (data.token) {
       localStorage.setItem('authToken', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
       return data
     }
-    throw new Error(data.error || 'Invalid code')
-  },
-
-  get2FAStatus: async (): Promise<{ enabled: boolean }> => {
-    const response = await apiRequest('/auth/2fa/status')
-    return response.json()
-  },
-
-  setup2FA: async (): Promise<{ secret: string; qrDataUrl: string }> => {
-    const response = await apiRequest('/auth/2fa/setup', { method: 'POST' })
-    return response.json()
-  },
-
-  confirm2FA: async (code: string): Promise<{ message: string }> => {
-    const response = await apiRequest('/auth/2fa/confirm', {
-      method: 'POST',
-      body: JSON.stringify({ code }),
-    })
-    return response.json()
-  },
-
-  disable2FA: async (password: string, code?: string): Promise<{ message: string }> => {
-    const response = await apiRequest('/auth/2fa/disable', {
-      method: 'POST',
-      body: JSON.stringify({ password, ...(code ? { code } : {}) }),
-    })
-    return response.json()
+    return { error: data.error || 'Google sign-in failed' }
   },
 }
 

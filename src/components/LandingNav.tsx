@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Home, CreditCard, Mail } from 'lucide-react'
 import Logo from './Logo'
 import { cn } from '@/lib/utils'
+import { usePublicConfig } from '../contexts/PublicConfigContext'
 
 const NAV_ITEMS = [
   { name: 'Home', url: '/', icon: Home },
@@ -12,6 +13,7 @@ const NAV_ITEMS = [
 
 export default function LandingNav() {
   const location = useLocation()
+  const { signupDisabled } = usePublicConfig()
 
   return (
     <header className="sticky top-0 z-[100] border-b border-border/60 bg-background/80 backdrop-blur-xl">
@@ -87,13 +89,13 @@ export default function LandingNav() {
               Sign In
             </Link>
             <Link
-              to="/signup"
+              to={signupDisabled ? '/login' : '/signup'}
               className={cn(
                 'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
                 'bg-primary text-white hover:bg-primary/90',
               )}
             >
-              Get Started
+              {signupDisabled ? 'Sign In' : 'Get Started'}
             </Link>
           </nav>
         </div>

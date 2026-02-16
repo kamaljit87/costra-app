@@ -371,9 +371,15 @@ export const SignInCard = ({
               </motion.div>
 
               <div className="text-center mt-6">
-                <a href={forgotPasswordHref} className="text-accent-600 hover:text-accent-700 text-sm transition-colors">
-                  Forgot password?
-                </a>
+                {forgotPasswordHref.startsWith('/') ? (
+                  <Link to={forgotPasswordHref} className="text-accent-600 hover:text-accent-700 text-sm transition-colors">
+                    Forgot password?
+                  </Link>
+                ) : (
+                  <a href={forgotPasswordHref} className="text-accent-600 hover:text-accent-700 text-sm transition-colors">
+                    Forgot password?
+                  </a>
+                )}
               </div>
             </form>
           </motion.div>

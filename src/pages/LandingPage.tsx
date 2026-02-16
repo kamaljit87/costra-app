@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
 import LandingNav from '../components/LandingNav'
+import { usePublicConfig } from '../contexts/PublicConfigContext'
 import { FlickeringGrid } from '@/components/ui/flickering-grid'
 
 const PLANS = {
@@ -77,6 +78,7 @@ const FEATURES = [
 export default function LandingPage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
   const location = useLocation()
+  const { signupDisabled } = usePublicConfig()
 
   // Scroll to pricing when navigating to /#pricing
   useEffect(() => {
@@ -115,12 +117,15 @@ export default function LandingPage() {
               with AI-powered insights and global currency support.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link to="/signup" className="btn-primary text-base px-8 py-3 flex items-center">
-                Start Free Trial
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-              <Link to="/login" className="btn-secondary text-base px-8 py-3">
+              {!signupDisabled && (
+                <Link to="/signup" className="btn-primary text-base px-8 py-3 flex items-center">
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              )}
+              <Link to="/login" className={signupDisabled ? 'btn-primary text-base px-8 py-3 flex items-center' : 'btn-secondary text-base px-8 py-3'}>
                 Sign In
+                {signupDisabled && <ArrowRight className="ml-2 h-4 w-4" />}
               </Link>
             </div>
 
@@ -266,10 +271,10 @@ export default function LandingPage() {
               </div>
 
               <Link
-                to="/signup"
+                to={signupDisabled ? '/login' : '/signup'}
                 className="w-full btn-secondary text-center block py-3 rounded-lg font-semibold"
               >
-                Start Free Trial
+                {signupDisabled ? 'Sign In' : 'Start Free Trial'}
               </Link>
             </div>
 
@@ -327,10 +332,10 @@ export default function LandingPage() {
               </div>
 
               <Link
-                to="/signup"
+                to={signupDisabled ? '/login' : '/signup'}
                 className="w-full btn-primary text-center block py-3 rounded-lg font-semibold"
               >
-                Start Free Trial
+                {signupDisabled ? 'Sign In' : 'Start Free Trial'}
               </Link>
             </div>
           </div>
@@ -350,8 +355,8 @@ export default function LandingPage() {
           <p className="text-xl text-accent-100 mb-10 max-w-2xl mx-auto">
             Join teams worldwide managing their multi-cloud infrastructure with Costra.
           </p>
-          <Link to="/signup" className="inline-flex items-center px-8 py-3.5 bg-white text-accent-700 rounded-lg font-semibold text-base hover:bg-accent-50 transition-colors duration-150">
-            Get Started Free
+          <Link to={signupDisabled ? '/login' : '/signup'} className="inline-flex items-center px-8 py-3.5 bg-white text-accent-700 rounded-lg font-semibold text-base hover:bg-accent-50 transition-colors duration-150">
+            {signupDisabled ? 'Sign In' : 'Get Started Free'}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
         </div>

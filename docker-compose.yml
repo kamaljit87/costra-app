@@ -91,10 +91,11 @@ services:
   costra-certbot:
     image: certbot/certbot:latest
     container_name: costra-certbot
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $$!; done;"]
     volumes:
       - certbot-certs:/etc/letsencrypt
       - certbot-webroot:/var/www/certbot
-    command: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $$!; done;"]
     depends_on:
       costra-nginx:
         condition: service_healthy

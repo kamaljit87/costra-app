@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { CurrencyProvider } from './contexts/CurrencyContext'
 import { FilterProvider } from './contexts/FilterContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { PublicConfigProvider, usePublicConfig } from './contexts/PublicConfigContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
@@ -23,6 +24,8 @@ import TermsOfServicePage from './pages/TermsOfServicePage'
 import ContactPage from './pages/ContactPage'
 import ChatBubbleDemoPage from './pages/ChatBubbleDemoPage'
 import GoogleCallbackPage from './pages/GoogleCallbackPage'
+import Verify2FAPage from './pages/Verify2FAPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import CookieConsent from './components/CookieConsent'
 import { NotFound } from './components/ui/ghost-404-page'
 
@@ -38,18 +41,36 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+function SignupRoute() {
+  const { signupDisabled, configReady } = usePublicConfig()
+  if (!configReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+      </div>
+    )
+  }
+  if (signupDisabled) {
+    return <Navigate to="/login" replace state={{ signupDisabled: true }} />
+  }
+  return <SignupTravelPage />
+}
+
 function App() {
   return (
     <AuthProvider>
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <CurrencyProvider>
-          <FilterProvider>
-            <NotificationProvider>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/login" element={<LoginTravelPage />} />
-                <Route path="/signup" element={<SignupTravelPage />} />
+      <PublicConfigProvider>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <CurrencyProvider>
+            <FilterProvider>
+              <NotificationProvider>
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/login" element={<LoginTravelPage />} />
+                  <Route path="/signup" element={<SignupRoute />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+                <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
                 <Route path="/contact" element={<ContactPage />} />
@@ -164,6 +185,7 @@ function App() {
           </FilterProvider>
         </CurrencyProvider>
       </Router>
+      </PublicConfigProvider>
     </AuthProvider>
   )
 }

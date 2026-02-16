@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useState } from 'react'
 
-// Google OAuth configuration
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 interface GoogleSignInButtonProps {
@@ -10,83 +7,26 @@ interface GoogleSignInButtonProps {
 }
 
 export default function GoogleSignInButton({ mode: _mode }: GoogleSignInButtonProps) {
-  const { googleLogin } = useAuth()
-  const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    // Load Google Identity Services script
-    if (GOOGLE_CLIENT_ID && typeof window.google === 'undefined') {
-      const script = document.createElement('script')
-      script.src = 'https://accounts.google.com/gsi/client'
-      script.async = true
-      script.defer = true
-      document.head.appendChild(script)
-    }
-  }, [])
-
-  const handleGoogleCallback = async (response: any) => {
-    try {
-      setIsLoading(true)
-
-      // Send the raw credential token to backend for server-side verification
-      const credential = response.credential
-      if (!credential) {
-        setError('No credential received from Google')
-        return
-      }
-
-      const success = await googleLogin(credential)
-
-      if (success) {
-        navigate('/dashboard')
-      } else {
-        setError('Failed to complete Google sign-in')
-      }
-    } catch (err: any) {
-      console.error('Google callback error:', err)
-      setError(err.message || 'Failed to complete Google sign-in')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Simplified approach: Direct OAuth flow
-  const handleSimpleGoogleSignIn = async () => {
+  // Always use redirect flow: avoids FedCM/One Tap aborts from extensions or browser, and never gets stuck
+  const handleGoogleSignIn = () => {
     if (!GOOGLE_CLIENT_ID) {
       setError('Google OAuth is not configured. Please use email/password authentication.')
       return
     }
-
-    try {
-      setIsLoading(true)
-      setError('')
-
-      // Use Google Identity Services One Tap
-      if (typeof window.google !== 'undefined') {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleCallback,
-        })
-        window.google.accounts.id.prompt()
-      } else {
-        // Fallback: redirect to Google OAuth
-        const redirectUri = encodeURIComponent(window.location.origin + '/auth/google/callback')
-        const scope = encodeURIComponent('email profile')
-        window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`
-      }
-    } catch (err: any) {
-      console.error('Google sign-in error:', err)
-      setError(err.message || 'Failed to initialize Google sign-in')
-      setIsLoading(false)
-    }
+    setError('')
+    setIsLoading(true)
+    const redirectUri = encodeURIComponent(window.location.origin + '/auth/google/callback')
+    const scope = encodeURIComponent('email profile')
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`
   }
 
   return (
     <>
       <button
-        onClick={handleSimpleGoogleSignIn}
+        onClick={handleGoogleSignIn}
         disabled={isLoading}
         type="button"
         className="w-full flex items-center justify-center space-x-2 px-4 py-3 border border-gray-200 rounded-xl bg-white text-gray-700 hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
@@ -94,7 +34,7 @@ export default function GoogleSignInButton({ mode: _mode }: GoogleSignInButtonPr
         {isLoading ? (
           <>
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
-            <span>Connecting...</span>
+            <span>Redirecting...</span>
           </>
         ) : (
           <>
@@ -120,17 +60,9 @@ export default function GoogleSignInButton({ mode: _mode }: GoogleSignInButtonPr
           </>
         )}
       </button>
-      <div id="google-signin-button" className="mt-2"></div>
       {error && (
         <div className="mt-2 text-sm text-red-600 text-center">{error}</div>
       )}
     </>
   )
-}
-
-// Extend Window interface for TypeScript
-declare global {
-  interface Window {
-    google: any
-  }
 }

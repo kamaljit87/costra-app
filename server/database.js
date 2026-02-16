@@ -1105,7 +1105,16 @@ export const createUser = async (name, email, passwordHash) => {
   }
 }
 
-export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl) => {
+/**
+ * @param {string} googleId
+ * @param {string} name
+ * @param {string} email
+ * @param {string|null} avatarUrl
+ * @param {{ allowCreate?: boolean }} [options] - If allowCreate is false, do not create a new user when none exists.
+ * @returns {Promise<{ userId: number, isNewUser: boolean } | { userId: null, isNewUser: true }>}
+ */
+export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl, options = {}) => {
+  const { allowCreate = true } = options
   const client = await pool.connect()
   try {
     // Check if user exists by Google ID
@@ -1115,6 +1124,7 @@ export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl)
     )
 
     let userId
+    let isNewUser = false
     if (result.rows.length > 0) {
       // Update existing user
       userId = result.rows[0].id
@@ -1136,6 +1146,8 @@ export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl)
           'UPDATE users SET google_id = $1, avatar_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
           [googleId, avatarUrl, userId]
         )
+      } else if (!allowCreate) {
+        return { userId: null, isNewUser: true }
       } else {
         // Create new user
         result = await client.query(
@@ -1143,6 +1155,7 @@ export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl)
           [name, email, googleId, avatarUrl]
         )
         userId = result.rows[0].id
+        isNewUser = true
 
         // Create default preferences
         await client.query(
@@ -1152,7 +1165,7 @@ export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl)
       }
     }
 
-    return userId
+    return { userId, isNewUser }
   } finally {
     client.release()
   }
@@ -1206,7 +1219,9 @@ export const get2FAStatus = async (userId) => {
     )
     const row = result.rows[0]
     if (!row) return null
-    return { enabled: !!row.enabled }
+    // pg can return boolean as true/false or 't'/'f'; only treat explicit true as enabled
+    const enabled = row.enabled === true || row.enabled === 't'
+    return { enabled }
   } finally {
     client.release()
   }

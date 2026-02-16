@@ -2,27 +2,52 @@ import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import speakeasy from 'speakeasy'
-import QRCode from 'qrcode'
 import {
   createUser,
   getUserByEmail,
   getUserById,
-  recordMultipleConsents,
   get2FAStatus,
+  getUserTOTPSecret,
   setTOTPPending,
   getTOTPPending,
   confirmTOTPAndEnable,
   disableTOTP,
-  getUserTOTPSecret,
+  recordMultipleConsents,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
 import { createTrialSubscription } from '../services/subscriptionService.js'
 import logger from '../utils/logger.js'
 
-const JWT_2FA_PENDING_EXPIRY = '5m'
-
 const router = express.Router()
+
+const TOTP_ISSUER = 'Costra'
+const TEMP_TOKEN_EXPIRY = '10m'
+
+/** Issue a short-lived token only valid for POST /auth/2fa/verify */
+function signTemporary2FAToken(userId, email) {
+  return jwt.sign(
+    { userId, email, purpose: '2fa_verify' },
+    process.env.JWT_SECRET,
+    { expiresIn: TEMP_TOKEN_EXPIRY }
+  )
+}
+
+/** Verify temporary 2FA token; returns payload or throws */
+function verifyTemporary2FAToken(temporaryToken) {
+  const payload = jwt.verify(temporaryToken, process.env.JWT_SECRET)
+  if (payload.purpose !== '2fa_verify') throw new Error('Invalid token purpose')
+  return payload
+}
+
+function toUserResponse(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatarUrl: user.avatar_url ?? null,
+  }
+}
 
 /**
  * @swagger
@@ -74,10 +99,30 @@ const router = express.Router()
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
+/** Public config (no auth). Used by frontend to hide signup when DISABLE_SIGNUP is set. */
+router.get('/config', (_req, res) => {
+  const signupDisabled = process.env.DISABLE_SIGNUP === 'true' || process.env.DISABLE_SIGNUP === '1'
+  res.json({ signupDisabled })
+})
+
+/** Forgot password: accept email and return generic success (no email sent unless configured). Prevents user enumeration. */
+router.post('/forgot-password', (req, res) => {
+  const email = req.body?.email
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return res.status(400).json({ error: 'Email is required' })
+  }
+  // Always return success to avoid revealing whether the account exists
+  res.json({ message: 'If an account exists for this email, you will receive reset instructions.' })
+})
+
 router.post('/signup',
   validateSignup,
   async (req, res) => {
     try {
+      if (process.env.DISABLE_SIGNUP === 'true' || process.env.DISABLE_SIGNUP === '1') {
+        return res.status(503).json({ error: 'Sign up is temporarily disabled.' })
+      }
+
       const { name, email, password, consentAccepted } = req.body
 
       // Require consent to Privacy Policy and Terms of Service (GDPR Art. 6 / DPDPA Sec. 6)
@@ -251,18 +296,14 @@ router.post('/login',
         return res.status(401).json({ error: 'Invalid credentials' })
       }
 
-      // If 2FA is enabled, return a short-lived token for the 2FA verification step (use get2FAStatus so we match Settings logic)
-      const twoFAStatus = await get2FAStatus(user.id)
-      if (twoFAStatus?.enabled) {
-        const tempToken = jwt.sign(
-          { userId: user.id, email: user.email, purpose: '2fa_pending' },
-          process.env.JWT_SECRET,
-          { expiresIn: JWT_2FA_PENDING_EXPIRY }
-        )
+      const twoFA = await get2FAStatus(user.id)
+      if (twoFA?.enabled) {
+        const temporaryToken = signTemporary2FAToken(user.id, user.email)
         return res.json({
-          requires2fa: true,
-          tempToken,
-          message: 'Enter your authentication code',
+          message: 'Two-factor authentication required',
+          twoFactorRequired: true,
+          temporaryToken,
+          user: toUserResponse(user),
         })
       }
 
@@ -276,12 +317,7 @@ router.post('/login',
       res.json({
         message: 'Login successful',
         token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          avatarUrl: user.avatar_url,
-        },
+        user: toUserResponse(user),
       })
     } catch (error) {
       logger.error('Login error', {
@@ -394,40 +430,36 @@ router.post('/refresh', authenticateToken, async (req, res) => {
   }
 })
 
-// --- 2FA (TOTP) routes ---
-
-/** Verify 2FA code after login and return full JWT */
-router.post('/2fa/verify-login', async (req, res) => {
+// --- 2FA verify (no auth middleware; uses temporary token) ---
+router.post('/2fa/verify', async (req, res) => {
   try {
-    const { tempToken, code } = req.body
-    if (!tempToken || !code || typeof code !== 'string') {
-      return res.status(400).json({ error: 'Token and code are required' })
+    const { temporaryToken, code } = req.body
+    if (!temporaryToken || typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({ error: 'temporaryToken and code are required' })
     }
     let payload
     try {
-      payload = jwt.verify(tempToken, process.env.JWT_SECRET)
-    } catch (e) {
-      return res.status(401).json({ error: 'Session expired. Please log in again.' })
+      payload = verifyTemporary2FAToken(temporaryToken)
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired code. Please sign in again.' })
     }
-    if (payload.purpose !== '2fa_pending' || !payload.userId) {
-      return res.status(401).json({ error: 'Invalid token' })
-    }
-    const secret = await getUserTOTPSecret(payload.userId)
+    const userId = payload.userId
+    const secret = await getUserTOTPSecret(userId)
     if (!secret) {
-      return res.status(401).json({ error: 'Two-factor not enabled for this account' })
+      return res.status(401).json({ error: 'Two-factor authentication is not enabled for this account.' })
     }
     const valid = speakeasy.totp.verify({
       secret,
       encoding: 'base32',
-      token: code.replace(/\s/g, ''),
+      token: code.trim(),
       window: 1,
     })
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid or expired code' })
+      return res.status(401).json({ error: 'Invalid verification code.' })
     }
-    const user = await getUserById(payload.userId)
+    const user = await getUserById(userId)
     if (!user) {
-      return res.status(404).json({ error: 'User not found' })
+      return res.status(401).json({ error: 'User not found.' })
     }
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -435,135 +467,108 @@ router.post('/2fa/verify-login', async (req, res) => {
       { expiresIn: '7d' }
     )
     res.json({
-      message: 'Login successful',
+      message: 'Two-factor verification successful',
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        avatarUrl: user.avatar_url || null,
-      },
+      user: toUserResponse(user),
     })
   } catch (error) {
-    logger.error('2FA verify-login error', { error: error.message, stack: error.stack })
+    logger.error('2FA verify error', { requestId: req.requestId, error: error.message })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-/** Get current user's 2FA status (enabled or not) */
+// --- 2FA setup (authenticated) ---
 router.get('/2fa/status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
     const status = await get2FAStatus(userId)
-    if (!status) {
-      return res.status(404).json({ error: 'User not found' })
-    }
-    res.json({ enabled: !!status.enabled })
+    const enabled = status?.enabled === true || status?.enabled === 't'
+    res.json({ enabled: !!enabled })
   } catch (error) {
-    logger.error('2FA status error', { error: error.message })
+    logger.error('2FA status error', { requestId: req.requestId, error: error.message })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-/** Start 2FA setup: generate secret, store pending, return QR data URL and secret for manual entry */
 router.post('/2fa/setup', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
     const user = await getUserById(userId)
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' })
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' })
     const status = await get2FAStatus(userId)
     if (status?.enabled) {
-      return res.status(400).json({ error: 'Two-factor authentication is already enabled' })
+      return res.status(400).json({ error: 'Two-factor authentication is already enabled.' })
     }
-    const secret = speakeasy.generateSecret({
-      name: `Costra (${user.email})`,
+    const gen = speakeasy.generateSecret({
+      name: `${TOTP_ISSUER} (${user.email})`,
       length: 20,
-      issuer: 'Costra',
     })
-    await setTOTPPending(userId, secret.base32)
-    const otpauthUrl = secret.otpauth_url || speakeasy.otpauthURL({
-      secret: secret.base32,
-      label: user.email.replace(/@/g, '%40'),
-      issuer: 'Costra',
-      encoding: 'base32',
+    await setTOTPPending(userId, gen.base32)
+    res.json({
+      secret: gen.base32,
+      otpauthUrl: gen.otpauth_url,
     })
-    const qrDataUrl = await QRCode.toDataURL(otpauthUrl)
-    res.json({ secret: secret.base32, qrDataUrl })
   } catch (error) {
-    logger.error('2FA setup error', { error: error.message, stack: error.stack })
+    logger.error('2FA setup error', { requestId: req.requestId, error: error.message })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-/** Confirm 2FA setup with a code from the authenticator app */
 router.post('/2fa/confirm', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    const { code } = req.body
-    if (!code || typeof code !== 'string') {
+    const code = req.body?.code
+    if (!code || typeof code !== 'string' || !code.trim()) {
       return res.status(400).json({ error: 'Code is required' })
     }
-    const pendingSecret = await getTOTPPending(userId)
-    if (!pendingSecret) {
-      return res.status(400).json({ error: 'No 2FA setup in progress. Start setup again.' })
+    const pending = await getTOTPPending(userId)
+    if (!pending) {
+      return res.status(400).json({ error: 'No 2FA setup in progress. Start setup first.' })
     }
     const valid = speakeasy.totp.verify({
-      secret: pendingSecret,
+      secret: pending,
       encoding: 'base32',
-      token: code.replace(/\s/g, ''),
+      token: code.trim(),
       window: 1,
     })
     if (!valid) {
-      return res.status(401).json({ error: 'Invalid or expired code. Please try again.' })
+      return res.status(400).json({ error: 'Invalid verification code.' })
     }
     const ok = await confirmTOTPAndEnable(userId)
     if (!ok) {
-      return res.status(400).json({ error: 'Could not enable 2FA' })
+      return res.status(400).json({ error: 'Could not enable 2FA. Please try again.' })
     }
-    res.json({ message: 'Two-factor authentication is now enabled' })
+    res.json({ message: 'Two-factor authentication enabled.' })
   } catch (error) {
-    logger.error('2FA confirm error', { error: error.message, stack: error.stack })
+    logger.error('2FA confirm error', { requestId: req.requestId, error: error.message })
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-/** Disable 2FA (requires current password) */
 router.post('/2fa/disable', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    const { password, code } = req.body
-    if (!password || typeof password !== 'string') {
-      return res.status(400).json({ error: 'Password is required to disable 2FA' })
+    const code = req.body?.code
+    if (!code || typeof code !== 'string' || !code.trim()) {
+      return res.status(400).json({ error: 'Code is required' })
     }
-    const user = await getUserById(userId)
-    if (!user || !user.password_hash) {
-      return res.status(400).json({ error: 'Cannot disable 2FA for this account' })
+    const secret = await getUserTOTPSecret(userId)
+    if (!secret) {
+      return res.status(400).json({ error: 'Two-factor authentication is not enabled.' })
     }
-    const validPassword = await bcrypt.compare(password, user.password_hash)
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Incorrect password' })
-    }
-    // Optionally require current TOTP code for extra security
-    if (code) {
-      const secret = await getUserTOTPSecret(userId)
-      if (secret) {
-        const validCode = speakeasy.totp.verify({
-          secret,
-          encoding: 'base32',
-          token: String(code).replace(/\s/g, ''),
-          window: 1,
-        })
-        if (!validCode) {
-          return res.status(401).json({ error: 'Invalid authentication code' })
-        }
-      }
+    const valid = speakeasy.totp.verify({
+      secret,
+      encoding: 'base32',
+      token: code.trim(),
+      window: 1,
+    })
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid verification code.' })
     }
     await disableTOTP(userId)
-    res.json({ message: 'Two-factor authentication has been disabled' })
+    res.json({ message: 'Two-factor authentication disabled.' })
   } catch (error) {
-    logger.error('2FA disable error', { error: error.message, stack: error.stack })
+    logger.error('2FA disable error', { requestId: req.requestId, error: error.message })
     res.status(500).json({ error: 'Internal server error' })
   }
 })

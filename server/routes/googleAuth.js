@@ -1,8 +1,10 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import { OAuth2Client } from 'google-auth-library'
-import { createOrUpdateGoogleUser, getUserByGoogleId } from '../database.js'
+import { createOrUpdateGoogleUser, getUserByGoogleId, get2FAStatus } from '../database.js'
 import logger from '../utils/logger.js'
+
+const TEMP_TOKEN_EXPIRY = '10m'
 
 const router = express.Router()
 
@@ -96,11 +98,40 @@ router.post('/callback', async (req, res) => {
       return res.status(401).json({ error: 'Google email not verified' })
     }
 
-    // Create or update user
-    const userId = await createOrUpdateGoogleUser(googleId, name, email, avatarUrl)
+    const signupDisabled = process.env.DISABLE_SIGNUP === 'true' || process.env.DISABLE_SIGNUP === '1'
+    const { userId, isNewUser } = await createOrUpdateGoogleUser(googleId, name, email, avatarUrl, { allowCreate: !signupDisabled })
+    if (userId === null && isNewUser) {
+      logger.warn('Google OAuth: new user rejected (signup disabled)', { email })
+      return res.status(403).json({
+        error: 'Sign up is disabled. Only existing accounts can sign in.',
+      })
+    }
 
     // Get user data
     const user = await getUserByGoogleId(googleId)
+    if (!user) {
+      return res.status(500).json({ error: 'User not found after sign-in.' })
+    }
+
+    const twoFA = await get2FAStatus(user.id)
+    if (twoFA?.enabled) {
+      const temporaryToken = jwt.sign(
+        { userId: user.id, email: user.email, purpose: '2fa_verify' },
+        process.env.JWT_SECRET,
+        { expiresIn: TEMP_TOKEN_EXPIRY }
+      )
+      return res.json({
+        message: 'Two-factor authentication required',
+        twoFactorRequired: true,
+        temporaryToken,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatarUrl: user.avatar_url,
+        },
+      })
+    }
 
     // Generate JWT token
     const token = jwt.sign(

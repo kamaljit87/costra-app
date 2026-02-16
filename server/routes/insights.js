@@ -44,7 +44,7 @@ const router = express.Router()
  */
 router.get('/cost-vs-usage', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, startDate, endDate, accountId } = req.query
     
     if (!startDate || !endDate) {
@@ -80,7 +80,7 @@ router.get('/cost-vs-usage', authenticateToken, async (req, res) => {
  */
 router.get('/untagged-resources', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, limit = 50, accountId } = req.query
     
     const resources = await getUntaggedResources(
@@ -120,7 +120,7 @@ router.get('/untagged-resources', authenticateToken, async (req, res) => {
  */
 router.get('/anomalies', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, thresholdPercent = 20, accountId } = req.query
     
     const anomalies = await getAnomalies(
@@ -159,7 +159,7 @@ router.get('/anomalies', authenticateToken, async (req, res) => {
  */
 router.post('/anomalies/calculate', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, serviceName, baselineDate, accountId } = req.body
     
     if (!providerId || !serviceName || !baselineDate) {
@@ -351,7 +351,7 @@ router.post('/cost-summary-range/:providerId', authenticateToken, async (req, re
  */
 router.get('/dimensions', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { providerId, accountId } = req.query
     
     const dimensions = await getAvailableDimensions(
@@ -378,7 +378,7 @@ router.get('/dimensions', authenticateToken, async (req, res) => {
  */
 router.get('/cost-by-dimension', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { dimensionKey, dimensionValue, providerId, accountId } = req.query
     
     if (!dimensionKey) {
@@ -415,7 +415,7 @@ router.get('/cost-by-dimension', authenticateToken, async (req, res) => {
  */
 router.post('/business-metrics', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { metricType, metricName, date, metricValue, unit, notes, providerId, accountId } = req.body
     
     if (!metricType || !metricName || !date || metricValue === undefined) {
@@ -453,7 +453,7 @@ router.post('/business-metrics', authenticateToken, async (req, res) => {
  */
 router.get('/business-metrics', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { startDate, endDate, metricType, metricName, providerId } = req.query
     
     if (!startDate || !endDate) {
@@ -488,7 +488,7 @@ router.get('/business-metrics', authenticateToken, async (req, res) => {
  */
 router.get('/unit-economics', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { startDate, endDate, providerId, accountId } = req.query
     
     // Check if user has access to unit economics (Pro only)
@@ -547,7 +547,7 @@ router.get('/unit-economics', authenticateToken, async (req, res) => {
  */
 router.get('/cost-efficiency', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { startDate, endDate, providerId, accountId } = req.query
     
     if (!startDate || !endDate) {
@@ -757,7 +757,7 @@ router.get('/rightsizing-recommendations', authenticateToken, async (req, res) =
  */
 router.get('/cost-by-product', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { startDate, endDate, providerId, accountId } = req.query
     
     if (!startDate || !endDate) {
@@ -793,7 +793,7 @@ router.get('/cost-by-product', authenticateToken, async (req, res) => {
  */
 router.get('/cost-by-team', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { startDate, endDate, providerId, accountId } = req.query
     
     if (!startDate || !endDate) {
@@ -829,7 +829,7 @@ router.get('/cost-by-team', authenticateToken, async (req, res) => {
  */
 router.get('/product/:productName/trends', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { productName } = req.params
     const { startDate, endDate, providerId, accountId } = req.query
     
@@ -868,7 +868,7 @@ router.get('/product/:productName/trends', authenticateToken, async (req, res) =
  */
 router.get('/team/:teamName/trends', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { teamName } = req.params
     const { startDate, endDate, providerId, accountId } = req.query
     
@@ -907,7 +907,7 @@ router.get('/team/:teamName/trends', authenticateToken, async (req, res) => {
  */
 router.get('/product/:productName/services', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { productName } = req.params
     const { startDate, endDate, providerId, accountId } = req.query
     
@@ -946,7 +946,7 @@ router.get('/product/:productName/services', authenticateToken, async (req, res)
  */
 router.get('/team/:teamName/services', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id
+    const userId = req.user.userId || req.user.id
     const { teamName } = req.params
     const { startDate, endDate, providerId, accountId } = req.query
     
