@@ -29,7 +29,7 @@ const AnimatedMenuToggle = ({
         initial="closed"
         animate={isOpen ? 'open' : 'closed'}
         transition={{ duration: 0.3 }}
-        className="text-gray-900"
+        className="text-gray-900 dark:text-gray-100"
       >
         <motion.path
           fill="transparent"
@@ -200,8 +200,8 @@ const Sidebar = ({
   const linkClass = (path: string) =>
     `flex gap-2 font-medium text-sm items-center w-full py-2 px-4 rounded-xl transition-colors text-left ${
       isActive(path)
-        ? 'bg-accent-50 text-accent-700'
-        : 'text-gray-700 hover:bg-surface-200 hover:text-gray-900'
+        ? 'bg-accent-50 dark:bg-accent-900/50 text-accent-700 dark:text-accent-200'
+        : 'text-gray-700 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
     }`
 
   const renderNav = () => (
@@ -222,7 +222,7 @@ const Sidebar = ({
   )
 
   const renderFooter = () => (
-    <div className="p-4 border-t border-surface-200 space-y-2">
+    <div className="p-4 border-t border-surface-200 dark:border-gray-700 space-y-2">
       {onContactClick && (
         <button
           type="button"
@@ -230,7 +230,7 @@ const Sidebar = ({
             onContactClick()
             closeOnNav()
           }}
-          className="flex items-center gap-2 w-full font-medium text-sm py-2 px-4 rounded-xl text-gray-600 hover:bg-surface-200 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-2 w-full font-medium text-sm py-2 px-4 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
         >
           <MessageCircle className="h-4 w-4" />
           Contact Us
@@ -239,7 +239,7 @@ const Sidebar = ({
       <Link
         to="/settings"
         onClick={closeOnNav}
-        className="flex items-center justify-center gap-2 font-medium text-sm p-2 text-center bg-accent-100 text-accent-800 rounded-xl hover:bg-accent-200 transition-colors"
+        className="flex items-center justify-center gap-2 font-medium text-sm p-2 text-center bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-200 rounded-xl hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors"
       >
         <Plus className="h-4 w-4" />
         Add provider
@@ -352,7 +352,7 @@ const Sidebar = ({
   )
 
   return (
-    <div className="flex h-screen bg-surface-100">
+    <div className="flex h-screen bg-surface-100 dark:bg-gray-900">
       {/* Mobile Sidebar */}
       <AnimatePresence>
         {isOpen && (
@@ -371,17 +371,19 @@ const Sidebar = ({
               exit="hidden"
               variants={mobileSidebarVariants}
               transition={{ duration: 0.3 }}
-              className="md:hidden fixed inset-y-0 left-0 w-72 z-40 bg-white text-gray-900 border-r border-surface-200 shadow-xl flex flex-col"
+              className="md:hidden fixed inset-y-0 left-0 w-72 z-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-xl flex flex-col"
             >
-              <div className="flex items-center justify-between h-16 px-4 border-b border-surface-200 shrink-0">
-                <Link to="/dashboard" onClick={closeOnNav} className="flex items-center">
-                  <img src="/logo.png" alt="Costra" className="h-9 w-auto" />
+              <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0 relative">
+                <Link to="/dashboard" onClick={closeOnNav} className="w-full flex justify-center items-center">
+                  <span className="dark:inline-block dark:rounded-lg dark:bg-gray-900 dark:px-1">
+                    <img src="/logo.png" alt="Costra" className="h-9 w-auto block dark:mix-blend-multiply" />
+                  </span>
                 </Link>
                 <button
                   type="button"
                   onClick={toggleSidebar}
                   aria-label="Close menu"
-                  className="p-2 rounded-lg text-gray-500 hover:bg-surface-200 hover:text-gray-900"
+                  className="absolute right-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
                 >
                   <span className="text-xl leading-none">×</span>
                 </button>
@@ -393,10 +395,12 @@ const Sidebar = ({
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex flex-col fixed top-0 left-0 h-full w-72 bg-white text-gray-900 border-r border-surface-200 shadow-sm z-20">
-        <div className="flex items-center h-16 px-4 border-b border-surface-200 shrink-0">
-          <Link to="/dashboard" className="flex items-center">
-            <img src="/logo.png" alt="Costra" className="h-9 w-auto" />
+      <div className="hidden lg:flex flex-col fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-sm z-20">
+        <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0">
+          <Link to="/dashboard" className="w-full flex justify-center items-center">
+            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-900 dark:px-1">
+              <img src="/logo.png" alt="Costra" className="h-9 w-auto block dark:mix-blend-multiply" />
+            </span>
           </Link>
         </div>
         {sidebarContent}

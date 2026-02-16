@@ -4,7 +4,7 @@
 import { Router } from 'express'
 import { authenticateToken } from '../middleware/auth.js'
 import { getGoals, createGoal, deleteGoal, getGoalProgress } from '../database.js'
-import { logger } from '../logger.js'
+import logger from '../utils/logger.js'
 
 const router = Router()
 router.use(authenticateToken)

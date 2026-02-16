@@ -10,11 +10,13 @@ interface LogoProps {
 
 export default function Logo({ className = '', height = 40 }: LogoProps) {
   return (
-    <img
-      src="/logo.png"
-      alt="Costra"
-      className={`w-auto ${className}`}
-      style={{ height: `${height}px` }}
-    />
+    <span className="dark:inline-block dark:rounded-lg dark:bg-gray-900 dark:px-1">
+      <img
+        src="/logo.png"
+        alt="Costra"
+        className={`w-auto dark:mix-blend-multiply ${className}`}
+        style={{ height: `${height}px` }}
+      />
+    </span>
   )
 }

@@ -50,7 +50,7 @@ export default function Layout({ children }: LayoutProps) {
           <TopNav onMenuClick={() => setSidebarOpen(true)} />
         </div>
         <TrialBanner />
-        <main className="flex-1 overflow-y-auto bg-surface-100">
+        <main className="flex-1 overflow-y-auto bg-surface-100 dark:bg-gray-900">
           <div className="min-h-full px-6 lg:px-8 py-6 lg:py-8">
             {children}
           </div>

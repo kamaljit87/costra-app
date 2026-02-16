@@ -5,7 +5,7 @@ import { Router } from 'express'
 import crypto from 'node:crypto'
 import { requireJwt } from '../middleware/auth.js'
 import { getApiKeys, createApiKey, deleteApiKey } from '../database.js'
-import { logger } from '../logger.js'
+import logger from '../utils/logger.js'
 
 const router = Router()
 router.use(requireJwt)

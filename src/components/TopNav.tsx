@@ -324,7 +324,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   })
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-surface-300">
+    <header className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-surface-300 dark:border-gray-800 dark:bg-gray-900">
       <div className="w-full px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Mobile Menu Button - Minimum 44x44px touch target */}
@@ -339,7 +339,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
           {/* Search Bar - Responsive */}
           <div className="flex-1 max-w-2xl mx-2 sm:mx-4 lg:mx-8" ref={searchRef}>
             <div className="relative">
-              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-500" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -348,12 +348,12 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
                 onKeyDown={handleSearchKeyDown}
-                className="w-full pl-10 sm:pl-12 pr-9 sm:pr-10 py-2 sm:py-2.5 text-sm sm:text-base bg-surface-100 border border-surface-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 placeholder-gray-400"
+                className="w-full pl-10 sm:pl-12 pr-9 sm:pr-10 py-2 sm:py-2.5 text-sm sm:text-base bg-surface-100 dark:bg-gray-800 border border-surface-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500 text-gray-900 dark:text-gray-100 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 dark:bg-gray-800 dark:border-gray-700"
               />
               {searchQuery && (
                 <button
                   onClick={clearSearch}
-                  className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-600 rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded min-w-[44px] min-h-[44px] flex items-center justify-center"
                   aria-label="Clear search"
                 >
                   <X className="h-4 w-4" />
@@ -362,7 +362,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               
               {/* Search Results Dropdown */}
               {isSearchFocused && searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-dropdown border border-surface-300 max-h-96 overflow-y-auto z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-dropdown border border-surface-300 dark:border-gray-700 max-h-96 overflow-y-auto z-50">
                   <div className="py-2">
                     {searchResults.map((result, index) => (
                       <button
@@ -373,8 +373,8 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                           w-full px-4 py-3 text-left flex items-center justify-between
                           transition-colors
                           ${selectedResultIndex === index 
-                            ? 'bg-accent-50 text-accent-700' 
-                            : 'text-gray-700 hover:bg-gray-50'
+                            ? 'bg-accent-50 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300' 
+                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                           }
                         `}
                       >
@@ -416,11 +416,11 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               
               {/* No Results */}
               {isSearchFocused && searchQuery.length >= 2 && searchResults.length === 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-dropdown border border-surface-300 py-8 z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-dropdown border border-surface-300 dark:border-gray-700 py-8 z-50">
                   <div className="text-center">
-                    <Search className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No results found</p>
-                    <p className="text-xs text-gray-400 mt-1">Try searching for providers, accounts, or services</p>
+                    <Search className="h-8 w-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No results found</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try searching for providers, accounts, or services</p>
                   </div>
                 </div>
               )}
@@ -437,8 +437,8 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   flex items-center space-x-2 px-4 py-2 rounded-lg
                   transition-colors
                   ${isProviderPage 
-                    ? 'bg-accent-50 text-accent-700' 
-                    : 'text-gray-700 hover:bg-gray-100'
+                    ? 'bg-accent-50 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300' 
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }
                 `}
               >
@@ -448,7 +448,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
               </button>
 
               {isProviderMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-dropdown border border-surface-300 py-2 z-50 max-h-[500px] overflow-y-auto">
+                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-dropdown border border-surface-300 dark:border-gray-700 py-2 z-50 max-h-[500px] overflow-y-auto">
                   {sortedProviders.length === 0 ? (
                     <div className="px-4 py-8 text-center">
                       <Cloud className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -521,7 +521,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                     loadUnreadNotificationCount()
                   }
                 }}
-                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <Bell className="h-5 w-5" />
                 {unreadNotificationCount > 0 && (
@@ -553,7 +553,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 {user?.avatarUrl ? (
                   <img 
@@ -566,18 +566,18 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                     <User className="h-4 w-4 text-white" />
                   </div>
                 )}
-                <span className="hidden md:block text-sm font-medium text-gray-700">{user?.name || 'User'}</span>
-                <ChevronDown className={`h-4 w-4 text-gray-600 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                <span className="hidden md:block text-sm font-medium text-gray-700 dark:text-gray-200">{user?.name || 'User'}</span>
+                <ChevronDown className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-dropdown border border-surface-300 py-2 z-50">
-                  <div className="px-4 py-3 border-b border-gray-200">
-                    <p className="text-sm font-semibold text-gray-900">{user?.name || 'User'}</p>
-                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-dropdown border border-surface-300 dark:border-gray-700 py-2 z-50">
+                  <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user?.name || 'User'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
                     {subscriptionStatus && (
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-700 capitalize">
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300 capitalize">
                           {subscriptionStatus.planType} Plan
                         </span>
                         {subscriptionStatus.daysRemaining !== null && subscriptionStatus.planType === 'trial' && (
@@ -592,7 +592,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/profile"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <User className="h-4 w-4" />
                     <span>Profile</span>
@@ -601,7 +601,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/settings"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <Settings className="h-4 w-4" />
                     <span>Settings</span>
@@ -610,7 +610,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/settings/billing"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <CreditCard className="h-4 w-4" />
                     <span>Billing & Subscription</span>
@@ -619,16 +619,16 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/debug"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
                     <Bug className="h-4 w-4" />
                     <span>API Debug</span>
                   </Link>
                   
-                  <div className="border-t border-gray-200 mt-2 pt-2">
+                  <div className="border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
                     <button
                       onClick={handleLogout}
-                      className="flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full transition-colors"
+                      className="flex items-center space-x-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 w-full transition-colors"
                     >
                       <LogOut className="h-4 w-4" />
                       <span>Logout</span>

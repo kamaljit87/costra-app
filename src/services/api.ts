@@ -1,11 +1,16 @@
 // Use relative URL to leverage Vite proxy in development, or absolute URL in production
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3002/api')
 
-/** Public auth config (no token). Signup disabled when DISABLE_SIGNUP env is set. */
+/** Public auth config (no token). Signup disabled when DISABLE_SIGNUP env is set. On 502/5xx or network error, returns safe default so app still loads. */
 export const getAuthConfig = async (): Promise<{ signupDisabled: boolean }> => {
-  const res = await fetch(`${API_BASE_URL}/auth/config`)
-  const data = await res.json().catch(() => ({}))
-  return { signupDisabled: !!data.signupDisabled }
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/config`)
+    if (!res.ok) return { signupDisabled: false }
+    const data = await res.json().catch(() => ({}))
+    return { signupDisabled: !!data.signupDisabled }
+  } catch {
+    return { signupDisabled: false }
+  }
 }
 
 // Get auth token from localStorage

@@ -205,13 +205,13 @@ export default function Dashboard() {
 
         {/* Demo Mode Banner */}
         {isDemoMode && (
-          <div className="mb-4 bg-accent-50 border border-accent-100 rounded-xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
-            <div className="w-8 h-8 rounded-lg bg-accent-100 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-accent-500" />
+          <div className="mb-4 bg-accent-50 dark:bg-accent-900/30 border border-accent-100 dark:border-accent-800 rounded-xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
+            <div className="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-800/50 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-accent-500 dark:text-accent-400" />
             </div>
             <div>
-              <span className="text-accent-700 font-semibold text-sm">Demo Mode</span>
-              <span className="text-gray-500 text-xs ml-2">
+              <span className="text-accent-700 dark:text-accent-300 font-semibold text-sm">Demo Mode</span>
+              <span className="text-gray-500 dark:text-gray-400 text-xs ml-2">
                 You're viewing sample data. Sign up to connect your cloud accounts.
               </span>
             </div>
@@ -221,10 +221,10 @@ export default function Dashboard() {
         {/* Header with Sync and Add Provider - Compact */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-0.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-0.5">
               Dashboard
             </h1>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
@@ -274,8 +274,8 @@ export default function Dashboard() {
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 text-accent-600 animate-spin mx-auto mb-4" />
-              <p className="text-gray-500">Loading cost data...</p>
+              <RefreshCw className="h-8 w-8 text-accent-600 dark:text-accent-400 animate-spin mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">Loading cost data...</p>
             </div>
           </div>
         ) : (
@@ -393,11 +393,11 @@ export default function Dashboard() {
               if (providersToShow.length === 0 && !isDemoMode) {
                 return (
                   <div className="flex flex-col items-center justify-center py-16 px-4">
-                    <div className="w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-6">
-                      <Cloud className="h-12 w-12 text-gray-400" />
+                    <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-6">
+                      <Cloud className="h-12 w-12 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Cloud Providers Connected</h3>
-                    <p className="text-gray-600 text-center max-w-md mb-6">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No Cloud Providers Connected</h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-6">
                       Connect your cloud provider accounts to start tracking costs and managing your cloud spending.
                     </p>
                     <button
@@ -413,7 +413,7 @@ export default function Dashboard() {
 
               return (
                 <div className="mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">By Provider</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">By Provider</h2>
                   <div className="space-y-4">
                     {providersToShow.map((data) => {
                       const hasData = data.currentMonth > 0 || data.services.length > 0
