@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
     }
 
     // Validate notification type
-    const allowedTypes = ['info', 'success', 'warning', 'error', 'sync', 'anomaly']
+    const allowedTypes = ['info', 'success', 'warning', 'error', 'sync', 'anomaly', 'provider_alert']
     if (!allowedTypes.includes(type)) {
       return res.status(400).json({ error: 'Invalid notification type' })
     }

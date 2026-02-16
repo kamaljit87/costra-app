@@ -6,6 +6,7 @@ import {
   getUserCloudProviders,
   saveCostData,
   saveBulkDailyCostData,
+  saveServiceUsageMetrics,
   getCachedCostData,
   setCachedCostData,
   updateCloudProviderSyncTime,
@@ -158,6 +159,16 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       await saveBulkDailyCostData(userId, account.provider_id, costData.dailyData, account.id)
     }
 
+    // Save service-level cost + usage for Cost vs Usage analytics (AWS returns serviceUsageMetrics)
+    if (costData.serviceUsageMetrics?.length > 0) {
+      try {
+        await saveServiceUsageMetrics(userId, account.id, account.provider_id, costData.serviceUsageMetrics)
+        logger.debug('Service usage metrics saved', { requestId, userId, accountId: account.id, count: costData.serviceUsageMetrics.length })
+      } catch (metricsErr) {
+        logger.warn('Failed to save service usage metrics (non-fatal)', { requestId, userId, accountId: account.id, error: metricsErr.message })
+      }
+    }
+
     // Calculate anomaly baselines (async, non-blocking)
     calculateBaselinesForServices(userId, account.provider_id, account.id, costData)
       .catch(err => logger.error('Baseline calculation failed', { requestId, userId, accountId: account.id, accountLabel, error: err.message, stack: err.stack }))
@@ -171,7 +182,7 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
     await createNotification(userId, {
       type: 'sync',
       title: `Sync Completed: ${accountLabel}`,
-      message: `Successfully synced cost data. Current month: $${costData.currentMonth.toFixed(2)}`,
+      message: `Successfully synced cost data. Current month: $${Number(costData.currentMonth ?? 0).toFixed(2)}`,
       link: `/provider/${account.provider_id}`,
       linkText: 'View Details',
       metadata: { accountId: account.id, providerId: account.provider_id, currentMonth: costData.currentMonth }

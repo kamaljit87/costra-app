@@ -147,3 +147,22 @@ export const initOptimizationSchedule = () => {
 
   logger.info('Optimization analysis cron initialized (daily at 4 AM UTC)')
 }
+
+/**
+ * Initialize AWS billing/health alert polling
+ * Fetches AWS status (e.g. billing issues) and notifies users with AWS connected
+ */
+export const initAwsHealthPolling = () => {
+  cron.schedule('0 */2 * * *', async () => {
+    try {
+      logger.info('Starting AWS billing health check')
+      const { fetchAndNotifyAwsBillingIssues } = await import('./awsHealthService.js')
+      const result = await fetchAndNotifyAwsBillingIssues()
+      logger.info('AWS billing health check completed', result)
+    } catch (error) {
+      logger.error('AWS billing health check failed', { error: error.message, stack: error.stack })
+    }
+  })
+
+  logger.info('AWS health polling cron initialized (runs every 2 hours)')
+}

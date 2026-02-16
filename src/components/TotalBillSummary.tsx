@@ -4,6 +4,8 @@ import { TrendingUp, TrendingDown, Wallet, Target, Zap } from 'lucide-react'
 interface TotalBillSummaryProps {
   totalCurrent: number
   totalLastMonth: number
+  /** When set, % vs last month uses this (same date range as current month-to-date) for apples-to-apples comparison. */
+  totalLastMonthSamePeriod?: number
   totalForecast: number
   totalSavings: number
   forecastConfidence?: number | null
@@ -21,6 +23,7 @@ const getConfidenceLabel = (confidence: number | null | undefined) => {
 export default function TotalBillSummary({
   totalCurrent,
   totalLastMonth,
+  totalLastMonthSamePeriod,
   totalForecast,
   totalSavings,
   forecastConfidence,
@@ -31,9 +34,16 @@ export default function TotalBillSummary({
 
   const currentWithTax = totalCurrent + totalTaxCurrent
   const lastMonthWithTax = totalLastMonth + totalTaxLastMonth
-  const changePercent = lastMonthWithTax > 0
-    ? ((currentWithTax - lastMonthWithTax) / lastMonthWithTax) * 100
-    : 0
+  // Compare current month-to-date to last month same date range when available (e.g. 1st–14th vs 1st–14th); use cost-only for same-period
+  const changePercent = (() => {
+    if (totalLastMonthSamePeriod != null && totalLastMonthSamePeriod > 0) {
+      return ((totalCurrent - totalLastMonthSamePeriod) / totalLastMonthSamePeriod) * 100
+    }
+    if (lastMonthWithTax > 0) {
+      return ((currentWithTax - lastMonthWithTax) / lastMonthWithTax) * 100
+    }
+    return 0
+  })()
 
   void totalSavings
 
@@ -92,8 +102,8 @@ export default function TotalBillSummary({
             ) : (
               <TrendingDown className="h-3.5 w-3.5 mr-1.5" />
             )}
-            <span className="font-semibold">
-              {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(1)}% vs last month
+            <span className="font-semibold" title={totalLastMonthSamePeriod != null ? 'Compared to same period last month (e.g. 1st–today)' : undefined}>
+              {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(1)}% vs last month{totalLastMonthSamePeriod != null ? ' (same period)' : ''}
             </span>
           </div>
         )}

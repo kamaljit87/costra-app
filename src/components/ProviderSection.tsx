@@ -17,6 +17,7 @@ interface ProviderSectionProps {
   providerName: string
   currentMonth: number
   lastMonth: number
+  lastMonthSamePeriod?: number
   taxCurrentMonth?: number
   taxLastMonth?: number
   forecast: number
@@ -38,6 +39,7 @@ export default function ProviderSection({
   providerName,
   currentMonth,
   lastMonth,
+  lastMonthSamePeriod,
   taxCurrentMonth = 0,
   taxLastMonth = 0,
   forecast,
@@ -67,9 +69,15 @@ export default function ProviderSection({
   const displayCurrent = hasTax ? currentMonth + taxCurrentMonth : currentMonth
   const displayLast = hasTax ? lastMonth + taxLastMonth : lastMonth
 
-  const changePercent = displayLast > 0
-    ? ((displayCurrent - displayLast) / displayLast) * 100
-    : 0
+  const changePercent = (() => {
+    if (lastMonthSamePeriod != null && lastMonthSamePeriod > 0) {
+      return ((currentMonth - lastMonthSamePeriod) / lastMonthSamePeriod) * 100
+    }
+    if (displayLast > 0) {
+      return ((displayCurrent - displayLast) / displayLast) * 100
+    }
+    return 0
+  })()
 
   const monthlyData = useMemo(() => {
     const allData = [...chartData12Months]
@@ -204,6 +212,8 @@ export default function ProviderSection({
                     data={getChartData()}
                     currentMonth={displayCurrent}
                     lastMonth={displayLast}
+                    lastMonthSamePeriod={lastMonthSamePeriod}
+                    currentMonthCost={lastMonthSamePeriod != null ? currentMonth : undefined}
                     period="monthly"
                     isMonthlyView={true}
                   />

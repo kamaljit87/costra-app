@@ -4,6 +4,7 @@ import { requireFeature, limitHistoricalData } from '../middleware/featureGate.j
 import logger from '../utils/logger.js'
 import {
   getCostDataForUser,
+  getLastMonthSamePeriodTotals,
   saveCostData,
   getUserPreferences,
   updateUserCurrency,
@@ -68,35 +69,55 @@ router.get('/', async (req, res) => {
       300 // 5 minutes TTL
     )
 
+    // For current month, get last month same date range (e.g. 1st–14th vs 1st–14th) for apples-to-apples % comparison
+    const isCurrentMonth = (month === now.getMonth() + 1 && year === now.getFullYear())
+    let lastMonthSamePeriodMap = new Map()
+    if (isCurrentMonth) {
+      try {
+        const samePeriodRows = await getLastMonthSamePeriodTotals(userId)
+        for (const row of samePeriodRows) {
+          const key = `${row.provider_id}|${row.account_id ?? 'null'}`
+          lastMonthSamePeriodMap.set(key, row.total)
+        }
+      } catch (err) {
+        logger.warn('getLastMonthSamePeriodTotals failed, using full last month for comparison', { userId, error: err.message })
+      }
+    }
+
     // Format response to match frontend expectations
-    const formattedData = costData.map(cost => ({
-      provider: {
-        id: cost.provider_code,
-        name: cost.provider_name,
-        icon: cost.icon || '☁️',
-      },
-      currentMonth: parseFloat(cost.current_month_cost) || 0,
-      lastMonth: parseFloat(cost.last_month_cost) || 0,
-      forecast: parseFloat(cost.forecast_cost) || 0,
-      forecastConfidence: cost.forecast_confidence != null ? parseInt(cost.forecast_confidence) : null,
-      credits: parseFloat(cost.credits) || 0,
-      savings: parseFloat(cost.savings) || 0,
-      taxCurrentMonth: parseFloat(cost.tax_current_month) || 0,
-      taxLastMonth: parseFloat(cost.tax_last_month) || 0,
-      dataSource: cost.data_source || 'cost_explorer',
-      // Transform service_name to name and change_percent to change for frontend compatibility
-      // Filter out Tax entries - they are not services
-      services: (cost.services || [])
-        .filter(service => {
-          const name = (service.service_name || '').toLowerCase()
-          return name !== 'tax' && !name.includes('tax -') && name !== 'vat'
-        })
-        .map(service => ({
-          name: service.service_name,
-          cost: parseFloat(service.cost) || 0,
-          change: parseFloat(service.change_percent) || 0,
-        })),
-    }))
+    const formattedData = costData.map(cost => {
+      const key = `${cost.provider_code}|${cost.account_id ?? 'null'}`
+      const lastMonthSamePeriod = lastMonthSamePeriodMap.get(key) ?? null
+      return {
+        provider: {
+          id: cost.provider_code,
+          name: cost.provider_name,
+          icon: cost.icon || '☁️',
+        },
+        currentMonth: parseFloat(cost.current_month_cost) || 0,
+        lastMonth: parseFloat(cost.last_month_cost) || 0,
+        lastMonthSamePeriod: lastMonthSamePeriod != null ? lastMonthSamePeriod : undefined,
+        forecast: parseFloat(cost.forecast_cost) || 0,
+        forecastConfidence: cost.forecast_confidence != null ? parseInt(cost.forecast_confidence) : null,
+        credits: parseFloat(cost.credits) || 0,
+        savings: parseFloat(cost.savings) || 0,
+        taxCurrentMonth: parseFloat(cost.tax_current_month) || 0,
+        taxLastMonth: parseFloat(cost.tax_last_month) || 0,
+        dataSource: cost.data_source || 'cost_explorer',
+        // Transform service_name to name and change_percent to change for frontend compatibility
+        // Filter out Tax entries - they are not services
+        services: (cost.services || [])
+          .filter(service => {
+            const name = (service.service_name || '').toLowerCase()
+            return name !== 'tax' && !name.includes('tax -') && name !== 'vat'
+          })
+          .map(service => ({
+            name: service.service_name,
+            cost: parseFloat(service.cost) || 0,
+            change: parseFloat(service.change_percent) || 0,
+          })),
+      }
+    })
 
     res.json({ costData: formattedData })
   } catch (error) {

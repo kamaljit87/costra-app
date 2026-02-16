@@ -184,6 +184,10 @@ export default function Dashboard() {
   // Calculate totals (in USD — conversion happens at display time via formatCurrency)
   const totalCurrent = costData.reduce((sum, data) => sum + data.currentMonth, 0)
   const totalLastMonth = costData.reduce((sum, data) => sum + data.lastMonth, 0)
+  const totalLastMonthSamePeriod = costData.reduce(
+    (sum, data) => sum + (typeof data.lastMonthSamePeriod === 'number' ? data.lastMonthSamePeriod : 0),
+    0
+  )
   const totalForecast = costData.reduce((sum, data) => sum + data.forecast, 0)
   const totalSavings = costData.reduce((sum, data) => sum + Math.abs(data.savings || 0), 0)
   const totalTaxCurrent = costData.reduce((sum, data) => sum + (data.taxCurrentMonth || 0), 0)
@@ -285,6 +289,7 @@ export default function Dashboard() {
               <TotalBillSummary
                 totalCurrent={totalCurrent}
                 totalLastMonth={totalLastMonth}
+                totalLastMonthSamePeriod={totalLastMonthSamePeriod > 0 ? totalLastMonthSamePeriod : undefined}
                 totalForecast={totalForecast}
                 totalSavings={totalSavings}
                 forecastConfidence={avgForecastConfidence}
@@ -425,6 +430,7 @@ export default function Dashboard() {
                               providerName={data.provider.name}
                               currentMonth={data.currentMonth}
                               lastMonth={data.lastMonth}
+                              lastMonthSamePeriod={typeof data.lastMonthSamePeriod === 'number' ? data.lastMonthSamePeriod : undefined}
                               taxCurrentMonth={data.taxCurrentMonth}
                               taxLastMonth={data.taxLastMonth}
                               forecast={data.forecast}

@@ -15,7 +15,7 @@ import {
 import { BCMDataExportsClient, CreateExportCommand, ListExportsCommand, DeleteExportCommand } from '@aws-sdk/client-bcm-data-exports'
 import { getAssumedRoleCredentials } from './awsAuth.js'
 import { pool } from '../database.js'
-import { clearUserCache, clearCostExplanationsCache, createNotification } from '../database.js'
+import { clearUserCache, clearCostExplanationsCache, createNotification, saveServiceUsageMetrics } from '../database.js'
 import logger from '../utils/logger.js'
 
 const MAX_PARQUET_FILE_SIZE = 200 * 1024 * 1024 // 200MB
@@ -358,6 +358,8 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
     const dailyTotals = new Map()
     const serviceTotals = new Map()
     const resourceAccumulator = new Map() // keyed by resource_id for resource-level data
+    // service_usage_metrics: key = "service|date|usageType" -> { cost, usageQuantity, usageUnit }
+    const serviceDailyUsage = new Map()
     let totalCost = 0
     let totalTax = 0
     let rowCount = 0
@@ -423,6 +425,19 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
               serviceTotals.set(service, (serviceTotals.get(service) || 0) + cost)
             }
 
+            // Accumulate per-service per-day usage for Cost vs Usage analytics
+            const usageType = (row.line_item_usage_type || 'Usage').toString().trim() || 'Usage'
+            const usageAmount = parseFloat(row.line_item_usage_amount || 0)
+            const usageUnit = (row.line_item_usage_unit || '').toString().trim() || null
+            if (date && (cost > 0 || usageAmount > 0)) {
+              const key = `${service}|${date}|${usageType}`
+              const existing = serviceDailyUsage.get(key) || { cost: 0, usageQuantity: 0, usageUnit }
+              existing.cost += cost
+              existing.usageQuantity += usageAmount
+              if (usageUnit) existing.usageUnit = usageUnit
+              serviceDailyUsage.set(key, existing)
+            }
+
             // Accumulate resource-level data for optimization engine
             const resourceId = row.line_item_resource_id
             if (resourceId) {
@@ -480,6 +495,31 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
       services,
       tax: totalTax,
     })
+
+    // Save service-level cost + usage for Cost vs Usage analytics
+    if (serviceDailyUsage.size > 0) {
+      const usageMetrics = []
+      for (const [key, val] of serviceDailyUsage.entries()) {
+        const parts = key.split('|')
+        const serviceName = parts[0] || 'Other'
+        const date = parts[1] || ''
+        const usageType = parts.slice(2).join('|') || 'Usage'
+        usageMetrics.push({
+          serviceName,
+          date,
+          cost: Math.round(val.cost * 100) / 100,
+          usageQuantity: val.usageQuantity > 0 ? val.usageQuantity : null,
+          usageUnit: val.usageUnit || null,
+          usageType: usageType || 'Usage',
+        })
+      }
+      try {
+        await saveServiceUsageMetrics(userId, accountId, account.provider_id, usageMetrics)
+        logger.info('Service usage metrics saved for Cost vs Usage', { userId, accountId, count: usageMetrics.length })
+      } catch (metricsErr) {
+        logger.warn('Failed to save service usage metrics (non-fatal)', { userId, accountId, error: metricsErr.message })
+      }
+    }
 
     // Save resource-level data from CUR for optimization engine
     if (resourceAccumulator.size > 0) {

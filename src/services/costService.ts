@@ -7,6 +7,8 @@ export interface CostData {
   provider: CloudProvider
   currentMonth: number
   lastMonth: number
+  /** Last month cost for same date range as current month-to-date; used for % comparison. */
+  lastMonthSamePeriod?: number
   forecast: number
   credits: number
   savings: number

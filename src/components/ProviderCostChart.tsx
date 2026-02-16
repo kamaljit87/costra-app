@@ -14,6 +14,9 @@ interface ProviderCostChartProps {
   data: CostDataPoint[]
   currentMonth: number
   lastMonth: number
+  /** When set, % uses same-period comparison (cost-only). Pass currentMonthCost for numerator. */
+  lastMonthSamePeriod?: number
+  currentMonthCost?: number
   period: '1month' | '2months' | '3months' | '4months' | '6months' | '12months' | 'custom' | 'monthly'
   isMonthlyView?: boolean
 }
@@ -24,14 +27,23 @@ export default function ProviderCostChart({
   data,
   currentMonth,
   lastMonth,
+  lastMonthSamePeriod,
+  currentMonthCost,
   period,
   isMonthlyView = false,
 }: ProviderCostChartProps) {
   const { formatCurrency, convertAmount, selectedCurrency } = useCurrency()
 
-  const changePercent = lastMonth > 0
-    ? ((currentMonth - lastMonth) / lastMonth) * 100
-    : 0
+  const changePercent = (() => {
+    if (lastMonthSamePeriod != null && lastMonthSamePeriod > 0) {
+      const numerator = currentMonthCost ?? currentMonth
+      return ((numerator - lastMonthSamePeriod) / lastMonthSamePeriod) * 100
+    }
+    if (lastMonth > 0) {
+      return ((currentMonth - lastMonth) / lastMonth) * 100
+    }
+    return 0
+  })()
 
   const getCurrencySymbol = () => {
     const symbols: Record<string, string> = {

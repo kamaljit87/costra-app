@@ -562,10 +562,17 @@ export default function ProviderDetailPage() {
   const hasTax = (providerData.taxCurrentMonth ?? 0) > 0 || (providerData.taxLastMonth ?? 0) > 0
   const displayCurrent = hasTax ? providerData.currentMonth + (providerData.taxCurrentMonth ?? 0) : providerData.currentMonth
   const displayLast = hasTax ? providerData.lastMonth + (providerData.taxLastMonth ?? 0) : providerData.lastMonth
+  const lastMonthSamePeriod = providerData.lastMonthSamePeriod
 
-  const changePercent = displayLast > 0
-    ? ((displayCurrent - displayLast) / displayLast) * 100
-    : 0
+  const changePercent = (() => {
+    if (lastMonthSamePeriod != null && lastMonthSamePeriod > 0) {
+      return ((providerData.currentMonth - lastMonthSamePeriod) / lastMonthSamePeriod) * 100
+    }
+    if (displayLast > 0) {
+      return ((displayCurrent - displayLast) / displayLast) * 100
+    }
+    return 0
+  })()
 
   const getDailyChartData = (): CostDataPoint[] => {
     // For custom periods, prioritize filteredData (freshly fetched)
@@ -759,15 +766,18 @@ export default function ProviderDetailPage() {
                 </div>
               )}
               {changePercent !== 0 && (
-                <div className={`text-xs mt-1 flex items-center ${
-                  changePercent >= 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'
-                }`}>
+                <div
+                  className={`text-xs mt-1 flex items-center ${
+                    changePercent >= 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'
+                  }`}
+                  title={lastMonthSamePeriod != null ? 'Compared to same period last month (e.g. 1st–today)' : undefined}
+                >
                   {changePercent >= 0 ? (
                     <TrendingUp className="h-3 w-3 mr-0.5" />
                   ) : (
                     <TrendingDown className="h-3 w-3 mr-0.5" />
                   )}
-                  {Math.abs(changePercent).toFixed(1)}% vs last month
+                  {Math.abs(changePercent).toFixed(1)}% vs last month{lastMonthSamePeriod != null ? ' (same period)' : ''}
                 </div>
               )}
             </div>
@@ -1350,6 +1360,8 @@ export default function ProviderDetailPage() {
                       data={chartData}
                       currentMonth={displayCurrent}
                       lastMonth={displayLast}
+                      lastMonthSamePeriod={lastMonthSamePeriod ?? undefined}
+                      currentMonthCost={lastMonthSamePeriod != null ? providerData.currentMonth : undefined}
                       period={viewMode === 'monthly' ? 'monthly' : selectedPeriod}
                       isMonthlyView={viewMode === 'monthly'}
                     />

@@ -524,7 +524,7 @@ export const initDatabase = async () => {
         CREATE TABLE IF NOT EXISTS notifications (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL,
-          type TEXT NOT NULL CHECK (type IN ('budget', 'anomaly', 'sync', 'report', 'warning', 'info', 'success')),
+          type TEXT NOT NULL CHECK (type IN ('budget', 'anomaly', 'sync', 'report', 'warning', 'info', 'success', 'provider_alert')),
           title TEXT NOT NULL,
           message TEXT,
           link TEXT,
@@ -1027,6 +1027,31 @@ export const initDatabase = async () => {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(cur_config_id, billing_period, manifest_key)
         )
+      `)
+
+      // Provider health / billing alerts (e.g. AWS status) - avoid duplicate notifications
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS provider_health_events (
+          id SERIAL PRIMARY KEY,
+          provider_id TEXT NOT NULL,
+          external_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          message TEXT,
+          link TEXT,
+          event_date TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(provider_id, external_id)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_provider_health_events_provider ON provider_health_events(provider_id, created_at DESC)`)
+
+      // Allow 'provider_alert' notification type (migration for existing DBs)
+      await client.query(`
+        ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+      `)
+      await client.query(`
+        ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+          CHECK (type IN ('budget', 'anomaly', 'sync', 'report', 'warning', 'info', 'success', 'provider_alert'));
       `)
 
       // CUR-related column additions
@@ -1680,6 +1705,41 @@ export const getServiceCostsForDateRange = async (userId, providerId, startDate,
   }
 }
 
+/**
+ * Get last month's cost for the same date range as current month-to-date (e.g. if today is 14th, sum last month 1st–14th).
+ * Used for apples-to-apples "vs last month" comparison.
+ */
+export const getLastMonthSamePeriodTotals = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const now = new Date()
+    const currentDay = now.getDate()
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastYear = lastMonthDate.getFullYear()
+    const lastMonth = lastMonthDate.getMonth() + 1
+    const lastMonthDays = new Date(lastYear, lastMonth, 0).getDate()
+    const sameDay = Math.min(currentDay, lastMonthDays)
+    const startDate = `${lastYear}-${String(lastMonth).padStart(2, '0')}-01`
+    const endDate = `${lastYear}-${String(lastMonth).padStart(2, '0')}-${String(sameDay).padStart(2, '0')}`
+
+    const result = await client.query(
+      `SELECT provider_id, account_id, COALESCE(SUM(cost), 0)::numeric as total
+       FROM daily_cost_data
+       WHERE user_id = $1 AND date >= $2::date AND date <= $3::date
+       GROUP BY provider_id, account_id`,
+      [userId, startDate, endDate]
+    )
+
+    return result.rows.map(row => ({
+      provider_id: row.provider_id,
+      account_id: row.account_id,
+      total: parseFloat(row.total) || 0,
+    }))
+  } finally {
+    client.release()
+  }
+}
+
 // Cost data operations
 export const getCostDataForUser = async (userId, month, year) => {
   const client = await pool.connect()
@@ -2170,9 +2230,14 @@ export const getCloudProviderCredentials = async (userId, providerId) => {
       return null
     }
     
-    const { decrypt } = await import('./services/encryption.js')
-    const decrypted = decrypt(result.rows[0].credentials_encrypted)
-    return JSON.parse(decrypted)
+    try {
+      const { decrypt } = await import('./services/encryption.js')
+      const decrypted = decrypt(result.rows[0].credentials_encrypted)
+      return JSON.parse(decrypted)
+    } catch (err) {
+      logger.warn('Failed to decrypt provider credentials', { userId, providerId, error: err.message })
+      return null
+    }
   } finally {
     client.release()
   }
@@ -2191,16 +2256,24 @@ export const getCloudProviderAccountsByType = async (userId, providerId) => {
     )
     
     const { decrypt } = await import('./services/encryption.js')
-    
-    return result.rows.map(row => ({
-      accountId: row.id,
-      providerId: row.provider_id,
-      providerName: row.provider_name,
-      accountAlias: row.account_alias,
-      credentials: JSON.parse(decrypt(row.credentials_encrypted)),
-      isActive: row.is_active,
-      lastSyncAt: row.last_sync_at
-    }))
+    const rows = []
+    for (const row of result.rows) {
+      try {
+        const creds = JSON.parse(decrypt(row.credentials_encrypted))
+        rows.push({
+          accountId: row.id,
+          providerId: row.provider_id,
+          providerName: row.provider_name,
+          accountAlias: row.account_alias,
+          credentials: creds,
+          isActive: row.is_active,
+          lastSyncAt: row.last_sync_at
+        })
+      } catch (err) {
+        logger.warn('Failed to decrypt credentials for account', { accountId: row.id, error: err.message })
+      }
+    }
+    return rows
   } finally {
     client.release()
   }
@@ -3098,6 +3171,9 @@ export const saveServiceUsageMetrics = async (userId, accountId, providerId, met
     await client.query('BEGIN')
     
     for (const metric of metrics) {
+      const serviceName = metric?.serviceName ?? metric?.service_name
+      const date = metric?.date
+      if (!serviceName || !date) continue
       await client.query(
         `INSERT INTO service_usage_metrics (
           user_id, account_id, provider_id, service_name, date,
@@ -3111,9 +3187,9 @@ export const saveServiceUsageMetrics = async (userId, accountId, providerId, met
           updated_at = CURRENT_TIMESTAMP`,
         [
           userId, accountId, providerId,
-          metric.serviceName, metric.date,
-          metric.cost || 0, metric.usageQuantity || null,
-          metric.usageUnit || null, metric.usageType || null
+          String(serviceName).slice(0, 255), String(date).slice(0, 10),
+          metric.cost || 0, metric.usageQuantity ?? metric.usage_quantity ?? null,
+          metric.usageUnit ?? metric.usage_unit ?? null, metric.usageType ?? metric.usage_type ?? null
         ]
       )
     }
@@ -5770,6 +5846,15 @@ export const getNotifications = async (userId, options = {}) => {
     
     const result = await client.query(query, params)
     
+    const parseMetadata = (raw) => {
+      if (raw == null) return null
+      if (typeof raw !== 'string') return raw
+      try {
+        return JSON.parse(raw)
+      } catch {
+        return null
+      }
+    }
     const notifications = result.rows.map(row => ({
       id: row.id,
       type: row.type,
@@ -5778,7 +5863,7 @@ export const getNotifications = async (userId, options = {}) => {
       link: row.link,
       linkText: row.link_text,
       isRead: row.is_read,
-      metadata: row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata) : null,
+      metadata: parseMetadata(row.metadata),
       createdAt: row.created_at,
       readAt: row.read_at
     }))
@@ -5841,6 +5926,42 @@ export const markAllNotificationsAsRead = async (userId) => {
        WHERE user_id = $1 AND is_read = false`,
       [userId]
     )
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Get distinct user IDs that have the given cloud provider connected (active)
+ */
+export const getUserIdsWithProvider = async (providerId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT DISTINCT user_id FROM cloud_provider_credentials
+       WHERE provider_id = $1 AND is_active = true`,
+      [providerId]
+    )
+    return result.rows.map((r) => r.user_id)
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Record a provider health event and return true if it was new (inserted), false if duplicate
+ */
+export const saveProviderHealthEvent = async (providerId, externalId, title, message, link, eventDate) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `INSERT INTO provider_health_events (provider_id, external_id, title, message, link, event_date)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (provider_id, external_id) DO NOTHING
+       RETURNING id`,
+      [providerId, externalId, title || '', message || null, link || null, eventDate || null]
+    )
+    return result.rowCount > 0
   } finally {
     client.release()
   }

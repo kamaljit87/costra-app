@@ -532,24 +532,23 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     
     logger.debug('Total response received', { resultsByTimeCount: totalResponse.ResultsByTime?.length || 0 })
 
-    // Fetch tax totals separately (MONTHLY granularity is enough)
-    const taxCommand = new GetCostAndUsageCommand({
-      TimePeriod: {
-        Start: startDate,
-        End: endDate,
+    // Fetch tax: (1) try Tax-only query, (2) fallback: fetch usage+tax total and derive tax
+    const taxOnlyFilter = { Dimensions: { Key: 'RECORD_TYPE', Values: ['Tax'] } }
+    const usagePlusTaxFilter = {
+      Dimensions: {
+        Key: 'RECORD_TYPE',
+        Values: ['Usage', 'DiscountedUsage', 'SavingsPlanCoveredUsage', 'Tax'],
       },
-      Granularity: 'MONTHLY',
-      Metrics: ['UnblendedCost'],
-      Filter: {
-        Dimensions: {
-          Key: 'RECORD_TYPE',
-          Values: ['Tax'],
-        },
-      },
-    })
+    }
 
     let taxResponse = null
     try {
+      const taxCommand = new GetCostAndUsageCommand({
+        TimePeriod: { Start: startDate, End: endDate },
+        Granularity: 'MONTHLY',
+        Metrics: ['UnblendedCost'],
+        Filter: taxOnlyFilter,
+      })
       taxResponse = await retryWithBackoff(
         () => client.send(taxCommand),
         { maxAttempts: 3, timeout: 20000 },
@@ -558,10 +557,32 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
       )
       logger.debug('Tax response received', { resultsByTimeCount: taxResponse.ResultsByTime?.length || 0 })
     } catch (taxErr) {
-      logger.warn('Failed to fetch tax data, continuing without it', { error: taxErr.message })
+      logger.warn('Tax-only query failed, will try usage+tax fallback', { error: taxErr.message })
     }
 
-    return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate, taxResponse)
+    // Fallback: get usage+tax total and derive tax = (usage+tax) - usage (more reliable when Tax-only filter returns nothing)
+    let usagePlusTaxResponse = null
+    if (!taxResponse?.ResultsByTime?.length || taxResponse.ResultsByTime.every(r => !parseFloat(r.Total?.UnblendedCost?.Amount || 0))) {
+      try {
+        const usagePlusTaxCommand = new GetCostAndUsageCommand({
+          TimePeriod: { Start: startDate, End: endDate },
+          Granularity: 'DAILY',
+          Metrics: ['UnblendedCost'],
+          Filter: usagePlusTaxFilter,
+        })
+        usagePlusTaxResponse = await retryWithBackoff(
+          () => client.send(usagePlusTaxCommand),
+          { maxAttempts: 3, timeout: 20000 },
+          'aws',
+          { startDate, endDate, operation: 'getCostAndUsage-usagePlusTax' }
+        )
+        logger.debug('Usage+tax response received', { resultsByTimeCount: usagePlusTaxResponse.ResultsByTime?.length || 0 })
+      } catch (uptErr) {
+        logger.warn('Usage+tax fallback failed', { error: uptErr.message })
+      }
+    }
+
+    return transformAWSCostData(totalResponse, groupedResponse, startDate, endDate, taxResponse, usagePlusTaxResponse)
   } catch (error) {
     // Map AWS-specific errors to user-friendly messages
     let userMessage = error.message
@@ -591,13 +612,15 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
  * @param totalData - Response from query without GroupBy (excludes Tax/Support/Refund/Credit)
  * @param groupedData - Response from query with GroupBy by SERVICE (for service breakdown)
  * @param taxData - Response from tax-only query (optional)
+ * @param usagePlusTaxData - Response from usage+tax total query; used to derive tax when taxData is empty
  */
-const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxData = null) => {
+const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxData = null, usagePlusTaxData = null) => {
   const totalResultsByTime = totalData.ResultsByTime || []
   const groupedResultsByTime = groupedData.ResultsByTime || []
   
   const dailyData = []
   const serviceMap = new Map()
+  const serviceUsageMetrics = [] // for Cost vs Usage analytics: { serviceName, date, cost, usageQuantity, usageUnit, usageType }
   let currentMonth = 0
   let lastMonth = 0
 
@@ -639,9 +662,20 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxDat
     groups.forEach((group) => {
       const serviceName = group.Keys?.[0] || 'Other'
       const cost = parseFloat(group.Metrics?.UnblendedCost?.Amount || 0)
+      const usageQuantity = parseFloat(group.Metrics?.UsageQuantity?.Amount || 0)
       if (cost > 0) {
         const existing = serviceMap.get(serviceName) || 0
         serviceMap.set(serviceName, existing + cost)
+      }
+      if (date && cost > 0 && usageQuantity > 0) {
+        serviceUsageMetrics.push({
+          serviceName,
+          date,
+          cost,
+          usageQuantity,
+          usageUnit: null,
+          usageType: 'Usage',
+        })
       }
     })
     
@@ -716,7 +750,7 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxDat
   currentMonth = monthToDate
   lastMonth = prevMonthTotal
 
-  // Extract tax amounts from the separate tax query
+  // Extract tax amounts: prefer tax-only query, else derive from (usage+tax) - usage
   let taxCurrentMonth = 0
   let taxLastMonth = 0
   if (taxData && taxData.ResultsByTime) {
@@ -732,14 +766,38 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxDat
         }
       }
     })
-    logger.info('AWS tax amounts', {
+    logger.info('AWS tax amounts (from tax-only query)', {
       taxCurrentMonth: taxCurrentMonth.toFixed(2),
       taxLastMonth: taxLastMonth.toFixed(2),
     })
-  } else if (taxData === null) {
-    logger.info('AWS tax amounts skipped (tax query did not run or failed)', { taxCurrentMonth: 0, taxLastMonth: 0 })
-  } else if (!taxData.ResultsByTime?.length) {
-    logger.info('AWS tax amounts empty (no tax records in period)', { taxCurrentMonth: 0, taxLastMonth: 0 })
+  }
+  // Fallback: derive tax from (usage+tax total) - (usage total) per period
+  if ((taxCurrentMonth === 0 && taxLastMonth === 0) && usagePlusTaxData?.ResultsByTime?.length) {
+    let currentMonthWithTax = 0
+    let lastMonthWithTax = 0
+    usagePlusTaxData.ResultsByTime.forEach((result) => {
+      const periodStart = result.TimePeriod?.Start
+      const amount = parseFloat(result.Total?.UnblendedCost?.Amount || 0)
+      if (periodStart) {
+        const d = new Date(periodStart)
+        if (d.getFullYear() === currentYear && d.getMonth() === currentMonthIdx && d.getDate() <= currentDay) {
+          currentMonthWithTax += amount
+        } else if (d.getFullYear() === prevMonthYear && d.getMonth() === prevMonthIdx) {
+          lastMonthWithTax += amount
+        }
+      }
+    })
+    taxCurrentMonth = Math.round((currentMonthWithTax - monthToDate) * 100) / 100
+    taxLastMonth = Math.round((lastMonthWithTax - prevMonthTotal) * 100) / 100
+    if (taxCurrentMonth < 0) taxCurrentMonth = 0
+    if (taxLastMonth < 0) taxLastMonth = 0
+    logger.info('AWS tax amounts (derived from usage+tax total)', {
+      taxCurrentMonth: taxCurrentMonth.toFixed(2),
+      taxLastMonth: taxLastMonth.toFixed(2),
+    })
+  }
+  if (taxCurrentMonth === 0 && taxLastMonth === 0) {
+    logger.info('AWS tax amounts unavailable', { taxCurrentMonth: 0, taxLastMonth: 0 })
   }
 
   return {
@@ -752,6 +810,7 @@ const transformAWSCostData = (totalData, groupedData, startDate, endDate, taxDat
     dailyData,
     taxCurrentMonth,
     taxLastMonth,
+    serviceUsageMetrics,
   }
 }
 
@@ -1916,6 +1975,7 @@ const transformAzureCostData = (totalData, groupedData, startDate, endDate) => {
     dailyData,
     taxCurrentMonth: 0,
     taxLastMonth: 0,
+    serviceUsageMetrics: [],
   }
 }
 
@@ -1988,6 +2048,7 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
         savings: 0,
         services: [],
         dailyData: [],
+        serviceUsageMetrics: [],
       }
     }
 
@@ -2008,6 +2069,7 @@ export const fetchGCPCostData = async (credentials, startDate, endDate) => {
       savings: 0,
       services: [],
       dailyData: [],
+      serviceUsageMetrics: [],
     }
   } catch (error) {
     // Map GCP-specific errors to user-friendly messages
@@ -2218,6 +2280,7 @@ const transformGCPBigQueryData = (bqData, startDate, endDate) => {
     dailyData,
     taxCurrentMonth: 0,
     taxLastMonth: 0,
+    serviceUsageMetrics: [],
   }
 }
 
@@ -2425,6 +2488,7 @@ const transformDigitalOceanCostData = (invoicesData, billingHistory, balanceData
     dailyData,
     taxCurrentMonth: 0,
     taxLastMonth: 0,
+    serviceUsageMetrics: [],
   }
 }
 
@@ -2617,6 +2681,7 @@ const transformIBMCloudCostData = (accountSummary, usageData, startDate, endDate
     dailyData,
     taxCurrentMonth: 0,
     taxLastMonth: 0,
+    serviceUsageMetrics: [],
   }
 }
 
@@ -2796,6 +2861,7 @@ const transformLinodeCostData = (accountData, invoices, currentInvoiceItems, sta
     dailyData,
     taxCurrentMonth: 0,
     taxLastMonth: 0,
+    serviceUsageMetrics: [],
   }
 }
 
@@ -2929,13 +2995,22 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
   // Sort daily data
   dailyData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
-  // Recalculate lastMonth accurately — only previous calendar month
   const currentYear = now.getFullYear()
   const currentMonthIdx = now.getMonth()
+  const todayStr = now.toISOString().split('T')[0]
   const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
   const prevMonthIdx = prevMonthDate.getMonth()
   const prevMonthYear = prevMonthDate.getFullYear()
 
+  // Current month = pending (unbilled) + month-to-date from daily data (billed charges)
+  dailyData.forEach((day) => {
+    const d = new Date(day.date)
+    if (day.date <= todayStr && d.getFullYear() === currentYear && d.getMonth() === currentMonthIdx) {
+      currentMonth += day.cost
+    }
+  })
+
+  // Last month = full previous calendar month (for same-period comparison in backend)
   lastMonth = 0
   dailyData.forEach((day) => {
     const d = new Date(day.date)
@@ -2975,6 +3050,7 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
     dailyData,
     taxCurrentMonth: 0,
     taxLastMonth: 0,
+    serviceUsageMetrics: [],
   }
 }
 
