@@ -214,6 +214,35 @@ Resources:
         - Key: CostraAccountId
           Value: !Ref CostraAccountId
 
+  # S3 bucket for CUR 2.0 Data Exports (must exist for BCM to deliver; policy applied by Costra on verify/setup)
+  CostraCURBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldReports
+            Status: Enabled
+            ExpirationInDays: 400
+            Filter: {}
+      Tags:
+        - Key: ManagedBy
+          Value: Costra
+        - Key: Purpose
+          Value: CostAndUsageReports
+        - Key: ConnectionName
+          Value: !Ref ConnectionName
+
   # Lambda function that notifies Costra API when the stack is created
   CostraCallbackRole:
     Type: AWS::IAM::Role
@@ -354,7 +383,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-Region'
 
   CURBucketName:
-    Description: 'Expected S3 bucket name for CUR data (created by Costra after verification)'
-    Value: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
+    Description: 'S3 bucket for CUR 2.0 Data Exports (bucket policy applied by Costra when you verify or run Set up CUR)'
+    Value: !Ref CostraCURBucket
     Export:
       Name: !Sub '${AWS::StackName}-CURBucket'

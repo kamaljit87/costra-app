@@ -683,28 +683,35 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                    '⏳ Pending'}
                                 </span>
                                 {curStatuses[provider.accountId] && (
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                    curStatuses[provider.accountId].curStatus === 'active'
-                                      ? 'bg-blue-100 text-blue-700'
-                                      : curStatuses[provider.accountId].curStatus === 'error'
-                                      ? 'bg-red-100 text-red-700'
-                                      : curStatuses[provider.accountId].curStatus === 'disabled'
-                                      ? 'bg-gray-100 text-gray-500'
-                                      : 'bg-yellow-100 text-yellow-700'
-                                  }`} title={
-                                    curStatuses[provider.accountId].curStatus === 'active'
-                                      ? `CUR active${curStatuses[provider.accountId].lastIngestion ? ` - Last ingestion: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}${curStatuses[provider.accountId].billingPeriods?.length ? ` • ${curStatuses[provider.accountId].billingPeriods!.length} period(s) ingested` : ''}`
-                                      : curStatuses[provider.accountId].curStatus === 'provisioning'
-                                      ? 'CUR export is being set up (data available within 24h)'
-                                      : curStatuses[provider.accountId].curStatus === 'error'
-                                      ? (curStatuses[provider.accountId].statusMessage ? `CUR error: ${curStatuses[provider.accountId].statusMessage}` : 'CUR setup encountered an error')
-                                      : 'CUR is pending setup'
-                                  }>
-                                    {curStatuses[provider.accountId].curStatus === 'active' ? 'CUR Active' :
-                                     curStatuses[provider.accountId].curStatus === 'provisioning' ? 'CUR Pending' :
-                                     curStatuses[provider.accountId].curStatus === 'error' ? 'CUR Error' :
-                                     null}
-                                  </span>
+                                  <>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                      curStatuses[provider.accountId].curStatus === 'active'
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                        : curStatuses[provider.accountId].curStatus === 'error'
+                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                        : curStatuses[provider.accountId].curStatus === 'disabled'
+                                        ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
+                                    }`} title={
+                                      curStatuses[provider.accountId].curStatus === 'active'
+                                        ? `CUR active${curStatuses[provider.accountId].lastIngestion ? ` - Last ingestion: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}${curStatuses[provider.accountId].billingPeriods?.length ? ` • ${curStatuses[provider.accountId].billingPeriods!.length} period(s) ingested` : ''}`
+                                        : curStatuses[provider.accountId].curStatus === 'provisioning'
+                                        ? 'CUR export is being set up (data available within 24h)'
+                                        : curStatuses[provider.accountId].curStatus === 'error'
+                                        ? (curStatuses[provider.accountId].statusMessage ? `CUR error: ${curStatuses[provider.accountId].statusMessage}` : 'CUR setup encountered an error')
+                                        : 'CUR is pending setup'
+                                    }>
+                                      {curStatuses[provider.accountId].curStatus === 'active' ? 'CUR Active' :
+                                       curStatuses[provider.accountId].curStatus === 'provisioning' ? 'CUR Pending' :
+                                       curStatuses[provider.accountId].curStatus === 'error' ? 'CUR Error' :
+                                       null}
+                                    </span>
+                                    {curStatuses[provider.accountId].curStatus === 'active' && (
+                                      <p className="text-xs text-green-600 dark:text-green-400 mt-1" role="status">
+                                        CUR integration successful. Cost data will appear on the Dashboard.
+                                      </p>
+                                    )}
+                                  </>
                                 )}
                               </>
                             )}

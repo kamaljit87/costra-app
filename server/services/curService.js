@@ -677,7 +677,8 @@ export const pollCURDataForAllAccounts = async () => {
   logger.info('Starting CUR data polling for all accounts')
 
   const result = await pool.query(
-    `SELECT cec.*, cpc.role_arn, cpc.external_id, cpc.aws_account_id, cpc.user_id, cpc.provider_id
+    `SELECT cec.*, cpc.role_arn, cpc.external_id, cpc.aws_account_id, cpc.user_id, cpc.provider_id,
+       cpc.account_alias, cpc.provider_name
      FROM cur_export_config cec
      JOIN cloud_provider_credentials cpc ON cec.account_id = cpc.id
      WHERE cec.cur_status IN ('active', 'provisioning')
@@ -707,12 +708,24 @@ export const pollCURDataForAllAccounts = async () => {
         }
       }
 
-      // Transition provisioning → active when data arrives
+      // Transition provisioning → active when data arrives; notify user
       if (config.cur_status === 'provisioning') {
         await pool.query(
           `UPDATE cur_export_config SET cur_status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           [config.id]
         )
+        try {
+          const accountLabel = config.account_alias || config.provider_name || 'AWS account'
+          await createNotification(config.user_id, {
+            type: 'success',
+            title: 'CUR integration successful',
+            message: `Cost and Usage Report (CUR 2.0) is now active for ${accountLabel}. Cost data will appear on your Dashboard.`,
+            link: '/dashboard',
+            linkText: 'View Dashboard',
+          })
+        } catch (notifErr) {
+          logger.error('Failed to create CUR success notification', { error: notifErr.message })
+        }
       }
     } catch (error) {
       errors++

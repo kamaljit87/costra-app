@@ -998,6 +998,29 @@ router.post('/aws/:accountId/cur-setup', async (req, res) => {
       connectionName
     )
 
+    const accountLabel = account.accountAlias || account.providerName || 'AWS account'
+    try {
+      if (result.status === 'active') {
+        await createNotification(userId, {
+          type: 'success',
+          title: 'CUR integration successful',
+          message: `Cost and Usage Report (CUR 2.0) is active for ${accountLabel}. Cost data will appear on your Dashboard.`,
+          link: '/dashboard',
+          linkText: 'View Dashboard',
+        })
+      } else {
+        await createNotification(userId, {
+          type: 'success',
+          title: 'CUR setup started',
+          message: `CUR 2.0 export has been created for ${accountLabel}. Data will be available within 24 hours and will appear on your Dashboard.`,
+          link: '/settings',
+          linkText: 'View Settings',
+        })
+      }
+    } catch (notifErr) {
+      logger.error('CUR setup: failed to create notification', { error: notifErr.message })
+    }
+
     res.json({ message: 'CUR setup initiated', ...result })
   } catch (error) {
     logger.error('CUR setup error', { userId: req.user?.userId, accountId: req.params?.accountId, error: error.message })
