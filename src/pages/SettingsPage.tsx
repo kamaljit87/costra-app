@@ -89,23 +89,23 @@ export default function SettingsPage() {
 
         {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Settings</h1>
+        <p className="text-gray-600 dark:text-gray-300">
           Manage your account preferences and cloud provider integrations
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-6 border-b border-gray-200">
+      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-6 sm:gap-8">
           <button
             onClick={() => { setActiveTab('general'); setSearchParams({}) }}
             className={`
-              py-4 px-1 border-b-2 font-medium text-sm -mb-px
+              py-4 px-1 border-b-2 font-medium text-sm -mb-px transition-colors
               ${
                 activeTab === 'general'
-                  ? 'border-accent-500 text-accent-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-accent-500 text-accent-700 dark:text-accent-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
               }
             `}
           >
@@ -120,8 +120,8 @@ export default function SettingsPage() {
               py-4 px-1 border-b-2 font-medium text-sm -mb-px
               ${
                 activeTab === 'providers'
-                  ? 'border-accent-500 text-accent-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-accent-500 text-accent-700 dark:text-accent-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
               }
             `}
           >
@@ -136,8 +136,8 @@ export default function SettingsPage() {
               py-4 px-1 border-b-2 font-medium text-sm -mb-px
               ${
                 activeTab === 'security'
-                  ? 'border-accent-500 text-accent-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-accent-500 text-accent-700 dark:text-accent-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
               }
             `}
           >
@@ -152,8 +152,8 @@ export default function SettingsPage() {
               py-4 px-1 border-b-2 font-medium text-sm -mb-px
               ${
                 activeTab === 'api'
-                  ? 'border-accent-500 text-accent-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-accent-500 text-accent-700 dark:text-accent-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
               }
             `}
           >
@@ -175,7 +175,7 @@ export default function SettingsPage() {
                 <Sun className="h-5 w-5 text-accent-700 shrink-0 dark:text-accent-400" />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Appearance</h2>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                 Choose light, dark, or match your system preference.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -188,7 +188,7 @@ export default function SettingsPage() {
                       inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium
                       ${theme === mode
                         ? 'bg-accent-100 border-accent-500 text-accent-700 dark:bg-accent-900/40 dark:border-accent-500 dark:text-accent-300'
-                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600'
+                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-500'
                       }
                     `}
                   >
@@ -209,7 +209,7 @@ export default function SettingsPage() {
                   Currency Preferences
                 </h2>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                 Select your preferred currency for displaying cost data. All financial
                 information will be converted and displayed in your chosen currency.
               </p>
@@ -419,7 +419,7 @@ export default function SettingsPage() {
                 <Key className="h-5 w-5 text-accent-700 dark:text-accent-400 shrink-0" />
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">API keys</h2>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                 Create API keys to access cost and insights data from scripts or BI tools. Use <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">Authorization: Bearer &lt;key&gt;</code>. Keys are read-only and cannot manage account or create new keys.
               </p>
               {newKeyShown && (
@@ -456,9 +456,9 @@ export default function SettingsPage() {
                 </button>
               </div>
               {apiKeysLoading ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>
+                <p className="text-sm text-gray-500 dark:text-gray-300">Loading…</p>
               ) : apiKeys.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">No API keys yet. Create one to get started.</p>
+                <p className="text-sm text-gray-500 dark:text-gray-300">No API keys yet. Create one to get started.</p>
               ) : (
                 <ul className="space-y-2">
                   {apiKeys.map((k) => (

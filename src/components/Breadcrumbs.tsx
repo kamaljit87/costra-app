@@ -108,7 +108,7 @@ export default function Breadcrumbs() {
   }
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+    <nav className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
       {breadcrumbs.map((crumb, index) => {
         const isLast = index === breadcrumbs.length - 1
         const isActive = !crumb.path || isLast
@@ -116,22 +116,22 @@ export default function Breadcrumbs() {
         return (
           <div key={index} className="flex items-center space-x-2">
             {index === 0 && (
-              <Home className="h-4 w-4 text-gray-400" />
+              <Home className="h-4 w-4 text-gray-400 dark:text-gray-500" />
             )}
             {crumb.path && !isLast ? (
               <Link
                 to={crumb.path}
-                className="hover:text-gray-900 transition-colors"
+                className="hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
               >
                 {crumb.label}
               </Link>
             ) : (
-              <span className={isActive ? 'text-gray-900 font-medium' : ''}>
+              <span className={isActive ? 'text-gray-900 dark:text-gray-100 font-medium' : ''}>
                 {crumb.label}
               </span>
             )}
             {!isLast && (
-              <ChevronRight className="h-4 w-4 text-gray-400" />
+              <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500" />
             )}
           </div>
         )

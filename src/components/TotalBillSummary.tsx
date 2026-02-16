@@ -78,7 +78,7 @@ export default function TotalBillSummary({
         <h2 className="text-5xl font-bold text-gray-900 dark:text-gray-100 mb-1.5">
           Total Spend
         </h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Overview across all cloud providers{hasTax ? '' : ' (before tax)'}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-300 mb-3">Overview across all cloud providers{hasTax ? '' : ' (before tax)'}</p>
         {changePercent !== 0 && (
           <div className={`flex items-center px-4 py-1.5 rounded-xl text-xs ${
             changePercent >= 0
@@ -126,7 +126,7 @@ export default function TotalBillSummary({
 
               <div className="flex-1 flex flex-col justify-end">
                 <div className={`text-[10px] font-semibold mb-1.5 uppercase tracking-wider ${
-                  stat.highlight ? 'text-accent-600 dark:text-accent-400' : 'text-gray-500 dark:text-gray-400'
+                  stat.highlight ? 'text-accent-600 dark:text-accent-400' : 'text-gray-500 dark:text-gray-300'
                 }`}>
                   {stat.label}
                 </div>
@@ -138,7 +138,7 @@ export default function TotalBillSummary({
                 </div>
 
                 {stat.taxBreakdown && (
-                  <div className="text-[10px] mt-1.5 text-gray-400 dark:text-gray-500">
+                  <div className="text-[10px] mt-1.5 text-gray-400 dark:text-gray-400">
                     {stat.taxBreakdown}
                   </div>
                 )}

@@ -182,7 +182,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
           <button
             type="button"
             onClick={() => setIsSavedViewsOpen(!isSavedViewsOpen)}
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-600"
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-medium border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
           >
             <Bookmark className="h-4 w-4" />
             <span>Saved views</span>
@@ -193,15 +193,15 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
               <div className="fixed inset-0 z-10" onClick={() => setIsSavedViewsOpen(false)} />
               <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl z-20 py-2 animate-fade-in">
                 {savedViewsLoading ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">Loading…</div>
+                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-300">Loading…</div>
                 ) : savedViews.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No saved views</div>
+                  <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-300">No saved views</div>
                 ) : (
                   <div className="max-h-56 overflow-y-auto">
                     {savedViews.map((view) => (
                       <div
                         key={view.id}
-                        className="flex items-center group px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                        className="flex items-center group px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
                         onClick={() => handleLoadView(view)}
                       >
                         <span className="flex-1 truncate text-sm text-gray-700 dark:text-gray-200">{view.name}</span>

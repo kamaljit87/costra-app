@@ -108,11 +108,11 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
         {/* Logo */}
         <div className="flex items-center justify-between h-20 px-6 border-b border-surface-300">
           <Link to="/dashboard" className="flex items-center group">
-            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-900 dark:px-1">
+            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
               <img
                 src="/logo.png"
                 alt="Costra"
-                className="h-16 w-auto transition-all duration-200 group-hover:scale-105 dark:mix-blend-multiply"
+                className="h-16 w-auto transition-all duration-200 group-hover:scale-105"
               />
             </span>
           </Link>

@@ -54,7 +54,7 @@ export default function TrialBanner() {
             <p className="text-sm sm:text-base text-amber-900 dark:text-amber-100 font-medium">
               Your trial ends in <span className="font-bold">{daysRemaining}</span> {daysRemaining === 1 ? 'day' : 'days'}
             </p>
-            <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-200/90 mt-0.5">
+            <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-100 mt-0.5">
               Upgrade to continue using all features after your trial expires
             </p>
           </div>

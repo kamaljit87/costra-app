@@ -224,7 +224,7 @@ export default function Dashboard() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-0.5">
               Dashboard
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-gray-500 dark:text-gray-300">
               Multi-cloud cost overview across all your providers
             </p>
           </div>
@@ -309,9 +309,9 @@ export default function Dashboard() {
                     </button>
                   </div>
                   {goalsLoading ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading goals…</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">Loading goals…</p>
                   ) : goals.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Set a target (e.g. reduce spend by 10% this quarter vs same period last year).</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">Set a target (e.g. reduce spend by 10% this quarter vs same period last year).</p>
                   ) : (
                     <ul className="space-y-3">
                       {goals.map((g) => {

@@ -374,7 +374,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                           transition-colors
                           ${selectedResultIndex === index 
                             ? 'bg-accent-50 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300' 
-                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                           }
                         `}
                       >
@@ -419,8 +419,8 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-dropdown border border-surface-300 dark:border-gray-700 py-8 z-50">
                   <div className="text-center">
                     <Search className="h-8 w-8 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No results found</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try searching for providers, accounts, or services</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-300">No results found</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-400 mt-1">Try searching for providers, accounts, or services</p>
                   </div>
                 </div>
               )}
@@ -438,7 +438,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   transition-colors
                   ${isProviderPage 
                     ? 'bg-accent-50 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300' 
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
                   }
                 `}
               >
@@ -521,7 +521,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                     loadUnreadNotificationCount()
                   }
                 }}
-                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
               >
                 <Bell className="h-5 w-5" />
                 {unreadNotificationCount > 0 && (
@@ -543,7 +543,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
             <button
               type="button"
               onClick={() => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark')}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-600 rounded-lg transition-colors"
               title={effectiveTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -553,7 +553,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
               >
                 {user?.avatarUrl ? (
                   <img 
@@ -574,7 +574,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-dropdown border border-surface-300 dark:border-gray-700 py-2 z-50">
                   <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user?.name || 'User'}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-300 truncate">{user?.email}</p>
                     {subscriptionStatus && (
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-xs font-medium text-gray-700 dark:text-gray-300 capitalize">
@@ -592,7 +592,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/profile"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     <User className="h-4 w-4" />
                     <span>Profile</span>
@@ -601,7 +601,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/settings"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     <Settings className="h-4 w-4" />
                     <span>Settings</span>
@@ -610,7 +610,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/settings/billing"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     <CreditCard className="h-4 w-4" />
                     <span>Billing & Subscription</span>
@@ -619,7 +619,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                   <Link
                     to="/debug"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                   >
                     <Bug className="h-4 w-4" />
                     <span>API Debug</span>

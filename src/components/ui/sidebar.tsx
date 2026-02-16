@@ -201,7 +201,7 @@ const Sidebar = ({
     `flex gap-2 font-medium text-sm items-center w-full py-2 px-4 rounded-xl transition-colors text-left ${
       isActive(path)
         ? 'bg-accent-50 dark:bg-accent-900/50 text-accent-700 dark:text-accent-200'
-        : 'text-gray-700 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+        : 'text-gray-700 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'
     }`
 
   const renderNav = () => (
@@ -230,7 +230,7 @@ const Sidebar = ({
             onContactClick()
             closeOnNav()
           }}
-          className="flex items-center gap-2 w-full font-medium text-sm py-2 px-4 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          className="flex items-center gap-2 w-full font-medium text-sm py-2 px-4 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
         >
           <MessageCircle className="h-4 w-4" />
           Contact Us
@@ -284,15 +284,15 @@ const Sidebar = ({
                 onClick={() => toggleProviderExpand(providerId)}
                 className={`flex items-center gap-2 w-full py-2 px-3 rounded-xl text-left transition-colors ${
                   expandedProviders.has(providerId)
-                    ? 'bg-surface-200 text-gray-900'
-                    : 'text-gray-600 hover:bg-surface-200 hover:text-gray-900'
+                    ? 'bg-surface-200 dark:bg-gray-600 text-gray-900 dark:text-gray-100'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'
                 }`}
               >
-                <div className={`w-8 h-8 flex items-center justify-center rounded-lg shrink-0 ${expandedProviders.has(providerId) ? 'bg-surface-200' : 'bg-surface-100'}`}>
+                <div className={`w-8 h-8 flex items-center justify-center rounded-lg shrink-0 ${expandedProviders.has(providerId) ? 'bg-surface-200 dark:bg-gray-500' : 'bg-surface-100 dark:bg-gray-700'}`}>
                   <ProviderIcon providerId={providerId} size={18} />
                 </div>
                 <span className="flex-1 text-sm font-semibold truncate">{accounts[0].providerName}</span>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-200 text-gray-600 shrink-0">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 shrink-0">
                   {accounts.length}
                 </span>
                 <span className="text-gray-500 text-sm font-medium w-5 text-center shrink-0" aria-label={expandedProviders.has(providerId) ? 'Collapse' : 'Expand'}>
@@ -311,10 +311,10 @@ const Sidebar = ({
                         onClick={closeOnNav}
                         className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors flex-1 min-w-0 ${
                           location.search.includes(`account=${account.accountId}`)
-                            ? 'bg-accent-50 text-accent-700 font-medium'
+                            ? 'bg-accent-50 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 font-medium'
                             : account.isActive
-                              ? 'text-gray-600 hover:bg-surface-200 hover:text-gray-900'
-                              : 'text-gray-400 hover:bg-surface-200 hover:text-gray-600'
+                              ? 'text-gray-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'
+                              : 'text-gray-400 dark:text-gray-500 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-600 dark:hover:text-gray-300'
                         }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${account.isActive ? 'bg-accent-400' : 'bg-gray-300'}`} />
@@ -375,15 +375,15 @@ const Sidebar = ({
             >
               <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0 relative">
                 <Link to="/dashboard" onClick={closeOnNav} className="w-full flex justify-center items-center">
-                  <span className="dark:inline-block dark:rounded-lg dark:bg-gray-900 dark:px-1">
-                    <img src="/logo.png" alt="Costra" className="h-9 w-auto block dark:mix-blend-multiply" />
+                  <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
+                    <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
                   </span>
                 </Link>
                 <button
                   type="button"
                   onClick={toggleSidebar}
                   aria-label="Close menu"
-                  className="absolute right-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
+                  className="absolute right-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100"
                 >
                   <span className="text-xl leading-none">×</span>
                 </button>
@@ -398,8 +398,8 @@ const Sidebar = ({
       <div className="hidden lg:flex flex-col fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-sm z-20">
         <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0">
           <Link to="/dashboard" className="w-full flex justify-center items-center">
-            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-900 dark:px-1">
-              <img src="/logo.png" alt="Costra" className="h-9 w-auto block dark:mix-blend-multiply" />
+            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
+              <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
             </span>
           </Link>
         </div>
