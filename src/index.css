@@ -12,6 +12,10 @@
     background-color: theme('colors.surface.100');
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+  .dark body {
+    @apply text-gray-100;
+    background-color: theme('colors.sidebar.bg-dark');
+  }
 
   /* Responsive Typography */
   h1 {
@@ -124,6 +128,7 @@
            bg-white text-gray-700 rounded-lg font-semibold text-sm
            border border-surface-300
            hover:bg-surface-200 hover:border-surface-400
+           dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600
            transition-colors duration-150
            focus:outline-none focus:ring-2 focus:ring-accent-500/15 focus:ring-offset-2
            shadow-xs
@@ -141,6 +146,7 @@
   .card {
     @apply bg-white rounded-xl shadow-card
            border border-surface-300 p-6
+           dark:bg-gray-800 dark:border-gray-700
            transition-shadow duration-200;
   }
   .card:hover {
@@ -306,6 +312,10 @@
   }
   to {
     transform: translateX(0);
+    opacity: 1;
+  }
+}
+  transform: translateX(0);
     opacity: 1;
   }
 }

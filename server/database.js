@@ -194,6 +194,46 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // User saved filter views
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_views (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          filters JSONB NOT NULL DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+
+      // User spend goals (e.g. "reduce by 10% vs same period last year")
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_goals (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          name TEXT,
+          target_type TEXT NOT NULL DEFAULT 'percent_reduction',
+          target_value DECIMAL(10, 2) NOT NULL,
+          baseline TEXT NOT NULL DEFAULT 'same_period_last_year',
+          period TEXT NOT NULL DEFAULT 'quarter',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+
+      // User API keys (for read-only API access)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_api_keys (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          name TEXT,
+          key_hash TEXT NOT NULL,
+          key_prefix TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+
       // Cloud providers table
       await client.query(`
         CREATE TABLE IF NOT EXISTS cloud_providers (
@@ -1353,6 +1393,216 @@ export const updateUserCurrency = async (userId, currency) => {
       'UPDATE user_preferences SET currency = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
       [currency, userId]
     )
+  } finally {
+    client.release()
+  }
+}
+
+// Saved filter views
+export const getSavedViews = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT id, name, filters, created_at FROM user_views WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    )
+    return result.rows
+  } catch (error) {
+    logger.error('getSavedViews error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const createSavedView = async (userId, name, filters) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'INSERT INTO user_views (user_id, name, filters) VALUES ($1, $2, $3) RETURNING id, name, filters, created_at',
+      [userId, name, JSON.stringify(filters || {})]
+    )
+    return result.rows[0]
+  } catch (error) {
+    logger.error('createSavedView error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const deleteSavedView = async (userId, viewId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'DELETE FROM user_views WHERE user_id = $1 AND id = $2 RETURNING id',
+      [userId, viewId]
+    )
+    return result.rowCount > 0
+  } catch (error) {
+    logger.error('deleteSavedView error', { userId, viewId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+// Spend goals
+export const getGoals = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT id, name, target_type, target_value, baseline, period, created_at FROM user_goals WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    )
+    return result.rows
+  } catch (error) {
+    logger.error('getGoals error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const createGoal = async (userId, data) => {
+  const client = await pool.connect()
+  try {
+    const { name, target_type, target_value, baseline, period } = data
+    const result = await client.query(
+      `INSERT INTO user_goals (user_id, name, target_type, target_value, baseline, period)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, name, target_type, target_value, baseline, period, created_at`,
+      [userId, name || null, target_type || 'percent_reduction', target_value, baseline || 'same_period_last_year', period || 'quarter']
+    )
+    return result.rows[0]
+  } catch (error) {
+    logger.error('createGoal error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const deleteGoal = async (userId, goalId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'DELETE FROM user_goals WHERE user_id = $1 AND id = $2 RETURNING id',
+      [userId, goalId]
+    )
+    return result.rowCount > 0
+  } catch (error) {
+    logger.error('deleteGoal error', { userId, goalId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getTotalSpendForDateRange = async (userId, startDate, endDate) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT COALESCE(SUM(cost), 0)::numeric as total FROM daily_cost_data WHERE user_id = $1 AND date >= $2::date AND date <= $3::date',
+      [userId, startDate, endDate]
+    )
+    return parseFloat(result.rows[0]?.total || 0)
+  } catch (error) {
+    logger.error('getTotalSpendForDateRange error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getGoalProgress = async (userId, goalId) => {
+  const goals = await getGoals(userId)
+  const goal = goals.find((g) => g.id === goalId)
+  if (!goal) return null
+  const now = new Date()
+  let currentStart, currentEnd, baselineStart, baselineEnd
+  if (goal.period === 'month') {
+    currentStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    currentEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    baselineStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+    baselineEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0)
+  } else {
+    const q = Math.floor(now.getMonth() / 3) + 1
+    currentStart = new Date(now.getFullYear(), (q - 1) * 3, 1)
+    currentEnd = new Date(now.getFullYear(), q * 3, 0)
+    baselineStart = new Date(now.getFullYear() - 1, (q - 1) * 3, 1)
+    baselineEnd = new Date(now.getFullYear() - 1, q * 3, 0)
+  }
+  const fmt = (d) => d.toISOString().slice(0, 10)
+  const [currentSpend, baselineSpend] = await Promise.all([
+    getTotalSpendForDateRange(userId, fmt(currentStart), fmt(currentEnd)),
+    getTotalSpendForDateRange(userId, fmt(baselineStart), fmt(baselineEnd)),
+  ])
+  const targetPercent = parseFloat(goal.target_value)
+  const percentChange = baselineSpend > 0 ? ((baselineSpend - currentSpend) / baselineSpend) * 100 : 0
+  return { goal, currentSpend, baselineSpend, percentChange, targetPercent }
+}
+
+// User API keys
+export const getApiKeys = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT id, name, key_prefix, created_at FROM user_api_keys WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    )
+    return result.rows
+  } catch (error) {
+    logger.error('getApiKeys error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const createApiKey = async (userId, name, keyHash, keyPrefix) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'INSERT INTO user_api_keys (user_id, name, key_hash, key_prefix) VALUES ($1, $2, $3, $4) RETURNING id, name, key_prefix, created_at',
+      [userId, name || null, keyHash, keyPrefix]
+    )
+    return result.rows[0]
+  } catch (error) {
+    logger.error('createApiKey error', { userId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const deleteApiKey = async (userId, keyId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'DELETE FROM user_api_keys WHERE user_id = $1 AND id = $2 RETURNING id',
+      [userId, keyId]
+    )
+    return result.rowCount > 0
+  } catch (error) {
+    logger.error('deleteApiKey error', { userId, keyId, error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getUserIdByApiKeyHash = async (keyHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      'SELECT user_id FROM user_api_keys WHERE key_hash = $1',
+      [keyHash]
+    )
+    return result.rows[0]?.user_id ?? null
+  } catch (error) {
+    logger.error('getUserIdByApiKeyHash error', { error: error.message })
+    return null
   } finally {
     client.release()
   }
@@ -6246,6 +6496,50 @@ export const getServiceCostsHistory = async (userId, months = 3) => {
     [userId, months]
   )
   return result.rows
+}
+
+/** Get weekly cost summary for email report: last 7 days total, previous 7 days total, top 5 services by cost (current month). */
+export const getWeeklyCostSummary = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const thisWeek = await client.query(
+      `SELECT COALESCE(SUM(cost), 0)::float AS total
+       FROM daily_cost_data
+       WHERE user_id = $1 AND date >= CURRENT_DATE - 7 AND date < CURRENT_DATE`,
+      [userId]
+    )
+    const lastWeek = await client.query(
+      `SELECT COALESCE(SUM(cost), 0)::float AS total
+       FROM daily_cost_data
+       WHERE user_id = $1 AND date >= CURRENT_DATE - 14 AND date < CURRENT_DATE - 7`,
+      [userId]
+    )
+    const topServices = await client.query(
+      `SELECT sc.service_name AS name, SUM(sc.cost)::float AS cost
+       FROM service_costs sc
+       INNER JOIN cost_data cd ON sc.cost_data_id = cd.id
+       WHERE cd.user_id = $1
+         AND cd.year = EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER
+         AND cd.month = EXTRACT(MONTH FROM CURRENT_DATE)::INTEGER
+       GROUP BY sc.service_name
+       ORDER BY cost DESC
+       LIMIT 5`,
+      [userId]
+    )
+    const totalCost = parseFloat(thisWeek.rows[0]?.total) || 0
+    const previousWeekTotal = parseFloat(lastWeek.rows[0]?.total) || 0
+    const costChange = previousWeekTotal > 0
+      ? ((totalCost - previousWeekTotal) / previousWeekTotal) * 100
+      : null
+    return {
+      totalCost,
+      previousWeekTotal,
+      costChange,
+      topServices: (topServices.rows || []).map((r) => ({ name: r.name, cost: parseFloat(r.cost) || 0 })),
+    }
+  } finally {
+    client.release()
+  }
 }
 
 export const getAnomalyBaselinesForUser = async (userId) => {

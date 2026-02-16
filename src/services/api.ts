@@ -202,6 +202,27 @@ export const authAPI = {
 
 // Cost Data API
 export const costDataAPI = {
+  exportCostData: async (month: number, year: number, format: 'csv' | 'pdf') => {
+    const token = getToken()
+    const params = new URLSearchParams({ month: String(month), year: String(year), format })
+    const res = await fetch(`${API_BASE_URL}/cost-data/export?${params}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || data.message || 'Export failed')
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    const name = match ? match[1] : `cost-${year}-${String(month).padStart(2, '0')}.${format}`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.click()
+    URL.revokeObjectURL(url)
+  },
   getCostData: async (month?: number, year?: number) => {
     const params = new URLSearchParams()
     if (month) params.set('month', String(month))
@@ -279,6 +300,67 @@ export const savingsPlansAPI = {
       body: JSON.stringify(plan),
     })
     return response.json()
+  },
+}
+
+// Saved views API (filter presets)
+export const savedViewsAPI = {
+  getList: async () => {
+    const response = await apiRequest('/saved-views')
+    const data = await response.json()
+    return data.views ?? []
+  },
+  create: async (name: string, filters: { selectedService?: string | null; showCreditsOnly?: boolean; selectedAccountId?: number | null }) => {
+    const response = await apiRequest('/saved-views', {
+      method: 'POST',
+      body: JSON.stringify({ name, filters }),
+    })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    await apiRequest(`/saved-views/${id}`, { method: 'DELETE' })
+  },
+}
+
+// Goals API (spend targets)
+export const goalsAPI = {
+  getList: async () => {
+    const response = await apiRequest('/goals')
+    const data = await response.json()
+    return data.goals ?? []
+  },
+  create: async (params: { name?: string; target_value: number; baseline?: string; period?: string }) => {
+    const response = await apiRequest('/goals', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    })
+    return response.json()
+  },
+  getProgress: async (goalId: number) => {
+    const response = await apiRequest(`/goals/${goalId}/progress`)
+    return response.json()
+  },
+  delete: async (id: number) => {
+    await apiRequest(`/goals/${id}`, { method: 'DELETE' })
+  },
+}
+
+// API keys (read-only access; manage with JWT only)
+export const apiKeysAPI = {
+  getList: async () => {
+    const response = await apiRequest('/api-keys')
+    const data = await response.json()
+    return data.keys ?? []
+  },
+  create: async (name?: string) => {
+    const response = await apiRequest('/api-keys', {
+      method: 'POST',
+      body: JSON.stringify({ name: name || null }),
+    })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    await apiRequest(`/api-keys/${id}`, { method: 'DELETE' })
   },
 }
 

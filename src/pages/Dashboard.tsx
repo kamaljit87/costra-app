@@ -4,14 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 
 import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
-import { cloudProvidersAPI, syncAPI, budgetsAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI, budgetsAPI, costDataAPI, goalsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
 import OptimizationSummary from '../components/OptimizationSummary'
-import { Sparkles, RefreshCw, Plus, Cloud, ArrowRight } from 'lucide-react'
+import { Sparkles, RefreshCw, Plus, Cloud, ArrowRight, Download, Target, Trash2 } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ProviderIcon } from '../components/CloudProviderIcons'
 
@@ -36,6 +36,11 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null)
+  const [exportingFormat, setExportingFormat] = useState<'csv' | 'pdf' | null>(null)
+  const [goals, setGoals] = useState<Array<{ id: number; name?: string; target_value: number; period: string }>>([])
+  const [goalsProgress, setGoalsProgress] = useState<Record<number, { percentChange: number; targetPercent: number; currentSpend: number; baselineSpend: number }>>({})
+  const [goalsLoading, setGoalsLoading] = useState(false)
+  const [addingGoal, setAddingGoal] = useState(false)
 
   const loadData = async () => {
     try {
@@ -68,6 +73,22 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData()
+  }, [isDemoMode])
+
+  useEffect(() => {
+    if (isDemoMode) return
+    setGoalsLoading(true)
+    goalsAPI.getList().then((list) => {
+      setGoals(list)
+      return Promise.all(list.map((g: { id: number }) => goalsAPI.getProgress(g.id))).then((progressList) => {
+        const map: Record<number, { percentChange: number; targetPercent: number; currentSpend: number; baselineSpend: number }> = {}
+        list.forEach((g: { id: number }, i: number) => {
+          const p = progressList[i]
+          if (p) map[g.id] = { percentChange: p.percentChange, targetPercent: p.targetPercent, currentSpend: p.currentSpend, baselineSpend: p.baselineSpend }
+        })
+        setGoalsProgress(map)
+      })
+    }).catch(() => {}).finally(() => setGoalsLoading(false))
   }, [isDemoMode])
 
   const handleSync = async () => {
@@ -109,6 +130,54 @@ export default function Dashboard() {
       )
     } finally {
       setIsSyncing(false)
+    }
+  }
+
+  const handleAddGoal = async () => {
+    const raw = window.prompt('Target reduction (%): e.g. 10 for 10%')
+    if (raw == null) return
+    const n = parseFloat(raw)
+    if (Number.isNaN(n) || n < 0) {
+      showError('Invalid target', 'Enter a number (e.g. 10 for 10% reduction).')
+      return
+    }
+    setAddingGoal(true)
+    try {
+      const goal = await goalsAPI.create({ target_value: n, period: 'quarter', baseline: 'same_period_last_year' })
+      setGoals((prev) => [goal, ...prev])
+      const progress = await goalsAPI.getProgress(goal.id)
+      setGoalsProgress((prev) => ({ ...prev, [goal.id]: { percentChange: progress.percentChange, targetPercent: progress.targetPercent, currentSpend: progress.currentSpend, baselineSpend: progress.baselineSpend } }))
+    } catch (err: any) {
+      showError('Failed to add goal', err.message || 'Could not create goal.')
+    } finally {
+      setAddingGoal(false)
+    }
+  }
+
+  const handleDeleteGoal = async (id: number) => {
+    try {
+      await goalsAPI.delete(id)
+      setGoals((prev) => prev.filter((g) => g.id !== id))
+      setGoalsProgress((prev) => { const next = { ...prev }; delete next[id]; return next })
+    } catch (_) {}
+  }
+
+  const handleExport = async (format: 'csv' | 'pdf') => {
+    if (isDemoMode) {
+      showWarning('Demo Mode', 'Export is not available in demo mode.')
+      return
+    }
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = now.getFullYear()
+    setExportingFormat(format)
+    try {
+      await costDataAPI.exportCostData(month, year, format)
+      showSuccess('Export complete', `Cost data exported as ${format.toUpperCase()}.`)
+    } catch (err: any) {
+      showError('Export failed', err.message || 'Could not export. You may need a Pro plan.')
+    } finally {
+      setExportingFormat(null)
     }
   }
 
@@ -178,6 +247,26 @@ export default function Dashboard() {
                 {isSyncing && <Spinner variant="bars" size={16} className="shrink-0" />}
                 <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
               </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExport('csv')}
+                  disabled={!!exportingFormat}
+                  className="btn-secondary"
+                  title="Export cost data as CSV"
+                >
+                  {exportingFormat === 'csv' ? <Spinner variant="bars" size={16} className="shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
+                  <span className="text-sm">Export CSV</span>
+                </button>
+                <button
+                  onClick={() => handleExport('pdf')}
+                  disabled={!!exportingFormat}
+                  className="btn-secondary"
+                  title="Export cost data as PDF"
+                >
+                  {exportingFormat === 'pdf' ? <Spinner variant="bars" size={16} className="shrink-0" /> : <Download className="h-4 w-4 shrink-0" />}
+                  <span className="text-sm">Export PDF</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -205,6 +294,59 @@ export default function Dashboard() {
             </div>
             {/* Optimization Insights */}
             {!isDemoMode && <OptimizationSummary />}
+            {/* Spend goals */}
+            {!isDemoMode && (
+              <div className="mb-6">
+                <div className="card">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-accent-600 dark:text-accent-400" />
+                      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Spend goals</h2>
+                    </div>
+                    <button type="button" onClick={handleAddGoal} disabled={addingGoal} className="btn-secondary text-sm py-2">
+                      {addingGoal ? <Spinner variant="bars" size={14} /> : <Plus className="h-4 w-4" />}
+                      <span>Add goal</span>
+                    </button>
+                  </div>
+                  {goalsLoading ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading goals…</p>
+                  ) : goals.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Set a target (e.g. reduce spend by 10% this quarter vs same period last year).</p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {goals.map((g) => {
+                        const prog = goalsProgress[g.id]
+                        const label = g.name || `Reduce by ${g.target_value}%`
+                        const done = prog ? prog.percentChange >= g.target_value : false
+                        const pct = prog ? Math.min(100, Math.max(0, (prog.percentChange / g.target_value) * 100)) : 0
+                        return (
+                          <li key={g.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{label}</span>
+                                {prog != null && (
+                                  <span className={`text-sm shrink-0 ${done ? 'text-success-600 dark:text-success-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                    {prog.percentChange.toFixed(1)}% vs {g.target_value}% target
+                                  </span>
+                                )}
+                              </div>
+                              {prog != null && (
+                                <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                                  <div className={`h-full rounded-full ${done ? 'bg-success-500' : 'bg-accent-500'}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              )}
+                            </div>
+                            <button type="button" onClick={() => handleDeleteGoal(g.id)} className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded" aria-label="Delete goal">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
             {/* Provider Sections with Charts */}
             {(() => {
               const providerDataMap = new Map<string, CostData>()
@@ -343,5 +485,8 @@ export default function Dashboard() {
 
       </div>
     </Layout>
+  )
+}
+
   )
 }

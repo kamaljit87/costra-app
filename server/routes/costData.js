@@ -14,6 +14,7 @@ import {
   getCloudProviderCredentialsByAccountId,
   createNotification,
 } from '../database.js'
+import { requireFeature } from '../middleware/featureGate.js'
 import { cached, cacheKeys, clearUserCache, del as cacheDel } from '../utils/cache.js'
 import {
   fetchAWSServiceDetails,
@@ -106,6 +107,99 @@ router.get('/', async (req, res) => {
       stack: error.stack 
     })
     res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/**
+ * GET /api/cost-data/export?month=&year=&format=csv|pdf
+ * Export current view as CSV or PDF (Pro only)
+ */
+router.get('/export', requireFeature('csv_export'), async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const now = new Date()
+    const month = req.query.month ? parseInt(req.query.month, 10) : (now.getMonth() + 1)
+    const year = req.query.year ? parseInt(req.query.year, 10) : now.getFullYear()
+    const format = (req.query.format || 'csv').toLowerCase()
+    if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+      return res.status(400).json({ error: 'Invalid month or year' })
+    }
+    if (format !== 'csv' && format !== 'pdf') {
+      return res.status(400).json({ error: 'format must be csv or pdf' })
+    }
+    const costData = await getCostDataForUser(userId, month, year)
+    const formattedData = costData.map(cost => ({
+      provider: { id: cost.provider_code, name: cost.provider_name },
+      currentMonth: parseFloat(cost.current_month_cost) || 0,
+      lastMonth: parseFloat(cost.last_month_cost) || 0,
+      services: (cost.services || [])
+        .filter(s => (s.service_name || '').toLowerCase() !== 'tax' && !(s.service_name || '').toLowerCase().includes('tax -'))
+        .map(s => ({ name: s.service_name, cost: parseFloat(s.cost) || 0, change: parseFloat(s.change_percent) || 0 })),
+    }))
+    const filename = `costra-cost-${year}-${String(month).padStart(2, '0')}`
+    if (format === 'csv') {
+      const rows = []
+      rows.push(['Provider', 'Current Month ($)', 'Last Month ($)', 'Service', 'Cost ($)', 'Change (%)'])
+      for (const row of formattedData) {
+        const provName = row.provider?.name || row.provider?.id || 'Unknown'
+        if (row.services.length === 0) {
+          rows.push([provName, row.currentMonth.toFixed(2), row.lastMonth.toFixed(2), '', '', ''])
+        } else {
+          row.services.forEach((s, i) => {
+            rows.push([
+              i === 0 ? provName : '',
+              i === 0 ? row.currentMonth.toFixed(2) : '',
+              i === 0 ? row.lastMonth.toFixed(2) : '',
+              s.name,
+              s.cost.toFixed(2),
+              s.change.toFixed(1),
+            ])
+          })
+        }
+      }
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.csv"`)
+      res.send(csv)
+      return
+    }
+    const PDFDocument = (await import('pdfkit')).default
+    const doc = new PDFDocument({ margin: 50 })
+    const chunks = []
+    doc.on('data', (chunk) => chunks.push(chunk))
+    doc.on('end', () => {
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`)
+      res.send(Buffer.concat(chunks))
+    })
+    doc.on('error', (err) => {
+      logger.error('Export PDF error', { userId, error: err.message })
+      res.status(500).json({ error: 'Failed to generate PDF' })
+    })
+    doc.fontSize(18).text('Cost Overview', { align: 'center' })
+    doc.moveDown(0.5)
+    doc.fontSize(11).text(`${new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' })} ${year}`, { align: 'center' })
+    doc.moveDown(1)
+    let y = doc.y
+    doc.fontSize(10)
+    doc.text('Provider', 50, y)
+    doc.text('Current ($)', 250, y)
+    doc.text('Last month ($)', 350, y)
+    doc.text('Services', 450, y)
+    y += 20
+    for (const row of formattedData) {
+      if (y > 700) { doc.addPage(); y = 50 }
+      const provName = row.provider?.name || row.provider?.id || 'Unknown'
+      doc.text(provName, 50, y, { width: 180 })
+      doc.text(row.currentMonth.toFixed(2), 250, y)
+      doc.text(row.lastMonth.toFixed(2), 350, y)
+      doc.text(String(row.services.length), 450, y)
+      y += 18
+    }
+    doc.end()
+  } catch (error) {
+    logger.error('Export cost data error', { userId: req.user?.userId, error: error.message })
+    res.status(500).json({ error: 'Failed to export' })
   }
 })
 

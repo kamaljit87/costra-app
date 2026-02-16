@@ -17,6 +17,9 @@ import reportsRoutes from './reports.js'
 import notificationsRoutes from './notifications.js'
 import billingRoutes from './billing.js'
 import emailPreferencesRoutes from './emailPreferences.js'
+import savedViewsRoutes from './savedViews.js'
+import goalsRoutes from './goals.js'
+import apiKeysRoutes from './apiKeys.js'
 import complianceRoutes from './compliance.js'
 import contactRoutes from './contact.js'
 import awsCallbackRoutes from './awsCallback.js'
@@ -39,6 +42,9 @@ const routes = [
   { path: '/api/notifications', handler: notificationsRoutes },
   { path: '/api/billing', handler: billingRoutes },
   { path: '/api/email-preferences', handler: emailPreferencesRoutes },
+  { path: '/api/saved-views', handler: savedViewsRoutes },
+  { path: '/api/goals', handler: goalsRoutes },
+  { path: '/api/api-keys', handler: apiKeysRoutes },
   { path: '/api/compliance', handler: complianceRoutes },
   { path: '/api/contact', handler: contactRoutes },
   { path: '/api/health', handler: healthRoutes },

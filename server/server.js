@@ -70,6 +70,9 @@ if (isProduction) {
     initCURPolling()
     initOptimizationSchedule()
   }).catch((e) => logger.warn('Sync scheduler init failed', { error: e.message }))
+  import('./services/weeklySummaryScheduler.js').then(({ initWeeklySummarySchedule }) => {
+    initWeeklySummarySchedule()
+  }).catch((e) => logger.warn('Weekly summary scheduler init failed', { error: e.message }))
 }
 
 // Create Express app

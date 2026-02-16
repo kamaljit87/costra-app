@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { cloudProvidersAPI, costDataAPI, notificationsAPI } from '../services/api'
 import { ProviderIcon, getProviderColor } from './CloudProviderIcons'
 import { 
@@ -15,7 +16,9 @@ import {
   CreditCard,
   Bug,
   X,
-  ArrowRight
+  ArrowRight,
+  Sun,
+  Moon
 } from 'lucide-react'
 import NotificationDropdown from './NotificationDropdown'
 
@@ -47,6 +50,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { logout, user, isDemoMode } = useAuth()
+  const { effectiveTheme, setTheme } = useTheme()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isProviderMenuOpen, setIsProviderMenuOpen] = useState(false)
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
@@ -534,6 +538,16 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                 }}
               />
             </div>
+
+            {/* Theme toggle */}
+            <button
+              type="button"
+              onClick={() => setTheme(effectiveTheme === 'dark' ? 'light' : 'dark')}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              title={effectiveTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {effectiveTheme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
 
             {/* User Menu */}
             <div className="relative" ref={userMenuRef}>
