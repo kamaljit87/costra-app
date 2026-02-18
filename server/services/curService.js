@@ -8,7 +8,7 @@ import {
   S3Client,
   ListObjectsV2Command, GetObjectCommand, HeadObjectCommand,
   HeadBucketCommand,
-  CreateBucketCommand, PutBucketPolicyCommand, PutBucketTaggingCommand,
+  CreateBucketCommand, PutBucketPolicyCommand, PutBucketTaggingCommand, GetBucketTaggingCommand,
   PutBucketEncryptionCommand, PutBucketLifecycleConfigurationCommand,
   PutPublicAccessBlockCommand,
 } from '@aws-sdk/client-s3'
@@ -170,16 +170,31 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
     },
   }))
 
-  // Tags
-  await s3Client.send(new PutBucketTaggingCommand({
-    Bucket: s3Bucket,
-    Tagging: {
-      TagSet: [
-        { Key: 'ManagedBy', Value: 'Costra' },
-        { Key: 'Purpose', Value: 'CostAndUsageReports' },
-      ],
-    },
-  }))
+  // Tags — merge with existing tags so we don't remove CloudFormation system tags
+  const desiredTags = [
+    { Key: 'ManagedBy', Value: 'Costra' },
+    { Key: 'Purpose', Value: 'CostAndUsageReports' },
+  ]
+  try {
+    let existingTags = []
+    try {
+      const tagResp = await s3Client.send(new GetBucketTaggingCommand({ Bucket: s3Bucket }))
+      existingTags = tagResp.TagSet || []
+    } catch (tagErr) {
+      // NoSuchTagSet means no tags exist yet — that's fine
+      if (tagErr.name !== 'NoSuchTagSet') throw tagErr
+    }
+    // Merge: keep existing tags, override only the ones we manage
+    const desiredKeys = new Set(desiredTags.map(t => t.Key))
+    const mergedTags = existingTags.filter(t => !desiredKeys.has(t.Key)).concat(desiredTags)
+    await s3Client.send(new PutBucketTaggingCommand({
+      Bucket: s3Bucket,
+      Tagging: { TagSet: mergedTags },
+    }))
+  } catch (tagErr) {
+    // Tagging is non-critical — log and continue
+    logger.warn('Could not update bucket tags, continuing', { s3Bucket, error: tagErr.message })
+  }
 
   // 3. Set bucket policy: allow BCM Data Exports to write + Costra cross-account read
   // Per https://docs.aws.amazon.com/cur/latest/userguide/dataexports-s3-bucket.html both
