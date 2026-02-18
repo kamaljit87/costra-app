@@ -237,7 +237,7 @@ const Sidebar = ({
         </button>
       )}
       <Link
-        to="/settings"
+        to="/settings?tab=providers"
         onClick={closeOnNav}
         className="flex items-center justify-center gap-2 font-medium text-sm p-2 text-center bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-200 rounded-xl hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors"
       >

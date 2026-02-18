@@ -454,7 +454,7 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
                       <Cloud className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-500">No providers configured</p>
                       <Link
-                        to="/settings"
+                        to="/settings?tab=providers"
                         onClick={() => setIsProviderMenuOpen(false)}
                               className="text-sm text-accent-600 hover:text-accent-700 mt-2 inline-block"
                       >
