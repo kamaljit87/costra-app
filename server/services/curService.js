@@ -12,13 +12,14 @@ import {
   PutBucketEncryptionCommand, PutBucketLifecycleConfigurationCommand,
   PutPublicAccessBlockCommand,
 } from '@aws-sdk/client-s3'
-import { BCMDataExportsClient, CreateExportCommand, ListExportsCommand, DeleteExportCommand } from '@aws-sdk/client-bcm-data-exports'
+import { BCMDataExportsClient, CreateExportCommand, ListExportsCommand, DeleteExportCommand, GetExportCommand } from '@aws-sdk/client-bcm-data-exports'
 import { getAssumedRoleCredentials } from './awsAuth.js'
 import { pool } from '../database.js'
 import { clearUserCache, clearCostExplanationsCache, createNotification, saveServiceUsageMetrics } from '../database.js'
 import logger from '../utils/logger.js'
 
 const MAX_PARQUET_FILE_SIZE = 200 * 1024 * 1024 // 200MB
+const CUR_S3_PREFIX = 'costra-cur'
 
 // ─── Database helpers ────────────────────────────────────────────────
 
@@ -30,14 +31,14 @@ const getCurConfig = async (userId, accountId) => {
   return result.rows[0] || null
 }
 
-const upsertCurConfig = async (userId, accountId, exportName, exportArn, s3Bucket, status, statusMessage = null) => {
+const upsertCurConfig = async (userId, accountId, exportName, exportArn, s3Bucket, status, statusMessage = null, s3Prefix = 'costra-cur') => {
   await pool.query(
-    `INSERT INTO cur_export_config (user_id, account_id, export_name, export_arn, s3_bucket, cur_status, status_message, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+    `INSERT INTO cur_export_config (user_id, account_id, export_name, export_arn, s3_bucket, s3_prefix, cur_status, status_message, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
      ON CONFLICT (user_id, account_id)
      DO UPDATE SET export_name = $3, export_arn = COALESCE($4, cur_export_config.export_arn),
-       s3_bucket = $5, cur_status = $6, status_message = $7, updated_at = CURRENT_TIMESTAMP`,
-    [userId, accountId, exportName, exportArn, s3Bucket, status, statusMessage]
+       s3_bucket = $5, s3_prefix = $6, cur_status = $7, status_message = $8, updated_at = CURRENT_TIMESTAMP`,
+    [userId, accountId, exportName, exportArn, s3Bucket, s3Prefix, status, statusMessage]
   )
 }
 
@@ -85,11 +86,26 @@ const checkIfPeriodIngested = async (curConfigId, billingPeriod) => {
   return result.rows.length > 0
 }
 
-// ─── CUR Export Setup ────────────────────────────────────────────────
+// ─── CUR Export Registration (from CloudFormation) ──────────────────
 
 /**
- * Create a CUR 2.0 Data Export in the customer's AWS account.
- * The S3 bucket is created by CloudFormation. This creates the export definition.
+ * Register a CUR export that was already created by CloudFormation.
+ * Just records the export details in our database — no AWS API calls needed.
+ */
+export const registerCURExport = async (userId, accountId, exportName, exportArn, s3Bucket) => {
+  await upsertCurConfig(userId, accountId, exportName, exportArn, s3Bucket, 'provisioning', null, CUR_S3_PREFIX)
+  await pool.query(
+    `UPDATE cloud_provider_credentials SET cur_enabled = true, cur_bucket_name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3`,
+    [s3Bucket, accountId, userId]
+  )
+  return { exportArn, s3Bucket, status: 'provisioning' }
+}
+
+// ─── CUR Export Setup (API fallback) ─────────────────────────────────
+
+/**
+ * Create a CUR 2.0 Data Export in the customer's AWS account via API.
+ * Used as fallback for stacks that don't include the BCM export resource.
  */
 export const setupCURExport = async (userId, accountId, roleArn, externalId, awsAccountId, connectionName) => {
   const creds = await getAssumedRoleCredentials(roleArn, externalId, `costra-cur-setup-${accountId}-${Date.now()}`)
@@ -214,58 +230,211 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
   }
 
   if (existingArn) {
-    await upsertCurConfig(userId, accountId, exportName, existingArn, s3Bucket, 'active')
+    // Check export health — an existing export may be UNHEALTHY (e.g. bucket policy removed)
+    let exportStatus = 'active'
+    try {
+      const resp = await bcmClient.send(new GetExportCommand({ ExportArn: existingArn }))
+      const statusCode = resp.ExportStatus?.StatusCode
+      const statusReason = resp.ExportStatus?.StatusReason
+      if (statusCode === 'UNHEALTHY') {
+        exportStatus = 'provisioning'
+        logger.warn('CUR export exists but is UNHEALTHY — bucket policy re-applied, waiting for next delivery', {
+          userId, accountId, exportName, statusReason,
+        })
+      } else {
+        logger.info('CUR export health check', { userId, accountId, exportName, statusCode, statusReason })
+      }
+    } catch (healthErr) {
+      logger.warn('Could not check export health', { error: healthErr.message })
+    }
+    await upsertCurConfig(userId, accountId, exportName, existingArn, s3Bucket, exportStatus, null, CUR_S3_PREFIX)
     await pool.query(
       `UPDATE cloud_provider_credentials SET cur_enabled = true, cur_bucket_name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3`,
       [s3Bucket, accountId, userId]
     )
-    return { exportArn: existingArn, s3Bucket, status: 'active' }
+    return { exportArn: existingArn, s3Bucket, status: exportStatus }
   }
 
   // 5. Create the Data Export
-  const createResp = await bcmClient.send(new CreateExportCommand({
-    Export: {
-      Name: exportName,
-      DataQuery: {
-        QueryStatement: 'SELECT * FROM COST_AND_USAGE_REPORT',
-        TableConfigurations: {
-          COST_AND_USAGE_REPORT: {
-            TIME_GRANULARITY: 'DAILY',
-            INCLUDE_RESOURCES: 'FALSE',
-            INCLUDE_MANUAL_DISCOUNT_COMPATIBILITY: 'FALSE',
-            INCLUDE_SPLIT_COST_ALLOCATION_DATA: 'FALSE',
+  // Use only columns confirmed valid in CUR 2.0 (verified against AWS docs)
+  const CUR_COLUMNS = [
+    'identity_line_item_id',
+    'identity_time_interval',
+    'line_item_line_item_type',
+    'line_item_product_code',
+    'line_item_usage_start_date',
+    'line_item_usage_type',
+    'line_item_usage_amount',
+    'line_item_unblended_cost',
+    'line_item_currency_code',
+    'line_item_operation',
+    'line_item_tax_type',
+    'pricing_term',
+    'pricing_unit',
+  ]
+  const CUR_QUERY = `SELECT ${CUR_COLUMNS.join(', ')} FROM COST_AND_USAGE_REPORT`
+
+  logger.info('Creating CUR export', { userId, accountId, exportName, query: CUR_QUERY })
+
+  let createResp
+  try {
+    createResp = await bcmClient.send(new CreateExportCommand({
+      Export: {
+        Name: exportName,
+        DataQuery: {
+          QueryStatement: CUR_QUERY,
+          TableConfigurations: {
+            COST_AND_USAGE_REPORT: {
+              TIME_GRANULARITY: 'DAILY',
+              INCLUDE_RESOURCES: 'FALSE',
+              INCLUDE_MANUAL_DISCOUNT_COMPATIBILITY: 'FALSE',
+              INCLUDE_SPLIT_COST_ALLOCATION_DATA: 'FALSE',
+            },
           },
         },
-      },
-      DestinationConfigurations: {
-        S3Destination: {
-          S3Bucket: s3Bucket,
-          S3Prefix: 'costra-cur',
-          S3Region: 'us-east-1',
-          S3OutputConfigurations: {
-            OutputType: 'CUSTOM',
-            Format: 'PARQUET',
-            Compression: 'PARQUET',
-            Overwrite: 'OVERWRITE_REPORT',
+        DestinationConfigurations: {
+          S3Destination: {
+            S3Bucket: s3Bucket,
+            S3Prefix: CUR_S3_PREFIX,
+            S3Region: 'us-east-1',
+            S3OutputConfigurations: {
+              OutputType: 'CUSTOM',
+              Format: 'PARQUET',
+              Compression: 'PARQUET',
+              Overwrite: 'OVERWRITE_REPORT',
+            },
           },
         },
+        RefreshCadence: {
+          Frequency: 'SYNCHRONOUS',
+        },
       },
-      RefreshCadence: {
-        Frequency: 'SYNCHRONOUS',
-      },
-    },
-  }))
+    }))
+  } catch (createErr) {
+    logger.error('CreateExport FAILED', {
+      userId, accountId, exportName,
+      errorName: createErr.name,
+      errorMessage: createErr.message,
+      query: CUR_QUERY,
+    })
+    throw createErr
+  }
 
   const exportArn = createResp.ExportArn
   logger.info('CUR export created', { userId, accountId, exportName, exportArn })
 
-  await upsertCurConfig(userId, accountId, exportName, exportArn, s3Bucket, 'provisioning')
+  await upsertCurConfig(userId, accountId, exportName, exportArn, s3Bucket, 'provisioning', null, CUR_S3_PREFIX)
   await pool.query(
     `UPDATE cloud_provider_credentials SET cur_enabled = true, cur_bucket_name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3`,
     [s3Bucket, accountId, userId]
   )
 
   return { exportArn, s3Bucket, status: 'provisioning' }
+}
+
+/**
+ * Re-apply the S3 bucket policy for an existing CUR export so Data Exports can deliver again.
+ * Use when export is UNHEALTHY with INSUFFICIENT_PERMISSION (e.g. policy was edited or removed).
+ */
+export const applyCURBucketPolicy = async (userId, accountId) => {
+  const config = await getCurConfig(userId, accountId)
+  if (!config) throw new Error('CUR not configured for this account')
+
+  const account = await getAccountData(userId, accountId)
+  if (!account?.role_arn || !account.external_id || !account.aws_account_id) {
+    throw new Error('Account credentials missing')
+  }
+
+  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costra-cur-fix-policy-${accountId}-${Date.now()}`)
+  const s3Bucket = config.s3_bucket
+  const awsAccountId = account.aws_account_id
+  const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID
+
+  const s3Client = new S3Client({
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: creds.accessKeyId,
+      secretAccessKey: creds.secretAccessKey,
+      sessionToken: creds.sessionToken,
+    },
+  })
+
+  const bucketPolicy = {
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Sid: 'AllowBCMDataExportsWrite',
+        Effect: 'Allow',
+        Principal: { Service: 'bcm-data-exports.amazonaws.com' },
+        Action: ['s3:PutObject', 's3:GetBucketPolicy'],
+        Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
+        Condition: {
+          StringEquals: { 'aws:SourceAccount': awsAccountId },
+          ArnLike: { 'aws:SourceArn': `arn:aws:bcm-data-exports:us-east-1:${awsAccountId}:export/*` },
+        },
+      },
+      ...(costraAccountId ? [{
+        Sid: 'AllowCostraCrossAccountRead',
+        Effect: 'Allow',
+        Principal: { AWS: `arn:aws:iam::${costraAccountId}:root` },
+        Action: ['s3:GetObject', 's3:ListBucket', 's3:GetBucketLocation'],
+        Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
+      }] : []),
+    ],
+  }
+
+  await s3Client.send(new PutBucketPolicyCommand({
+    Bucket: s3Bucket,
+    Policy: JSON.stringify(bucketPolicy),
+  }))
+
+  logger.info('CUR bucket policy re-applied', { userId, accountId, s3Bucket })
+  return { success: true, message: 'Bucket policy updated. Data Exports should be able to deliver on the next refresh.' }
+}
+
+// ─── AWS Export Health (GetExport) ───────────────────────────────────
+
+const EXPORT_STATUS_MESSAGES = {
+  INSUFFICIENT_PERMISSION: 'Data Exports cannot write to your S3 bucket. Re-apply the bucket policy (e.g. use "Fix CUR" in settings) so the export can deliver.',
+  BILL_OWNER_CHANGED: 'Your AWS account moved organizations or billing groups. Create a new CUR export and remove the old one.',
+  INTERNAL_FAILURE: 'AWS Data Exports reported an internal error. Check the AWS Service Health Dashboard or try again later.',
+}
+
+/**
+ * Fetch export health from AWS GetExport. Returns { statusCode, statusReason, statusMessage } or null.
+ */
+async function getExportStatusFromAWS(userId, accountId) {
+  const config = await getCurConfig(userId, accountId)
+  if (!config?.export_arn) return null
+
+  const account = await getAccountData(userId, accountId)
+  if (!account?.role_arn || !account.external_id) return null
+
+  try {
+    const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costra-cur-status-${accountId}-${Date.now()}`)
+    const bcmClient = new BCMDataExportsClient({
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
+        sessionToken: creds.sessionToken,
+      },
+    })
+    const resp = await bcmClient.send(new GetExportCommand({ ExportArn: config.export_arn }))
+    const st = resp.ExportStatus
+    if (!st) return null
+    const statusReason = st.StatusReason || null
+    const statusMessage = statusReason ? (EXPORT_STATUS_MESSAGES[statusReason] || `Export status: ${statusReason}`) : null
+    return {
+      statusCode: st.StatusCode,
+      statusReason,
+      statusMessage,
+      lastRefreshedAt: st.LastRefreshedAt,
+    }
+  } catch (err) {
+    logger.warn('GetExport failed (non-fatal)', { userId, accountId, error: err.message })
+    return null
+  }
 }
 
 // ─── CUR Data Availability Check ────────────────────────────────────
@@ -293,16 +462,34 @@ export const checkCURDataAvailability = async (userId, accountId) => {
   })
 
   // CUR 2.0 delivery path per AWS docs: {prefix}/{export-name}/data/BILLING_PERIOD=YYYY-MM/...parquet
-  const dataPrefix = `${config.s3_prefix}/${config.export_name}/data/`
+  const s3Prefix = config.s3_prefix || CUR_S3_PREFIX
+  const dataPrefix = `${s3Prefix}/${config.export_name}/data/`
+
+  logger.debug('CUR availability check: listing S3 objects', {
+    userId, accountId, bucket: config.s3_bucket, prefix: dataPrefix,
+  })
+
   const resp = await s3Client.send(new ListObjectsV2Command({
     Bucket: config.s3_bucket,
     Prefix: dataPrefix,
     MaxKeys: 1000,
   }))
 
-  const parquetFiles = (resp.Contents || []).filter(obj => obj.Key.endsWith('.parquet'))
-  const billingPeriods = [...new Set(parquetFiles.map(obj => {
-    const match = obj.Key.match(/\/data\/BILLING_PERIOD=(\d{4}-\d{2})\//)
+  const allKeys = (resp.Contents || []).map(obj => obj.Key)
+  const parquetFiles = allKeys.filter(key => key.endsWith('.parquet'))
+
+  if (allKeys.length === 0) {
+    logger.info('CUR availability: no objects found under prefix', {
+      userId, accountId, bucket: config.s3_bucket, prefix: dataPrefix,
+    })
+  } else if (parquetFiles.length === 0) {
+    logger.info('CUR availability: objects found but no .parquet files', {
+      userId, accountId, objectCount: allKeys.length, sampleKey: allKeys[0],
+    })
+  }
+
+  const billingPeriods = [...new Set(parquetFiles.map(key => {
+    const match = key.match(/\/data\/BILLING_PERIOD=(\d{4}-\d{2})\//)
     return match ? match[1] : null
   }).filter(Boolean))].sort()
 
@@ -335,7 +522,8 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
   })
 
   // List Parquet files for this billing period (CUR 2.0 uses partition BILLING_PERIOD=YYYY-MM)
-  const prefix = `${config.s3_prefix}/${config.export_name}/data/BILLING_PERIOD=${billingPeriod}/`
+  const s3Prefix = config.s3_prefix || CUR_S3_PREFIX
+  const prefix = `${s3Prefix}/${config.export_name}/data/BILLING_PERIOD=${billingPeriod}/`
   const listResp = await s3Client.send(new ListObjectsV2Command({
     Bucket: config.s3_bucket,
     Prefix: prefix,
@@ -428,7 +616,7 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
             // Accumulate per-service per-day usage for Cost vs Usage analytics
             const usageType = (row.line_item_usage_type || 'Usage').toString().trim() || 'Usage'
             const usageAmount = parseFloat(row.line_item_usage_amount || 0)
-            const usageUnit = (row.line_item_usage_unit || '').toString().trim() || null
+            const usageUnit = (row.pricing_unit || '').toString().trim() || null
             if (date && (cost > 0 || usageAmount > 0)) {
               const key = `${service}|${date}|${usageType}`
               const existing = serviceDailyUsage.get(key) || { cost: 0, usageQuantity: 0, usageUnit }
@@ -733,6 +921,24 @@ export const pollCURDataForAllAccounts = async () => {
       const availability = await checkCURDataAvailability(config.user_id, config.account_id)
 
       if (!availability.available) {
+        // When bucket is empty, check export health to surface actionable errors
+        if (config.cur_status === 'provisioning' || config.cur_status === 'active') {
+          try {
+            const awsStatus = await getExportStatusFromAWS(config.user_id, config.account_id)
+            if (awsStatus?.statusCode === 'UNHEALTHY') {
+              logger.warn('CUR export is UNHEALTHY — data will not be delivered until fixed', {
+                userId: config.user_id, accountId: config.account_id,
+                statusReason: awsStatus.statusReason, statusMessage: awsStatus.statusMessage,
+              })
+              await pool.query(
+                `UPDATE cur_export_config SET cur_status = 'error', status_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                [awsStatus.statusMessage || `Export unhealthy: ${awsStatus.statusReason}`, config.id]
+              )
+            }
+          } catch (healthErr) {
+            logger.debug('Export health check failed during poll', { error: healthErr.message })
+          }
+        }
         logger.debug('No CUR data available yet', { userId: config.user_id, accountId: config.account_id, curStatus: config.cur_status })
         continue
       }
@@ -811,7 +1017,7 @@ export const pollCURDataForAllAccounts = async () => {
 export const getCURStatus = async (userId, accountId) => {
   const config = await getCurConfig(userId, accountId)
   if (!config) {
-    return { curEnabled: false, curStatus: null, lastIngestion: null, billingPeriods: [] }
+    return { curEnabled: false, curStatus: null, lastIngestion: null, billingPeriods: [], bucketEmpty: false }
   }
 
   // Get ingested billing periods
@@ -822,17 +1028,55 @@ export const getCURStatus = async (userId, accountId) => {
     [config.id]
   )
 
+  const billingPeriods = logResult.rows.map(r => ({
+    period: r.billing_period,
+    totalCost: parseFloat(r.total_cost),
+    ingestedAt: r.completed_at,
+  }))
+
+  let bucketEmpty = false
+  let bucketEmptyMessage = null
+  let exportStatusCode = null
+  let exportStatusReason = null
+  let exportStatusMessage = null
+
+  try {
+    const awsStatus = await getExportStatusFromAWS(userId, accountId)
+    if (awsStatus) {
+      exportStatusCode = awsStatus.statusCode
+      exportStatusReason = awsStatus.statusReason
+      exportStatusMessage = awsStatus.statusMessage
+    }
+  } catch (e) {
+    logger.debug('Export status fetch failed (non-fatal)', { userId, accountId, error: e.message })
+  }
+
+  try {
+    const availability = await checkCURDataAvailability(userId, accountId)
+    if (!availability.available && billingPeriods.length === 0) {
+      bucketEmpty = true
+      if (exportStatusCode === 'UNHEALTHY' && exportStatusMessage) {
+        bucketEmptyMessage = exportStatusMessage
+      } else {
+        bucketEmptyMessage = 'S3 bucket is empty. AWS typically delivers the first CUR report within 24–72 hours. Cost Explorer is used in the meantime.'
+      }
+    }
+  } catch (availErr) {
+    logger.debug('CUR availability check failed (non-fatal)', { userId, accountId, error: availErr.message })
+  }
+
   return {
     curEnabled: true,
     curStatus: config.cur_status,
     statusMessage: config.status_message,
     lastIngestion: config.last_successful_ingestion,
     s3Bucket: config.s3_bucket,
-    billingPeriods: logResult.rows.map(r => ({
-      period: r.billing_period,
-      totalCost: parseFloat(r.total_cost),
-      ingestedAt: r.completed_at,
-    })),
+    billingPeriods,
+    bucketEmpty,
+    bucketEmptyMessage,
+    exportStatusCode,
+    exportStatusReason,
+    exportStatusMessage,
   }
 }
 

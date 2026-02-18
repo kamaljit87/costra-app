@@ -16,7 +16,19 @@ import {
   createNotification,
   pool
 } from '../database.js'
+import { del as cacheDel } from '../utils/cache.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
+import { writeCostCacheCSV } from '../services/costCacheCSV.js'
+
+/** Date range for a calendar month (1-based month, full year). Uses UTC so server TZ doesn't change the month. */
+function getDateRangeForMonth(month, year) {
+  const start = new Date(Date.UTC(year, month - 1, 1))
+  const endLastDay = new Date(Date.UTC(year, month, 0))
+  return {
+    startDate: start.toISOString().split('T')[0],
+    endDate: endLastDay.toISOString().split('T')[0],
+  }
+}
 import { enhanceCostData } from '../utils/costCalculations.js'
 import { sanitizeCostData, validateCostDataResponse } from '../utils/dataValidator.js'
 import { runOptimizationForUser } from '../services/optimizationEngine.js'
@@ -46,9 +58,10 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Account not found' } }
     }
 
-    // Handle automated AWS connections (role-based)
+    // Handle automated AWS connections (role-based); other providers use credentials as-is
     let credentialsToUse = accountData.credentials || {}
-    if (account.provider_id === 'aws' && accountData.connectionType?.startsWith('automated')) {
+    const isAws = String(account.provider_id || '').toLowerCase().trim() === 'aws'
+    if (isAws && accountData.connectionType?.startsWith('automated')) {
       logger.info('Automated AWS connection detected', { requestId, userId, accountId: account.id, accountLabel })
 
       if (!accountData.roleArn || !accountData.externalId) {
@@ -95,7 +108,7 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
     } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0) {
       logger.warn('No credentials found', { requestId, userId, accountId: account.id, accountLabel })
       return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Credentials not found' } }
-    } else if (account.provider_id === 'aws' && (!credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey)) {
+    } else if (isAws && (!credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey)) {
       logger.warn('AWS credentials incomplete (missing accessKeyId or secretAccessKey)', { requestId, userId, accountId: account.id, accountLabel })
       return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'AWS credentials invalid (missing Access Key ID or Secret Access Key)' } }
     }
@@ -158,6 +171,12 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       logger.debug('Saving daily data points', { requestId, userId, accountId: account.id, accountLabel, dailyDataCount: costData.dailyData.length })
       await saveBulkDailyCostData(userId, account.provider_id, costData.dailyData, account.id)
     }
+
+    await writeCostCacheCSV(userId, account.id, currentYear, currentMonth, {
+      dailyData: costData.dailyData || [],
+      services: sanitizedData.services || [],
+      total: sanitizedData.currentMonth,
+    }).catch(() => {})
 
     // Save service-level cost + usage for Cost vs Usage analytics (AWS returns serviceUsageMetrics)
     if (costData.serviceUsageMetrics?.length > 0) {
@@ -316,6 +335,179 @@ router.post('/', async (req, res) => {
 })
 
 /**
+ * Fetch and save cost data for a specific month (e.g. when compare page has no data for that month).
+ * POST /api/sync/fetch-month
+ * Body: { providerId: string, month: number, year: number }
+ */
+router.post('/fetch-month', async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const { providerId, month, year } = req.body || {}
+
+    if (!providerId || !month || !year) {
+      return res.status(400).json({ error: 'providerId, month, and year are required' })
+    }
+    const monthNum = parseInt(month, 10)
+    const yearNum = parseInt(year, 10)
+    if (isNaN(monthNum) || monthNum < 1 || monthNum > 12 || isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+      return res.status(400).json({ error: 'Invalid month or year' })
+    }
+
+    const providerAccounts = await getUserCloudProviders(userId)
+    const providerIdLower = String(providerId || '').toLowerCase().trim()
+    const accounts = providerAccounts.filter(
+      a => String(a.provider_id || '').toLowerCase().trim() === providerIdLower && a.is_active !== false
+    )
+    if (accounts.length === 0) {
+      logger.warn('Fetch-month: no active accounts for provider', { userId, providerId, providerIdLower })
+      return res.status(404).json({ error: 'No active accounts found for this provider' })
+    }
+
+    const { startDate, endDate } = getDateRangeForMonth(monthNum, yearNum)
+    logger.info('Fetch-month: fetching data for period', { userId, providerId, month: monthNum, year: yearNum, startDate, endDate })
+
+    const results = []
+    const errors = []
+
+    for (const account of accounts) {
+      try {
+        const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
+        if (!accountData) {
+          errors.push({ accountId: account.id, error: 'Account not found' })
+          continue
+        }
+
+        let credentialsToUse = accountData.credentials || {}
+        const isAwsAccount = String(account.provider_id || '').toLowerCase().trim() === 'aws'
+        if (isAwsAccount && accountData.connectionType?.startsWith('automated')) {
+          if (!accountData.roleArn || !accountData.externalId) {
+            errors.push({ accountId: account.id, error: 'Automated connection missing role ARN or external ID' })
+            continue
+          }
+          try {
+            const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+            const stsClient = new STSClient({ region: 'us-east-1' })
+            const assumeRoleCommand = new AssumeRoleCommand({
+              RoleArn: accountData.roleArn,
+              RoleSessionName: `costra-fetch-month-${account.id}-${Date.now()}`,
+              ExternalId: accountData.externalId,
+              DurationSeconds: 3600,
+            })
+            const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
+            if (!assumeRoleResponse.Credentials) throw new Error('No credentials returned')
+            credentialsToUse = {
+              accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
+              secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
+              sessionToken: assumeRoleResponse.Credentials.SessionToken,
+              region: 'us-east-1',
+            }
+          } catch (assumeErr) {
+            errors.push({ accountId: account.id, error: assumeErr.message || 'Failed to assume role' })
+            continue
+          }
+        } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0) {
+          errors.push({ accountId: account.id, error: 'Credentials not found' })
+          continue
+        }
+
+        const costData = await fetchProviderCostData(providerId, credentialsToUse, startDate, endDate, false)
+        const validation = validateCostDataResponse(costData)
+        if (!validation.valid) {
+          logger.warn('Fetch-month: validation failed, continuing', { userId, accountId: account.id, errors: validation.errors })
+        }
+
+        // fetchProviderCostData calculates currentMonth/lastMonth relative to today's date,
+        // which gives 0 for historical months. Recalculate the total for the target month
+        // from daily data so the saved cost_data.current_month_cost is accurate.
+        const targetMonthTotal = (costData.dailyData || []).reduce((sum, d) => {
+          const dayDate = new Date(d.date)
+          if (dayDate.getUTCFullYear() === yearNum && dayDate.getUTCMonth() + 1 === monthNum) {
+            return sum + (parseFloat(d.cost) || 0)
+          }
+          return sum
+        }, 0)
+        if (targetMonthTotal > 0 && costData.currentMonth === 0) {
+          costData.currentMonth = targetMonthTotal
+          logger.info('Fetch-month: recalculated currentMonth from daily data', {
+            userId, accountId: account.id, month: monthNum, year: yearNum,
+            total: targetMonthTotal.toFixed(2),
+          })
+        }
+
+        const enhancedData = await enhanceCostData(
+          costData,
+          providerId,
+          credentialsToUse,
+          yearNum,
+          monthNum,
+          costData.dailyData
+        )
+        const sanitizedData = sanitizeCostData(enhancedData)
+
+        await saveCostData(userId, providerId, monthNum, yearNum, {
+          providerName: account.provider_name,
+          accountAlias: account.account_alias,
+          accountId: account.id,
+          icon: getProviderIcon(providerId),
+          currentMonth: sanitizedData.currentMonth,
+          lastMonth: sanitizedData.lastMonth,
+          forecast: sanitizedData.forecast,
+          forecastConfidence: sanitizedData.forecastConfidence,
+          credits: sanitizedData.credits || 0,
+          savings: sanitizedData.savings || 0,
+          services: sanitizedData.services || [],
+          taxCurrentMonth: sanitizedData.taxCurrentMonth || 0,
+          taxLastMonth: sanitizedData.taxLastMonth || 0,
+        })
+        logger.info('Fetch-month: saved cost_data', { userId, providerId, accountId: account.id, month: monthNum, year: yearNum })
+
+        if (costData.dailyData && costData.dailyData.length > 0) {
+          await saveBulkDailyCostData(userId, providerId, costData.dailyData, account.id)
+        }
+        if (costData.serviceUsageMetrics?.length > 0) {
+          try {
+            await saveServiceUsageMetrics(userId, account.id, providerId, costData.serviceUsageMetrics)
+          } catch (metricsErr) {
+            logger.warn('Fetch-month: saveServiceUsageMetrics failed (non-fatal)', { accountId: account.id, error: metricsErr.message })
+          }
+        }
+
+        await writeCostCacheCSV(userId, account.id, yearNum, monthNum, {
+          dailyData: costData.dailyData || [],
+          services: sanitizedData.services || [],
+          total: sanitizedData.currentMonth,
+        }).catch(() => {})
+
+        await clearUserCache(userId).catch(() => {})
+        await cacheDel(`cost_data:${userId}:${monthNum}:${yearNum}`).catch(() => {})
+        results.push({ accountId: account.id, accountAlias: account.account_alias, status: 'success' })
+      } catch (err) {
+        logger.error('Fetch-month: account failed', { userId, accountId: account.id, providerId, error: err.message, stack: err.stack })
+        errors.push({ accountId: account.id, error: err.message || 'Unknown error' })
+      }
+    }
+
+    const statusCode = errors.length > 0 ? (results.length > 0 ? 207 : 500) : 200
+    const message = errors.length > 0
+      ? (results.length > 0 ? 'Fetched with some errors' : 'Failed to fetch data for this month')
+      : 'Data fetched and saved'
+    const firstErrorDetail = errors.length > 0 ? errors[0].error : null
+    res.status(statusCode).json({
+      message,
+      error: statusCode === 500 && firstErrorDetail ? `${message}: ${firstErrorDetail}` : undefined,
+      providerId,
+      month: monthNum,
+      year: yearNum,
+      results,
+      errors: errors.length > 0 ? errors : undefined,
+    })
+  } catch (error) {
+    logger.error('Fetch-month error', { userId: req.user?.userId, error: error.message, stack: error.stack })
+    res.status(500).json({ error: error.message || 'Internal server error' })
+  }
+})
+
+/**
  * Sync cost data for a specific account
  * POST /api/sync/account/:accountId
  */
@@ -338,9 +530,10 @@ router.post('/account/:accountId', async (req, res) => {
     const { providerId, providerName, accountAlias } = accountData
     const accountLabel = accountAlias || `${providerId} (${accountId})`
     
-    // Handle automated AWS connections (role-based)
+    // Handle automated AWS connections (role-based); other providers use credentials as-is
     let credentialsToUse = accountData.credentials || {}
-    if (providerId === 'aws' && accountData.connectionType?.startsWith('automated')) {
+    const isAwsProvider = String(providerId || '').toLowerCase().trim() === 'aws'
+    if (isAwsProvider && accountData.connectionType?.startsWith('automated')) {
       logger.info('Automated AWS connection detected (account sync)', { requestId: req.requestId, userId, accountId, accountLabel })
       
       if (!accountData.roleArn || !accountData.externalId) {
@@ -489,6 +682,12 @@ router.post('/account/:accountId', async (req, res) => {
       await saveBulkDailyCostData(userId, providerId, costData.dailyData, accountId)
     }
 
+    await writeCostCacheCSV(userId, accountId, currentYear, currentMonth, {
+      dailyData: costData.dailyData || [],
+      services: sanitizedData.services || [],
+      total: sanitizedData.currentMonth,
+    }).catch(() => {})
+
     // Calculate anomaly baselines for all services (async, non-blocking)
     calculateBaselinesForServices(userId, providerId, accountId, costData)
       .catch(err => logger.error('Baseline calculation failed for account', { requestId: req.requestId, userId, accountId, error: err.message, stack: err.stack }))
@@ -522,9 +721,12 @@ router.post('/:providerId', async (req, res) => {
     const userId = req.user.userId || req.user.id
     const { providerId } = req.params
 
-    // Get all accounts for this provider type
+    // Get all accounts for this provider type (case-insensitive for provider_id)
     const allAccounts = await getUserCloudProviders(userId)
-    const providerAccounts = allAccounts.filter(a => a.provider_id === providerId && a.is_active)
+    const providerIdNorm = String(providerId || '').toLowerCase().trim()
+    const providerAccounts = allAccounts.filter(
+      a => String(a.provider_id || '').toLowerCase().trim() === providerIdNorm && a.is_active !== false
+    )
 
     if (providerAccounts.length === 0) {
       return res.status(404).json({ error: 'No active accounts found for this provider' })
@@ -604,6 +806,12 @@ router.post('/:providerId', async (req, res) => {
           await saveBulkDailyCostData(userId, providerId, costData.dailyData, account.id)
         }
 
+        await writeCostCacheCSV(userId, account.id, currentYear, currentMonth, {
+          dailyData: costData.dailyData || [],
+          services: sanitizedData.services || [],
+          total: sanitizedData.currentMonth,
+        }).catch(() => {})
+
         // Calculate anomaly baselines for all services (async, non-blocking)
         calculateBaselinesForServices(userId, providerId, account.id, costData)
           .catch(err => logger.error('Baseline calculation failed for account (provider sync)', { requestId: req.requestId, userId, accountId: account.id, providerId, error: err.message, stack: err.stack }))
@@ -619,6 +827,10 @@ router.post('/:providerId', async (req, res) => {
       } catch (error) {
         errors.push({ accountId: account.id, error: error.message })
       }
+    }
+
+    if (results.length > 0) {
+      await cacheDel(`cost_data:${userId}:${currentMonth}:${currentYear}`).catch(() => {})
     }
 
     const statusCode = errors.length > 0

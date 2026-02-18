@@ -106,6 +106,10 @@ export async function createApp() {
   // Register all API routes
   registerRoutes(app)
 
+  // Ensure cost-cache CSV storage directory exists
+  const { ensureCostCacheDir } = await import('./services/costCacheCSV.js')
+  await ensureCostCacheDir().catch((err) => logger.warn('Cost cache dir init', { error: err.message }))
+
   // Swagger API docs (non-production)
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
     const { setupSwagger } = await import('./swagger.js')

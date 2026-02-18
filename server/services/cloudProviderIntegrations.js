@@ -429,10 +429,18 @@ export const fetchGCPRightsizingRecommendations = async (credentials) => {
 /**
  * AWS Cost Explorer API Integration using official SDK
  */
+// AWS Cost Explorer End date is exclusive; caller passes inclusive end (last day of month).
+function awsEndDateExclusive(inclusiveEndDate) {
+  const d = new Date(inclusiveEndDate + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().split('T')[0]
+}
+
 export const fetchAWSCostData = async (credentials, startDate, endDate) => {
   const { accessKeyId, secretAccessKey, sessionToken, region = 'us-east-1' } = credentials
+  const endExclusive = awsEndDateExclusive(endDate)
 
-  logger.debug('Starting AWS fetch', { startDate, endDate, region, accessKeyIdLast4: accessKeyId?.slice(-4) || 'MISSING', hasSessionToken: !!sessionToken })
+  logger.debug('Starting AWS fetch', { startDate, endDate, endExclusive, region, accessKeyIdLast4: accessKeyId?.slice(-4) || 'MISSING', hasSessionToken: !!sessionToken })
 
   // Validate credentials
   if (!accessKeyId || !secretAccessKey) {
@@ -478,7 +486,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     const command = new GetCostAndUsageCommand({
       TimePeriod: {
         Start: startDate,
-        End: endDate,
+        End: endExclusive,
       },
       Granularity: 'DAILY',
       Metrics: ['UnblendedCost'],
@@ -515,7 +523,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     const totalCommand = new GetCostAndUsageCommand({
       TimePeriod: {
         Start: startDate,
-        End: endDate,
+        End: endExclusive,
       },
       Granularity: 'DAILY',
       Metrics: ['UnblendedCost'],
@@ -544,7 +552,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     let taxResponse = null
     try {
       const taxCommand = new GetCostAndUsageCommand({
-        TimePeriod: { Start: startDate, End: endDate },
+        TimePeriod: { Start: startDate, End: endExclusive },
         Granularity: 'MONTHLY',
         Metrics: ['UnblendedCost'],
         Filter: taxOnlyFilter,
@@ -565,7 +573,7 @@ export const fetchAWSCostData = async (credentials, startDate, endDate) => {
     if (!taxResponse?.ResultsByTime?.length || taxResponse.ResultsByTime.every(r => !parseFloat(r.Total?.UnblendedCost?.Amount || 0))) {
       try {
         const usagePlusTaxCommand = new GetCostAndUsageCommand({
-          TimePeriod: { Start: startDate, End: endDate },
+          TimePeriod: { Start: startDate, End: endExclusive },
           Granularity: 'DAILY',
           Metrics: ['UnblendedCost'],
           Filter: usagePlusTaxFilter,

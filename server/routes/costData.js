@@ -6,6 +6,7 @@ import {
   getCostDataForUser,
   getLastMonthSamePeriodTotals,
   saveCostData,
+  saveBulkDailyCostData,
   getUserPreferences,
   updateUserCurrency,
   updateProviderCredits,
@@ -13,8 +14,10 @@ import {
   getServiceCostsForDateRange,
   getCloudProviderCredentials,
   getCloudProviderCredentialsByAccountId,
+  getUserCloudProviders,
   createNotification,
 } from '../database.js'
+import { loadMonthFromCSVForAccounts } from '../services/costCacheCSV.js'
 import { cached, cacheKeys, clearUserCache, del as cacheDel } from '../utils/cache.js'
 import {
   fetchAWSServiceDetails,
@@ -44,6 +47,11 @@ import {
 } from '../database.js'
 
 const router = express.Router()
+
+function getProviderIcon(providerId) {
+  const icons = { aws: '☁️', azure: '🔷', gcp: '🔵', digitalocean: '🌊', linode: '🟢', vultr: '⚡' }
+  return icons[String(providerId || '').toLowerCase()] || '☁️'
+}
 
 // All routes require authentication
 router.use(authenticateToken)
@@ -267,27 +275,73 @@ router.get('/services/:providerId', async (req, res) => {
 
     logger.debug('Services API: Fetching services', { userId, providerId, startDate, endDate })
 
-    const allServices = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
-    
-    // Filter out Tax - it's not a service but a fee
-    const services = allServices.filter(s => 
-      s.name.toLowerCase() !== 'tax' && 
-      !s.name.toLowerCase().includes('tax -') &&
-      s.name.toLowerCase() !== 'vat'
-    )
-    
-    // Calculate total for the response (excluding tax)
-    const totalCost = services.reduce((sum, s) => sum + s.cost, 0)
+    let result = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
+    let allServices = result.services || []
+    let noData = result.noData === true
 
-    logger.debug('Services API: Found services', { 
-      servicesCount: services.length, 
-      allServicesCount: allServices.length, 
-      totalCost: totalCost.toFixed(2) 
+    // When DB has no cost_data for this period, try loading from CSV cache and re-query
+    if (noData) {
+      const parts = String(startDate).split('-').map(Number)
+      const periodYear = parts[0]
+      const periodMonth = parts[1]
+      if (periodYear && periodMonth >= 1 && periodMonth <= 12) {
+        const allAccounts = await getUserCloudProviders(userId)
+        const providerNorm = String(providerId || '').toLowerCase().trim()
+        const providerAccounts = (allAccounts || []).filter(
+          (a) => String(a.provider_id || '').toLowerCase().trim() === providerNorm && a.is_active !== false
+        )
+        const loaded = await loadMonthFromCSVForAccounts(userId, providerAccounts, periodYear, periodMonth)
+        for (const { account, dailyData, services: svcList, total } of loaded) {
+          await saveCostData(userId, providerId, periodMonth, periodYear, {
+            providerName: account.provider_name,
+            accountAlias: account.account_alias,
+            accountId: account.id,
+            icon: getProviderIcon(providerId),
+            currentMonth: total,
+            lastMonth: null,
+            forecast: null,
+            credits: 0,
+            savings: 0,
+            services: svcList || [],
+            taxCurrentMonth: 0,
+            taxLastMonth: 0,
+          })
+          if (dailyData && dailyData.length > 0) {
+            await saveBulkDailyCostData(userId, providerId, dailyData, account.id)
+          }
+        }
+        if (loaded.length > 0) {
+          await cacheDel(`cost_data:${userId}:${periodMonth}:${periodYear}`).catch(() => {})
+          clearUserCache(userId).catch(() => {})
+          result = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
+          allServices = result.services || []
+          noData = result.noData === true
+        }
+      }
+    }
+
+    // Filter out Tax - it's not a service but a fee
+    const services = (Array.isArray(allServices) ? allServices : []).filter(s =>
+      s.name && (
+        s.name.toLowerCase() !== 'tax' &&
+        !s.name.toLowerCase().includes('tax -') &&
+        s.name.toLowerCase() !== 'vat'
+      )
+    )
+
+    // Calculate total for the response (excluding tax)
+    const totalCost = services.reduce((sum, s) => sum + (s.cost || 0), 0)
+
+    logger.debug('Services API: Found services', {
+      servicesCount: services.length,
+      noData: noData === true,
+      totalCost: totalCost.toFixed(2)
     })
 
-    // Include metadata to help frontend detect changes
-    res.json({ 
+    // Include noData so frontend can show "No data for this month" instead of wrong/empty data
+    res.json({
       services,
+      noData: noData === true,
       period: { startDate, endDate },
       totalCost,
       timestamp: Date.now()
@@ -344,9 +398,10 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
     }
 
     let subServices = []
+    const providerKey = String(providerId || '').toLowerCase().trim()
 
-    // Fetch sub-service details based on provider
-    switch (providerId) {
+    // Fetch sub-service details based on provider (case-insensitive for all clouds)
+    switch (providerKey) {
       case 'aws':
         try {
           const awsResult = await fetchAWSServiceDetails(credentials, decodedServiceName, startDate, endDate)
@@ -848,12 +903,15 @@ router.post('/:providerId/report', async (req, res) => {
       total: totalDailyCost.toFixed(2) 
     })
     
-    // Get services breakdown
+    // Get services breakdown (only for this period's data — no wrong fallback)
     logger.debug('Provider Report: Fetching services breakdown')
     let servicesResult = []
+    let servicesNoData = false
     try {
-      servicesResult = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
-      logger.debug('Provider Report: Services fetched', { count: servicesResult.length })
+      const { services: list = [], noData } = await getServiceCostsForDateRange(userId, providerId, startDate, endDate)
+      servicesResult = Array.isArray(list) ? list : []
+      servicesNoData = noData === true
+      logger.debug('Provider Report: Services fetched', { count: servicesResult.length, noData: servicesNoData })
     } catch (err) {
       logger.error('Provider Report: Error fetching services', { 
         userId, 
@@ -866,10 +924,11 @@ router.post('/:providerId/report', async (req, res) => {
       servicesResult = []
     }
     
-    // If no services found, try to get from cost_data table for months in the period
+    // If no services found and we have no "no data" signal, try cost_data for months in the period.
+    // When noData is true we don't fall back — show no data rather than wrong data.
     let fallbackServices = []
     let fallbackTotal = 0
-    if (servicesResult.length === 0 && totalDailyCost === 0) {
+    if (servicesResult.length === 0 && totalDailyCost === 0 && !servicesNoData) {
       logger.debug('Provider Report: No daily data found, trying to aggregate from cost_data table')
       const client = await pool.connect()
       try {
@@ -1874,8 +1933,8 @@ router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (
 
     // Resolve credentials — handle both manual and automated connections
     let credentials
+    let resolvedAccountId = accountId
     if (accountId) {
-      // Specific account requested
       const accountData = await getCloudProviderCredentialsByAccountId(userId, accountId)
       if (!accountData) {
         return res.status(404).json({ error: 'Account not found' })
@@ -1887,22 +1946,46 @@ router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (
         credentials = accountData.credentials
       }
     } else {
-      // Legacy: use first active account for this provider
-      credentials = await getCloudProviderCredentials(userId, providerId)
+      // Use first active account for this provider (supports automated/role-based AWS)
+      const accounts = await getUserCloudProviders(userId)
+      const first = accounts.find(a => String(a.provider_id || '').toLowerCase().trim() === String(providerId || '').toLowerCase().trim() && a.is_active !== false)
+      if (!first) {
+        return res.status(404).json({ error: 'Provider not configured' })
+      }
+      resolvedAccountId = first.id
+      const accountData = await getCloudProviderCredentialsByAccountId(userId, first.id)
+      if (!accountData) {
+        return res.status(404).json({ error: 'Provider not configured' })
+      }
+      if (accountData.connectionType?.startsWith('automated') && accountData.roleArn && accountData.externalId) {
+        const { getAssumedRoleCredentials } = await import('../services/awsAuth.js')
+        credentials = await getAssumedRoleCredentials(accountData.roleArn, accountData.externalId, `costra-monthly-total-${first.id}-${Date.now()}`)
+      } else {
+        credentials = accountData.credentials
+      }
     }
 
-    if (!credentials) {
+    if (!credentials || (!credentials.accessKeyId && !credentials.sessionToken)) {
       return res.status(404).json({ error: 'Provider not configured' })
     }
 
     // Cache for 10 minutes — historical months rarely change
-    const cacheKey = `user:${userId}:monthly_total:${providerId}:${year}:${month}:${accountId || 'default'}`
+    const cacheKey = `user:${userId}:monthly_total:${providerId}:${year}:${month}:${resolvedAccountId || 'default'}`
+    const providerKey = String(providerId || '').toLowerCase().trim()
     const result = await cached(
       cacheKey,
       async () => {
-        switch (providerId) {
+        switch (providerKey) {
           case 'aws':
             return await fetchAWSMonthlyTotal(credentials, month, year)
+          case 'azure':
+          case 'gcp':
+          case 'google':
+          case 'digitalocean':
+          case 'ibm':
+          case 'linode':
+          case 'vultr':
+            return null
           default:
             return null
         }
@@ -1916,11 +1999,19 @@ router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (
 
     res.json(result)
   } catch (error) {
-    logger.error('Get monthly total error', {
-      userId: req.user?.userId,
-      providerId: req.params?.providerId,
-      error: error.message,
-    })
+    const isCredsMissing = /credentials are missing|not configured/i.test(error.message)
+    if (isCredsMissing) {
+      logger.warn('Get monthly total: credentials missing or invalid', {
+        userId: req.user?.userId,
+        providerId: req.params?.providerId,
+      })
+    } else {
+      logger.error('Get monthly total error', {
+        userId: req.user?.userId,
+        providerId: req.params?.providerId,
+        error: error.message,
+      })
+    }
     res.status(500).json({ error: 'Failed to fetch monthly total' })
   }
 })

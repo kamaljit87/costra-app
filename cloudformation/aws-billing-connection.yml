@@ -214,7 +214,7 @@ Resources:
         - Key: CostraAccountId
           Value: !Ref CostraAccountId
 
-  # S3 bucket for CUR 2.0 Data Exports (must exist for BCM to deliver; policy applied by Costra on verify/setup)
+  # S3 bucket for CUR 2.0 Data Exports
   CostraCURBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
@@ -234,7 +234,7 @@ Resources:
           - Id: ExpireOldReports
             Status: Enabled
             ExpirationInDays: 400
-            Filter: {}
+            Prefix: ''
       Tags:
         - Key: ManagedBy
           Value: Costra
@@ -242,6 +242,44 @@ Resources:
           Value: CostAndUsageReports
         - Key: ConnectionName
           Value: !Ref ConnectionName
+
+  # Bucket policy: allow BCM Data Exports to deliver CUR + Costra cross-account read
+  CostraCURBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CostraCURBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowBCMDataExportsWrite
+            Effect: Allow
+            Principal:
+              Service: bcm-data-exports.amazonaws.com
+            Action:
+              - 's3:PutObject'
+              - 's3:GetBucketPolicy'
+            Resource:
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}'
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}/*'
+            Condition:
+              StringEquals:
+                'aws:SourceAccount': !Ref AWS::AccountId
+              ArnLike:
+                'aws:SourceArn': !Sub 'arn:aws:bcm-data-exports:us-east-1:${AWS::AccountId}:export/*'
+          - Sid: AllowCostraCrossAccountRead
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${CostraAccountId}:root'
+            Action:
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:GetBucketLocation'
+            Resource:
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}'
+              - !Sub 'arn:aws:s3:::${CostraCURBucket}/*'
+
+  # CUR 2.0 Data Export is created via the Costra API after the stack is deployed.
+  # This avoids rollback of the entire stack if the BCM export creation fails.
 
   # Lambda function that notifies Costra API when the stack is created
   CostraCallbackRole:
@@ -383,7 +421,8 @@ Outputs:
       Name: !Sub '${AWS::StackName}-Region'
 
   CURBucketName:
-    Description: 'S3 bucket for CUR 2.0 Data Exports (bucket policy applied by Costra when you verify or run Set up CUR)'
+    Description: 'S3 bucket for CUR 2.0 Data Exports'
     Value: !Ref CostraCURBucket
     Export:
       Name: !Sub '${AWS::StackName}-CURBucket'
+

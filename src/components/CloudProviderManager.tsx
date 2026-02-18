@@ -26,6 +26,11 @@ interface CurStatusInfo {
   lastIngestion: string | null
   statusMessage?: string | null
   billingPeriods?: { period: string; totalCost: number; ingestedAt: string }[]
+  bucketEmpty?: boolean
+  bucketEmptyMessage?: string | null
+  exportStatusCode?: string | null
+  exportStatusReason?: string | null
+  exportStatusMessage?: string | null
 }
 
 interface CloudProviderManagerProps {
@@ -69,6 +74,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
   const [pollAttempts, setPollAttempts] = useState(0)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [curStatuses, setCurStatuses] = useState<Record<number, CurStatusInfo>>({})
+  const [curFixPolicyAccountId, setCurFixPolicyAccountId] = useState<number | null>(null)
+  const [curSetupAccountId, setCurSetupAccountId] = useState<number | null>(null)
   const [deleteModal, setDeleteModal] = useState<{
     accountId: number
     accountAlias: string
@@ -212,6 +219,11 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                 lastIngestion: result.lastIngestion,
                 statusMessage: result.statusMessage ?? null,
                 billingPeriods: result.billingPeriods,
+                bucketEmpty: result.bucketEmpty,
+                bucketEmptyMessage: result.bucketEmptyMessage ?? null,
+                exportStatusCode: result.exportStatusCode ?? null,
+                exportStatusReason: result.exportStatusReason ?? null,
+                exportStatusMessage: result.exportStatusMessage ?? null,
               }
             }
           })
@@ -434,6 +446,60 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       window.dispatchEvent(new CustomEvent('cloud-providers-changed'))
     } catch (error: any) {
       setError(error.message || 'Failed to update account status')
+    }
+  }
+
+  const handleFixCurPolicy = async (accountId: number) => {
+    setCurFixPolicyAccountId(accountId)
+    try {
+      await cloudProvidersAPI.fixCurPolicy(accountId)
+      const result = await cloudProvidersAPI.getCurStatus(accountId)
+      setCurStatuses(prev => ({
+        ...prev,
+        [accountId]: {
+          curEnabled: result.curEnabled,
+          curStatus: result.curStatus,
+          lastIngestion: result.lastIngestion,
+          statusMessage: result.statusMessage ?? null,
+          billingPeriods: result.billingPeriods,
+          bucketEmpty: result.bucketEmpty,
+          bucketEmptyMessage: result.bucketEmptyMessage ?? null,
+          exportStatusCode: result.exportStatusCode ?? null,
+          exportStatusReason: result.exportStatusReason ?? null,
+          exportStatusMessage: result.exportStatusMessage ?? null,
+        },
+      }))
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fix CUR policy')
+    } finally {
+      setCurFixPolicyAccountId(null)
+    }
+  }
+
+  const handleSetupCur = async (accountId: number) => {
+    setCurSetupAccountId(accountId)
+    try {
+      await cloudProvidersAPI.setupCur(accountId)
+      const result = await cloudProvidersAPI.getCurStatus(accountId)
+      setCurStatuses(prev => ({
+        ...prev,
+        [accountId]: {
+          curEnabled: result.curEnabled,
+          curStatus: result.curStatus,
+          lastIngestion: result.lastIngestion,
+          statusMessage: result.statusMessage ?? null,
+          billingPeriods: result.billingPeriods,
+          bucketEmpty: result.bucketEmpty,
+          bucketEmptyMessage: result.bucketEmptyMessage ?? null,
+          exportStatusCode: result.exportStatusCode ?? null,
+          exportStatusReason: result.exportStatusReason ?? null,
+          exportStatusMessage: result.exportStatusMessage ?? null,
+        },
+      }))
+    } catch (err: any) {
+      setError(err?.message || 'Failed to set up CUR')
+    } finally {
+      setCurSetupAccountId(null)
     }
   }
 
@@ -687,6 +753,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                       curStatuses[provider.accountId].curStatus === 'active'
                                         ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                                        : curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY'
+                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                                         : curStatuses[provider.accountId].curStatus === 'error'
                                         ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                                         : curStatuses[provider.accountId].curStatus === 'disabled'
@@ -695,13 +763,16 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                     }`} title={
                                       curStatuses[provider.accountId].curStatus === 'active'
                                         ? `CUR active${curStatuses[provider.accountId].lastIngestion ? ` - Last ingestion: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}${curStatuses[provider.accountId].billingPeriods?.length ? ` • ${curStatuses[provider.accountId].billingPeriods!.length} period(s) ingested` : ''}`
+                                        : curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY'
+                                        ? (curStatuses[provider.accountId].exportStatusMessage || 'CUR export is unhealthy')
                                         : curStatuses[provider.accountId].curStatus === 'provisioning'
-                                        ? 'CUR export is being set up (data available within 24h)'
+                                        ? (curStatuses[provider.accountId].bucketEmptyMessage || 'CUR export is being set up (data available within 24h)')
                                         : curStatuses[provider.accountId].curStatus === 'error'
                                         ? (curStatuses[provider.accountId].statusMessage ? `CUR error: ${curStatuses[provider.accountId].statusMessage}` : 'CUR setup encountered an error')
                                         : 'CUR is pending setup'
                                     }>
                                       {curStatuses[provider.accountId].curStatus === 'active' ? 'CUR Active' :
+                                       curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' ? 'CUR Unhealthy' :
                                        curStatuses[provider.accountId].curStatus === 'provisioning' ? 'CUR Pending' :
                                        curStatuses[provider.accountId].curStatus === 'error' ? 'CUR Error' :
                                        null}
@@ -711,7 +782,51 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                         CUR integration successful. Cost data will appear on the Dashboard.
                                       </p>
                                     )}
+                                    {(curStatuses[provider.accountId].curStatus === 'provisioning' && curStatuses[provider.accountId].bucketEmptyMessage) && (
+                                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" role="status">
+                                        {curStatuses[provider.accountId].bucketEmptyMessage}
+                                      </p>
+                                    )}
+                                    {curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' && curStatuses[provider.accountId].exportStatusMessage && (
+                                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" role="status">
+                                        {curStatuses[provider.accountId].exportStatusMessage}
+                                      </p>
+                                    )}
+                                    {curStatuses[provider.accountId].exportStatusReason === 'INSUFFICIENT_PERMISSION' && (
+                                      <div className="mt-1 flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleFixCurPolicy(provider.accountId)}
+                                          disabled={curFixPolicyAccountId === provider.accountId}
+                                          className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-800/40 disabled:opacity-50"
+                                        >
+                                          {curFixPolicyAccountId === provider.accountId ? 'Applying…' : 'Fix CUR (re-apply bucket policy)'}
+                                        </button>
+                                      </div>
+                                    )}
+                                    {(curStatuses[provider.accountId].curStatus === 'error' || !curStatuses[provider.accountId].curEnabled) && curStatuses[provider.accountId].exportStatusReason !== 'INSUFFICIENT_PERMISSION' && (
+                                      <div className="mt-1 flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSetupCur(provider.accountId)}
+                                          disabled={curSetupAccountId === provider.accountId}
+                                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50"
+                                        >
+                                          {curSetupAccountId === provider.accountId ? 'Setting up…' : 'Set up CUR'}
+                                        </button>
+                                      </div>
+                                    )}
                                   </>
+                                )}
+                                {!curStatuses[provider.accountId] && provider.providerId === 'aws' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetupCur(provider.accountId)}
+                                    disabled={curSetupAccountId === provider.accountId}
+                                    className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50"
+                                  >
+                                    {curSetupAccountId === provider.accountId ? 'Setting up…' : 'Set up CUR'}
+                                  </button>
                                 )}
                               </>
                             )}

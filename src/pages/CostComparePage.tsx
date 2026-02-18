@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
-import { costDataAPI, cloudProvidersAPI } from '../services/api'
+import { costDataAPI, cloudProvidersAPI, syncAPI } from '../services/api'
 import { CostData, getCostData } from '../services/costService'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
@@ -41,6 +41,10 @@ interface PanelData {
   services: ServiceCost[]
   dailyData: { date: string; cost: number }[]
   isLoading: boolean
+  /** True when the selected month has no stored data — show "No data" instead of wrong data */
+  noData?: boolean
+  /** Set when we tried to fetch this month but the request failed */
+  fetchMonthError?: string
 }
 
 // Generate last 12 months options
@@ -59,8 +63,8 @@ function getMonthOptions(): { label: string; month: number; year: number }[] {
 }
 
 function getMonthDateRange(month: number, year: number) {
-  const start = new Date(year, month - 1, 1)
-  const end = new Date(year, month, 0) // last day of month
+  const start = new Date(Date.UTC(year, month - 1, 1))
+  const end = new Date(Date.UTC(year, month, 0))
   return {
     startDate: start.toISOString().split('T')[0],
     endDate: end.toISOString().split('T')[0],
@@ -217,6 +221,102 @@ export default function CostComparePage() {
         const [costResponse, dailyResponse, servicesResponse, monthlyTotalResponse] =
           await Promise.all(fetchList)
 
+        const noData = !!(servicesResponse as any).noData
+        if (noData) {
+          const fetchKey = `${panelId}-${providerId}-${month}-${year}`
+          const alreadyTried = fetchMonthAttemptedRef.current.has(fetchKey)
+          if (!alreadyTried) {
+            fetchMonthAttemptedRef.current.add(fetchKey)
+            setPanels((prev) =>
+              prev.map((p) =>
+                p.id === panelId ? { ...p, isLoading: true, noData: true, fetchMonthError: undefined } : p
+              )
+            );
+            try {
+              const fetchRes = await syncAPI.fetchMonth(providerId, month, year)
+              if (fetchRes.results?.length > 0) {
+                const firstError = (fetchRes as any).errors?.[0]?.error
+                await new Promise((r) => setTimeout(r, 800))
+                const [costRes, dailyRes, servicesRes, monthlyRes] = await Promise.all([
+                  costDataAPI.getCostData(month, year),
+                  costDataAPI.getDailyCostData(providerId, startDate, endDate),
+                  costDataAPI.getServicesForDateRange(providerId, startDate, endDate),
+                  !isCurrentMonth ? costDataAPI.getMonthlyTotal(providerId, year, month).catch(() => null) : Promise.resolve(null),
+                ])
+                const stillNoData = !!(servicesRes as any).noData
+                if (!stillNoData && Array.isArray((servicesRes as any).services)) {
+                  const costData = (costRes as any).costData || []
+                  const providerCost = costData.find((c: any) => c.provider?.id === providerId || c.provider_code === providerId)
+                  const dailyData = ((dailyRes as any).dailyData || []).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  const services = ((servicesRes as any).services || []).map((s: any) => ({ name: s.name, cost: s.cost, change: s.change || 0 }))
+                  let totalCost: number
+                  if (isCurrentMonth && providerCost) totalCost = providerCost.currentMonth
+                  else if ((monthlyRes as any)?.total != null) totalCost = (monthlyRes as any).total
+                  else totalCost = dailyData.reduce((sum: number, d: any) => sum + (d.cost || 0), 0)
+                  setPanels((prev) =>
+                    prev.map((p) =>
+                      p.id === panelId
+                        ? { ...p, totalCost, services, dailyData, isLoading: false, noData: false, fetchMonthError: undefined }
+                        : p
+                    )
+                  )
+                  return
+                }
+                if (stillNoData) {
+                  setPanels((prev) =>
+                    prev.map((p) =>
+                      p.id === panelId
+                        ? { ...p, isLoading: false, noData: true, fetchMonthError: firstError || 'Data was fetched but not available yet. Try "Fetch data for this month" again.' }
+                        : p
+                    )
+                  )
+                  return
+                }
+              } else {
+                const errMsg = (fetchRes as any).error || (fetchRes as any).errors?.[0]?.error || 'Fetch did not return data.'
+                setPanels((prev) =>
+                  prev.map((p) =>
+                    p.id === panelId ? { ...p, isLoading: false, noData: true, fetchMonthError: errMsg } : p
+                  )
+                )
+                return
+              }
+            } catch (fetchErr: any) {
+              setPanels((prev) =>
+                prev.map((p) =>
+                  p.id === panelId
+                    ? {
+                        ...p,
+                        totalCost: 0,
+                        services: [],
+                        dailyData: [],
+                        isLoading: false,
+                        noData: true,
+                        fetchMonthError: fetchErr?.message || fetchErr?.error || 'Fetch failed',
+                      }
+                    : p
+                )
+              )
+              return
+            }
+          }
+          setPanels((prev) =>
+            prev.map((p) =>
+              p.id === panelId
+                ? {
+                    ...p,
+                    totalCost: 0,
+                    services: [],
+                    dailyData: [],
+                    isLoading: false,
+                    noData: true,
+                  }
+                : p
+            )
+          )
+          return
+        }
+
         const costData = costResponse.costData || []
         const providerCost = costData.find(
           (c: any) => c.provider.id === providerId || c.provider_code === providerId
@@ -224,7 +324,7 @@ export default function CostComparePage() {
         const dailyData = (dailyResponse.dailyData || []).sort(
           (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime()
         )
-        const services = (servicesResponse.services || []).map((s: any) => ({
+        const services = ((servicesResponse.services || []) as any[]).map((s: any) => ({
           name: s.name,
           cost: s.cost,
           change: s.change || 0,
@@ -232,20 +332,17 @@ export default function CostComparePage() {
 
         let totalCost: number
         if (isCurrentMonth && providerCost) {
-          // Current month: use the stored current_month_cost
           totalCost = providerCost.currentMonth
         } else if (monthlyTotalResponse?.total != null) {
-          // Historical month: use the accurate total from AWS Cost Explorer
           totalCost = monthlyTotalResponse.total
         } else {
-          // Fallback: sum daily data
           totalCost = dailyData.reduce((sum: number, d: any) => sum + (d.cost || 0), 0)
         }
 
         setPanels((prev) =>
           prev.map((p) =>
             p.id === panelId
-              ? { ...p, totalCost, services, dailyData, isLoading: false }
+              ? { ...p, totalCost, services, dailyData, isLoading: false, noData: false }
               : p
           )
         )
@@ -261,6 +358,7 @@ export default function CostComparePage() {
 
   // Fetch data when panel selections change
   const prevPanelSelections = useRef<Record<string, string>>({})
+  const fetchMonthAttemptedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     panels.forEach((panel) => {
@@ -270,7 +368,6 @@ export default function CostComparePage() {
         fetchPanelData(panel.id, panel.providerId, panel.month, panel.year)
       }
     })
-    // Clean up old entries
     const activeIds = new Set(panels.map((p) => p.id))
     Object.keys(prevPanelSelections.current).forEach((id) => {
       if (!activeIds.has(id)) delete prevPanelSelections.current[id]
@@ -312,8 +409,8 @@ export default function CostComparePage() {
     return symbols[selectedCurrency] || '$'
   }
 
-  // Loaded panels for comparison summary
-  const loadedPanels = panels.filter((p) => p.providerId && !p.isLoading)
+  // Loaded panels for comparison summary (only panels with data)
+  const loadedPanels = panels.filter((p) => p.providerId && !p.isLoading && !p.noData)
 
   // Build service comparison data for N panels
   const serviceComparison = (() => {
@@ -427,6 +524,28 @@ export default function CostComparePage() {
         ) : !panel.providerId ? (
           <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
             Select a provider to view costs
+          </div>
+        ) : panel.noData ? (
+          <div
+            className="flex flex-col items-center justify-center h-48 text-gray-500 text-sm text-center px-4 rounded-xl border border-dashed border-gray-300 bg-gray-50/50"
+            style={{ borderColor: `${providerColor}30` }}
+          >
+            <span className="font-medium text-gray-600">No data for this month</span>
+            {panel.fetchMonthError ? (
+              <span className="text-xs mt-1 text-amber-600">{panel.fetchMonthError}</span>
+            ) : (
+              <span className="text-xs mt-1">We don&apos;t have cost data for the selected month.</span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                fetchMonthAttemptedRef.current.delete(`${panel.id}-${panel.providerId}-${panel.month}-${panel.year}`)
+                fetchPanelData(panel.id, panel.providerId, panel.month, panel.year)
+              }}
+              className="mt-3 px-3 py-1.5 text-xs font-medium text-accent-600 bg-accent-50 hover:bg-accent-100 rounded-lg transition-colors"
+            >
+              Fetch data for this month
+            </button>
           </div>
         ) : (
           <>
@@ -654,11 +773,15 @@ export default function CostComparePage() {
                             </th>
                             {loadedPanels.map((panel) => {
                               const name = providers.find((p) => p.id === panel.providerId)?.name || panel.providerId
+                              const monthLabel = monthOptions.find((m) => m.month === panel.month && m.year === panel.year)?.label || ''
                               return (
                                 <th key={panel.id} className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                                  <div className="flex items-center justify-end space-x-1">
-                                    <ProviderIcon providerId={panel.providerId} size={12} />
-                                    <span>{name}</span>
+                                  <div className="flex flex-col items-end">
+                                    <div className="flex items-center space-x-1">
+                                      <ProviderIcon providerId={panel.providerId} size={12} />
+                                      <span>{name}</span>
+                                    </div>
+                                    <span className="text-[10px] font-normal text-gray-400 normal-case tracking-normal">{monthLabel}</span>
                                   </div>
                                 </th>
                               )

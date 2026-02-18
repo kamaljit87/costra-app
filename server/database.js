@@ -1633,12 +1633,40 @@ export const getUserIdByApiKeyHash = async (keyHash) => {
   }
 }
 
-// Get aggregated service costs for a date range
-// This calculates proportional service costs based on the period's total cost
+// Get aggregated service costs for a date range.
+// Only uses data for the requested period's month. If we don't have that month's data, return empty
+// so the UI can show "No data" instead of wrong/estimated data.
 export const getServiceCostsForDateRange = async (userId, providerId, startDate, endDate) => {
   const client = await pool.connect()
   try {
-    // Step 1: Get total daily costs for the date range
+    // Parse YYYY-MM-DD from string so period is correct in any timezone (avoid new Date() giving wrong month)
+    const startStr = typeof startDate === 'string' ? startDate : startDate.toISOString?.().split('T')[0]
+    const parts = (startStr || '').split('-').map(Number)
+    const periodYear = parts[0]
+    const periodMonth = parts[1]
+    if (!periodYear || !periodMonth || periodMonth < 1 || periodMonth > 12) {
+      logger.debug('Invalid startDate for getServiceCostsForDateRange', { startDate: startStr, userId, providerId })
+      return { services: [], noData: true }
+    }
+
+    // Step 1: Get cost_data for this exact month only (no fallback to other months)
+    // Match provider_id case-insensitively (frontend may send "AWS" vs DB "aws")
+    const periodCostDataResult = await client.query(
+      `SELECT cd.id
+       FROM cost_data cd
+       WHERE cd.user_id = $1 AND LOWER(TRIM(cd.provider_id)) = LOWER(TRIM($2)) AND cd.year = $3 AND cd.month = $4`,
+      [userId, String(providerId || '').trim(), periodYear, periodMonth]
+    )
+
+    if (periodCostDataResult.rows.length === 0) {
+      logger.info('No cost_data for requested period — returning no data', { userId, providerId, periodYear, periodMonth })
+      return { services: [], noData: true }
+    }
+
+    const costDataIds = periodCostDataResult.rows.map((r) => r.id)
+    logger.info('Using service breakdown for requested period', { userId, providerId, periodYear, periodMonth, costDataRows: costDataIds.length })
+
+    // Step 2: Get total cost for the date range from daily_cost_data (that month's stored data)
     const dailyTotalResult = await client.query(
       `SELECT COALESCE(SUM(cost), 0) as total_cost
        FROM daily_cost_data
@@ -1648,58 +1676,41 @@ export const getServiceCostsForDateRange = async (userId, providerId, startDate,
          AND date <= $4::date`,
       [userId, providerId, startDate, endDate]
     )
-    
     const periodTotalCost = parseFloat(dailyTotalResult.rows[0]?.total_cost) || 0
-    
     logger.debug('Period total cost calculated', { userId, providerId, startDate, endDate, periodTotalCost: periodTotalCost.toFixed(2) })
-    
-    // Step 2: Get the latest month's service breakdown to use as proportions
-    const latestCostDataResult = await client.query(
-      `SELECT cd.id
-       FROM cost_data cd
-       WHERE cd.user_id = $1 AND cd.provider_id = $2
-       ORDER BY cd.year DESC, cd.month DESC
-       LIMIT 1`,
-      [userId, providerId]
-    )
-    
-    if (latestCostDataResult.rows.length === 0) {
-      return []
-    }
-    
-    const costDataId = latestCostDataResult.rows[0].id
-    
-    // Step 3: Get service costs and calculate their percentages
+
+    // Step 3: Get service costs (aggregate across accounts when multiple cost_data for same month)
     const servicesResult = await client.query(
-      `SELECT service_name, cost, change_percent
-       FROM service_costs 
-       WHERE cost_data_id = $1
-       ORDER BY cost DESC`,
-      [costDataId]
+      `SELECT sc.service_name, SUM(sc.cost::numeric) as cost, AVG(sc.change_percent::numeric) as change_percent
+       FROM service_costs sc
+       WHERE sc.cost_data_id = ANY($1::int[])
+       GROUP BY sc.service_name
+       ORDER BY SUM(sc.cost::numeric) DESC`,
+      [costDataIds]
     )
-    
+
     if (servicesResult.rows.length === 0) {
-      return []
+      return { services: [], noData: false }
     }
-    
-    // Calculate total of all services to get percentages
+
     const servicesTotalCost = servicesResult.rows.reduce(
       (sum, row) => sum + (parseFloat(row.cost) || 0), 0
     )
-    
-    // Always apply proportions based on period's total cost
-    // If period total is 0, services will show 0 (which is correct)
-    return servicesResult.rows.map(row => {
+
+    const out = servicesResult.rows.map((row) => {
       const serviceCost = parseFloat(row.cost) || 0
       const proportion = servicesTotalCost > 0 ? serviceCost / servicesTotalCost : 0
-      
+      const cost = periodTotalCost * proportion
       return {
         name: row.service_name,
-        // Apply the proportion to the period's total cost
-        cost: periodTotalCost * proportion,
+        cost,
         change: parseFloat(row.change_percent) || 0,
       }
     })
+
+    // Exclude zero-cost services so we don't show phantom services (e.g. Directory Service at $0)
+    const nonZero = out.filter((s) => s.cost > 0.001)
+    return { services: nonZero, noData: false }
   } finally {
     client.release()
   }
@@ -2214,16 +2225,17 @@ export const getCloudProviderCredentialsByAccountId = async (userId, accountId) 
 }
 
 // Get credentials by provider ID (legacy - returns first active account for backward compatibility)
+// Matches provider_id case-insensitively so "AWS" and "aws" both work
 export const getCloudProviderCredentials = async (userId, providerId) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
       `SELECT id, credentials_encrypted, account_alias
        FROM cloud_provider_credentials
-       WHERE user_id = $1 AND provider_id = $2 AND is_active = true
+       WHERE user_id = $1 AND LOWER(TRIM(provider_id)) = LOWER(TRIM($2)) AND is_active = true
        ORDER BY created_at ASC
        LIMIT 1`,
-      [userId, providerId]
+      [userId, String(providerId || '').trim()]
     )
     
     if (result.rows.length === 0) {
@@ -2243,16 +2255,16 @@ export const getCloudProviderCredentials = async (userId, providerId) => {
   }
 }
 
-// Get all active accounts for a specific provider type
+// Get all active accounts for a specific provider type (provider_id matched case-insensitively)
 export const getCloudProviderAccountsByType = async (userId, providerId) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
       `SELECT id, provider_id, provider_name, account_alias, credentials_encrypted, is_active, last_sync_at
        FROM cloud_provider_credentials
-       WHERE user_id = $1 AND provider_id = $2 AND is_active = true
+       WHERE user_id = $1 AND LOWER(TRIM(provider_id)) = LOWER(TRIM($2)) AND is_active = true
        ORDER BY created_at ASC`,
-      [userId, providerId]
+      [userId, String(providerId || '').trim()]
     )
     
     const { decrypt } = await import('./services/encryption.js')

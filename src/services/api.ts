@@ -510,6 +510,14 @@ export const cloudProvidersAPI = {
     })
     return response.json()
   },
+
+  // Re-apply S3 bucket policy for CUR (fix UNHEALTHY / INSUFFICIENT_PERMISSION)
+  fixCurPolicy: async (accountId: number) => {
+    const response = await apiRequest(`/cloud-providers/aws/${accountId}/cur-fix-policy`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
 }
 
 // Sync API
@@ -524,6 +532,15 @@ export const syncAPI = {
   syncProvider: async (providerId: string) => {
     const response = await apiRequest(`/sync/${providerId}`, {
       method: 'POST',
+    })
+    return response.json()
+  },
+
+  /** Fetch and save cost data for a specific month (e.g. when compare has no data for that month). */
+  fetchMonth: async (providerId: string, month: number, year: number) => {
+    const response = await apiRequest('/sync/fetch-month', {
+      method: 'POST',
+      body: JSON.stringify({ providerId, month, year }),
     })
     return response.json()
   },

@@ -1028,6 +1028,24 @@ router.post('/aws/:accountId/cur-setup', async (req, res) => {
   }
 })
 
+// Re-apply CUR S3 bucket policy (fix UNHEALTHY / INSUFFICIENT_PERMISSION)
+router.post('/aws/:accountId/cur-fix-policy', async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const accountId = parseInt(req.params.accountId, 10)
+    if (isNaN(accountId)) {
+      return res.status(400).json({ error: 'Invalid account ID' })
+    }
+
+    const { applyCURBucketPolicy } = await import('../services/curService.js')
+    const result = await applyCURBucketPolicy(userId, accountId)
+    res.json(result)
+  } catch (error) {
+    logger.error('CUR fix policy error', { userId: req.user?.userId, accountId: req.params?.accountId, error: error.message })
+    res.status(500).json({ error: error.message || 'Failed to re-apply bucket policy' })
+  }
+})
+
 // Clean up orphaned AWS resources (stack, role, export) before re-creating a connection
 // S3 bucket is always preserved — it may contain valuable CUR data and will be reused
 router.post('/aws/cleanup-orphaned',
