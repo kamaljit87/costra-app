@@ -787,6 +787,13 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                         {curStatuses[provider.accountId].bucketEmptyMessage}
                                       </p>
                                     )}
+                                    {(curStatuses[provider.accountId].curStatus === 'provisioning' || curStatuses[provider.accountId].curStatus === 'active') && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <strong>Note:</strong> If you see a &quot;fine-grained permissions&quot; error in the AWS console, sign in as the <strong>root user</strong> and enable{' '}
+                                        <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_billing.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">IAM access to billing</a>.
+                                        {' '}This is a one-time AWS account setting.
+                                      </p>
+                                    )}
                                     {curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' && curStatuses[provider.accountId].exportStatusMessage && (
                                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" role="status">
                                         {curStatuses[provider.accountId].exportStatusMessage}
