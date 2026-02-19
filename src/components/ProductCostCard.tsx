@@ -53,8 +53,8 @@ export default function ProductCostCard({ product, startDate, endDate, providerI
     setIsLoadingTrend(true)
     try {
       // Calculate previous period for comparison
-      const start = new Date(startDate)
-      const end = new Date(endDate)
+      const start = new Date(startDate + 'T12:00:00')
+      const end = new Date(endDate + 'T12:00:00')
       const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
       
       const prevEnd = new Date(start)

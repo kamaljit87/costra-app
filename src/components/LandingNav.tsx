@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, CreditCard, Mail } from 'lucide-react'
+import { Home, CreditCard, Mail, BookOpen } from 'lucide-react'
 import Logo from './Logo'
 import { cn } from '@/lib/utils'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
@@ -8,6 +8,7 @@ import { usePublicConfig } from '../contexts/PublicConfigContext'
 const NAV_ITEMS = [
   { name: 'Home', url: '/', icon: Home },
   { name: 'Pricing', url: '/#pricing', icon: CreditCard },
+  { name: 'Blog', url: '/blog', icon: BookOpen },
   { name: 'Contact', url: '/contact', icon: Mail },
 ]
 

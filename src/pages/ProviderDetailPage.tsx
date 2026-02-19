@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
-import { cloudProvidersAPI, syncAPI, costDataAPI, productTeamAPI, budgetsAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI, costDataAPI, productTeamAPI, budgetsAPI, billingAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import ProviderCostChart from '../components/ProviderCostChart'
@@ -91,6 +91,26 @@ export default function ProviderDetailPage() {
   const [isLoadingTeams, setIsLoadingTeams] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [showDownloadMenu, setShowDownloadMenu] = useState(false)
+  const [maxHistoricalMonths, setMaxHistoricalMonths] = useState(12)
+
+  // Filter available periods based on subscription plan
+  const periodMonthsMap: Record<string, number> = { '1month': 1, '2months': 2, '3months': 3, '4months': 4, '6months': 6, '12months': 12 }
+  const availablePeriods = useMemo(() => {
+    return (['1month', '2months', '3months', '4months', '6months', '12months'] as PeriodType[]).filter(
+      p => periodMonthsMap[p] <= maxHistoricalMonths
+    )
+  }, [maxHistoricalMonths])
+
+  // Minimum allowed start date for custom range based on plan
+  const minAllowedDate = useMemo(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - maxHistoricalMonths)
+    d.setDate(1)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${dd}`
+  }, [maxHistoricalMonths])
 
   // Define sub-service type
   interface SubService {
@@ -149,7 +169,7 @@ export default function ProviderDetailPage() {
           }
         }
 
-        // Load budgets for this provider (for header badge & counts)
+        // Load budgets and subscription info
         if (!isDemoMode) {
           try {
             const budgetsResponse = await budgetsAPI.getBudgets(providerId)
@@ -158,6 +178,14 @@ export default function ProviderDetailPage() {
           } catch (error) {
             console.error('Failed to load provider budgets:', error)
             setProviderBudgetCount(0)
+          }
+          try {
+            const subResponse = await billingAPI.getSubscription()
+            if (subResponse?.limits?.historicalDataMonths) {
+              setMaxHistoricalMonths(subResponse.limits.historicalDataMonths)
+            }
+          } catch (error) {
+            console.error('Failed to load subscription info:', error)
           }
         } else {
           setProviderBudgetCount(0)
@@ -249,10 +277,10 @@ export default function ProviderDetailPage() {
           // If no data from API, try to filter from allHistoricalData as fallback
           console.warn(`No data returned from API for ${selectedPeriod}, using preloaded data`)
           const filtered = providerData.allHistoricalData.filter(point => {
-            const pointDate = new Date(point.date)
+            const pointDate = new Date(point.date + 'T12:00:00')
             return pointDate >= startDate && pointDate <= endDate
           })
-          
+
           if (filtered.length > 0) {
             setFilteredData(filtered)
           } else {
@@ -269,7 +297,7 @@ export default function ProviderDetailPage() {
             : getDateRangeForPeriod(selectedPeriod)
           
           const filtered = providerData.allHistoricalData.filter(point => {
-            const pointDate = new Date(point.date)
+            const pointDate = new Date(point.date + 'T12:00:00')
             return pointDate >= range.startDate && pointDate <= range.endDate
           })
           setFilteredData(filtered.length > 0 ? filtered : [])
@@ -590,7 +618,7 @@ export default function ProviderDetailPage() {
       if (customStartDate && customEndDate) {
         const { startDate, endDate } = getDateRangeForPeriod('custom', customStartDate, customEndDate)
         const filtered = providerData.allHistoricalData.filter(point => {
-          const pointDate = new Date(point.date)
+          const pointDate = new Date(point.date + 'T12:00:00')
           return pointDate >= startDate && pointDate <= endDate
         })
         return filtered.length > 0 ? filtered : []
@@ -805,7 +833,7 @@ export default function ProviderDetailPage() {
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Period Pills */}
               <div className="flex flex-wrap items-center gap-2">
-                {(['1month', '2months', '3months', '4months', '6months', '12months'] as PeriodType[]).map((period) => (
+                {availablePeriods.map((period) => (
                   <button
                     key={period}
                     onClick={() => {
@@ -824,7 +852,8 @@ export default function ProviderDetailPage() {
                   </button>
                 ))}
                 
-                {/* Custom Filter Button */}
+                {/* Custom Filter Button - Pro plan only */}
+                {maxHistoricalMonths >= 12 && (
                 <button
                   onClick={() => {
                     setShowCustomFilter(!showCustomFilter)
@@ -842,6 +871,7 @@ export default function ProviderDetailPage() {
                   <Calendar className="h-3 w-3" />
                   <span>Custom</span>
                 </button>
+                )}
               </div>
 
               {/* Service Filter */}
@@ -992,7 +1022,11 @@ export default function ProviderDetailPage() {
                       <input
                         type="date"
                         value={customStartDate}
-                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        min={minAllowedDate}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setCustomStartDate(val < minAllowedDate ? minAllowedDate : val)
+                        }}
                         className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       />
                     </div>
@@ -1439,7 +1473,7 @@ export default function ProviderDetailPage() {
                                 borderRadius: '12px',
                                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                               }}
-                              formatter={(value: number) => formatCurrency(value)}
+                              formatter={(_value: number, _name: string, props: any) => formatCurrency(props?.payload?.originalCost ?? _value)}
                             />
                           </PieChart>
                         </ResponsiveContainer>
@@ -1502,7 +1536,7 @@ export default function ProviderDetailPage() {
                                 borderRadius: '12px',
                                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                               }}
-                              formatter={(value: number) => formatCurrency(value)}
+                              formatter={(_value: number, _name: string, props: any) => formatCurrency(props?.payload?.originalCost ?? _value)}
                               labelStyle={{ color: '#2F3899', fontWeight: '600' }}
                             />
                             <Bar

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
-import { cloudProvidersAPI, syncAPI, budgetsAPI, costDataAPI, goalsAPI } from '../services/api'
+import { cloudProvidersAPI, syncAPI, budgetsAPI, costDataAPI, goalsAPI, billingAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import TotalBillSummary from '../components/TotalBillSummary'
@@ -41,14 +41,16 @@ export default function Dashboard() {
   const [goalsProgress, setGoalsProgress] = useState<Record<number, { percentChange: number; targetPercent: number; currentSpend: number; baselineSpend: number }>>({})
   const [goalsLoading, setGoalsLoading] = useState(false)
   const [addingGoal, setAddingGoal] = useState(false)
+  const [historicalDataMonths, setHistoricalDataMonths] = useState(12)
 
   const loadData = async () => {
     try {
-      const [costs, plans, providersResponse, budgetsResponse] = await Promise.all([
+      const [costs, plans, providersResponse, budgetsResponse, subscriptionResponse] = await Promise.all([
         getCostData(isDemoMode),
         getSavingsPlans(isDemoMode),
         isDemoMode ? Promise.resolve({ providers: [] }) : cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
         isDemoMode ? Promise.resolve({ budgets: [] }) : budgetsAPI.getBudgets().catch(() => ({ budgets: [] })),
+        isDemoMode ? Promise.resolve(null) : billingAPI.getSubscription().catch(() => null),
       ])
       setCostData(costs)
       setSavingsPlans(plans)
@@ -63,6 +65,9 @@ export default function Dashboard() {
         }
       })
       setProviderBudgetCounts(counts)
+      if (subscriptionResponse?.limits?.historicalDataMonths) {
+        setHistoricalDataMonths(subscriptionResponse.limits.historicalDataMonths)
+      }
     } catch (error: any) {
       console.error('Failed to load data:', error)
       showError('Failed to Load Data', error.message || 'Could not load dashboard data. Please try again.')
@@ -443,6 +448,7 @@ export default function Dashboard() {
                               chartData4Months={data.chartData4Months}
                               chartData6Months={data.chartData6Months}
                               chartData12Months={data.chartData12Months}
+                              maxHistoricalMonths={historicalDataMonths}
                               isExpanded={expandedProvider === data.provider.id}
                               onToggle={() => setExpandedProvider(
                                 expandedProvider === data.provider.id ? null : data.provider.id

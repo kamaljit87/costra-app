@@ -924,8 +924,9 @@ export const pollCURDataForAllAccounts = async () => {
        cpc.account_alias, cpc.provider_name
      FROM cur_export_config cec
      JOIN cloud_provider_credentials cpc ON cec.account_id = cpc.id
-     WHERE cec.cur_status IN ('active', 'provisioning')
-       AND cpc.is_active = true`
+     WHERE cec.cur_status IN ('active', 'provisioning', 'error')
+       AND cpc.is_active = true
+       AND cpc.cur_enabled = true`
   )
 
   let processed = 0
@@ -969,18 +970,21 @@ export const pollCURDataForAllAccounts = async () => {
         }
       }
 
-      // Transition provisioning → active when data arrives; notify user
-      if (config.cur_status === 'provisioning') {
+      // Transition provisioning/error → active when data arrives; notify user
+      if (config.cur_status === 'provisioning' || config.cur_status === 'error') {
         await pool.query(
-          `UPDATE cur_export_config SET cur_status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          `UPDATE cur_export_config SET cur_status = 'active', status_message = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           [config.id]
         )
         try {
           const accountLabel = config.account_alias || config.provider_name || 'AWS account'
+          const isRecovery = config.cur_status === 'error'
           await createNotification(config.user_id, {
             type: 'success',
-            title: 'CUR integration successful',
-            message: `Cost and Usage Report (CUR 2.0) is now active for ${accountLabel}. Cost data will appear on your Dashboard.`,
+            title: isRecovery ? 'CUR recovered' : 'CUR integration successful',
+            message: isRecovery
+              ? `Cost and Usage Report (CUR 2.0) for ${accountLabel} has recovered and is now active again.`
+              : `Cost and Usage Report (CUR 2.0) is now active for ${accountLabel}. Cost data will appear on your Dashboard.`,
             link: '/dashboard',
             linkText: 'View Dashboard',
           })

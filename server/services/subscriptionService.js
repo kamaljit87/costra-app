@@ -37,8 +37,9 @@ const FEATURE_DEFINITIONS = {
       'custom_date_ranges',
       'monthly_summaries',
       'scheduled_sync',
+      'csv_export',
     ],
-    restrictedFeatures: ['csv_export', 'email_alerts', 'unit_economics'],
+    restrictedFeatures: ['email_alerts', 'unit_economics'],
   },
   pro: {
     historicalDataMonths: 12,
@@ -303,8 +304,11 @@ export const getMaxProviderAccounts = async (userId) => {
  * Get required plan for a feature
  */
 export const getRequiredPlan = (featureName) => {
-  if (['csv_export', 'email_alerts', 'unit_economics'].includes(featureName)) {
+  if (['email_alerts', 'unit_economics'].includes(featureName)) {
     return 'Pro'
+  }
+  if (['csv_export'].includes(featureName)) {
+    return 'Starter'
   }
   if (['scheduled_sync'].includes(featureName)) {
     return 'Starter'

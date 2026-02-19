@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { insightsAPI } from '../services/api'
+import { Marked } from 'marked'
 import { FileText, RefreshCw, TrendingUp, TrendingDown, DollarSign, Calendar, Info, X } from 'lucide-react'
+
+const markedInstance = new Marked({ async: false })
 
 interface CostSummaryProps {
   providerId: string
@@ -158,6 +161,27 @@ export default function CostSummary({ providerId, month, year, accountId, startD
   const isIncrease = costChange > 0
   const isDecrease = costChange < 0
 
+  const explanationHtml = useMemo(() => {
+    if (!explanation) return ''
+    // If the text contains markdown headings or bullet points, render as markdown
+    const hasMarkdown = /^#{1,3}\s|^\s*[-*]\s|^\d+\.\s/m.test(explanation)
+    if (hasMarkdown) {
+      try {
+        const result = markedInstance.parse(explanation)
+        if (typeof result === 'string') return result
+        return `<p>${explanation}</p>`
+      } catch {
+        return `<p>${explanation}</p>`
+      }
+    }
+    // Plain text fallback: split into paragraphs on double newlines, or wrap as single paragraph
+    const paragraphs = explanation.split(/\n{2,}/).filter(Boolean)
+    if (paragraphs.length > 1) {
+      return paragraphs.map(p => `<p>${p.trim()}</p>`).join('')
+    }
+    return `<p>${explanation}</p>`
+  }, [explanation])
+
   return (
     <div className="card bg-white border-accent-100">
       <div className="flex items-center justify-between mb-6">
@@ -175,7 +199,7 @@ export default function CostSummary({ providerId, month, year, accountId, startD
           </h3>
           <p className="text-sm text-accent-600">
             {isCustomRange && startDate && endDate
-              ? `${new Date(startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - What Changed & Why`
+              ? `${new Date(startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${new Date(endDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - What Changed & Why`
               : month && year
                 ? `${monthNames[month - 1]} ${year} - What Changed & Why`
                 : 'Cost Summary'}
@@ -228,13 +252,18 @@ export default function CostSummary({ providerId, month, year, accountId, startD
 
       {/* Explanation Text */}
       <div className="mb-6">
-        <div className="prose prose-sm max-w-none">
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <p className="text-gray-800 leading-relaxed whitespace-pre-line">
-              {explanation}
-            </p>
-          </div>
-        </div>
+        <div
+          className="prose prose-sm prose-gray max-w-none
+            prose-headings:text-base prose-headings:font-semibold prose-headings:text-gray-900 prose-headings:mt-4 prose-headings:mb-2
+            prose-p:text-gray-700 prose-p:leading-relaxed prose-p:my-1.5
+            prose-li:text-gray-700 prose-li:my-0.5
+            prose-ul:my-2 prose-ol:my-2
+            prose-strong:text-gray-900
+            [&>h2]:flex [&>h2]:items-center [&>h2]:gap-2 [&>h2]:text-accent-700
+            [&>h2]:border-b [&>h2]:border-gray-100 [&>h2]:pb-1.5
+            p-4 bg-gray-50 rounded-xl border border-gray-200"
+          dangerouslySetInnerHTML={{ __html: explanationHtml }}
+        />
       </div>
 
       {/* Contributing Factors */}

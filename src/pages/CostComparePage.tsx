@@ -437,13 +437,15 @@ export default function CostComparePage() {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      // Use originalCost (USD) so formatCurrency converts once; fall back to value if missing
+      const cost = payload[0]?.payload?.originalCost ?? payload[0]?.value
       return (
         <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-surface-200 p-3">
           <p className="text-xs text-gray-500 mb-1">
-            {new Date(label).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {new Date(label + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </p>
           <p className="text-sm font-bold text-gray-900">
-            {formatCurrency(payload[0].value)}
+            {formatCurrency(cost)}
           </p>
         </div>
       )
@@ -570,7 +572,7 @@ export default function CostComparePage() {
                   Daily Costs
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={panel.dailyData.map((d) => ({ ...d, cost: convertAmount(d.cost) }))}>
+                  <BarChart data={panel.dailyData.map((d) => ({ ...d, cost: convertAmount(d.cost), originalCost: d.cost }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" opacity={0.6} vertical={false} />
                     <XAxis
                       dataKey="date"
@@ -578,13 +580,14 @@ export default function CostComparePage() {
                       tickLine={false}
                       axisLine={false}
                       tick={{ fill: '#64748B' }}
-                      tickFormatter={(v) => new Date(v).getDate().toString()}
+                      tickFormatter={(v) => new Date(v + 'T12:00:00').getDate().toString()}
                     />
                     <YAxis
                       fontSize={10}
                       tickLine={false}
                       axisLine={false}
                       tick={{ fill: '#64748B' }}
+                      domain={[0, 'auto']}
                       tickFormatter={(v) => {
                         const s = getCurrencySymbol()
                         return v >= 1000 ? `${s}${(v / 1000).toFixed(0)}k` : `${s}${v.toFixed(0)}`

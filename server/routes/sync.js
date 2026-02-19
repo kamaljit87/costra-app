@@ -18,6 +18,7 @@ import {
 } from '../database.js'
 import { del as cacheDel } from '../utils/cache.js'
 import { fetchProviderCostData, getDateRange } from '../services/cloudProviderIntegrations.js'
+import { getProviderAdapter } from '../services/providers/index.js'
 import { writeCostCacheCSV } from '../services/costCacheCSV.js'
 
 /** Date range for a calendar month (1-based month, full year). Uses UTC so server TZ doesn't change the month. */
@@ -58,59 +59,17 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Account not found' } }
     }
 
-    // Handle automated AWS connections (role-based); other providers use credentials as-is
-    let credentialsToUse = accountData.credentials || {}
-    const isAws = String(account.provider_id || '').toLowerCase().trim() === 'aws'
-    if (isAws && accountData.connectionType?.startsWith('automated')) {
-      logger.info('Automated AWS connection detected', { requestId, userId, accountId: account.id, accountLabel })
+    // Use provider adapter for credential resolution (each provider handles its own logic)
+    const adapter = getProviderAdapter(account.provider_id)
+    if (!adapter) {
+      logger.warn('No adapter found for provider', { requestId, userId, accountId: account.id, accountLabel, providerId: account.provider_id })
+      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: `Unsupported provider: ${account.provider_id}` } }
+    }
 
-      if (!accountData.roleArn || !accountData.externalId) {
-        logger.warn('Missing roleArn or externalId for automated connection', { requestId, userId, accountId: account.id, accountLabel })
-        return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Automated connection missing role ARN or external ID' } }
-      }
-
-      try {
-        const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
-        const stsClient = new STSClient({ region: 'us-east-1' })
-        const assumeRoleCommand = new AssumeRoleCommand({
-          RoleArn: accountData.roleArn,
-          RoleSessionName: `costra-sync-${account.id}-${Date.now()}`,
-          ExternalId: accountData.externalId,
-          DurationSeconds: 3600,
-        })
-
-        logger.info('Assuming role for automated connection', { requestId, userId, accountId: account.id, accountLabel, roleArn: accountData.roleArn })
-        const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
-
-        if (!assumeRoleResponse.Credentials) {
-          throw new Error('Failed to assume role: No credentials returned')
-        }
-
-        credentialsToUse = {
-          accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
-          secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
-          sessionToken: assumeRoleResponse.Credentials.SessionToken,
-          region: 'us-east-1',
-        }
-        logger.info('Successfully assumed role', { requestId, userId, accountId: account.id, accountLabel })
-      } catch (assumeError) {
-        logger.error('Failed to assume role for automated connection', { requestId, userId, accountId: account.id, accountLabel, error: assumeError.message, stack: assumeError.stack, code: assumeError.code })
-        let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
-        if (assumeError.message?.includes('Could not load credentials') || assumeError.code === 'CredentialsError') {
-          errorMessage = 'Server AWS credentials not configured. The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials.'
-        } else if (assumeError.code === 'AccessDenied') {
-          errorMessage = 'Access denied when assuming role. Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra\'s AWS account has permission to assume the role.'
-        } else if (assumeError.code === 'InvalidClientTokenId') {
-          errorMessage = 'Invalid AWS credentials. Please check that the server\'s AWS credentials are valid and have permission to assume roles.'
-        }
-        return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: errorMessage } }
-      }
-    } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0) {
-      logger.warn('No credentials found', { requestId, userId, accountId: account.id, accountLabel })
-      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'Credentials not found' } }
-    } else if (isAws && (!credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey)) {
-      logger.warn('AWS credentials incomplete (missing accessKeyId or secretAccessKey)', { requestId, userId, accountId: account.id, accountLabel })
-      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: 'AWS credentials invalid (missing Access Key ID or Secret Access Key)' } }
+    const { credentials: credentialsToUse, error: credError } = await adapter.resolveCredentials(account, accountData)
+    if (credError || !credentialsToUse) {
+      logger.warn('Credential resolution failed', { requestId, userId, accountId: account.id, accountLabel, error: credError })
+      return { error: { accountId: account.id, accountAlias: account.account_alias, providerId: account.provider_id, error: credError || 'Credentials not found' } }
     }
 
     logger.debug('Using credentials for account', { requestId, userId, accountId: account.id, accountLabel, connectionType: accountData.connectionType || 'manual' })
@@ -126,7 +85,13 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
         logger.debug('Force refresh requested', { requestId, userId, accountId: account.id, accountLabel })
       }
       logger.info('Fetching fresh data', { requestId, userId, accountId: account.id, accountLabel })
-      costData = await fetchProviderCostData(account.provider_id, credentialsToUse, startDate, endDate)
+      costData = await adapter.fetchCostData(credentialsToUse, startDate, endDate)
+
+      // Synthesize daily data for providers that don't give daily granularity (e.g. Linode, DO, Vultr, IBM)
+      const synthesized = adapter.synthesizeDailyData(costData, startDate, endDate)
+      if (synthesized && synthesized.length > 0) {
+        costData.dailyData = synthesized
+      }
 
       logger.info('Fetched data for account', {
         requestId, userId, accountId: account.id, accountLabel,
@@ -377,40 +342,23 @@ router.post('/fetch-month', async (req, res) => {
           continue
         }
 
-        let credentialsToUse = accountData.credentials || {}
-        const isAwsAccount = String(account.provider_id || '').toLowerCase().trim() === 'aws'
-        if (isAwsAccount && accountData.connectionType?.startsWith('automated')) {
-          if (!accountData.roleArn || !accountData.externalId) {
-            errors.push({ accountId: account.id, error: 'Automated connection missing role ARN or external ID' })
-            continue
-          }
-          try {
-            const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
-            const stsClient = new STSClient({ region: 'us-east-1' })
-            const assumeRoleCommand = new AssumeRoleCommand({
-              RoleArn: accountData.roleArn,
-              RoleSessionName: `costra-fetch-month-${account.id}-${Date.now()}`,
-              ExternalId: accountData.externalId,
-              DurationSeconds: 3600,
-            })
-            const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
-            if (!assumeRoleResponse.Credentials) throw new Error('No credentials returned')
-            credentialsToUse = {
-              accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
-              secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
-              sessionToken: assumeRoleResponse.Credentials.SessionToken,
-              region: 'us-east-1',
-            }
-          } catch (assumeErr) {
-            errors.push({ accountId: account.id, error: assumeErr.message || 'Failed to assume role' })
-            continue
-          }
-        } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0) {
-          errors.push({ accountId: account.id, error: 'Credentials not found' })
+        const fetchAdapter = getProviderAdapter(account.provider_id)
+        if (!fetchAdapter) {
+          errors.push({ accountId: account.id, error: `Unsupported provider: ${account.provider_id}` })
+          continue
+        }
+        const { credentials: credentialsToUse, error: credResolveErr } = await fetchAdapter.resolveCredentials(account, accountData)
+        if (credResolveErr || !credentialsToUse) {
+          errors.push({ accountId: account.id, error: credResolveErr || 'Credentials not found' })
           continue
         }
 
-        const costData = await fetchProviderCostData(providerId, credentialsToUse, startDate, endDate, false)
+        const costData = await fetchAdapter.fetchCostData(credentialsToUse, startDate, endDate)
+        // Synthesize daily data for invoice-based providers
+        const synthDaily = fetchAdapter.synthesizeDailyData(costData, startDate, endDate)
+        if (synthDaily && synthDaily.length > 0) {
+          costData.dailyData = synthDaily
+        }
         const validation = validateCostDataResponse(costData)
         if (!validation.valid) {
           logger.warn('Fetch-month: validation failed, continuing', { userId, accountId: account.id, errors: validation.errors })
@@ -529,84 +477,19 @@ router.post('/account/:accountId', async (req, res) => {
 
     const { providerId, providerName, accountAlias } = accountData
     const accountLabel = accountAlias || `${providerId} (${accountId})`
-    
-    // Handle automated AWS connections (role-based); other providers use credentials as-is
-    let credentialsToUse = accountData.credentials || {}
-    const isAwsProvider = String(providerId || '').toLowerCase().trim() === 'aws'
-    if (isAwsProvider && accountData.connectionType?.startsWith('automated')) {
-      logger.info('Automated AWS connection detected (account sync)', { requestId: req.requestId, userId, accountId, accountLabel })
-      
-      if (!accountData.roleArn || !accountData.externalId) {
-        return res.status(400).json({ 
-          error: 'Automated connection missing role ARN or external ID',
-          details: 'Please verify the connection was set up correctly.'
-        })
-      }
-      
-      try {
-        // Assume the role to get temporary credentials
-        // Note: The server needs AWS credentials (from environment variables, IAM instance profile, etc.)
-        // to assume the role in the user's account
-        const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
-        
-        // Check if we have AWS credentials available
-        // AWS SDK will automatically check: environment variables, IAM instance profile, etc.
-        const stsClient = new STSClient({ 
-          region: 'us-east-1',
-          // Don't specify credentials - let SDK use default credential chain
-        })
-        
-        const assumeRoleCommand = new AssumeRoleCommand({
-          RoleArn: accountData.roleArn,
-          RoleSessionName: `costra-sync-${accountId}-${Date.now()}`,
-          ExternalId: accountData.externalId,
-          DurationSeconds: 3600, // 1 hour
-        })
-        
-        logger.info('Assuming role for automated connection (account sync)', { requestId: req.requestId, userId, accountId, accountLabel, roleArn: accountData.roleArn })
-        const assumeRoleResponse = await stsClient.send(assumeRoleCommand)
-        
-        if (!assumeRoleResponse.Credentials) {
-          throw new Error('Failed to assume role: No credentials returned')
-        }
-        
-        // Use temporary credentials from role assumption
-        credentialsToUse = {
-          accessKeyId: assumeRoleResponse.Credentials.AccessKeyId,
-          secretAccessKey: assumeRoleResponse.Credentials.SecretAccessKey,
-          sessionToken: assumeRoleResponse.Credentials.SessionToken,
-          region: 'us-east-1',
-        }
-        
-        logger.info('Successfully assumed role (account sync)', { requestId: req.requestId, userId, accountId, accountLabel })
-      } catch (assumeError) {
-        logger.error('Failed to assume role for automated connection (account sync)', { requestId: req.requestId, userId, accountId, accountLabel, error: assumeError.message, stack: assumeError.stack, code: assumeError.code })
-        
-        // Provide helpful error message
-        let errorMessage = assumeError.message || assumeError.code || 'Unknown error'
-        let errorDetails = ''
-        
-        if (assumeError.message?.includes('Could not load credentials') || 
-            assumeError.code === 'CredentialsError') {
-          errorMessage = 'Server AWS credentials not configured'
-          errorDetails = 'The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials in the server/.env file or as environment variables.'
-        } else if (assumeError.code === 'AccessDenied') {
-          errorMessage = 'Access denied when assuming role'
-          errorDetails = 'Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra\'s AWS account has permission to assume the role.'
-        } else if (assumeError.code === 'InvalidClientTokenId') {
-          errorMessage = 'Invalid AWS credentials'
-          errorDetails = 'Please check that the server\'s AWS credentials are valid and have permission to assume roles.'
-        }
-        
-        return res.status(500).json({ 
-          error: errorMessage,
-          details: errorDetails || assumeError.message || assumeError.code || 'Unknown error'
-        })
-      }
-    } else if (!credentialsToUse || Object.keys(credentialsToUse).length === 0 || 
-               !credentialsToUse.accessKeyId || !credentialsToUse.secretAccessKey) {
-      // For non-automated connections, validate credentials exist
-      return res.status(404).json({ error: 'Account credentials not found or invalid' })
+
+    // Use provider adapter for credential resolution
+    const acctAdapter = getProviderAdapter(providerId)
+    if (!acctAdapter) {
+      return res.status(400).json({ error: `Unsupported provider: ${providerId}` })
+    }
+
+    const { credentials: credentialsToUse, error: credErr } = await acctAdapter.resolveCredentials(
+      { id: accountId, provider_id: providerId },
+      accountData
+    )
+    if (credErr || !credentialsToUse) {
+      return res.status(400).json({ error: credErr || 'Account credentials not found or invalid' })
     }
 
     // Clear cost explanations cache for this account to ensure fresh summaries
@@ -625,8 +508,14 @@ router.post('/account/:accountId', async (req, res) => {
     
     if (!costData) {
       // Fetch cost data from provider API using the appropriate credentials
-      costData = await fetchProviderCostData(providerId, credentialsToUse, startDate, endDate)
-      
+      costData = await acctAdapter.fetchCostData(credentialsToUse, startDate, endDate)
+
+      // Synthesize daily data for invoice-based providers
+      const acctSynthDaily = acctAdapter.synthesizeDailyData(costData, startDate, endDate)
+      if (acctSynthDaily && acctSynthDaily.length > 0) {
+        costData.dailyData = acctSynthDaily
+      }
+
       // Cache the result for 60 minutes
       await setCachedCostData(userId, providerId, cacheKey, costData, 60)
     }
@@ -758,7 +647,16 @@ router.post('/:providerId', async (req, res) => {
         let costData = await getCachedCostData(userId, providerId, cacheKey)
         
         if (!costData) {
-          costData = await fetchProviderCostData(providerId, accountData.credentials, startDate, endDate)
+          const legacyAdapter = getProviderAdapter(providerId)
+          if (legacyAdapter) {
+            costData = await legacyAdapter.fetchCostData(accountData.credentials, startDate, endDate)
+            const legacySynth = legacyAdapter.synthesizeDailyData(costData, startDate, endDate)
+            if (legacySynth && legacySynth.length > 0) {
+              costData.dailyData = legacySynth
+            }
+          } else {
+            costData = await fetchProviderCostData(providerId, accountData.credentials, startDate, endDate)
+          }
           await setCachedCostData(userId, providerId, cacheKey, costData, 60)
         }
 

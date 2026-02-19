@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { getExchangeRates, Currency, ExchangeRates } from '../services/currencyService'
 import { costDataAPI } from '../services/api'
+import { useAuth } from './AuthContext'
 
 interface CurrencyContextType {
   selectedCurrency: Currency
@@ -15,6 +16,7 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined)
 
 export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth()
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>('USD')
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -36,7 +38,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
 
     loadUserPreferences()
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     const loadExchangeRates = async () => {

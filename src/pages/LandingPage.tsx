@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
 import LandingNav from '../components/LandingNav'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
@@ -90,6 +91,15 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Helmet>
+        <title>Costra - Multi-Cloud Cost Management | Simplify Cloud Spending</title>
+        <meta name="description" content="Costra helps teams manage and optimize cloud costs across AWS, Azure, GCP, and more. Get unified visibility, anomaly detection, and actionable insights." />
+        <meta property="og:title" content="Costra - Multi-Cloud Cost Management" />
+        <meta property="og:description" content="Simplify cloud spending across AWS, Azure, GCP, and more with unified cost visibility and optimization." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://costra.app" />
+      </Helmet>
+
       <LandingNav />
 
       {/* Hero Section */}
@@ -371,6 +381,7 @@ export default function LandingPage() {
               <Link to="/privacy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gray-900 transition-colors">Terms of Service</Link>
               <Link to="/contact" className="hover:text-gray-900 transition-colors">Contact Us</Link>
+              <Link to="/blog" className="hover:text-gray-900 transition-colors">Blog</Link>
             </div>
           </div>
           <p className="text-center text-xs text-gray-400 mt-4">Prices shown exclude applicable taxes. Tax is calculated at checkout by our payment partner.</p>

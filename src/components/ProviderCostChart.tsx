@@ -66,7 +66,7 @@ export default function ProviderCostChart({
     cost: convertAmount(point.cost),
     originalCost: point.cost,
     monthLabel: isMonthlyView
-      ? new Date(point.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      ? new Date(point.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
       : point.date,
   }))
 
@@ -91,7 +91,7 @@ export default function ProviderCostChart({
       const originalCost = payload[0]?.payload?.originalCost ?? payload[0]?.value
       const displayDate = isMonthlyView
         ? label
-        : new Date(label).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : new Date(label + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
       return (
         <div className="bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-accent-200 p-4">
@@ -160,6 +160,7 @@ export default function ProviderCostChart({
               axisLine={false}
               dx={-10}
               tick={{ fill: '#64748B' }}
+              domain={[0, 'auto']}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`
@@ -196,7 +197,7 @@ export default function ProviderCostChart({
               dy={10}
               tick={{ fill: '#64748B' }}
               tickFormatter={(value) => {
-                const date = new Date(value)
+                const date = new Date(value + 'T12:00:00')
                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }}
             />
@@ -207,6 +208,7 @@ export default function ProviderCostChart({
               axisLine={false}
               dx={-10}
               tick={{ fill: '#64748B' }}
+              domain={[0, 'auto']}
               tickFormatter={(value) => {
                 const symbol = getCurrencySymbol()
                 if (value >= 1000000) return `${symbol}${(value / 1000000).toFixed(1)}M`

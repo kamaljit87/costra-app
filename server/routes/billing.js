@@ -6,7 +6,7 @@
 
 import express from 'express'
 import { authenticateToken } from '../middleware/auth.js'
-import { getUserSubscription, getSubscriptionStatus } from '../services/subscriptionService.js'
+import { getUserSubscription, getSubscriptionStatus, getSubscriptionFeatures } from '../services/subscriptionService.js'
 import {
   createCheckoutSession as createStripeCheckout,
   createPortalSession,
@@ -32,7 +32,8 @@ router.get('/subscription', authenticateToken, async (req, res) => {
     const userId = req.user.userId || req.user.id
     const subscription = await getUserSubscription(userId)
     const status = await getSubscriptionStatus(userId)
-    
+    const features = await getSubscriptionFeatures(userId)
+
     res.json({
       subscription: {
         planType: subscription.plan_type,
@@ -44,6 +45,10 @@ router.get('/subscription', authenticateToken, async (req, res) => {
         subscriptionEndDate: subscription.subscription_end_date,
       },
       status,
+      limits: {
+        historicalDataMonths: features.historicalDataMonths,
+        maxProviderAccounts: features.maxProviderAccounts,
+      },
     })
   } catch (error) {
     logger.error('Error getting subscription', { 

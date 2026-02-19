@@ -8,10 +8,10 @@ interface ProviderCostCardProps {
 }
 
 export default function ProviderCostCard({ data }: ProviderCostCardProps) {
-  const { formatCurrency, convertAmount } = useCurrency()
+  const { formatCurrency } = useCurrency()
 
-  const currentMonth = convertAmount(data.currentMonth)
-  const lastMonth = convertAmount(data.lastMonth)
+  const currentMonth = data.currentMonth
+  const lastMonth = data.lastMonth
   const changePercent = lastMonth > 0 ? ((currentMonth - lastMonth) / lastMonth) * 100 : 0
 
   return (

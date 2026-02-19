@@ -52,9 +52,12 @@ const sliceByMonths = (sortedDailyData: CostDataPoint[], monthsBack: number): Co
   const cutoff = new Date()
   cutoff.setDate(1)
   cutoff.setMonth(cutoff.getMonth() - monthsBack)
-  cutoff.setHours(0, 0, 0, 0)
-  const cutoffStr = cutoff.toISOString().split('T')[0]
-  return sortedDailyData.filter(d => d.date >= cutoffStr)
+  // Format as YYYY-MM-DD using local date parts (not toISOString which converts to UTC and can shift the date back a day in UTC+ timezones)
+  const y = cutoff.getFullYear()
+  const m = String(cutoff.getMonth() + 1).padStart(2, '0')
+  const d = String(cutoff.getDate()).padStart(2, '0')
+  const cutoffStr = `${y}-${m}-${d}`
+  return sortedDailyData.filter(dp => dp.date >= cutoffStr)
 }
 
 // Helper function to aggregate daily data into monthly data
@@ -64,9 +67,8 @@ export const aggregateToMonthly = (dailyData: CostDataPoint[]): CostDataPoint[] 
   const monthlyMap = new Map<string, number>()
   
   dailyData.forEach(point => {
-    const date = new Date(point.date)
-    // Use YYYY-MM format as key, but store as first day of month
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+    // Parse YYYY-MM-DD string directly to avoid timezone shifts from new Date()
+    const monthKey = point.date.substring(0, 7) + '-01'
     const existing = monthlyMap.get(monthKey) || 0
     monthlyMap.set(monthKey, existing + point.cost)
   })
@@ -81,7 +83,8 @@ export const aggregateToMonthly = (dailyData: CostDataPoint[]): CostDataPoint[] 
 
 // Get month name from date string
 export const getMonthName = (dateStr: string): string => {
-  const date = new Date(dateStr)
+  // Append time to avoid UTC-only parsing which can shift dates in non-UTC timezones
+  const date = new Date(dateStr + 'T12:00:00')
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
 }
 
@@ -329,8 +332,8 @@ export const getDateRangeForPeriod = (period: PeriodType, customStartDate?: stri
   const startDate = new Date()
 
   if (period === 'custom' && customStartDate && customEndDate) {
-    const parsedStart = new Date(customStartDate)
-    const parsedEnd = new Date(customEndDate)
+    const parsedStart = new Date(customStartDate + 'T12:00:00')
+    const parsedEnd = new Date(customEndDate + 'T12:00:00')
 
     const isValidDate = (d: Date) => !isNaN(d.getTime())
     const isReasonableYear = (d: Date) => d.getFullYear() >= 1970 && d.getFullYear() <= 2100

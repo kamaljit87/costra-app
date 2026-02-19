@@ -27,6 +27,8 @@ import GoogleCallbackPage from './pages/GoogleCallbackPage'
 import Verify2FAPage from './pages/Verify2FAPage'
 import Suggest2FAPage from './pages/Suggest2FAPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import BlogListPage from './pages/BlogListPage'
+import BlogPostPage from './pages/BlogPostPage'
 import CookieConsent from './components/CookieConsent'
 import { NotFound } from './components/ui/ghost-404-page'
 
@@ -76,6 +78,8 @@ function App() {
                 <Route path="/privacy" element={<PrivacyPolicyPage />} />
                 <Route path="/terms" element={<TermsOfServicePage />} />
                 <Route path="/contact" element={<ContactPage />} />
+                <Route path="/blog" element={<BlogListPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route
                   path="/chat-demo"
                   element={

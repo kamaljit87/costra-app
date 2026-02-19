@@ -19,16 +19,7 @@ import {
 } from '../database.js'
 import { loadMonthFromCSVForAccounts } from '../services/costCacheCSV.js'
 import { cached, cacheKeys, clearUserCache, del as cacheDel } from '../utils/cache.js'
-import {
-  fetchAWSServiceDetails,
-  fetchAzureServiceDetails,
-  fetchGCPServiceDetails,
-  fetchDigitalOceanServiceDetails,
-  fetchIBMServiceDetails,
-  fetchLinodeServiceDetails,
-  fetchVultrServiceDetails,
-  fetchAWSMonthlyTotal,
-} from '../services/cloudProviderIntegrations.js'
+import { getProviderAdapter } from '../services/providers/index.js'
 import { generateCSVReport, generatePDFReport } from '../utils/reportGenerator.js'
 import { 
   getCostByTeam, 
@@ -398,108 +389,23 @@ router.get('/services/:providerId/:serviceName/details', async (req, res) => {
     }
 
     let subServices = []
-    const providerKey = String(providerId || '').toLowerCase().trim()
 
-    // Fetch sub-service details based on provider (case-insensitive for all clouds)
-    switch (providerKey) {
-      case 'aws':
-        try {
-          const awsResult = await fetchAWSServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = awsResult.subServices || []
-        } catch (err) {
-          logger.warn('AWS Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      case 'azure':
-        try {
-          const azureResult = await fetchAzureServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = azureResult.subServices || []
-        } catch (err) {
-          logger.warn('Azure Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      case 'gcp':
-      case 'google':
-        try {
-          const gcpResult = await fetchGCPServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = gcpResult.subServices || []
-        } catch (err) {
-          logger.warn('GCP Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      case 'digitalocean':
-      case 'do':
-        try {
-          const doResult = await fetchDigitalOceanServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = doResult.subServices || []
-        } catch (err) {
-          logger.warn('DO Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      case 'ibm':
-      case 'ibmcloud':
-        try {
-          const ibmResult = await fetchIBMServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = ibmResult.subServices || []
-        } catch (err) {
-          logger.warn('IBM Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      case 'linode':
-      case 'akamai':
-        try {
-          const linodeResult = await fetchLinodeServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = linodeResult.subServices || []
-        } catch (err) {
-          logger.warn('Linode Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      case 'vultr':
-        try {
-          const vultrResult = await fetchVultrServiceDetails(credentials, decodedServiceName, startDate, endDate)
-          subServices = vultrResult.subServices || []
-        } catch (err) {
-          logger.warn('Vultr Service Details: API failed, using simulated data', { 
-            serviceName: decodedServiceName, 
-            error: err.message 
-          })
-          subServices = await getSimulatedSubServices(decodedServiceName, providerId)
-        }
-        break
-      
-      default:
-        // For other providers, provide generic sub-service simulation based on service type
+    // Use provider adapter for service details (handles aliases like 'akamai' → linode, 'do' → digitalocean)
+    const detailAdapter = getProviderAdapter(providerId)
+    if (detailAdapter) {
+      try {
+        const result = await detailAdapter.fetchServiceDetails(credentials, decodedServiceName, startDate, endDate)
+        subServices = result.subServices || []
+      } catch (err) {
+        logger.warn('Service Details: API failed, using simulated data', {
+          serviceName: decodedServiceName,
+          providerId,
+          error: err.message,
+        })
         subServices = await getSimulatedSubServices(decodedServiceName, providerId)
+      }
+    } else {
+      subServices = await getSimulatedSubServices(decodedServiceName, providerId)
     }
 
     logger.debug('Service Details API: Found sub-services', { 
@@ -1975,20 +1881,11 @@ router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (
     const result = await cached(
       cacheKey,
       async () => {
-        switch (providerKey) {
-          case 'aws':
-            return await fetchAWSMonthlyTotal(credentials, month, year)
-          case 'azure':
-          case 'gcp':
-          case 'google':
-          case 'digitalocean':
-          case 'ibm':
-          case 'linode':
-          case 'vultr':
-            return null
-          default:
-            return null
+        const mtAdapter = getProviderAdapter(providerKey)
+        if (mtAdapter && typeof mtAdapter.fetchMonthlyTotal === 'function') {
+          return await mtAdapter.fetchMonthlyTotal(credentials, month, year)
         }
+        return null
       },
       600
     )

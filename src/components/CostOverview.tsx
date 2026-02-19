@@ -7,13 +7,13 @@ interface CostOverviewProps {
 }
 
 export default function CostOverview({ costData }: CostOverviewProps) {
-  const { formatCurrency, convertAmount } = useCurrency()
+  const { formatCurrency } = useCurrency()
 
-  const totalCurrent = costData.reduce((sum, data) => sum + convertAmount(data.currentMonth), 0)
-  const totalLastMonth = costData.reduce((sum, data) => sum + convertAmount(data.lastMonth), 0)
-  const totalForecast = costData.reduce((sum, data) => sum + convertAmount(data.forecast), 0)
-  const totalCredits = costData.reduce((sum, data) => sum + convertAmount(data.credits), 0)
-  const totalSavings = costData.reduce((sum, data) => sum + convertAmount(data.savings), 0)
+  const totalCurrent = costData.reduce((sum, data) => sum + data.currentMonth, 0)
+  const totalLastMonth = costData.reduce((sum, data) => sum + data.lastMonth, 0)
+  const totalForecast = costData.reduce((sum, data) => sum + data.forecast, 0)
+  const totalCredits = costData.reduce((sum, data) => sum + data.credits, 0)
+  const totalSavings = costData.reduce((sum, data) => sum + data.savings, 0)
 
   const changePercent = totalLastMonth > 0 
     ? ((totalCurrent - totalLastMonth) / totalLastMonth) * 100 

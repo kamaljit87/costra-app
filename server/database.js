@@ -1755,27 +1755,28 @@ export const getLastMonthSamePeriodTotals = async (userId) => {
 export const getCostDataForUser = async (userId, month, year) => {
   const client = await pool.connect()
   try {
-    // Only return cost data for providers that still exist in cloud_provider_credentials
-    // This ensures deleted providers don't show stale data
-    // Use INNER JOIN to filter out orphaned cost_data records
+    // Return cost data for providers that have at least one active credential.
+    // Use LEFT JOIN so we don't lose cost_data rows when account_id doesn't exactly
+    // match cpc.id (e.g. legacy NULL account_id rows, or ID mismatches after re-add).
+    // The EXISTS subquery ensures we only show providers the user still has configured.
     const result = await client.query(
       `SELECT DISTINCT ON (cd.provider_id, COALESCE(cd.account_id, 0))
-         cd.*, 
-         cpc.provider_name, 
-         cpc.provider_id as provider_code,
+         cd.*,
+         COALESCE(cpc.provider_name, cd.provider_id) as provider_name,
+         COALESCE(cpc.provider_id, cd.provider_id) as provider_code,
          cpc.account_alias
        FROM cost_data cd
-       INNER JOIN cloud_provider_credentials cpc 
-         ON cd.user_id = cpc.user_id 
-         AND cd.provider_id = cpc.provider_id
-         AND (
-           cd.account_id = cpc.id 
-           OR (cd.account_id IS NULL AND cpc.id = (
-             SELECT MIN(id) FROM cloud_provider_credentials 
-             WHERE user_id = cd.user_id AND provider_id = cd.provider_id
-           ))
-         )
+       LEFT JOIN cloud_provider_credentials cpc
+         ON cd.user_id = cpc.user_id
+         AND LOWER(cd.provider_id) = LOWER(cpc.provider_id)
+         AND (cd.account_id = cpc.id OR cd.account_id IS NULL)
        WHERE cd.user_id = $1 AND cd.month = $2 AND cd.year = $3
+         AND EXISTS (
+           SELECT 1 FROM cloud_provider_credentials cpc2
+           WHERE cpc2.user_id = cd.user_id
+             AND LOWER(cpc2.provider_id) = LOWER(cd.provider_id)
+             AND cpc2.is_active = true
+         )
        ORDER BY cd.provider_id, COALESCE(cd.account_id, 0), cd.current_month_cost DESC`,
       [userId, month, year]
     )
@@ -3518,55 +3519,57 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
       serviceParams
     )
     
-    // Build explanation - account for credits properly
-    let explanation = `Your ${providerId.toUpperCase()} cloud spend `
-    
+    // Build explanation in markdown format
+    let explanation = `## Period Overview\n\n`
+    explanation += `Your **${providerId.toUpperCase()}** cloud spend `
+
     // If credits are applied, explain the net cost vs gross cost
     if (credits > 0 || savings > 0) {
       const totalDiscounts = credits + savings
-      explanation += `this month is $${grossCost.toFixed(2)} before credits and savings. `
-      explanation += `After applying $${totalDiscounts.toFixed(2)} in credits`
+      explanation += `this month is **$${grossCost.toFixed(2)}** before credits and savings. `
+      explanation += `After applying **$${totalDiscounts.toFixed(2)}** in credits`
       if (savings > 0) {
-        explanation += ` and $${savings.toFixed(2)} in savings`
+        explanation += ` and **$${savings.toFixed(2)}** in savings`
       }
-      explanation += `, your net cost is $${netCost.toFixed(2)}. `
-      
+      explanation += `, your net cost is **$${netCost.toFixed(2)}**.\n\n`
+
       // Compare gross costs month-over-month
       if (grossCostChange > 0) {
-        explanation += `Your actual spending increased by $${Math.abs(grossCostChange).toFixed(2)} `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase) compared to last month. `
+        explanation += `Your actual spending **increased** by **$${Math.abs(grossCostChange).toFixed(2)}** `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase) compared to last month.\n\n`
       } else if (grossCostChange < 0) {
-        explanation += `Your actual spending decreased by $${Math.abs(grossCostChange).toFixed(2)} `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease) compared to last month. `
+        explanation += `Your actual spending **decreased** by **$${Math.abs(grossCostChange).toFixed(2)}** `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease) compared to last month.\n\n`
       } else {
-        explanation += `Your actual spending remained the same compared to last month. `
+        explanation += `Your actual spending remained the same compared to last month.\n\n`
       }
-      
+
       // Add credits information
       if (credits > 0) {
-        explanation += `You've used $${credits.toFixed(2)} in credits this month. `
+        explanation += `You've used **$${credits.toFixed(2)}** in credits this month.\n\n`
       }
     } else {
       // No credits - standard explanation
       if (netCostChange > 0) {
-        explanation += `increased by $${Math.abs(netCostChange).toFixed(2)} this month `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase). `
+        explanation += `**increased** by **$${Math.abs(netCostChange).toFixed(2)}** this month `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase).\n\n`
       } else if (netCostChange < 0) {
-        explanation += `decreased by $${Math.abs(netCostChange).toFixed(2)} this month `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease). `
+        explanation += `**decreased** by **$${Math.abs(netCostChange).toFixed(2)}** this month `
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease).\n\n`
       } else {
-        explanation += `remained the same this month. `
+        explanation += `remained the same this month.\n\n`
       }
     }
-    
+
     const contributingFactors = []
     if (servicesResult.rows.length > 0) {
       const topChange = servicesResult.rows[0]
       if (Math.abs(parseFloat(topChange.change_percent)) > 10) {
-        explanation += `This change was primarily driven by ${topChange.service_name}, `
+        explanation += `## Key Cost Driver\n\n`
+        explanation += `This change was primarily driven by **${topChange.service_name}**, `
         explanation += `which ${parseFloat(topChange.change_percent) > 0 ? 'increased' : 'decreased'} `
-        explanation += `by ${Math.abs(parseFloat(topChange.change_percent)).toFixed(1)}%. `
-        
+        explanation += `by **${Math.abs(parseFloat(topChange.change_percent)).toFixed(1)}%**.\n`
+
         contributingFactors.push({
           service: topChange.service_name,
           changePercent: parseFloat(topChange.change_percent),
@@ -3888,73 +3891,76 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
     // Sort by absolute change
     serviceChanges.sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
     
-    // Build explanation narrative
+    // Build explanation narrative in markdown
     const formatDate = (date) => {
       return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     }
-    
-    let explanation = `Over the period from ${formatDate(start)} to ${formatDate(end)} (${totalRangeDays} days), `
-    explanation += `your ${providerId.toUpperCase()} cloud spending `
-    
+
     // Calculate actual period costs for comparison
     const startPeriodCost = startCost
     const endPeriodCost = endCost
-    
+
+    let explanation = `## Period Overview\n\n`
+    explanation += `Over the period from **${formatDate(start)}** to **${formatDate(end)}** (${totalRangeDays} days), `
+    explanation += `your **${providerId.toUpperCase()}** cloud spending `
+
     if (totalChange > 0) {
-      explanation += `increased by $${Math.abs(totalChange).toFixed(2)} `
+      explanation += `**increased** by **$${Math.abs(totalChange).toFixed(2)}** `
       explanation += `(${Math.abs(changePercent).toFixed(1)}% increase). `
     } else if (totalChange < 0) {
-      explanation += `decreased by $${Math.abs(totalChange).toFixed(2)} `
+      explanation += `**decreased** by **$${Math.abs(totalChange).toFixed(2)}** `
       explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease). `
     } else {
       explanation += `remained relatively stable. `
     }
-    
-    explanation += `Total spending during this entire period was $${totalRangeCost.toFixed(2)}. `
-    explanation += `In the beginning ${comparisonWindowDays}-day window, you spent $${startPeriodCost.toFixed(2)} (averaging $${startAvgDaily.toFixed(2)} per day), `
-    explanation += `while in the ending ${comparisonWindowDays}-day window, you spent $${endPeriodCost.toFixed(2)} (averaging $${endAvgDaily.toFixed(2)} per day). `
-    
+
+    explanation += `Total spending during this period was **$${totalRangeCost.toFixed(2)}**.\n\n`
+
+    explanation += `## Spending Trend\n\n`
+    explanation += `- **First ${comparisonWindowDays} days:** $${startPeriodCost.toFixed(2)} (avg **$${startAvgDaily.toFixed(2)}/day**)\n`
+    explanation += `- **Last ${comparisonWindowDays} days:** $${endPeriodCost.toFixed(2)} (avg **$${endAvgDaily.toFixed(2)}/day**)\n\n`
+
     // Add detailed service-level insights with actual costs
     if (serviceChanges.length > 0) {
       const topIncrease = serviceChanges.filter(s => s.change > 0).slice(0, 5)
       const topDecrease = serviceChanges.filter(s => s.change < 0).slice(0, 5)
-      
-      if (topIncrease.length > 0) {
-        explanation += `The services with the largest cost increases in the comparison periods were: `
-        const top3 = topIncrease.slice(0, 3)
-        explanation += top3.map(s => 
-          `${s.service} ($${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)}, ${s.changePercent > 0 ? '+' : ''}${s.changePercent.toFixed(1)}%)`
-        ).join('; ')
-        if (topIncrease.length > 3) {
-          explanation += `; and ${topIncrease.length - 3} other service${topIncrease.length - 3 > 1 ? 's' : ''} also increased. `
-        } else {
-          explanation += `. `
-        }
+
+      if (topIncrease.length > 0 || topDecrease.length > 0) {
+        explanation += `## Key Cost Drivers\n\n`
       }
-      
-      if (topDecrease.length > 0) {
-        explanation += `The services with the largest cost decreases in the comparison periods were: `
-        const top3 = topDecrease.slice(0, 3)
-        explanation += top3.map(s => 
-          `${s.service} ($${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)}, ${s.changePercent.toFixed(1)}%)`
-        ).join('; ')
-        if (topDecrease.length > 3) {
-          explanation += `; and ${topDecrease.length - 3} other service${topDecrease.length - 3 > 1 ? 's' : ''} also decreased. `
-        } else {
-          explanation += `. `
+
+      if (topIncrease.length > 0) {
+        explanation += `**Cost increases:**\n`
+        topIncrease.slice(0, 3).forEach(s => {
+          explanation += `- **${s.service}:** $${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)} (${s.changePercent > 0 ? '+' : ''}${s.changePercent.toFixed(1)}%)\n`
+        })
+        if (topIncrease.length > 3) {
+          explanation += `- ...and ${topIncrease.length - 3} other service${topIncrease.length - 3 > 1 ? 's' : ''} also increased\n`
         }
+        explanation += `\n`
+      }
+
+      if (topDecrease.length > 0) {
+        explanation += `**Cost decreases:**\n`
+        topDecrease.slice(0, 3).forEach(s => {
+          explanation += `- **${s.service}:** $${s.startCost.toFixed(2)} → $${s.endCost.toFixed(2)} (${s.changePercent.toFixed(1)}%)\n`
+        })
+        if (topDecrease.length > 3) {
+          explanation += `- ...and ${topDecrease.length - 3} other service${topDecrease.length - 3 > 1 ? 's' : ''} also decreased\n`
+        }
+        explanation += `\n`
       }
     }
-    
+
     // Add notable shifts with specific numbers
     if (serviceChanges.length > 0) {
       const significantChanges = serviceChanges.filter(s => Math.abs(s.changePercent) > 20 || Math.abs(s.change) > 10)
       if (significantChanges.length > 0) {
         const topChange = significantChanges[0]
-        explanation += `The most significant change was ${topChange.service}, which `
+        explanation += `The most significant change was **${topChange.service}**, which `
         explanation += `${topChange.changePercent > 0 ? 'increased' : 'decreased'} `
-        explanation += `from $${topChange.startCost.toFixed(2)} to $${topChange.endCost.toFixed(2)} `
-        explanation += `(${topChange.changePercent > 0 ? '+' : ''}${topChange.changePercent.toFixed(1)}%, $${Math.abs(topChange.change).toFixed(2)} change). `
+        explanation += `from **$${topChange.startCost.toFixed(2)}** to **$${topChange.endCost.toFixed(2)}** `
+        explanation += `(${topChange.changePercent > 0 ? '+' : ''}${topChange.changePercent.toFixed(1)}%, $${Math.abs(topChange.change).toFixed(2)} change).\n`
       }
     }
     
@@ -4004,21 +4010,40 @@ export const generateCustomDateRangeExplanation = async (userId, providerId, sta
           apiKey: process.env.ANTHROPIC_API_KEY,
         })
         
-        const aiPrompt = `You are a cloud cost analyst. Take this cost explanation and make it more detailed, specific, and actionable. 
+        const aiPrompt = `You are a cloud cost analyst. Produce a well-structured, actionable cost summary.
 
-IMPORTANT REQUIREMENTS:
-1. Keep ALL numbers and facts 100% accurate - do not change any dollar amounts, percentages, or dates
-2. Provide SPECIFIC details about what changed - mention exact service names, dollar amounts, and percentages
-3. Explain the IMPACT of the changes - what does this mean for the business?
-4. Suggest ACTIONABLE insights - what should the user do about these changes?
-5. Be CONVERSATIONAL but PROFESSIONAL - write like you're explaining to a colleague
-6. Include CONTEXT - explain why these changes matter
-7. Use SPECIFIC EXAMPLES from the service changes data below
+FORMAT REQUIREMENTS (critical):
+- Use markdown with ## headings for each section
+- Use bullet points (- ) for lists of services or recommendations
+- Use **bold** for key numbers and service names
+- Keep paragraphs short (2-3 sentences max)
+- Separate sections with blank lines
 
-Original explanation:
+CONTENT REQUIREMENTS:
+1. Keep ALL numbers 100% accurate - do not change any dollar amounts, percentages, or dates
+2. Mention exact service names, dollar amounts, and percentages
+3. Explain what the changes mean for the business
+4. Suggest actionable next steps
+5. Be professional but conversational
+
+STRUCTURE (use these exact section headings):
+
+## Period Overview
+Brief summary of the time period, total spend, and overall trend (2-3 sentences).
+
+## Key Cost Drivers
+Bullet list of services with the biggest changes, each with dollar amounts and percentages.
+
+## Spending Trend
+Compare start vs end of the period with daily averages.
+
+## Recommendations
+Numbered list of 3-5 specific, actionable steps.
+
+Cost data:
 ${explanation}
 
-Detailed service changes data (use these specific numbers):
+Service changes:
 ${JSON.stringify(serviceChanges.slice(0, 10), null, 2)}
 
 Period details:
@@ -4027,7 +4052,7 @@ Period details:
 - Total period cost: $${totalRangeCost.toFixed(2)} over ${totalRangeDays} days
 - Actual cost change: $${totalChange.toFixed(2)} (${changePercent.toFixed(1)}%)
 
-Return only the enhanced explanation text with all the specific details, numbers, and actionable insights. Make it comprehensive and detailed.`
+Return ONLY the markdown-formatted summary. No preamble or closing remarks.`
         
         const aiResponse = await anthropicClient.messages.create({
           model: 'claude-3-haiku-20240307',

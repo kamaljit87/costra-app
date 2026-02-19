@@ -30,6 +30,7 @@ interface ProviderSectionProps {
   chartData4Months: CostDataPoint[]
   chartData6Months: CostDataPoint[]
   chartData12Months: CostDataPoint[]
+  maxHistoricalMonths?: number
   isExpanded?: boolean
   onToggle?: () => void
 }
@@ -52,6 +53,7 @@ export default function ProviderSection({
   chartData4Months: _chartData4Months,
   chartData6Months: _chartData6Months,
   chartData12Months,
+  maxHistoricalMonths = 12,
   isExpanded = false,
   onToggle,
 }: ProviderSectionProps) {
@@ -63,7 +65,14 @@ export default function ProviderSection({
   void _credits
 
   const { formatCurrency } = useCurrency()
-  const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>('6months')
+  const availablePeriods = useMemo(() => {
+    const periods: ('3months' | '6months' | '12months')[] = ['3months']
+    if (maxHistoricalMonths >= 6) periods.push('6months')
+    if (maxHistoricalMonths >= 12) periods.push('12months')
+    return periods
+  }, [maxHistoricalMonths])
+  const defaultPeriod = availablePeriods.includes('6months') ? '6months' : availablePeriods[availablePeriods.length - 1]
+  const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>(defaultPeriod)
 
   const hasTax = taxCurrentMonth > 0 || taxLastMonth > 0
   const displayCurrent = hasTax ? currentMonth + taxCurrentMonth : currentMonth
@@ -181,7 +190,7 @@ export default function ProviderSection({
                 {/* Period Selector */}
                 <div className="flex items-center space-x-2 mb-3 relative z-10">
                   <div className="flex bg-surface-100 rounded-xl p-1">
-                    {(['3months', '6months', '12months'] as const).map((period) => (
+                    {availablePeriods.map((period) => (
                       <button
                         key={period}
                         onClick={(e) => {
