@@ -1,6 +1,6 @@
 # Frontend Dockerfile - Multi-stage with nginx for maximum security
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:25-alpine AS builder
 
 ARG VITE_API_URL=/api
 ARG VITE_GOOGLE_CLIENT_ID=

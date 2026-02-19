@@ -1,6 +1,6 @@
 # Backend Dockerfile - Node.js API with maximum security hardening
 # Stage 1: Build (if needed for native deps - backend has none, so single stage)
-FROM node:20-alpine AS base
+FROM node:25-alpine AS base
 
 # Security: Run as non-root
 RUN addgroup -g 1001 -S appgroup && \
