@@ -129,6 +129,7 @@ router.post('/callback', async (req, res) => {
           name: user.name,
           email: user.email,
           avatarUrl: user.avatar_url,
+          isAdmin: user.is_admin || false,
         },
       })
     }
@@ -148,6 +149,7 @@ router.post('/callback', async (req, res) => {
         name: user.name,
         email: user.email,
         avatarUrl: user.avatar_url,
+        isAdmin: user.is_admin || false,
       },
     })
   } catch (error) {

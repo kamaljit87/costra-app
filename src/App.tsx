@@ -19,6 +19,7 @@ import BillingPage from './pages/BillingPage'
 import CostComparePage from './pages/CostComparePage'
 import RecommendationsPage from './pages/RecommendationsPage'
 import DebugPage from './pages/DebugPage'
+import AdminTicketsPage from './pages/AdminTicketsPage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
 import ContactPage from './pages/ContactPage'
@@ -193,6 +194,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DebugPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/tickets"
+              element={
+                <ProtectedRoute>
+                  <AdminTicketsPage />
                 </ProtectedRoute>
               }
             />

@@ -1215,6 +1215,31 @@ export const contactAPI = {
   },
 }
 
+// Admin API
+export const adminAPI = {
+  getTickets: async (params?: { status?: string; category?: string; page?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.status) q.append('status', params.status)
+    if (params?.category) q.append('category', params.category)
+    if (params?.page) q.append('page', params.page.toString())
+    const response = await apiRequest(`/admin/tickets?${q.toString()}`)
+    return response.json()
+  },
+
+  getTicket: async (id: number) => {
+    const response = await apiRequest(`/admin/tickets/${id}`)
+    return response.json()
+  },
+
+  updateTicketStatus: async (id: number, status: string) => {
+    const response = await apiRequest(`/admin/tickets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })
+    return response.json()
+  },
+}
+
 // Compliance API (GDPR / DPDPA)
 export const complianceAPI = {
   // Data Export (GDPR Art. 20 - Right to Data Portability)

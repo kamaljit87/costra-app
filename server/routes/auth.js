@@ -46,6 +46,7 @@ function toUserResponse(user) {
     name: user.name,
     email: user.email,
     avatarUrl: user.avatar_url ?? null,
+    isAdmin: user.is_admin || false,
   }
 }
 
@@ -178,12 +179,7 @@ router.post('/signup',
       res.status(201).json({
         message: 'User created successfully',
         token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          avatarUrl: user.avatar_url,
-        },
+        user: toUserResponse(user),
       })
     } catch (error) {
       logger.error('Signup error', {
@@ -376,6 +372,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         name: user.name,
         email: user.email,
         avatarUrl: user.avatar_url || null,
+        isAdmin: user.is_admin || false,
       },
     })
   } catch (error) {
@@ -412,12 +409,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
     res.json({
       message: 'Token refreshed successfully',
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        avatarUrl: user.avatar_url || null,
-      },
+      user: toUserResponse(user),
     })
   } catch (error) {
     logger.error('Refresh token error', {

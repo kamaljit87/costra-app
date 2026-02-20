@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 import crypto from 'node:crypto'
-import { getUserIdByApiKeyHash } from '../database.js'
+import { getUserIdByApiKeyHash, isUserAdmin } from '../database.js'
 
 export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization']
@@ -30,6 +30,19 @@ export const authenticateToken = async (req, res, next) => {
     req.user = user
     next()
   })
+}
+
+/** Require admin role (must be used after authenticateToken) */
+export const requireAdmin = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId || req.user?.id
+    if (!userId) return res.status(401).json({ error: 'Authentication required' })
+    const admin = await isUserAdmin(userId)
+    if (!admin) return res.status(403).json({ error: 'Admin access required' })
+    next()
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to verify admin status' })
+  }
 }
 
 /** Require JWT only (used for key management; API keys cannot create/delete keys) */

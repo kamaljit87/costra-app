@@ -119,6 +119,19 @@ export const initDatabase = async () => {
         END $$;
       `)
 
+      // Add is_admin column if it doesn't exist
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'users' AND column_name = 'is_admin'
+          ) THEN
+            ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT false;
+          END IF;
+        END $$;
+      `)
+
       // 2FA (TOTP) columns
       await client.query(`
         DO $$ 
@@ -1262,7 +1275,7 @@ export const getUserById = async (id) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at, totp_enabled_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at, totp_enabled_at, is_admin FROM users WHERE id = $1',
       [id]
     )
     return result.rows[0] || null
@@ -6425,6 +6438,95 @@ export const createContactSubmission = async (data) => {
       [data.name, data.email, data.category, data.subject, data.message, data.userId || null, data.ipAddress || null, data.userAgent || null]
     )
     return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+// Admin operations
+export const isUserAdmin = async (userId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT is_admin FROM users WHERE id = $1`,
+      [userId]
+    )
+    return result.rows[0]?.is_admin === true
+  } finally {
+    client.release()
+  }
+}
+
+export const getContactSubmissions = async ({ status, category, page = 1, limit = 25 } = {}) => {
+  const client = await pool.connect()
+  try {
+    let where = []
+    const params = []
+    let idx = 1
+
+    if (status) {
+      where.push(`status = $${idx++}`)
+      params.push(status)
+    }
+    if (category) {
+      where.push(`category = $${idx++}`)
+      params.push(category)
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+    const offset = (page - 1) * limit
+
+    const countResult = await client.query(
+      `SELECT COUNT(*) FROM contact_submissions ${whereClause}`,
+      params
+    )
+    const total = parseInt(countResult.rows[0].count)
+
+    const result = await client.query(
+      `SELECT cs.*, u.name as user_name, u.email as user_email
+       FROM contact_submissions cs
+       LEFT JOIN users u ON cs.user_id = u.id
+       ${whereClause}
+       ORDER BY cs.submitted_at DESC
+       LIMIT $${idx++} OFFSET $${idx++}`,
+      [...params, limit, offset]
+    )
+
+    return {
+      tickets: result.rows,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    }
+  } finally {
+    client.release()
+  }
+}
+
+export const getContactSubmissionById = async (id) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT cs.*, u.name as user_name, u.email as user_email
+       FROM contact_submissions cs
+       LEFT JOIN users u ON cs.user_id = u.id
+       WHERE cs.id = $1`,
+      [id]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+export const updateContactSubmissionStatus = async (id, status) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `UPDATE contact_submissions SET status = $1 WHERE id = $2 RETURNING id, status`,
+      [status, id]
+    )
+    return result.rows[0] || null
   } finally {
     client.release()
   }

@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Sidebar, type NavItem } from './ui/sidebar'
 import TopNav from './TopNav'
 import AIChat from './AIChat'
 import ContactChat from './ContactChat'
 import TrialBanner from './TrialBanner'
+import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard,
   Wallet,
   FileText,
   ArrowLeftRight,
+  ShieldCheck,
 } from 'lucide-react'
 
-const APP_NAV_ITEMS: NavItem[] = [
+const BASE_NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/budgets', label: 'Budgets', icon: Wallet },
   { to: '/reports', label: 'Reports', icon: FileText },
@@ -23,8 +25,16 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
+  const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [contactChatOpen, setContactChatOpen] = useState(false)
+
+  const navItems = useMemo(() => {
+    if (user?.isAdmin) {
+      return [...BASE_NAV_ITEMS, { to: '/admin/tickets', label: 'Admin', icon: ShieldCheck }]
+    }
+    return BASE_NAV_ITEMS
+  }, [user?.isAdmin])
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -42,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
     <Sidebar
       isOpen={sidebarOpen}
       onToggle={() => setSidebarOpen((o) => !o)}
-      navItems={APP_NAV_ITEMS}
+      navItems={navItems}
       onContactClick={() => setContactChatOpen(true)}
     >
       <div className="flex flex-col min-h-screen">

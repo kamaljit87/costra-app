@@ -70,6 +70,7 @@ router.get('/', authenticateToken, async (req, res) => {
         email: user.email,
         avatarUrl: user.avatar_url,
         createdAt: user.created_at,
+        isAdmin: user.is_admin || false,
       },
     })
   } catch (error) {

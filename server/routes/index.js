@@ -22,6 +22,7 @@ import goalsRoutes from './goals.js'
 import apiKeysRoutes from './apiKeys.js'
 import complianceRoutes from './compliance.js'
 import contactRoutes from './contact.js'
+import adminRoutes from './admin.js'
 import awsCallbackRoutes from './awsCallback.js'
 import healthRoutes from './health.js'
 
@@ -47,6 +48,7 @@ const routes = [
   { path: '/api/api-keys', handler: apiKeysRoutes },
   { path: '/api/compliance', handler: complianceRoutes },
   { path: '/api/contact', handler: contactRoutes },
+  { path: '/api/admin', handler: adminRoutes },
   { path: '/api/health', handler: healthRoutes },
 ]
 
