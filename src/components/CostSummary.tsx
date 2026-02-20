@@ -1,10 +1,74 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { insightsAPI } from '../services/api'
-import { Marked } from 'marked'
 import { FileText, RefreshCw, TrendingUp, TrendingDown, DollarSign, Calendar, Info, X } from 'lucide-react'
 
-const markedInstance = new Marked({ async: false })
+/**
+ * Lightweight markdown-to-HTML converter (headings, bold, italic, lists, paragraphs).
+ * Avoids the `marked` library which causes React error #310 in production builds.
+ */
+function simpleMarkdownToHtml(md: string): string {
+  const lines = md.split('\n')
+  const out: string[] = []
+  let inUl = false
+  let inOl = false
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i]
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)/)
+    if (headingMatch) {
+      if (inUl) { out.push('</ul>'); inUl = false }
+      if (inOl) { out.push('</ol>'); inOl = false }
+      const level = headingMatch[1].length
+      out.push(`<h${level}>${applyInline(headingMatch[2])}</h${level}>`)
+      continue
+    }
+
+    // Unordered list
+    const ulMatch = line.match(/^\s*[-*]\s+(.+)/)
+    if (ulMatch) {
+      if (inOl) { out.push('</ol>'); inOl = false }
+      if (!inUl) { out.push('<ul>'); inUl = true }
+      out.push(`<li>${applyInline(ulMatch[1])}</li>`)
+      continue
+    }
+
+    // Ordered list
+    const olMatch = line.match(/^\s*\d+\.\s+(.+)/)
+    if (olMatch) {
+      if (inUl) { out.push('</ul>'); inUl = false }
+      if (!inOl) { out.push('<ol>'); inOl = true }
+      out.push(`<li>${applyInline(olMatch[1])}</li>`)
+      continue
+    }
+
+    // Blank line
+    if (line.trim() === '') {
+      if (inUl) { out.push('</ul>'); inUl = false }
+      if (inOl) { out.push('</ol>'); inOl = false }
+      continue
+    }
+
+    // Regular paragraph
+    if (inUl) { out.push('</ul>'); inUl = false }
+    if (inOl) { out.push('</ol>'); inOl = false }
+    out.push(`<p>${applyInline(line)}</p>`)
+  }
+
+  if (inUl) out.push('</ul>')
+  if (inOl) out.push('</ol>')
+
+  return out.join('\n')
+}
+
+function applyInline(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+}
 
 interface CostSummaryProps {
   providerId: string
@@ -111,6 +175,17 @@ export default function CostSummary({ providerId, month, year, accountId, startD
     'July', 'August', 'September', 'October', 'November', 'December'
   ]
 
+  // All hooks must run on every render (Rules of Hooks) - compute before early returns
+  const costChange = summary ? (typeof summary.costChange === 'number' ? summary.costChange : Number(summary.costChange) || 0) : 0
+  const explanation = summary ? (typeof summary.explanation === 'string' ? summary.explanation : String(summary.explanation || '')) : ''
+  const contributingFactors = summary ? (Array.isArray(summary.contributingFactors) ? summary.contributingFactors : []) : []
+  const isIncrease = costChange > 0
+  const isDecrease = costChange < 0
+  const explanationHtml = useMemo(() => {
+    if (!explanation) return ''
+    return simpleMarkdownToHtml(explanation)
+  }, [explanation])
+
   if (isLoading) {
     return (
       <div className="card">
@@ -153,34 +228,6 @@ export default function CostSummary({ providerId, month, year, accountId, startD
       </div>
     )
   }
-
-  const costChange = summary.costChange || 0
-  const explanation = summary.explanation || ''
-  const contributingFactors = summary.contributingFactors || []
-
-  const isIncrease = costChange > 0
-  const isDecrease = costChange < 0
-
-  const explanationHtml = useMemo(() => {
-    if (!explanation) return ''
-    // If the text contains markdown headings or bullet points, render as markdown
-    const hasMarkdown = /^#{1,3}\s|^\s*[-*]\s|^\d+\.\s/m.test(explanation)
-    if (hasMarkdown) {
-      try {
-        const result = markedInstance.parse(explanation)
-        if (typeof result === 'string') return result
-        return `<p>${explanation}</p>`
-      } catch {
-        return `<p>${explanation}</p>`
-      }
-    }
-    // Plain text fallback: split into paragraphs on double newlines, or wrap as single paragraph
-    const paragraphs = explanation.split(/\n{2,}/).filter(Boolean)
-    if (paragraphs.length > 1) {
-      return paragraphs.map(p => `<p>${p.trim()}</p>`).join('')
-    }
-    return `<p>${explanation}</p>`
-  }, [explanation])
 
   return (
     <div className="card bg-white border-accent-100">

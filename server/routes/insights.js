@@ -10,6 +10,7 @@ import {
   getCostByDimension,
   getAvailableDimensions,
   saveBusinessMetric,
+  deleteBusinessMetric,
   getBusinessMetrics,
   getUnitEconomics,
   getCostEfficiencyMetrics,
@@ -444,6 +445,37 @@ router.post('/business-metrics', authenticateToken, async (req, res) => {
       stack: error.stack 
     })
     res.status(500).json({ error: 'Failed to save business metric' })
+  }
+})
+
+/**
+ * DELETE /api/insights/business-metrics/:id
+ * Delete a business metric
+ */
+router.delete('/business-metrics/:id', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const metricId = parseInt(req.params.id)
+
+    if (!metricId || isNaN(metricId)) {
+      return res.status(400).json({ error: 'Valid metric ID is required' })
+    }
+
+    const deleted = await deleteBusinessMetric(userId, metricId)
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Metric not found' })
+    }
+
+    res.json({ message: 'Business metric deleted successfully' })
+  } catch (error) {
+    logger.error('Delete business metric error', {
+      userId: req.user?.id,
+      metricId: req.params.id,
+      error: error.message,
+      stack: error.stack
+    })
+    res.status(500).json({ error: 'Failed to delete business metric' })
   }
 })
 

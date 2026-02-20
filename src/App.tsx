@@ -44,6 +44,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { authReady, isAuthenticated } = useAuth()
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+      </div>
+    )
+  }
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>
+}
+
 function SignupRoute() {
   const { signupDisabled, configReady } = usePublicConfig()
   if (!configReady) {
@@ -69,8 +81,8 @@ function App() {
               <NotificationProvider>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
-                  <Route path="/login" element={<LoginTravelPage />} />
-                  <Route path="/signup" element={<SignupRoute />} />
+                  <Route path="/login" element={<PublicRoute><LoginTravelPage /></PublicRoute>} />
+                  <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />

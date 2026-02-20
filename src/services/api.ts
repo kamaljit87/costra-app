@@ -777,6 +777,13 @@ export const insightsAPI = {
     return response.json()
   },
 
+  deleteBusinessMetric: async (id: number) => {
+    const response = await apiRequest(`/insights/business-metrics/${id}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+
   getBusinessMetrics: async (startDate: string, endDate: string, metricType?: string, metricName?: string, providerId?: string) => {
     const params = new URLSearchParams()
     params.append('startDate', startDate)

@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Home, CreditCard, Mail, BookOpen } from 'lucide-react'
+import { Home, CreditCard, Mail, BookOpen, LayoutDashboard } from 'lucide-react'
 import Logo from './Logo'
 import { cn } from '@/lib/utils'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const NAV_ITEMS = [
   { name: 'Home', url: '/', icon: Home },
@@ -15,6 +16,11 @@ const NAV_ITEMS = [
 export default function LandingNav() {
   const location = useLocation()
   const { signupDisabled } = usePublicConfig()
+  const { isAuthenticated, user } = useAuth()
+
+  const initials = user?.name
+    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '?'
 
   return (
     <header className="sticky top-0 z-[100] border-b border-border/60 bg-background/80 backdrop-blur-xl">
@@ -80,24 +86,52 @@ export default function LandingNav() {
 
             <span className="w-px h-4 bg-border mx-1.5 hidden sm:block" aria-hidden />
 
-            <Link
-              to="/login"
-              className={cn(
-                'text-sm font-semibold px-3 sm:px-4 py-2 rounded-full transition-colors',
-                'text-foreground/80 hover:text-primary hover:bg-muted/50',
-              )}
-            >
-              Sign In
-            </Link>
-            <Link
-              to={signupDisabled ? '/login' : '/signup'}
-              className={cn(
-                'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
-                'bg-primary text-white hover:bg-primary/90',
-              )}
-            >
-              {signupDisabled ? 'Sign In' : 'Get Started'}
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  className={cn(
+                    'flex items-center gap-1.5 text-sm font-semibold px-3 sm:px-4 py-2 rounded-full transition-colors',
+                    'bg-primary text-white hover:bg-primary/90',
+                  )}
+                >
+                  <LayoutDashboard size={16} strokeWidth={2.5} />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Link>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center justify-center w-8 h-8 rounded-full bg-accent-100 text-accent-700 text-xs font-bold overflow-hidden shrink-0"
+                  title={user?.name || 'Profile'}
+                >
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className={cn(
+                    'text-sm font-semibold px-3 sm:px-4 py-2 rounded-full transition-colors',
+                    'text-foreground/80 hover:text-primary hover:bg-muted/50',
+                  )}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to={signupDisabled ? '/login' : '/signup'}
+                  className={cn(
+                    'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
+                    'bg-primary text-white hover:bg-primary/90',
+                  )}
+                >
+                  {signupDisabled ? 'Sign In' : 'Get Started'}
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </div>

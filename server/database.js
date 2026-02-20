@@ -4187,6 +4187,22 @@ export const saveBusinessMetric = async (userId, metric) => {
 }
 
 /**
+ * Delete a business metric by ID (owned by user)
+ */
+export const deleteBusinessMetric = async (userId, metricId) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM business_metrics WHERE id = $1 AND user_id = $2 RETURNING id`,
+      [metricId, userId]
+    )
+    return result.rowCount > 0
+  } finally {
+    client.release()
+  }
+}
+
+/**
  * Get business metrics for a date range
  */
 export const getBusinessMetrics = async (userId, startDate, endDate, metricType = null, metricName = null, providerId = null) => {
