@@ -40,7 +40,22 @@ router.post('/showback', async (req, res) => {
     if (!['csv', 'pdf'].includes(format)) {
       return res.status(400).json({ error: 'format must be csv or pdf' })
     }
-    
+
+    // Check if CSV export is requested (Pro only)
+    if (format === 'csv') {
+      const { canAccessFeature } = await import('../services/subscriptionService.js')
+      const hasAccess = await canAccessFeature(userId, 'csv_export')
+      if (!hasAccess) {
+        return res.status(403).json({
+          error: 'Feature not available',
+          message: 'CSV export requires a Pro subscription',
+          feature: 'csv_export',
+          requiredPlan: 'Pro',
+          upgradeUrl: '/settings/billing',
+        })
+      }
+    }
+
     // Generate report data
     const reportData = await generateReportData(userId, 'showback', startDate, endDate, {
       providerId,
