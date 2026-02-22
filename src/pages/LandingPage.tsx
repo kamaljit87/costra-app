@@ -385,6 +385,10 @@ export default function LandingPage() {
             </div>
           </div>
           <p className="text-center text-xs text-gray-400 mt-4">Prices shown exclude applicable taxes. Tax is calculated at checkout by our payment partner.</p>
+          <p className="text-center text-xs text-gray-400 mt-3">
+            A product of{' '}
+            <a href="https://indraopstech.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 transition-colors">Indraops Technologies</a>
+          </p>
         </div>
       </footer>
     </div>

@@ -257,6 +257,10 @@ export default function PrivacyPolicyPage() {
               <Link to="/terms" className="hover:text-gray-900">Terms of Service</Link>
             </div>
           </div>
+          <p className="text-center text-xs text-gray-500 mt-4">
+            A product of{' '}
+            <a href="https://indraopstech.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700">Indraops Technologies</a>
+          </p>
         </div>
       </footer>
     </div>

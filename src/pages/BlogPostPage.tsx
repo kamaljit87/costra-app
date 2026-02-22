@@ -77,6 +77,10 @@ export default function BlogPostPage() {
               <Link to="/blog" className="hover:text-gray-900 transition-colors">Blog</Link>
             </div>
           </div>
+          <p className="text-center text-xs text-gray-400 mt-4">
+            A product of{' '}
+            <a href="https://indraopstech.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 transition-colors">Indraops Technologies</a>
+          </p>
         </div>
       </footer>
     </div>
