@@ -27,18 +27,18 @@ const Blog8 = ({
   posts = [],
 }: Blog8Props) => {
   return (
-    <section className="py-16 md:py-24">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center gap-16">
+    <section className="py-8 md:py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col items-center gap-8">
         <div className="text-center">
-          <h2 className="mx-auto mb-6 text-pretty text-3xl font-semibold md:text-4xl lg:max-w-3xl">
+          <h2 className="mx-auto mb-2 text-pretty text-2xl font-semibold md:text-3xl lg:max-w-3xl">
             {heading}
           </h2>
-          <p className="mx-auto max-w-2xl text-muted-foreground md:text-lg">
+          <p className="mx-auto max-w-2xl text-muted-foreground text-sm md:text-base mt-1">
             {description}
           </p>
         </div>
 
-        <div className="grid gap-y-10 sm:grid-cols-12 sm:gap-y-12 md:gap-y-16 lg:gap-y-20 w-full">
+        <div className="grid gap-y-8 sm:grid-cols-12 sm:gap-y-10 w-full">
           {posts.map((post) => (
             <Card
               key={post.id}

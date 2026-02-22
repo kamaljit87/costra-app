@@ -47,7 +47,7 @@ export default function BlogListPage() {
 
       <LandingNav />
 
-      <main className="pt-20">
+      <main className="pt-16 pb-2">
         {posts.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-gray-500 text-lg">No posts yet. Check back soon!</p>
