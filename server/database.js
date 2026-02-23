@@ -801,8 +801,21 @@ export const initDatabase = async () => {
         ON notifications(user_id, created_at DESC)
       `)
 
+      // Index for daily_cost_data queries that filter by user_id + date without provider
+      // (used by getTotalSpendForDateRange in goal progress)
       await client.query(`
-        CREATE INDEX IF NOT EXISTS idx_cost_data_cache_user_provider 
+        CREATE INDEX IF NOT EXISTS idx_daily_cost_data_user_date
+        ON daily_cost_data(user_id, date)
+      `)
+
+      // Index for user_goals lookups
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_user_goals_user_id
+        ON user_goals(user_id)
+      `)
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_cost_data_cache_user_provider
         ON cost_data_cache(user_id, provider_id)
       `)
 
@@ -1581,6 +1594,57 @@ export const getGoalProgress = async (userId, goalId) => {
   return { goal, currentSpend, baselineSpend, percentChange, targetPercent }
 }
 
+/**
+ * Get progress for all goals at once, avoiding N+1 queries.
+ * Groups goals by period type and shares date-range queries.
+ */
+export const getAllGoalProgress = async (userId) => {
+  const goals = await getGoals(userId)
+  if (goals.length === 0) return []
+
+  const now = new Date()
+  const fmt = (d) => d.toISOString().slice(0, 10)
+
+  // Compute date ranges per period type
+  const ranges = {}
+  for (const goal of goals) {
+    const period = goal.period || 'quarter'
+    if (ranges[period]) continue
+    let currentStart, currentEnd, baselineStart, baselineEnd
+    if (period === 'month') {
+      currentStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      currentEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      baselineStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+      baselineEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0)
+    } else {
+      const q = Math.floor(now.getMonth() / 3) + 1
+      currentStart = new Date(now.getFullYear(), (q - 1) * 3, 1)
+      currentEnd = new Date(now.getFullYear(), q * 3, 0)
+      baselineStart = new Date(now.getFullYear() - 1, (q - 1) * 3, 1)
+      baselineEnd = new Date(now.getFullYear() - 1, q * 3, 0)
+    }
+    ranges[period] = { currentStart: fmt(currentStart), currentEnd: fmt(currentEnd), baselineStart: fmt(baselineStart), baselineEnd: fmt(baselineEnd) }
+  }
+
+  // Fetch spend for each unique period range in parallel
+  const spendByPeriod = {}
+  await Promise.all(Object.entries(ranges).map(async ([period, r]) => {
+    const [currentSpend, baselineSpend] = await Promise.all([
+      getTotalSpendForDateRange(userId, r.currentStart, r.currentEnd),
+      getTotalSpendForDateRange(userId, r.baselineStart, r.baselineEnd),
+    ])
+    spendByPeriod[period] = { currentSpend, baselineSpend }
+  }))
+
+  return goals.map((goal) => {
+    const period = goal.period || 'quarter'
+    const { currentSpend, baselineSpend } = spendByPeriod[period]
+    const targetPercent = parseFloat(goal.target_value)
+    const percentChange = baselineSpend > 0 ? ((baselineSpend - currentSpend) / baselineSpend) * 100 : 0
+    return { goal, currentSpend, baselineSpend, percentChange, targetPercent }
+  })
+}
+
 // User API keys
 export const getApiKeys = async (userId) => {
   const client = await pool.connect()
@@ -1769,9 +1833,8 @@ export const getCostDataForUser = async (userId, month, year) => {
   const client = await pool.connect()
   try {
     // Return cost data for providers that have at least one active credential.
-    // Use LEFT JOIN so we don't lose cost_data rows when account_id doesn't exactly
-    // match cpc.id (e.g. legacy NULL account_id rows, or ID mismatches after re-add).
-    // The EXISTS subquery ensures we only show providers the user still has configured.
+    // Use a single EXISTS check instead of LEFT JOIN + separate EXISTS for efficiency.
+    // The LEFT JOIN is still needed to get provider_name/account_alias display info.
     const result = await client.query(
       `SELECT DISTINCT ON (cd.provider_id, COALESCE(cd.account_id, 0))
          cd.*,
@@ -1782,6 +1845,7 @@ export const getCostDataForUser = async (userId, month, year) => {
        LEFT JOIN cloud_provider_credentials cpc
          ON cd.user_id = cpc.user_id
          AND LOWER(cd.provider_id) = LOWER(cpc.provider_id)
+         AND cpc.is_active = true
          AND (cd.account_id = cpc.id OR cd.account_id IS NULL)
        WHERE cd.user_id = $1 AND cd.month = $2 AND cd.year = $3
          AND EXISTS (
@@ -2672,18 +2736,16 @@ export const getDailyCostData = async (userId, providerId, startDate, endDate, a
         [userId, accountId, startDateStr, endDateStr]
       )
     } else {
-      // Legacy query by provider_id - ensure at least one account for this provider exists
+      // Legacy query by provider_id - ensure at least one account for this provider exists.
+      // Uses EXISTS to verify provider still configured, avoids correlated subquery per row.
       result = await client.query(
         `SELECT dcd.date, dcd.cost
          FROM daily_cost_data dcd
-         INNER JOIN cloud_provider_credentials cpc 
-           ON dcd.user_id = cpc.user_id 
-           AND dcd.provider_id = cpc.provider_id
-           AND (dcd.account_id = cpc.id OR (dcd.account_id IS NULL AND cpc.id = (
-             SELECT MIN(id) FROM cloud_provider_credentials 
-             WHERE user_id = dcd.user_id AND provider_id = dcd.provider_id
-           )))
          WHERE dcd.user_id = $1 AND dcd.provider_id = $2 AND dcd.date >= $3::date AND dcd.date <= $4::date
+           AND EXISTS (
+             SELECT 1 FROM cloud_provider_credentials cpc
+             WHERE cpc.user_id = dcd.user_id AND cpc.provider_id = dcd.provider_id
+           )
          ORDER BY dcd.date ASC`,
         [userId, providerId, startDateStr, endDateStr]
       )
@@ -2711,6 +2773,52 @@ export const getDailyCostData = async (userId, providerId, startDate, endDate, a
     return mappedData
   } catch (error) {
     logger.error('getDailyCostData error', { userId, providerId, accountId, error: error.message, stack: error.stack })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Fetch daily cost data for ALL providers in a single query.
+ * Returns { [providerId]: CostDataPoint[] }
+ */
+export const getAllDailyCostData = async (userId, startDate, endDate) => {
+  const client = await pool.connect()
+  try {
+    const startDateStr = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0]
+    const endDateStr = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0]
+
+    const result = await client.query(
+      `SELECT dcd.provider_id, dcd.date, SUM(dcd.cost) as cost
+       FROM daily_cost_data dcd
+       WHERE dcd.user_id = $1 AND dcd.date >= $2::date AND dcd.date <= $3::date
+         AND EXISTS (
+           SELECT 1 FROM cloud_provider_credentials cpc
+           WHERE cpc.user_id = dcd.user_id AND cpc.provider_id = dcd.provider_id AND cpc.is_active = true
+         )
+       GROUP BY dcd.provider_id, dcd.date
+       ORDER BY dcd.provider_id, dcd.date ASC`,
+      [userId, startDateStr, endDateStr]
+    )
+
+    const grouped = {}
+    for (const row of result.rows) {
+      const pid = row.provider_id
+      if (!grouped[pid]) grouped[pid] = []
+      let dateStr
+      if (row.date instanceof Date) {
+        dateStr = row.date.toISOString().split('T')[0]
+      } else if (typeof row.date === 'string') {
+        dateStr = row.date.split('T')[0]
+      } else {
+        dateStr = String(row.date).split('T')[0]
+      }
+      grouped[pid].push({ date: dateStr, cost: parseFloat(row.cost) || 0 })
+    }
+    return grouped
+  } catch (error) {
+    logger.error('getAllDailyCostData error', { userId, error: error.message, stack: error.stack })
     throw error
   } finally {
     client.release()

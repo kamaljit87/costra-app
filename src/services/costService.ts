@@ -123,64 +123,45 @@ export const getCostData = async (isDemoMode: boolean = false): Promise<CostData
   }
 
   try {
-    const response = await costDataAPI.getCostData()
-    const costData = response.costData || []
-    
-    // Calculate date range for fetching daily data (365 days back for 1 year view)
+    // Fetch ~6 months of daily data for initial dashboard load (covers default 6M chart view).
+    // 12M data is lazy-loaded when the user selects that period.
     const fetchEndDate = new Date()
     fetchEndDate.setHours(23, 59, 59, 999)
     const fetchStartDate = new Date()
-    fetchStartDate.setDate(fetchStartDate.getDate() - 365)
+    fetchStartDate.setDate(1) // start of month
+    fetchStartDate.setMonth(fetchStartDate.getMonth() - 5) // 6 months back (current + 5 prior)
     fetchStartDate.setHours(0, 0, 0, 0)
-    
-    // Fetch daily data for each provider in parallel
-    const costDataWithHistory = await Promise.all(
-      costData.map(async (data: any) => {
-        try {
-          // Fetch daily cost data from the API
-          const dailyResponse = await costDataAPI.getDailyCostData(
-            data.provider.id,
-            fetchStartDate.toISOString().split('T')[0],
-            fetchEndDate.toISOString().split('T')[0]
-          )
-          
-          const dailyData: CostDataPoint[] = dailyResponse.dailyData || []
-          
-          // Sort by date
-          const sortedDaily = [...dailyData].sort((a, b) => 
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-          )
-          
-          console.log(`Dashboard: Fetched ${sortedDaily.length} daily data points for ${data.provider.id}`)
-          
-          return {
-            ...data,
-            chartData1Month: sliceByMonths(sortedDaily, 0),
-            chartData2Months: sliceByMonths(sortedDaily, 1),
-            chartData3Months: sliceByMonths(sortedDaily, 2),
-            chartData4Months: sliceByMonths(sortedDaily, 3),
-            chartData6Months: sliceByMonths(sortedDaily, 5),
-            chartData12Months: sliceByMonths(sortedDaily, 11),
-            allHistoricalData: sortedDaily,
-          }
-        } catch (dailyError) {
-          console.warn(`Failed to fetch daily data for ${data.provider.id}, using mock data:`, dailyError)
-          // Fallback to mock data for this provider
-          const allHistoricalData = generateHistoricalData(data.currentMonth || 100, 365, 0.15)
-          return {
-            ...data,
-            chartData1Month: sliceByMonths(allHistoricalData, 0),
-            chartData2Months: sliceByMonths(allHistoricalData, 1),
-            chartData3Months: sliceByMonths(allHistoricalData, 2),
-            chartData4Months: sliceByMonths(allHistoricalData, 3),
-            chartData6Months: sliceByMonths(allHistoricalData, 5),
-            chartData12Months: sliceByMonths(allHistoricalData, 11),
-            allHistoricalData,
-          }
-        }
-      })
-    )
-    
+    const startStr = fetchStartDate.toISOString().split('T')[0]
+    const endStr = fetchEndDate.toISOString().split('T')[0]
+
+    // Fetch cost summary + all providers' daily data in parallel (single batch request)
+    const [response, batchDailyResponse] = await Promise.all([
+      costDataAPI.getCostData(),
+      costDataAPI.getBatchDailyCostData(startStr, endStr),
+    ])
+    const costData = response.costData || []
+    const dailyByProvider: Record<string, CostDataPoint[]> = batchDailyResponse.dailyDataByProvider || {}
+
+    const costDataWithHistory = costData.map((data: any) => {
+      const providerId = data.provider.id
+      const dailyData: CostDataPoint[] = dailyByProvider[providerId] || []
+      const sortedDaily = dailyData.length > 0
+        ? [...dailyData].sort((a, b) => a.date.localeCompare(b.date))
+        : generateHistoricalData(data.currentMonth || 100, 180, 0.15)
+
+      return {
+        ...data,
+        chartData1Month: sliceByMonths(sortedDaily, 0),
+        chartData2Months: sliceByMonths(sortedDaily, 1),
+        chartData3Months: sliceByMonths(sortedDaily, 2),
+        chartData4Months: sliceByMonths(sortedDaily, 3),
+        chartData6Months: sliceByMonths(sortedDaily, 5),
+        // 12M left empty — lazy-loaded when user selects that period
+        chartData12Months: [],
+        allHistoricalData: sortedDaily,
+      }
+    })
+
     return costDataWithHistory
   } catch (error) {
     console.error('Failed to fetch cost data:', error)

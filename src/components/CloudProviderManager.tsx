@@ -600,6 +600,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         return ['apiKey', 'accountId']
       case 'vultr':
         return ['apiKey']
+      case 'mongodb':
+        return ['publicKey', 'privateKey', 'orgId']
       default:
         return ['apiKey']
     }
@@ -1181,6 +1183,9 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           s3BucketName: 'S3 Billing Bucket Name',
                           curReportName: 'Cost & Usage Report Name',
                           region: 'AWS Region',
+                          publicKey: 'API Public Key',
+                          privateKey: 'API Private Key',
+                          orgId: 'Organization ID',
                         }
                         return labels[f] || f.charAt(0).toUpperCase() + f.slice(1).replace(/([A-Z])/g, ' $1')
                       }
@@ -1192,6 +1197,9 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                           s3BucketName: 'your-company-billing',
                           curReportName: 'cloud-billing',
                           region: 'us-east-1',
+                          publicKey: 'abcdefgh',
+                          privateKey: '********-****-****-****-************',
+                          orgId: '5e8f8268d896f55555555555',
                         }
                         return placeholders[f] || `Enter ${getFieldLabel(f)}`
                       }
@@ -1210,7 +1218,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             )}
                           </label>
                           <input
-                            type={field.toLowerCase().includes('secret') || field.toLowerCase().includes('key') && !field.toLowerCase().includes('arn') ? 'password' : 'text'}
+                            type={field === 'publicKey' ? 'text' : (field.toLowerCase().includes('secret') || field.toLowerCase().includes('key') && !field.toLowerCase().includes('arn')) ? 'password' : 'text'}
                             value={credentials[field] || ''}
                             onChange={(e) =>
                               setCredentials({ ...credentials, [field]: e.target.value })

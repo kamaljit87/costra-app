@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { getExchangeRates, Currency, ExchangeRates } from '../services/currencyService'
 import { costDataAPI } from '../services/api'
 import { useAuth } from './AuthContext'
@@ -59,7 +59,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
     return () => clearInterval(interval)
   }, [])
 
-  const handleCurrencyChange = async (currency: Currency) => {
+  const handleCurrencyChange = useCallback(async (currency: Currency) => {
     setSelectedCurrency(currency)
     // Save to database if user is authenticated (not demo mode)
     const token = localStorage.getItem('authToken')
@@ -70,19 +70,19 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
         console.error('Failed to save currency preference:', error)
       }
     }
-  }
+  }, [])
 
-  const convertAmount = (amount: number, fromCurrency: Currency = 'USD'): number => {
+  const convertAmount = useCallback((amount: number, fromCurrency: Currency = 'USD'): number => {
     if (!exchangeRates || fromCurrency === selectedCurrency) {
       return amount
     }
-    
+
     // Convert from source currency to USD first, then to target currency
     const usdAmount = fromCurrency === 'USD' ? amount : amount / exchangeRates[fromCurrency]
     return selectedCurrency === 'USD' ? usdAmount : usdAmount * exchangeRates[selectedCurrency]
-  }
+  }, [exchangeRates, selectedCurrency])
 
-  const formatCurrency = (amount: number): string => {
+  const formatCurrency = useCallback((amount: number): string => {
     const convertedAmount = convertAmount(amount)
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -90,9 +90,9 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(convertedAmount)
-  }
+  }, [convertAmount, selectedCurrency])
 
-  const getCurrencySymbol = (): string => {
+  const getCurrencySymbol = useCallback((): string => {
     const symbols: Record<Currency, string> = {
       USD: '$',
       EUR: '€',
@@ -106,20 +106,20 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
       SGD: 'S$',
     }
     return symbols[selectedCurrency] || '$'
-  }
+  }, [selectedCurrency])
+
+  const value = useMemo(() => ({
+    selectedCurrency,
+    exchangeRates,
+    setSelectedCurrency: handleCurrencyChange,
+    convertAmount,
+    formatCurrency,
+    getCurrencySymbol,
+    isLoading,
+  }), [selectedCurrency, exchangeRates, handleCurrencyChange, convertAmount, formatCurrency, getCurrencySymbol, isLoading])
 
   return (
-    <CurrencyContext.Provider
-      value={{
-        selectedCurrency,
-        exchangeRates,
-        setSelectedCurrency: handleCurrencyChange,
-        convertAmount,
-        formatCurrency,
-        getCurrencySymbol,
-        isLoading,
-      }}
-    >
+    <CurrencyContext.Provider value={value}>
       {children}
     </CurrencyContext.Provider>
   )

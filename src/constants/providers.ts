@@ -6,4 +6,6 @@ export const SUPPORTED_PROVIDERS = [
   { id: 'linode', name: 'Linode (Akamai)' },
   { id: 'vultr', name: 'Vultr' },
   { id: 'ibm', name: 'IBM Cloud' },
+  { id: 'mongodb', name: 'MongoDB Atlas' },
 ] as const
+

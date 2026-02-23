@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'
 
 interface FilterContextType {
   // Service filter
@@ -24,24 +24,24 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const [showCreditsOnly, setShowCreditsOnly] = useState(false)
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSelectedService(null)
     setShowCreditsOnly(false)
     setSelectedAccountId(null)
-  }
+  }, [])
+
+  const value = useMemo(() => ({
+    selectedService,
+    setSelectedService,
+    showCreditsOnly,
+    setShowCreditsOnly,
+    selectedAccountId,
+    setSelectedAccountId,
+    clearFilters,
+  }), [selectedService, showCreditsOnly, selectedAccountId, clearFilters])
 
   return (
-    <FilterContext.Provider
-      value={{
-        selectedService,
-        setSelectedService,
-        showCreditsOnly,
-        setShowCreditsOnly,
-        selectedAccountId,
-        setSelectedAccountId,
-        clearFilters,
-      }}
-    >
+    <FilterContext.Provider value={value}>
       {children}
     </FilterContext.Provider>
   )

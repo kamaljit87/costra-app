@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useCurrency } from '../contexts/CurrencyContext'
 import ProviderCostChart from './ProviderCostChart'
 import { ArrowRight, TrendingUp, TrendingDown, Target, PiggyBank, ChevronDown } from 'lucide-react'
-import { aggregateToMonthly } from '../services/costService'
+import { aggregateToMonthly, fetchDailyCostDataForRange } from '../services/costService'
 import { ProviderIcon } from './CloudProviderIcons'
 import { motion, AnimatePresence, MotionConfig } from 'motion/react'
 
@@ -61,7 +61,6 @@ export default function ProviderSection({
   void _chartData2Months
   void _chartData3Months
   void _chartData4Months
-  void _chartData6Months
   void _credits
 
   const { formatCurrency } = useCurrency()
@@ -73,6 +72,24 @@ export default function ProviderSection({
   }, [maxHistoricalMonths])
   const defaultPeriod = availablePeriods.includes('6months') ? '6months' : availablePeriods[availablePeriods.length - 1]
   const [selectedPeriod, setSelectedPeriod] = useState<'3months' | '6months' | '12months'>(defaultPeriod)
+
+  // Lazy-load 12M data on demand
+  const [loaded12MData, setLoaded12MData] = useState<CostDataPoint[]>([])
+  const loading12MRef = useRef(false)
+
+  useEffect(() => {
+    if (selectedPeriod !== '12months') return
+    if (chartData12Months.length > 0 || loaded12MData.length > 0 || loading12MRef.current) return
+    loading12MRef.current = true
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(1)
+    startDate.setMonth(startDate.getMonth() - 11)
+    startDate.setHours(0, 0, 0, 0)
+    fetchDailyCostDataForRange(providerId, startDate, endDate).then((data) => {
+      setLoaded12MData(data)
+    }).catch(() => {}).finally(() => { loading12MRef.current = false })
+  }, [selectedPeriod, providerId, chartData12Months.length, loaded12MData.length])
 
   const hasTax = taxCurrentMonth > 0 || taxLastMonth > 0
   const displayCurrent = hasTax ? currentMonth + taxCurrentMonth : currentMonth
@@ -88,14 +105,18 @@ export default function ProviderSection({
     return 0
   })()
 
-  const monthlyData = useMemo(() => {
-    const allData = [...chartData12Months]
-    return aggregateToMonthly(allData)
-  }, [chartData12Months])
+  // Use 6M data as base; for 12M, use lazy-loaded data if available
+  const effectiveData = useMemo(() => {
+    if (selectedPeriod === '12months') {
+      const src = chartData12Months.length > 0 ? chartData12Months : loaded12MData
+      return aggregateToMonthly(src)
+    }
+    return aggregateToMonthly(_chartData6Months)
+  }, [selectedPeriod, _chartData6Months, chartData12Months, loaded12MData])
 
   const getChartData = () => {
     const monthsToShow = selectedPeriod === '3months' ? 3 : selectedPeriod === '6months' ? 6 : 12
-    return monthlyData.slice(-monthsToShow)
+    return effectiveData.slice(-monthsToShow)
   }
 
   const handleCardClick = (e: React.MouseEvent) => {

@@ -3062,6 +3062,346 @@ const transformVultrCostData = (account, billingHistory, invoices, startDate, en
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// MongoDB Atlas
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Make an authenticated request to MongoDB Atlas Admin API using HTTP Digest Auth.
+ * Atlas uses RFC 7616 digest auth with the public key as username and private key as password.
+ */
+const mongoAtlasRequest = async (url, publicKey, privateKey) => {
+  // Step 1: Send unauthenticated request to get the WWW-Authenticate challenge
+  const initialResponse = await fetch(url, {
+    headers: { 'Accept': 'application/vnd.atlas.2023-11-15+json' },
+  })
+
+  if (initialResponse.status !== 401) {
+    // If we didn't get a 401, something unexpected happened (or auth isn't required)
+    if (initialResponse.ok) return initialResponse
+    throw new Error(`MongoDB Atlas API error: ${initialResponse.status} ${initialResponse.statusText}`)
+  }
+
+  const wwwAuth = initialResponse.headers.get('www-authenticate')
+  if (!wwwAuth) {
+    throw new Error('MongoDB Atlas API did not return a digest challenge')
+  }
+
+  // Step 2: Parse the digest challenge
+  const parseDirective = (header, name) => {
+    const match = header.match(new RegExp(`${name}="?([^",]+)"?`))
+    return match ? match[1] : null
+  }
+
+  const realm = parseDirective(wwwAuth, 'realm')
+  const nonce = parseDirective(wwwAuth, 'nonce')
+  const qop = parseDirective(wwwAuth, 'qop')
+
+  if (!realm || !nonce) {
+    throw new Error('MongoDB Atlas digest challenge missing realm or nonce')
+  }
+
+  // Step 3: Compute the digest response
+  // We need a crypto module for MD5 hashing
+  const { createHash } = await import('crypto')
+  const md5 = (str) => createHash('md5').update(str).digest('hex')
+
+  const uri = new URL(url).pathname + new URL(url).search
+  const nc = '00000001'
+  const cnonce = Math.random().toString(36).substring(2, 18)
+
+  const ha1 = md5(`${publicKey}:${realm}:${privateKey}`)
+  const ha2 = md5(`GET:${uri}`)
+
+  let response
+  if (qop) {
+    response = md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+  } else {
+    response = md5(`${ha1}:${nonce}:${ha2}`)
+  }
+
+  // Step 4: Build the Authorization header
+  let authHeader = `Digest username="${publicKey}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`
+  if (qop) {
+    authHeader += `, qop=${qop}, nc=${nc}, cnonce="${cnonce}"`
+  }
+
+  // Step 5: Make the authenticated request
+  const authResponse = await fetch(url, {
+    headers: {
+      'Accept': 'application/vnd.atlas.2023-11-15+json',
+      'Authorization': authHeader,
+    },
+  })
+
+  if (!authResponse.ok) {
+    const body = await authResponse.text().catch(() => '')
+    throw new Error(`MongoDB Atlas API error: ${authResponse.status} ${authResponse.statusText} — ${body}`)
+  }
+
+  return authResponse
+}
+
+export const fetchMongoDBAtlasCostData = async (credentials, startDate, endDate) => {
+  const { publicKey, privateKey, orgId } = credentials
+
+  logger.debug('MongoDB Atlas Fetch: Starting fetch', { orgId, startDate, endDate })
+
+  try {
+    const baseUrl = 'https://cloud.mongodb.com/api/atlas/v2'
+
+    // Fetch pending invoice (current billing period) and all invoices in parallel
+    const [pendingResponse, invoicesResponse] = await Promise.all([
+      retryWithBackoff(
+        () => mongoAtlasRequest(`${baseUrl}/orgs/${orgId}/invoices/pending`, publicKey, privateKey),
+        { maxAttempts: 3, timeout: 30000 },
+        'mongodb',
+        { orgId, operation: 'fetchPendingInvoice' }
+      ),
+      retryWithBackoff(
+        () => mongoAtlasRequest(`${baseUrl}/orgs/${orgId}/invoices`, publicKey, privateKey),
+        { maxAttempts: 3, timeout: 30000 },
+        'mongodb',
+        { orgId, operation: 'fetchInvoices' }
+      ),
+    ])
+
+    const pendingInvoice = await pendingResponse.json()
+    const invoicesData = await invoicesResponse.json()
+
+    logger.debug('MongoDB Atlas Fetch: Data received', {
+      pendingSubtotal: pendingInvoice.subtotalCents,
+      invoiceCount: invoicesData.results?.length || 0,
+    })
+
+    return transformMongoDBAtlasCostData(pendingInvoice, invoicesData, startDate, endDate)
+  } catch (error) {
+    let userMessage = error.message
+    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+      userMessage = 'MongoDB Atlas API key is invalid. Please check your public key and private key.'
+    } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      userMessage = 'MongoDB Atlas API key does not have billing permissions. Ensure it has the Organization Billing Viewer role.'
+    } else if (error.message?.includes('404')) {
+      userMessage = 'MongoDB Atlas organization not found. Please verify your Organization ID.'
+    } else if (error.message?.includes('timeout')) {
+      userMessage = 'MongoDB Atlas API request timed out. Please try again.'
+    } else if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+      userMessage = 'MongoDB Atlas API rate limit exceeded. Please wait a moment and try again.'
+    }
+
+    logger.error('MongoDB Atlas Fetch: API error', {
+      orgId,
+      startDate,
+      endDate,
+      error: error.message,
+      stack: error.stack,
+    })
+    throw new Error(`MongoDB Atlas API Error: ${userMessage}`)
+  }
+}
+
+/**
+ * Map MongoDB Atlas SKU prefixes to human-readable service categories.
+ */
+const categorizeMongoDBSku = (sku) => {
+  if (!sku) return 'MongoDB Atlas Services'
+  const s = sku.toUpperCase()
+  if (s.includes('CLUSTER') || s.includes('INSTANCE') || s.includes('SERVER')) return 'Clusters (Compute)'
+  if (s.includes('STORAGE') || s.includes('DISK') || s.includes('IOPS')) return 'Storage'
+  if (s.includes('BACKUP') || s.includes('SNAPSHOT') || s.includes('PIT_RESTORE')) return 'Backup'
+  if (s.includes('DATA_TRANSFER') || s.includes('NETWORK')) return 'Data Transfer'
+  if (s.includes('BI_CONNECTOR')) return 'BI Connector'
+  if (s.includes('SERVERLESS')) return 'Serverless Instances'
+  if (s.includes('SEARCH') || s.includes('ATLAS_SEARCH')) return 'Atlas Search'
+  if (s.includes('DATA_FEDERATION') || s.includes('DATA_LAKE')) return 'Data Federation'
+  if (s.includes('STREAM')) return 'Stream Processing'
+  if (s.includes('APP_SERVICES') || s.includes('STITCH') || s.includes('REALM')) return 'App Services'
+  if (s.includes('CHARTS')) return 'Charts'
+  if (s.includes('SUPPORT')) return 'Support'
+  if (s.includes('CREDIT')) return 'Credits'
+  return 'Other Services'
+}
+
+/**
+ * Transform MongoDB Atlas invoice data to our standard cost data format.
+ */
+const transformMongoDBAtlasCostData = (pendingInvoice, invoicesData, startDate, endDate) => {
+  const now = new Date()
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const currentYear = now.getFullYear()
+  const currentMonthIdx = now.getMonth()
+  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+  const prevMonthIdx = prevMonthDate.getMonth()
+  const prevMonthYear = prevMonthDate.getFullYear()
+
+  const dailyData = []
+  const serviceMap = new Map()
+  let currentMonth = 0
+  let lastMonth = 0
+  let credits = 0
+  let taxCurrentMonth = 0
+  let taxLastMonth = 0
+
+  // Process the pending (current) invoice
+  if (pendingInvoice) {
+    currentMonth = (pendingInvoice.subtotalCents || 0) / 100
+    taxCurrentMonth = (pendingInvoice.salesTaxCents || 0) / 100
+    credits += (pendingInvoice.creditsCents || 0) / 100
+
+    // Extract service breakdown from line items
+    if (pendingInvoice.lineItems) {
+      for (const item of pendingInvoice.lineItems) {
+        const category = categorizeMongoDBSku(item.sku)
+        const cost = (item.totalPriceCents || 0) / 100
+        if (cost <= 0) continue
+        serviceMap.set(category, (serviceMap.get(category) || 0) + cost)
+      }
+    }
+  }
+
+  // Process historical invoices
+  const invoices = invoicesData.results || invoicesData || []
+  for (const invoice of invoices) {
+    // Skip pending invoices (already handled above)
+    if (invoice.statusName === 'PENDING') continue
+
+    const invoiceStart = invoice.startDate ? new Date(invoice.startDate) : null
+    const invoiceEnd = invoice.endDate ? new Date(invoice.endDate) : null
+    if (!invoiceStart) continue
+
+    // Check if invoice falls within our date range
+    if (invoiceStart > end || (invoiceEnd && invoiceEnd < start)) continue
+
+    const invoiceCost = (invoice.subtotalCents || 0) / 100
+    const invoiceTax = (invoice.salesTaxCents || 0) / 100
+    credits += (invoice.creditsCents || 0) / 100
+
+    // Push as a daily data point on the invoice start date
+    dailyData.push({
+      date: invoiceStart.toISOString().split('T')[0],
+      cost: invoiceCost,
+    })
+
+    // Check if this is last month's invoice
+    if (invoiceStart.getFullYear() === prevMonthYear && invoiceStart.getMonth() === prevMonthIdx) {
+      lastMonth = invoiceCost
+      taxLastMonth = invoiceTax
+    }
+
+    // Accumulate service breakdown from line items
+    if (invoice.lineItems) {
+      for (const item of invoice.lineItems) {
+        const category = categorizeMongoDBSku(item.sku)
+        const cost = (item.totalPriceCents || 0) / 100
+        if (cost <= 0) continue
+        serviceMap.set(category, (serviceMap.get(category) || 0) + cost)
+      }
+    }
+  }
+
+  // Sort daily data
+  dailyData.sort((a, b) => a.date.localeCompare(b.date))
+
+  // Build services array
+  const allServices = Array.from(serviceMap.entries())
+    .map(([name, cost]) => ({ name, cost, change: 0 }))
+    .sort((a, b) => b.cost - a.cost)
+  const services = filterOutTaxServices(allServices)
+
+  // If no services but we have costs, add a default entry
+  if (services.length === 0 && (currentMonth > 0 || lastMonth > 0)) {
+    services.push({ name: 'MongoDB Atlas Services', cost: currentMonth + lastMonth, change: 0 })
+  }
+
+  logger.info('MongoDB Atlas Transform: Processed data', {
+    currentMonth: currentMonth.toFixed(2),
+    lastMonth: lastMonth.toFixed(2),
+    credits: credits.toFixed(2),
+    servicesFound: services.length,
+    dailyDataPoints: dailyData.length,
+  })
+
+  return {
+    currentMonth,
+    lastMonth,
+    forecast: currentMonth * 1.1,
+    credits: Math.abs(credits),
+    savings: 0,
+    services,
+    dailyData,
+    taxCurrentMonth,
+    taxLastMonth,
+    serviceUsageMetrics: [],
+  }
+}
+
+export const fetchMongoDBAtlasServiceDetails = async (credentials, serviceName, startDate, endDate) => {
+  const { publicKey, privateKey, orgId } = credentials
+  const baseUrl = 'https://cloud.mongodb.com/api/atlas/v2'
+
+  logger.debug('MongoDB Atlas ServiceDetails: Fetching', { orgId, serviceName, startDate, endDate })
+
+  try {
+    // Fetch invoices and filter line items by service category
+    const [pendingResponse, invoicesResponse] = await Promise.all([
+      mongoAtlasRequest(`${baseUrl}/orgs/${orgId}/invoices/pending`, publicKey, privateKey),
+      mongoAtlasRequest(`${baseUrl}/orgs/${orgId}/invoices`, publicKey, privateKey),
+    ])
+
+    const pendingInvoice = await pendingResponse.json()
+    const invoicesData = await invoicesResponse.json()
+
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const serviceDetails = []
+    let totalCost = 0
+
+    // Helper to process line items from an invoice
+    const processLineItems = (lineItems, invoiceDate) => {
+      if (!lineItems) return
+      for (const item of lineItems) {
+        const category = categorizeMongoDBSku(item.sku)
+        if (category !== serviceName) continue
+        const cost = (item.totalPriceCents || 0) / 100
+        if (cost <= 0) continue
+        totalCost += cost
+        serviceDetails.push({
+          name: item.sku || 'Unknown',
+          description: item.clusterName ? `Cluster: ${item.clusterName}` : (item.groupName || ''),
+          cost,
+          date: invoiceDate,
+          quantity: item.quantity || 0,
+          unit: item.unit || '',
+        })
+      }
+    }
+
+    // Process pending invoice
+    if (pendingInvoice?.lineItems) {
+      processLineItems(pendingInvoice.lineItems, new Date().toISOString().split('T')[0])
+    }
+
+    // Process historical invoices
+    const invoices = invoicesData.results || invoicesData || []
+    for (const invoice of invoices) {
+      if (invoice.statusName === 'PENDING') continue
+      const invoiceStart = invoice.startDate ? new Date(invoice.startDate) : null
+      if (!invoiceStart || invoiceStart > end || invoiceStart < start) continue
+      processLineItems(invoice.lineItems, invoiceStart.toISOString().split('T')[0])
+    }
+
+    return {
+      serviceName,
+      totalCost,
+      details: serviceDetails.sort((a, b) => b.cost - a.cost),
+    }
+  } catch (error) {
+    logger.error('MongoDB Atlas ServiceDetails: Error', { orgId, serviceName, error: error.message })
+    throw new Error(`MongoDB Atlas service details error: ${error.message}`)
+  }
+}
+
 /**
  * Generic function to fetch cost data from any provider
  * Includes caching support
@@ -3099,6 +3439,11 @@ export const fetchProviderCostData = async (providerId, credentials, startDate, 
       break
     case 'vultr':
       result = await fetchVultrCostData(credentials, startDate, endDate)
+      break
+    case 'mongodb':
+    case 'mongodbatlas':
+    case 'atlas':
+      result = await fetchMongoDBAtlasCostData(credentials, startDate, endDate)
       break
     default:
       throw new Error(`Unsupported provider: ${providerId}`)

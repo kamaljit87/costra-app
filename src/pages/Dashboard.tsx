@@ -83,16 +83,19 @@ export default function Dashboard() {
   useEffect(() => {
     if (isDemoMode) return
     setGoalsLoading(true)
-    goalsAPI.getList().then((list) => {
+    // Single batch request for goals + progress instead of N+1 calls
+    Promise.all([
+      goalsAPI.getList(),
+      goalsAPI.getAllProgress(),
+    ]).then(([list, progressList]) => {
       setGoals(list)
-      return Promise.all(list.map((g: { id: number }) => goalsAPI.getProgress(g.id))).then((progressList) => {
-        const map: Record<number, { percentChange: number; targetPercent: number; currentSpend: number; baselineSpend: number }> = {}
-        list.forEach((g: { id: number }, i: number) => {
-          const p = progressList[i]
-          if (p) map[g.id] = { percentChange: p.percentChange, targetPercent: p.targetPercent, currentSpend: p.currentSpend, baselineSpend: p.baselineSpend }
-        })
-        setGoalsProgress(map)
-      })
+      const map: Record<number, { percentChange: number; targetPercent: number; currentSpend: number; baselineSpend: number }> = {}
+      for (const p of progressList) {
+        if (p?.goal?.id != null) {
+          map[p.goal.id] = { percentChange: p.percentChange, targetPercent: p.targetPercent, currentSpend: p.currentSpend, baselineSpend: p.baselineSpend }
+        }
+      }
+      setGoalsProgress(map)
     }).catch(() => {}).finally(() => setGoalsLoading(false))
   }, [isDemoMode])
 

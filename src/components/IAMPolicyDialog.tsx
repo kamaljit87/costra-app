@@ -194,6 +194,36 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             note: 'IBM Cloud does not have a native rightsizing API. Rightsizing recommendations use database heuristics when resource data is available.'
           }
         }
+      case 'mongodb':
+        return {
+          title: 'MongoDB Atlas API Key Setup',
+          description: 'Create a programmatic API key with billing read access for your MongoDB Atlas organization.',
+          steps: [
+            'Log in to MongoDB Atlas (cloud.mongodb.com)',
+            'Click your organization name in the top-left, then select "Organization Settings"',
+            'Note your Organization ID (shown in the URL or Settings page)',
+            'Go to "Access Manager" in the left sidebar, then click "API Keys"',
+            'Click "Create API Key"',
+            'Enter a description (e.g., "Costra Billing Reader")',
+            'Select the "Organization Billing Viewer" role',
+            'Click "Next"',
+            'Copy the Public Key and Private Key — the private key is shown only once',
+            'Add your server\'s IP address to the API key\'s Access List (or use 0.0.0.0/0 for any IP)',
+            'Click "Done"',
+            'Enter the Public Key, Private Key, and Organization ID in Costra'
+          ],
+          roles: [
+            'Organization Billing Viewer (required for invoice and cost data)',
+            'Organization Read Only (optional, for organization metadata)'
+          ],
+          links: [
+            { label: 'MongoDB Atlas', url: 'https://cloud.mongodb.com' },
+            { label: 'API Key Docs', url: 'https://www.mongodb.com/docs/atlas/configure-api-access/' }
+          ],
+          rightsizing: {
+            note: 'MongoDB Atlas does not have a native rightsizing API. Recommendations are generated from billing data patterns (data transfer costs, backup spend, etc.).'
+          }
+        }
       default:
         return {
           title: 'Provider Setup',

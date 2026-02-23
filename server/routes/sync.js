@@ -866,6 +866,7 @@ function getProviderIcon(providerId) {
     digitalocean: '🌊',
     linode: '🟢',
     vultr: '⚡',
+    mongodb: '🍃',
   }
   return icons[providerId.toLowerCase()] || '☁️'
 }

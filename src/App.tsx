@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { CurrencyProvider } from './contexts/CurrencyContext'
 import { FilterProvider } from './contexts/FilterContext'
@@ -5,33 +6,41 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PublicConfigProvider, usePublicConfig } from './contexts/PublicConfigContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import LandingPage from './pages/LandingPage'
-import Dashboard from './pages/Dashboard'
-import LoginTravelPage from './pages/LoginTravelPage'
-import SignupTravelPage from './pages/SignupTravelPage'
-import SettingsPage from './pages/SettingsPage'
-import ProfilePage from './pages/ProfilePage'
-import ProviderDetailPage from './pages/ProviderDetailPage'
-import BudgetsPage from './pages/BudgetsPage'
-import ProductCostView from './pages/ProductCostView'
-import TeamCostView from './pages/TeamCostView'
-import ReportsPage from './pages/ReportsPage'
-import BillingPage from './pages/BillingPage'
-import CostComparePage from './pages/CostComparePage'
-import RecommendationsPage from './pages/RecommendationsPage'
-import DebugPage from './pages/DebugPage'
-import AdminTicketsPage from './pages/AdminTicketsPage'
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
-import TermsOfServicePage from './pages/TermsOfServicePage'
-import ContactPage from './pages/ContactPage'
-import ChatBubbleDemoPage from './pages/ChatBubbleDemoPage'
-import GoogleCallbackPage from './pages/GoogleCallbackPage'
-import Verify2FAPage from './pages/Verify2FAPage'
-import Suggest2FAPage from './pages/Suggest2FAPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import BlogListPage from './pages/BlogListPage'
-import BlogPostPage from './pages/BlogPostPage'
 import CookieConsent from './components/CookieConsent'
 import { NotFound } from './components/ui/ghost-404-page'
+
+// Lazy-load all pages except landing (first paint)
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const LoginTravelPage = lazy(() => import('./pages/LoginTravelPage'))
+const SignupTravelPage = lazy(() => import('./pages/SignupTravelPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const ProviderDetailPage = lazy(() => import('./pages/ProviderDetailPage'))
+const BudgetsPage = lazy(() => import('./pages/BudgetsPage'))
+const ProductCostView = lazy(() => import('./pages/ProductCostView'))
+const TeamCostView = lazy(() => import('./pages/TeamCostView'))
+const ReportsPage = lazy(() => import('./pages/ReportsPage'))
+const BillingPage = lazy(() => import('./pages/BillingPage'))
+const CostComparePage = lazy(() => import('./pages/CostComparePage'))
+const RecommendationsPage = lazy(() => import('./pages/RecommendationsPage'))
+const DebugPage = lazy(() => import('./pages/DebugPage'))
+const AdminTicketsPage = lazy(() => import('./pages/AdminTicketsPage'))
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'))
+const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'))
+const ContactPage = lazy(() => import('./pages/ContactPage'))
+const ChatBubbleDemoPage = lazy(() => import('./pages/ChatBubbleDemoPage'))
+const GoogleCallbackPage = lazy(() => import('./pages/GoogleCallbackPage'))
+const Verify2FAPage = lazy(() => import('./pages/Verify2FAPage'))
+const Suggest2FAPage = lazy(() => import('./pages/Suggest2FAPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const BlogListPage = lazy(() => import('./pages/BlogListPage'))
+const BlogPostPage = lazy(() => import('./pages/BlogPostPage'))
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+  </div>
+)
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authReady, isAuthenticated } = useAuth()
@@ -80,6 +89,7 @@ function App() {
           <CurrencyProvider>
             <FilterProvider>
               <NotificationProvider>
+                <Suspense fallback={<PageLoader />}>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<PublicRoute><LoginTravelPage /></PublicRoute>} />
@@ -207,6 +217,7 @@ function App() {
             />
             <Route path="*" element={<NotFound />} />
               </Routes>
+                </Suspense>
               <CookieConsent />
             </NotificationProvider>
           </FilterProvider>

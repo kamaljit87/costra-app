@@ -11,6 +11,7 @@ import {
   updateUserCurrency,
   updateProviderCredits,
   getDailyCostData,
+  getAllDailyCostData,
   getServiceCostsForDateRange,
   getCloudProviderCredentials,
   getCloudProviderCredentialsByAccountId,
@@ -686,6 +687,49 @@ router.get('/:providerId/credits', async (req, res) => {
   }
 })
 
+// Batch: get daily cost data for ALL providers in a single request
+router.get('/daily/batch', limitHistoricalData, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    let { startDate, endDate } = req.query
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'startDate and endDate query parameters are required' })
+    }
+
+    // Apply historical data limit if set
+    const monthsLimit = req.subscriptionDataLimit
+    if (monthsLimit && monthsLimit > 0) {
+      const limitDate = new Date()
+      limitDate.setMonth(limitDate.getMonth() - monthsLimit)
+      limitDate.setHours(0, 0, 0, 0)
+      const limitDateStr = limitDate.toISOString().split('T')[0]
+      if (startDate < limitDateStr) {
+        startDate = limitDateStr
+      }
+    }
+
+    // Cache with 5-minute TTL, normalized to month boundaries
+    const cacheStart = startDate.substring(0, 7)
+    const cacheEnd = endDate.substring(0, 7)
+    const batchCacheKey = `user:${userId}:daily_cost_batch:${cacheStart}:${cacheEnd}`
+    const dailyDataByProvider = await cached(
+      batchCacheKey,
+      async () => await getAllDailyCostData(userId, startDate, endDate),
+      300
+    )
+
+    res.json({ dailyDataByProvider })
+  } catch (error) {
+    logger.error('Get batch daily cost data error', {
+      userId: req.user?.userId,
+      error: error.message,
+      stack: error.stack
+    })
+    res.status(500).json({ error: error.message || 'Internal server error' })
+  }
+})
+
 // Get daily cost data for a provider within a date range
 router.get('/:providerId/daily', limitHistoricalData, async (req, res) => {
   try {
@@ -715,8 +759,11 @@ router.get('/:providerId/daily', limitHistoricalData, async (req, res) => {
     logger.debug('Daily Cost Data: Fetching data', { userId, providerId, startDate, endDate })
 
     // Cache daily cost data with 5-minute TTL (same as cost summary)
-    // Key uses user: prefix so clearUserCache() invalidates it on sync
-    const dailyCacheKey = `user:${userId}:daily_cost:${providerId}:${startDate}:${endDate}`
+    // Key uses user: prefix so clearUserCache() invalidates it on sync.
+    // Normalize dates to month boundaries so rolling daily dates still hit cache.
+    const cacheStart = startDate.substring(0, 7) // YYYY-MM
+    const cacheEnd = endDate.substring(0, 7)     // YYYY-MM
+    const dailyCacheKey = `user:${userId}:daily_cost:${providerId}:${cacheStart}:${cacheEnd}`
     const dailyData = await cached(
       dailyCacheKey,
       async () => await getDailyCostData(userId, providerId, startDate, endDate),

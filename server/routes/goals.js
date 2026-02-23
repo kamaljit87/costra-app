@@ -3,7 +3,7 @@
  */
 import { Router } from 'express'
 import { authenticateToken } from '../middleware/auth.js'
-import { getGoals, createGoal, deleteGoal, getGoalProgress } from '../database.js'
+import { getGoals, createGoal, deleteGoal, getGoalProgress, getAllGoalProgress } from '../database.js'
 import logger from '../utils/logger.js'
 
 const router = Router()
@@ -41,6 +41,19 @@ router.post('/', async (req, res) => {
   } catch (error) {
     logger.error('POST goal error', { userId, error: error.message })
     res.status(500).json({ error: 'Failed to create goal' })
+  }
+})
+
+// Batch progress for all goals in a single request
+router.get('/progress', async (req, res) => {
+  const userId = req.user?.userId || req.user?.id
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' })
+  try {
+    const progress = await getAllGoalProgress(userId)
+    res.json({ progress })
+  } catch (error) {
+    logger.error('GET all goals progress error', { userId, error: error.message })
+    res.status(500).json({ error: 'Failed to get progress' })
   }
 })
 

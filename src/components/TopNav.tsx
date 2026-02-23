@@ -69,14 +69,14 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    // Fire all initial loads in parallel
     loadCloudAccounts()
     loadAllServices()
     if (!isDemoMode) {
-      loadUnreadNotificationCount()
-      loadSubscriptionStatus()
-      // Poll for new notifications every 60 seconds
+      Promise.all([loadUnreadNotificationCount(), loadSubscriptionStatus()])
+      // Poll for new notifications only when tab is visible
       const interval = setInterval(() => {
-        loadUnreadNotificationCount()
+        if (!document.hidden) loadUnreadNotificationCount()
       }, 60000)
       return () => clearInterval(interval)
     }

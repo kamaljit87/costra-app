@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'
 import Notification, { NotificationType } from '../components/Notification'
 
 interface NotificationData {
@@ -46,16 +46,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     showNotification({ type: 'info', title, message })
   }, [showNotification])
 
+  const value = useMemo(() => ({
+    showNotification,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+  }), [showNotification, showSuccess, showError, showWarning, showInfo])
+
   return (
-    <NotificationContext.Provider
-      value={{
-        showNotification,
-        showSuccess,
-        showError,
-        showWarning,
-        showInfo,
-      }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
       {/* Notification Container */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none">

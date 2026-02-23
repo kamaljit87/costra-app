@@ -263,6 +263,11 @@ export const costDataAPI = {
     return response.json()
   },
 
+  getBatchDailyCostData: async (startDate: string, endDate: string) => {
+    const response = await apiRequest(`/cost-data/daily/batch?startDate=${startDate}&endDate=${endDate}`)
+    return response.json()
+  },
+
   getServicesForDateRange: async (providerId: string, startDate: string, endDate: string) => {
     // Add cache-busting timestamp to ensure fresh data
     const timestamp = Date.now()
@@ -344,6 +349,11 @@ export const goalsAPI = {
   getProgress: async (goalId: number) => {
     const response = await apiRequest(`/goals/${goalId}/progress`)
     return response.json()
+  },
+  getAllProgress: async () => {
+    const response = await apiRequest('/goals/progress')
+    const data = await response.json()
+    return data.progress ?? []
   },
   delete: async (id: number) => {
     await apiRequest(`/goals/${id}`, { method: 'DELETE' })

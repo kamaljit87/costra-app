@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-const ALLOWED_PROVIDER_IDS = ['aws', 'azure', 'gcp', 'digitalocean', 'ibm', 'linode', 'vultr']
+const ALLOWED_PROVIDER_IDS = ['aws', 'azure', 'gcp', 'digitalocean', 'ibm', 'linode', 'vultr', 'mongodb']
 
 // Add a new cloud provider (supports multiple accounts per provider)
 router.post('/',

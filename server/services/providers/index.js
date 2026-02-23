@@ -17,6 +17,7 @@ import digitaloceanAdapter from './digitalocean.js'
 import linodeAdapter from './linode.js'
 import vultrAdapter from './vultr.js'
 import ibmAdapter from './ibm.js'
+import mongodbAdapter from './mongodb.js'
 
 const adapters = [
   awsAdapter,
@@ -26,6 +27,7 @@ const adapters = [
   linodeAdapter,
   vultrAdapter,
   ibmAdapter,
+  mongodbAdapter,
 ]
 
 // Build lookup map: id + aliases → adapter

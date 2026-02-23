@@ -18,6 +18,9 @@ export const getProviderIconFilename = (providerId: string): string | null => {
     vultr: 'vultr',
     ibm: 'ibm',
     ibmcloud: 'ibm',
+    mongodb: 'mongodb',
+    mongodbatlas: 'mongodb',
+    atlas: 'mongodb',
   }
   return map[id] ?? null
 }
@@ -118,6 +121,20 @@ export const IBMCloudIcon: React.FC<IconProps> = ({ className = '', size = 24 })
   </svg>
 )
 
+// MongoDB Atlas Icon (leaf logo)
+export const MongoDBIcon: React.FC<IconProps> = ({ className = '', size = 24 }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    className={className}
+    fill="currentColor"
+  >
+    <path d="M17.193 9.555c-1.264-5.58-4.252-7.414-4.573-8.115-.28-.394-.53-.954-.735-1.44-.036.495-.055.685-.523 1.184-.723.566-4.438 3.682-4.74 10.02-.282 5.912 4.27 9.435 4.888 9.884l.07.05A73.49 73.49 0 0 1 11.91 24h.213c.089-.574.196-1.15.33-1.72.468-.204.898-.46 1.284-.766.037-.029.073-.058.107-.09l.006-.004a7.024 7.024 0 0 0 3.343-5.865z" fill="#47A248"/>
+    <path d="M12.123 24c-.089-.574-.196-1.15-.33-1.72-.468-.204-.898-.46-1.284-.766a7.025 7.025 0 0 1-3.107-5.545c-.015-.18-.025-.362-.03-.546-.07.654-.09 1.316-.055 1.982.18 3.449 2.413 5.437 4.477 6.532l.07.05A73.49 73.49 0 0 1 11.91 24h.213z" fill="#47A248" opacity="0.5"/>
+  </svg>
+)
+
 // Generic Cloud Icon (fallback)
 export const CloudIcon: React.FC<IconProps> = ({ className = '', size = 24 }) => (
   <svg
@@ -144,6 +161,9 @@ const PROVIDER_SVG_MAP: Record<string, React.FC<IconProps>> = {
   vultr: VultrIcon,
   ibm: IBMCloudIcon,
   ibmcloud: IBMCloudIcon,
+  mongodb: MongoDBIcon,
+  mongodbatlas: MongoDBIcon,
+  atlas: MongoDBIcon,
 }
 
 function getInlineIcon(providerId: string): React.FC<IconProps> {
@@ -249,6 +269,10 @@ export const getProviderColor = (providerId: string): string => {
     case 'ibm':
     case 'ibmcloud':
       return '#1F70C1'
+    case 'mongodb':
+    case 'mongodbatlas':
+    case 'atlas':
+      return '#47A248'
     default:
       return '#6B7280'
   }
