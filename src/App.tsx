@@ -35,6 +35,7 @@ const Suggest2FAPage = lazy(() => import('./pages/Suggest2FAPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const BlogListPage = lazy(() => import('./pages/BlogListPage'))
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage'))
+const DocsPage = lazy(() => import('./pages/DocsPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -103,6 +104,7 @@ function App() {
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/blog" element={<BlogListPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
+                <Route path="/docs" element={<DocsPage />} />
                 <Route
                   path="/chat-demo"
                   element={
