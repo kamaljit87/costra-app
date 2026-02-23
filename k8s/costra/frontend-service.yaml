@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: costra-frontend
+  namespace: costra
+  labels:
+    app: costra
+    component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    app: costra
+    component: frontend

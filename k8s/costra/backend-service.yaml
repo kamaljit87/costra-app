@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: costra-backend
+  namespace: costra
+  labels:
+    app: costra
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3002
+      targetPort: 3002
+      name: http
+  selector:
+    app: costra
+    component: backend

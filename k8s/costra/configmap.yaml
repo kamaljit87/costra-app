@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: costra-config
+  namespace: costra
+  labels:
+    app: costra
+data:
+  NODE_ENV: "production"
+  PORT: "3002"
+  REDIS_URL: "redis://redis.infra.svc.cluster.local:6379"
+  FRONTEND_URL: "https://costra.app"
+  VITE_API_URL: "/api"
