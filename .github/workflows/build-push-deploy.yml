@@ -1,0 +1,154 @@
+# Build backend & frontend, push to ECR, SSH to node(s) and redeploy Kubernetes.
+#
+# Required secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SSH_PRIVATE_KEY, SSH_HOST.
+# SSH_HOST: one IP/hostname, or comma-separated for multiple nodes.
+# K8s: deployments costra-backend and costra-frontend in namespace "costra".
+
+name: Build, Push to ECR, and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_BACKEND: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-backend
+  ECR_FRONTEND: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-frontend
+  REMOTE_DIR: /var/servers/costra-app
+  REMOTE_USER: ubuntu
+  REMOTE_PORT: "44823"
+  K8S_NAMESPACE: costra
+
+jobs:
+  build-and-push:
+    name: Build and push to ECR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Dockerfiles exist
+        run: |
+          test -f Dockerfile.backend || { echo "::error::Dockerfile.backend not found"; exit 1; }
+          test -f Dockerfile.frontend || { echo "::error::Dockerfile.frontend not found"; exit 1; }
+
+      - name: Set image tag
+        id: meta
+        run: echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          region: ${{ env.AWS_REGION }}
+
+      - name: Create ECR repositories if missing
+        run: |
+          aws ecr describe-repositories --repository-names costra-backend --region ${{ env.AWS_REGION }} || \
+            aws ecr create-repository --repository-name costra-backend --region ${{ env.AWS_REGION }}
+          aws ecr describe-repositories --repository-names costra-frontend --region ${{ env.AWS_REGION }} || \
+            aws ecr create-repository --repository-name costra-frontend --region ${{ env.AWS_REGION }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: true
+          tags: |
+            ${{ env.ECR_BACKEND }}:latest
+            ${{ env.ECR_BACKEND }}:${{ steps.meta.outputs.short_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: |
+            ${{ env.ECR_FRONTEND }}:latest
+            ${{ env.ECR_FRONTEND }}:${{ steps.meta.outputs.short_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Verify pushed images
+        run: |
+          aws ecr describe-images --repository-name costra-backend --image-ids imageTag=latest --region ${{ env.AWS_REGION }}
+          aws ecr describe-images --repository-name costra-frontend --image-ids imageTag=latest --region ${{ env.AWS_REGION }}
+
+  deploy:
+    name: Deploy via SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Deploy to each node
+        env:
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          if [ -z "$REMOTE_HOST" ]; then
+            echo "::warning::SSH_HOST not set; skipping deploy."
+            exit 0
+          fi
+          PORT="${{ env.REMOTE_PORT }}"
+          USER="${{ env.REMOTE_USER }}"
+          DIR="${{ env.REMOTE_DIR }}"
+          REGION="${{ env.AWS_REGION }}"
+          NS="${{ env.K8S_NAMESPACE }}"
+          ECR_BACKEND="${{ env.ECR_BACKEND }}"
+          ECR_FRONTEND="${{ env.ECR_FRONTEND }}"
+          for HOST in $(echo "$REMOTE_HOST" | tr ',' ' '); do
+            [ -z "$HOST" ] && continue
+            echo "Deploying to $HOST:$PORT"
+            ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p "$PORT" "$USER@$HOST" bash -s << REMOTE
+              set -e
+              cd "$DIR" || { echo "Missing $DIR"; exit 1; }
+              [ -d .git ] && git pull --ff-only || true
+              if command -v aws >/dev/null 2>&1; then
+                aws ecr get-login-password --region $REGION | sudo docker login --username AWS --password-stdin 005878674861.dkr.ecr.us-east-1.amazonaws.com || true
+              fi
+              if command -v kubectl >/dev/null 2>&1 && kubectl get namespace "$NS" >/dev/null 2>&1; then
+                kubectl set image deployment/costra-backend costra-backend=$ECR_BACKEND:latest -n "$NS" --record 2>/dev/null || true
+                kubectl set image deployment/costra-frontend costra-frontend=$ECR_FRONTEND:latest -n "$NS" --record 2>/dev/null || true
+                kubectl rollout status deployment/costra-backend -n "$NS" --timeout=5m 2>/dev/null || true
+                kubectl rollout status deployment/costra-frontend -n "$NS" --timeout=5m 2>/dev/null || true
+                echo "Kubernetes rollout completed for $HOST."
+              else
+                echo "kubectl or namespace $NS not found on $HOST; skipping rollout."
+              fi
+          REMOTE
+          done
+
+      - name: Deploy status
+        run: echo "Deploy completed. Check pods: kubectl get pods -n ${{ env.K8S_NAMESPACE }}"
