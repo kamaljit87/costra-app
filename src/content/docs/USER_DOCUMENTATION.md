@@ -16,8 +16,6 @@
 
 **Note:** If your organization has disabled public signup, you won't see a sign-up link; use the sign-in page with credentials provided by your admin.
 
-<!-- Screenshot: Sign up page -->
-
 ### Signing in
 
 1. Go to the **Login** page.
@@ -27,8 +25,6 @@
 You can also sign in with **Google** if that option is available.
 
 If you have **two-factor authentication (2FA)** enabled, after entering your password you'll be asked for a code from your authenticator app. Enter it to complete sign-in.
-
-<!-- Screenshot: Login page -->
 
 ### Forgot password
 
@@ -40,21 +36,17 @@ If you have **two-factor authentication (2FA)** enabled, after entering your pas
 
 If you don't receive an email, confirm the address is correct and try again, or contact support.
 
-<!-- Screenshot: Forgot password page -->
-
 ### Demo mode
 
 If you use Costra without connecting any cloud accounts, you may see **Demo Mode**: sample data is shown so you can explore the dashboard, compare, and other features. To use your real data, sign up (or sign in) and connect at least one cloud provider in **Settings → Cloud Providers**.
 
-### Onboarding flow (first-time setup)
+### Onboarding flow
 
 1. **Create an account** (or sign in).
 2. You land on the **Dashboard**. In demo mode you'll see sample data; otherwise the dashboard may be empty until you connect a provider.
 3. **Connect your first cloud provider:** go to **Settings → Cloud Providers**, click **Add provider**, choose a provider (e.g. AWS, Azure, GCP), and complete the steps (credentials or automated setup).
 4. Back on the **Dashboard**, click **Sync Data** to pull the first cost data (or wait for auto-sync if enabled).
 5. Optionally set **Budgets**, **Goals**, or explore **Compare** and **Reports** as needed.
-
-<!-- Screenshot: Onboarding — first Dashboard after signup -->
 
 ---
 
@@ -85,8 +77,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - Export (CSV/PDF) may be limited to **Pro** plan; if export fails, the message may say you need to upgrade.
 - Historical data (how many months you can see) depends on your plan (e.g. trial: 12 months, Starter: 6 months, Pro: 12+ months).
 
-<!-- Screenshot: Dashboard Overview -->
-
 ---
 
 ### Cloud provider integrations
@@ -107,8 +97,7 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
    - **Other providers:** Enter the credentials or details shown for that provider (e.g. subscription/tenant IDs for Azure, project/key for GCP).
 6. After a successful connection, the provider appears in the list and in the sidebar. Cost data will appear after the first sync (triggered automatically or via **Sync Data** on the Dashboard).
 
-**Supported providers (as of this doc):** Amazon Web Services (AWS), Microsoft Azure, Google Cloud Platform (GCP), DigitalOcean, Linode (Akamai), Vultr, IBM Cloud, MongoDB Atlas.
-*TODO: Confirm with the team that all listed providers are fully supported in the current build.*
+**Supported providers:** Amazon Web Services (AWS), Microsoft Azure, Google Cloud Platform (GCP), DigitalOcean, Linode (Akamai), Vultr, IBM Cloud, MongoDB Atlas.
 
 **Limits and pitfalls:**
 
@@ -116,10 +105,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - If **Sync** says "No Providers Connected", add at least one provider in Settings.
 - AWS automated connection: if auto-detection times out, the UI may say something like "Auto-detection timed out. If your stack is still creating, click Verify Connection below." Click **Verify connection** once your AWS stack is ready.
 - Removing a provider removes its data from Costra; historical data for that account may no longer be available.
-
-<!-- Screenshot: Settings — Cloud Providers list -->
-
-<!-- Screenshot: Add provider — choose provider -->
 
 ---
 
@@ -146,10 +131,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - In **Demo Mode**, Budgets may show a message that you need to connect real accounts.
 - Budget alerts (in-app and by email) depend on your plan and email preferences in **Settings → General**.
 
-<!-- Screenshot: Budgets list -->
-
-<!-- Screenshot: Create budget form -->
-
 ---
 
 ### Reports
@@ -173,11 +154,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 - Report generation can take a little time for large date ranges or many resources.
 - If a report **fails**, check the status and try a shorter range or different filters; contact support if it keeps failing.
-- *TODO: Confirm with the team whether report generation is gated by plan (e.g. Pro only).*
-
-<!-- Screenshot: Reports list and statuses -->
-
-<!-- Screenshot: Create report form -->
 
 ---
 
@@ -202,11 +178,9 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - Historical months available depend on your **subscription** (e.g. 6 vs 12 months). The UI only offers months your plan allows.
 - Some months might have no data yet (e.g. before first sync); the app shows "No data" instead of wrong numbers.
 
-<!-- Screenshot: Compare — two panels -->
-
 ---
 
-### Provider detail (per-account view)
+### Provider detail
 
 **What it does:** When you click a provider (or an account under a provider) from the Dashboard or sidebar, you get a **Provider detail** page. It shows cost over time, cost by service, cost vs usage, untagged resources, anomaly detection, unit economics (if available), and product/team breakdowns for that account.
 
@@ -215,7 +189,7 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 **How to use it:**
 
 1. From the **Dashboard**, click a provider card, or from the **sidebar** under **Cloud Providers** click an account (e.g. "Production" under AWS).
-2. You'll land on the **Overview** tab: period selector (e.g. last 1–12 months), date range, and charts (daily/monthly).
+2. You'll land on the **Overview** tab: period selector (e.g. last 1-12 months), date range, and charts (daily/monthly).
 3. Use **Services** to see cost by service and sub-services; use filters (e.g. min/max cost, sort) to find the biggest line items.
 4. Use **Analytics** for cost vs usage, untagged resources, anomalies, unit economics, and rightsizing suggestions (availability may depend on provider and plan).
 5. Use **Products** and **Teams** to see cost grouped by product or team (when that data is configured).
@@ -225,10 +199,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 - **Historical period** (e.g. 12 months) is limited by your plan; the period dropdown only shows allowed ranges.
 - Some sections (e.g. unit economics, anomaly detection) may be Pro-only or provider-specific; the UI may show upgrade or "not available" messages.
-
-<!-- Screenshot: Provider detail — Overview -->
-
-<!-- Screenshot: Provider detail — Services -->
 
 ---
 
@@ -249,13 +219,10 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 **Limits:**
 
 - Recommendations depend on connected providers and ingested data; they may take a short time to appear after the first sync.
-- *TODO: Confirm with the team if recommendations are limited by plan (e.g. Pro only for some categories).*
-
-<!-- Screenshot: Recommendations list -->
 
 ---
 
-### Products and Teams views
+### Products and Teams
 
 **What it does:** **Products** and **Teams** are two separate pages that show cost grouped by product name or team name (based on tags or labels in your cloud). Useful for showback/chargeback and "cost by product/team."
 
@@ -271,11 +238,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 **Limits:**
 
 - Data depends on your cloud resources being tagged with the right product/team labels; untagged resources may appear under "Untagged" or similar.
-- *TODO: Confirm with the team how product/team names are derived (e.g. which tags) for each provider.*
-
-<!-- Screenshot: Products view -->
-
-<!-- Screenshot: Teams view -->
 
 ---
 
@@ -300,17 +262,13 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - Email alerts and some export/report features require a **Pro** subscription.
 - API keys are sensitive; don't share them. Revoke any key that might be exposed.
 
-<!-- Screenshot: Settings — General -->
-
-<!-- Screenshot: Settings — Security (2FA) -->
-
 ---
 
 ## Billing and subscription
 
 **What it does:** The **Billing** page (often under **Settings → Billing** or a direct **Billing** link) shows your current plan, trial status, renewal date, and history limit (e.g. 6 or 12 months). You can upgrade or manage payment (e.g. via Stripe).
 
-**Plans (as implemented in the app; confirm with product):**
+**Plans:**
 
 - **Free trial:** 7 days; full feature set with some restrictions (e.g. no CSV export, no email alerts, no scheduled sync, no unit economics).
 - **Starter:** Paid; e.g. up to 3 cloud provider accounts, up to 6 months history, daily auto-sync; no CSV export, no email alerts, no unit economics.
@@ -328,8 +286,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - **"Failed to load subscription"** — Check your connection; try again. If it persists, contact support.
 - **"Failed to create checkout session"** / **"No checkout URL received"** — Payment provider may be misconfigured; contact support.
 - **"Failed to open billing portal"** — Same; try again or contact support.
-
-<!-- Screenshot: Billing — Current plan -->
 
 ---
 
@@ -351,18 +307,15 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 - Password rules (length, complexity) follow what's shown on the form.
 - Data export and deletion handling may be asynchronous; the UI will explain next steps.
 
-<!-- Screenshot: Profile — overview -->
-
 ---
 
-## Advanced features (overview)
+## Advanced features
 
 - **Cost reduction goals (Dashboard):** Set a target % reduction (e.g. 10%) and track progress; goals are shown on the Dashboard.
 - **Savings plans (Dashboard):** View committed savings from AWS (or other) savings plans.
 - **Anomaly detection (Provider detail):** Highlights unusual cost changes; availability may be Pro or provider-specific.
 - **Unit economics (Provider detail):** Cost per unit of usage; may be Pro-only.
 - **API keys (Settings → API):** For integrating Costra with your own tools or scripts.
-- **Admin / Debug:** If you have an admin or debug route (e.g. **/admin/tickets**, **/debug**), these are for internal or support use; normal users typically don't need them.
 
 ---
 
@@ -419,10 +372,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 ## Support and contact
 
-- **Contact form:** Use the **Contact** page (often linked in the footer or sidebar as "Contact us"). Choose a category (e.g. Bug report, Help, Feature request), enter your name, email, subject, and message, then submit. You'll see a confirmation when the message is sent.
-- **In-app contact:** From the sidebar, **Contact us** (or similar) may open the contact page or your email client.
+- **Contact form:** Use the **Contact** page (linked in the footer as "Contact us"). Choose a category (e.g. Bug report, Help, Feature request), enter your name, email, subject, and message, then submit. You'll see a confirmation when the message is sent.
+- **In-app contact:** From the sidebar, **Contact us** may open the contact page or your email client.
 - For account, billing, or technical issues, include your email and a short description so support can help quickly.
-
----
-
-*This documentation is based on the current Costra application. If something doesn't match what you see in the app, the product may have changed; we recommend checking in-app help or contacting support. Items marked "TODO" are for the team to verify (e.g. plan limits, provider support, and feature availability).*
