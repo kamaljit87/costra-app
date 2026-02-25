@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import crypto from 'node:crypto'
 import { getUserIdByApiKeyHash, isUserAdmin } from '../database.js'
+import { cached } from '../utils/cache.js'
 
 export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization']
@@ -14,7 +15,11 @@ export const authenticateToken = async (req, res, next) => {
   if (token.startsWith('costra_') && token.length > 20) {
     try {
       const keyHash = crypto.createHash('sha256').update(token).digest('hex')
-      const userId = await getUserIdByApiKeyHash(keyHash)
+      const userId = await cached(
+        `apikey:${keyHash}`,
+        () => getUserIdByApiKeyHash(keyHash),
+        300 // 5 min TTL
+      )
       if (userId) {
         req.user = { userId, id: userId }
         return next()

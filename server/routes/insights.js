@@ -36,6 +36,7 @@ import {
   fetchGCPRightsizingRecommendations,
 } from '../services/cloudProviderIntegrations.js'
 import logger from '../utils/logger.js'
+import { cached } from '../utils/cache.js'
 
 const router = express.Router()
 
@@ -1036,8 +1037,9 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
       sort_by: sort_by || 'savings',
     }
 
-    const result = await getOptimizationRecommendations(userId, filters)
-    const summary = await getOptimizationSummary(userId)
+    const cacheKey = `user:${userId}:recommendations:${JSON.stringify(filters)}`
+    const result = await cached(cacheKey, () => getOptimizationRecommendations(userId, filters), 900)
+    const summary = await cached(`user:${userId}:opt_summary`, () => getOptimizationSummary(userId), 900)
 
     res.json({ ...result, summary })
   } catch (error) {
@@ -1053,7 +1055,7 @@ router.get('/recommendations', authenticateToken, async (req, res) => {
 router.get('/optimization-summary', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    const summary = await getOptimizationSummary(userId)
+    const summary = await cached(`user:${userId}:opt_summary`, () => getOptimizationSummary(userId), 900)
     res.json(summary)
   } catch (error) {
     logger.error('Get optimization summary error', { userId: req.user?.userId, error: error.message, stack: error.stack })

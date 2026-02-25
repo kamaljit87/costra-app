@@ -12,6 +12,7 @@ import {
   getBudgetAlerts,
   getCloudProviderCredentialsByAccountId,
 } from '../database.js'
+import { cached, del as cacheDel } from '../utils/cache.js'
 
 const router = express.Router()
 
@@ -83,7 +84,8 @@ router.post('/', async (req, res) => {
     
     // Update spend immediately
     await updateBudgetSpend(userId, budget.id)
-    
+    await cacheDel(`user:${userId}:budgets:all:all`)
+
     const message = createInCloudProvider && providerId && accountId
       ? 'Budget created successfully in app and cloud provider'
       : 'Budget created successfully'
@@ -113,33 +115,34 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ error: 'User ID not found in token' })
     }
     const { providerId, accountId } = req.query
-    
-    const budgets = await getBudgets(
-      userId,
-      providerId || null,
-      accountId ? parseInt(accountId) : null
-    )
-    
-    // Update spend for all budgets
-    for (const budget of budgets) {
-      if (budget.status !== 'paused') {
-        await updateBudgetSpend(userId, budget.id).catch(err => {
-          logger.error('Failed to update spend for budget', { 
-            userId, 
-            budgetId: budget.id, 
-            error: err.message 
+    const cacheKey = `user:${userId}:budgets:${providerId || 'all'}:${accountId || 'all'}`
+
+    const updatedBudgets = await cached(cacheKey, async () => {
+      const budgets = await getBudgets(
+        userId,
+        providerId || null,
+        accountId ? parseInt(accountId) : null
+      )
+
+      // Update spend for all budgets
+      await Promise.all(budgets.filter(b => b.status !== 'paused').map(budget =>
+        updateBudgetSpend(userId, budget.id).catch(err => {
+          logger.error('Failed to update spend for budget', {
+            userId,
+            budgetId: budget.id,
+            error: err.message
           })
         })
-      }
-    }
-    
-    // Re-fetch to get updated values
-    const updatedBudgets = await getBudgets(
-      userId,
-      providerId || null,
-      accountId ? parseInt(accountId) : null
-    )
-    
+      ))
+
+      // Re-fetch to get updated values
+      return getBudgets(
+        userId,
+        providerId || null,
+        accountId ? parseInt(accountId) : null
+      )
+    }, 300) // 5 min TTL
+
     res.json({ budgets: updatedBudgets })
   } catch (error) {
     logger.error('Get budgets error', { 
@@ -208,11 +211,12 @@ router.patch('/:budgetId', async (req, res) => {
     }
     
     const budget = await updateBudget(userId, budgetId, updateData)
-    
+    await cacheDel(`user:${userId}:budgets:all:all`)
+
     if (!budget) {
       return res.status(404).json({ error: 'Budget not found' })
     }
-    
+
     // Update spend if budget amount or period changed
     if (updateData.budgetAmount || updateData.budgetPeriod) {
       await updateBudgetSpend(userId, budgetId)
@@ -249,11 +253,12 @@ router.delete('/:budgetId', async (req, res) => {
     }
     
     const deleted = await deleteBudget(userId, budgetId)
-    
+    await cacheDel(`user:${userId}:budgets:all:all`)
+
     if (!deleted) {
       return res.status(404).json({ error: 'Budget not found' })
     }
-    
+
     res.json({ message: 'Budget deleted successfully' })
   } catch (error) {
     logger.error('Delete budget error', { 

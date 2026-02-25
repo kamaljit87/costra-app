@@ -5,9 +5,10 @@ import { FilterProvider } from './contexts/FilterContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PublicConfigProvider, usePublicConfig } from './contexts/PublicConfigContext'
 import { NotificationProvider } from './contexts/NotificationContext'
-import LandingPage from './pages/LandingPage'
 import CookieConsent from './components/CookieConsent'
-import { NotFound } from './components/ui/ghost-404-page'
+
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const NotFound = lazy(() => import('./components/ui/ghost-404-page').then(m => ({ default: m.NotFound })))
 
 // Lazy-load all pages except landing (first paint)
 const Dashboard = lazy(() => import('./pages/Dashboard'))

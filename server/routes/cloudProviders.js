@@ -39,7 +39,11 @@ router.use(authenticateToken)
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
-    const providers = await getUserCloudProviders(userId)
+    const providers = await cache.cached(
+      `user:${userId}:cloud_providers`,
+      () => getUserCloudProviders(userId),
+      300 // 5 min TTL
+    )
 
     // Format response (don't include encrypted credentials)
     const formattedProviders = providers.map(provider => ({
@@ -101,6 +105,7 @@ router.post('/',
       }
 
       const accountId = await addCloudProvider(userId, providerId, providerName, credentials, accountAlias)
+      await cache.del(`user:${userId}:cloud_providers`)
 
       // Create notification for provider addition
       try {
@@ -186,6 +191,7 @@ router.delete('/account/:accountId', async (req, res) => {
     }
 
     const deleted = await deleteCloudProviderByAccountId(userId, accountId)
+    await cache.del(`user:${userId}:cloud_providers`)
 
     if (!deleted) {
       return res.status(404).json({ error: 'Cloud provider account not found' })
@@ -230,6 +236,7 @@ router.delete('/:providerId', async (req, res) => {
     const { providerId } = req.params
 
     const deleted = await deleteCloudProvider(userId, providerId)
+    await cache.del(`user:${userId}:cloud_providers`)
 
     if (!deleted) {
       return res.status(404).json({ error: 'Cloud provider not found' })
@@ -263,9 +270,10 @@ router.patch('/account/:accountId/status', async (req, res) => {
     }
 
     await updateCloudProviderStatusByAccountId(userId, accountId, isActive)
+    await cache.del(`user:${userId}:cloud_providers`)
 
-    res.json({ 
-      message: `Cloud provider account ${isActive ? 'activated' : 'deactivated'} successfully` 
+    res.json({
+      message: `Cloud provider account ${isActive ? 'activated' : 'deactivated'} successfully`
     })
   } catch (error) {
     logger.error('Update cloud provider account status error', { 
@@ -295,8 +303,9 @@ router.patch('/account/:accountId/alias', async (req, res) => {
     }
 
     await updateCloudProviderAlias(userId, accountId, accountAlias)
+    await cache.del(`user:${userId}:cloud_providers`)
 
-    res.json({ 
+    res.json({
       message: 'Account alias updated successfully',
       accountAlias
     })
@@ -415,8 +424,9 @@ router.patch('/:providerId/status', async (req, res) => {
     }
 
     await updateCloudProviderStatus(userId, providerId, isActive)
+    await cache.del(`user:${userId}:cloud_providers`)
 
-    res.json({ 
+    res.json({
       message: `Cloud provider ${isActive ? 'activated' : 'deactivated'} successfully` 
     })
   } catch (error) {
