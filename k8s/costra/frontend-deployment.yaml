@@ -25,7 +25,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: costra-frontend:latest
+          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-frontend:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
               name: http

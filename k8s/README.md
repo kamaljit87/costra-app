@@ -54,11 +54,16 @@ kubectl get pods -n infra
 
 ### 1. Configure secrets
 
-Edit `k8s/costra/secret.yaml` and replace placeholder values with base64-encoded secrets:
+Generate `k8s/costra/secret.yaml` from your `.env` file (the generated file is gitignored):
 
 ```bash
-# Encode a value
-echo -n 'postgresql://user:pass@host:5432/costra' | base64
+./scripts/gen-k8s-secrets.sh
+```
+
+Alternatively, create the secret directly via kubectl:
+
+```bash
+./scripts/create-secret-from-env.sh
 ```
 
 ### 2. Build and tag container images
@@ -162,7 +167,8 @@ k8s/
 ├── costra/                     # Per-app (template for new apps)
 │   ├── namespace.yaml
 │   ├── configmap.yaml          # Non-secret env vars
-│   ├── secret.yaml             # Secrets (fill before applying)
+│   ├── secret.yaml             # Generated from .env (gitignored)
+│   ├── secret.yaml.example     # Template showing required keys
 │   ├── backend-deployment.yaml
 │   ├── backend-service.yaml
 │   ├── backend-hpa.yaml
