@@ -25,11 +25,11 @@ spec:
               name: redis
           resources:
             requests:
-              memory: "16Mi"
+              memory: "64Mi"
               cpu: "50m"
             limits:
-              memory: "64Mi"
-              cpu: "100m"
+              memory: "128Mi"
+              cpu: "200m"
           livenessProbe:
             exec:
               command: ["redis-cli", "ping"]
