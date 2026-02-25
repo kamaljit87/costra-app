@@ -26,7 +26,7 @@ spec:
       containers:
         - name: backend
           image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-backend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 3002
               name: http
