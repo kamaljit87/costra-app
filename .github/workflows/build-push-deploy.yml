@@ -117,6 +117,25 @@ jobs:
         with:
           sparse-checkout: scripts
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull and save images
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          docker pull "$ECR_BACKEND:$IMAGE_TAG"
+          docker pull "$ECR_FRONTEND:$IMAGE_TAG"
+          docker save "$ECR_BACKEND:$IMAGE_TAG" | gzip > /tmp/backend.tar.gz
+          docker save "$ECR_FRONTEND:$IMAGE_TAG" | gzip > /tmp/frontend.tar.gz
+
       - name: Deploy to each node
         env:
           REMOTE_HOST: ${{ secrets.SSH_HOST }}
@@ -129,16 +148,18 @@ jobs:
           PORT="${{ env.REMOTE_PORT }}"
           USER="${{ env.REMOTE_USER }}"
           DIR="${{ env.REMOTE_DIR }}"
-          REGION="${{ env.AWS_REGION }}"
           NS="${{ env.K8S_NAMESPACE }}"
           REGISTRY="${{ env.ECR_REGISTRY }}"
           TAG="$IMAGE_TAG"
+          SSH="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p $PORT"
+          SCP="scp -i ~/.ssh/deploy_key -P $PORT"
           for HOST in $(echo "$REMOTE_HOST" | tr ',' ' '); do
             [ -z "$HOST" ] && continue
             echo "::group::Deploying to $HOST"
             ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-            scp -i ~/.ssh/deploy_key -P "$PORT" scripts/k8s-deploy.sh "$USER@$HOST:/tmp/k8s-deploy.sh"
-            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p "$PORT" "$USER@$HOST" \
-              "bash /tmp/k8s-deploy.sh $REGION $REGISTRY $NS $TAG $DIR"
+            echo "Transferring images..."
+            $SCP /tmp/backend.tar.gz /tmp/frontend.tar.gz scripts/k8s-deploy.sh "$USER@$HOST:/tmp/"
+            echo "Importing images into k3s..."
+            $SSH "$USER@$HOST" "gunzip -c /tmp/backend.tar.gz | sudo k3s ctr images import - && gunzip -c /tmp/frontend.tar.gz | sudo k3s ctr images import - && bash /tmp/k8s-deploy.sh $REGISTRY $NS $TAG $DIR"
             echo "::endgroup::"
           done

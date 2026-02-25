@@ -1,30 +1,20 @@
 #!/usr/bin/env bash
 #
 # Deploy Costra images to k3s.
-# Called by GitHub Actions: bash k8s-deploy.sh REGION REGISTRY NAMESPACE TAG DIR
+# Called on the remote server after images are already imported into k3s containerd.
+# Usage: bash k8s-deploy.sh REGISTRY NAMESPACE TAG DIR
 #
 set -e
 
-REGION="$1"
-REGISTRY="$2"
-NS="$3"
-TAG="$4"
-DIR="$5"
+REGISTRY="$1"
+NS="$2"
+TAG="$3"
+DIR="$4"
 
 echo "Deploying $REGISTRY/costra-{backend,frontend}:$TAG to namespace $NS"
 
 # Pull latest code
 cd "$DIR" && [ -d .git ] && git pull --ff-only || true
-
-# Get ECR credentials
-ECR_PASS=$(aws ecr get-login-password --region "$REGION")
-
-# Pull images via docker, import into k3s containerd
-echo "$ECR_PASS" | docker login --username AWS --password-stdin "$REGISTRY"
-docker pull "$REGISTRY/costra-backend:$TAG"
-docker pull "$REGISTRY/costra-frontend:$TAG"
-docker save "$REGISTRY/costra-backend:$TAG" | sudo k3s ctr images import -
-docker save "$REGISTRY/costra-frontend:$TAG" | sudo k3s ctr images import -
 
 # Update deployments
 sudo kubectl set image deployment/costra-backend backend="$REGISTRY/costra-backend:$TAG" -n "$NS"
