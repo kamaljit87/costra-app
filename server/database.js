@@ -1163,6 +1163,218 @@ export const initDatabase = async () => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_opt_recs_savings ON optimization_recommendations(user_id, estimated_monthly_savings DESC) WHERE status = 'active'`)
       await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_opt_recs_dedup ON optimization_recommendations(user_id, provider_id, category, COALESCE(subcategory, ''), COALESCE(service_name, ''), COALESCE(resource_id, '')) WHERE status = 'active'`)
 
+      // ============================================================
+      // Organizations & RBAC tables
+      // ============================================================
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS organizations (
+          id SERIAL PRIMARY KEY,
+          name TEXT NOT NULL,
+          slug TEXT UNIQUE NOT NULL,
+          owner_id INTEGER NOT NULL REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS organization_members (
+          id SERIAL PRIMARY KEY,
+          organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member', 'viewer')),
+          joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(organization_id, user_id)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_org_members_user ON organization_members(user_id)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_org_members_org ON organization_members(organization_id)`)
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS organization_invites (
+          id SERIAL PRIMARY KEY,
+          organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          email TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member', 'viewer')),
+          invite_token TEXT UNIQUE NOT NULL,
+          invited_by INTEGER NOT NULL REFERENCES users(id),
+          accepted_at TIMESTAMP,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      // Add organization_id to existing tables
+      const tablesNeedingOrgId = [
+        'cloud_provider_credentials', 'cost_data', 'daily_cost_data',
+        'budgets', 'reports', 'notifications', 'subscriptions',
+        'anomaly_baselines', 'business_metrics', 'optimization_recommendations'
+      ]
+      for (const tableName of tablesNeedingOrgId) {
+        await client.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_name = '${tableName}' AND column_name = 'organization_id'
+            ) THEN
+              ALTER TABLE ${tableName} ADD COLUMN organization_id INTEGER REFERENCES organizations(id) ON DELETE SET NULL;
+            END IF;
+          END $$;
+        `)
+      }
+
+      // ============================================================
+      // Anomaly events table (ML anomaly detection with root cause)
+      // ============================================================
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS anomaly_events (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+          account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE SET NULL,
+          provider_id TEXT,
+          service_name TEXT,
+          detected_date DATE NOT NULL,
+          anomaly_type TEXT CHECK (anomaly_type IN ('spike', 'drop', 'trend')),
+          severity TEXT CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+          expected_cost DECIMAL(15, 2),
+          actual_cost DECIMAL(15, 2),
+          variance_percent DECIMAL(10, 2),
+          root_cause TEXT,
+          contributing_services JSONB,
+          resolution_status TEXT DEFAULT 'open' CHECK (resolution_status IN ('open', 'acknowledged', 'investigating', 'resolved', 'false_positive')),
+          resolved_at TIMESTAMP,
+          resolved_by INTEGER REFERENCES users(id),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_anomaly_events_user ON anomaly_events(user_id, detected_date DESC)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_anomaly_events_status ON anomaly_events(user_id, resolution_status)`)
+
+      // ============================================================
+      // Cost policies & violations tables
+      // ============================================================
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cost_policies (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          description TEXT,
+          policy_type TEXT NOT NULL CHECK (policy_type IN ('spend_threshold', 'tag_compliance', 'trend_alert', 'budget_forecast')),
+          conditions JSONB NOT NULL,
+          actions JSONB NOT NULL DEFAULT '["notify"]',
+          scope_provider_id TEXT,
+          scope_account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE SET NULL,
+          is_enabled BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_cost_policies_user ON cost_policies(user_id, is_enabled)`)
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS policy_violations (
+          id SERIAL PRIMARY KEY,
+          policy_id INTEGER NOT NULL REFERENCES cost_policies(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+          violation_type TEXT NOT NULL,
+          violation_details JSONB NOT NULL,
+          severity TEXT DEFAULT 'medium' CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+          resolved BOOLEAN DEFAULT false,
+          resolved_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_policy_violations_user ON policy_violations(user_id, resolved, created_at DESC)`)
+
+      // ============================================================
+      // Forecast scenarios table
+      // ============================================================
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS forecast_scenarios (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+          name TEXT NOT NULL,
+          description TEXT,
+          base_monthly_cost DECIMAL(15, 2),
+          adjustments JSONB NOT NULL DEFAULT '[]',
+          forecast_months INTEGER DEFAULT 6,
+          forecast_data JSONB,
+          ai_narrative TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      // ============================================================
+      // Kubernetes cost allocation tables
+      // ============================================================
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS k8s_clusters (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+          account_id INTEGER REFERENCES cloud_provider_credentials(id) ON DELETE SET NULL,
+          cluster_name TEXT NOT NULL,
+          cluster_id TEXT,
+          provider_id TEXT,
+          region TEXT,
+          node_count INTEGER DEFAULT 0,
+          total_cost DECIMAL(15, 2) DEFAULT 0,
+          last_metrics_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, cluster_name)
+        )
+      `)
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS k8s_namespace_costs (
+          id SERIAL PRIMARY KEY,
+          cluster_id INTEGER NOT NULL REFERENCES k8s_clusters(id) ON DELETE CASCADE,
+          namespace TEXT NOT NULL,
+          date DATE NOT NULL,
+          cpu_request_cores DECIMAL(10, 4),
+          cpu_usage_cores DECIMAL(10, 4),
+          memory_request_bytes BIGINT,
+          memory_usage_bytes BIGINT,
+          cpu_cost DECIMAL(15, 2),
+          memory_cost DECIMAL(15, 2),
+          total_cost DECIMAL(15, 2),
+          pod_count INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(cluster_id, namespace, date)
+        )
+      `)
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS k8s_workload_costs (
+          id SERIAL PRIMARY KEY,
+          cluster_id INTEGER NOT NULL REFERENCES k8s_clusters(id) ON DELETE CASCADE,
+          namespace TEXT NOT NULL,
+          workload_name TEXT NOT NULL,
+          workload_type TEXT CHECK (workload_type IN ('deployment', 'statefulset', 'daemonset', 'job', 'cronjob')),
+          date DATE NOT NULL,
+          cpu_request_cores DECIMAL(10, 4),
+          cpu_usage_cores DECIMAL(10, 4),
+          memory_request_bytes BIGINT,
+          memory_usage_bytes BIGINT,
+          cpu_cost DECIMAL(15, 2),
+          memory_cost DECIMAL(15, 2),
+          total_cost DECIMAL(15, 2),
+          replica_count INTEGER DEFAULT 1,
+          idle_cost DECIMAL(15, 2) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(cluster_id, namespace, workload_name, date)
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_k8s_ns_costs_cluster ON k8s_namespace_costs(cluster_id, date DESC)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_k8s_wl_costs_cluster ON k8s_workload_costs(cluster_id, namespace, date DESC)`)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -6936,6 +7148,582 @@ export const getAnomalyBaselinesForUser = async (userId) => {
     [userId]
   )
   return result.rows
+}
+
+// ============================================================
+// Organization CRUD operations
+// ============================================================
+
+export const createOrganization = async (name, ownerId) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36)
+    const orgResult = await client.query(
+      'INSERT INTO organizations (name, slug, owner_id) VALUES ($1, $2, $3) RETURNING *',
+      [name, slug, ownerId]
+    )
+    const org = orgResult.rows[0]
+    await client.query(
+      'INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)',
+      [org.id, ownerId, 'owner']
+    )
+    await client.query('COMMIT')
+    return org
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const getOrganizationsByUser = async (userId) => {
+  const result = await pool.query(
+    `SELECT o.*, om.role AS member_role
+     FROM organizations o
+     INNER JOIN organization_members om ON o.id = om.organization_id
+     WHERE om.user_id = $1
+     ORDER BY o.created_at ASC`,
+    [userId]
+  )
+  return result.rows
+}
+
+export const getOrganizationById = async (orgId) => {
+  const result = await pool.query('SELECT * FROM organizations WHERE id = $1', [orgId])
+  return result.rows[0]
+}
+
+export const getOrganizationMembers = async (orgId) => {
+  const result = await pool.query(
+    `SELECT om.id, om.role, om.joined_at, u.id AS user_id, u.name, u.email, u.avatar_url
+     FROM organization_members om
+     INNER JOIN users u ON om.user_id = u.id
+     WHERE om.organization_id = $1
+     ORDER BY om.role ASC, om.joined_at ASC`,
+    [orgId]
+  )
+  return result.rows
+}
+
+export const getUserOrgMembership = async (orgId, userId) => {
+  const result = await pool.query(
+    'SELECT * FROM organization_members WHERE organization_id = $1 AND user_id = $2',
+    [orgId, userId]
+  )
+  return result.rows[0]
+}
+
+export const addOrganizationMember = async (orgId, userId, role = 'member') => {
+  const result = await pool.query(
+    'INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (organization_id, user_id) DO NOTHING RETURNING *',
+    [orgId, userId, role]
+  )
+  return result.rows[0]
+}
+
+export const removeOrganizationMember = async (orgId, userId) => {
+  await pool.query(
+    'DELETE FROM organization_members WHERE organization_id = $1 AND user_id = $2 AND role != $3',
+    [orgId, userId, 'owner']
+  )
+}
+
+export const updateMemberRole = async (orgId, userId, role) => {
+  const result = await pool.query(
+    'UPDATE organization_members SET role = $3 WHERE organization_id = $1 AND user_id = $2 AND role != $4 RETURNING *',
+    [orgId, userId, role, 'owner']
+  )
+  return result.rows[0]
+}
+
+export const createOrganizationInvite = async (orgId, email, role, invitedBy) => {
+  const crypto = await import('crypto')
+  const token = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+  const result = await pool.query(
+    `INSERT INTO organization_invites (organization_id, email, role, invite_token, invited_by, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [orgId, email, role, token, invitedBy, expiresAt]
+  )
+  return result.rows[0]
+}
+
+export const getOrganizationInvites = async (orgId) => {
+  const result = await pool.query(
+    `SELECT oi.*, u.name AS invited_by_name
+     FROM organization_invites oi
+     INNER JOIN users u ON oi.invited_by = u.id
+     WHERE oi.organization_id = $1 AND oi.accepted_at IS NULL AND oi.expires_at > NOW()
+     ORDER BY oi.created_at DESC`,
+    [orgId]
+  )
+  return result.rows
+}
+
+export const acceptOrganizationInvite = async (token, userId) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const invite = await client.query(
+      'SELECT * FROM organization_invites WHERE invite_token = $1 AND accepted_at IS NULL AND expires_at > NOW()',
+      [token]
+    )
+    if (!invite.rows[0]) {
+      await client.query('ROLLBACK')
+      return null
+    }
+    const inv = invite.rows[0]
+    await client.query(
+      'INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (organization_id, user_id) DO UPDATE SET role = $3',
+      [inv.organization_id, userId, inv.role]
+    )
+    await client.query(
+      'UPDATE organization_invites SET accepted_at = NOW() WHERE id = $1',
+      [inv.id]
+    )
+    await client.query('COMMIT')
+    return inv
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const deleteOrganizationInvite = async (orgId, inviteId) => {
+  await pool.query(
+    'DELETE FROM organization_invites WHERE id = $1 AND organization_id = $2',
+    [inviteId, orgId]
+  )
+}
+
+export const updateOrganization = async (orgId, { name }) => {
+  const result = await pool.query(
+    'UPDATE organizations SET name = $2, updated_at = NOW() WHERE id = $1 RETURNING *',
+    [orgId, name]
+  )
+  return result.rows[0]
+}
+
+export const migrateExistingUsersToOrgs = async () => {
+  const client = await pool.connect()
+  try {
+    // Find users without any org membership
+    const usersWithoutOrg = await client.query(
+      `SELECT u.id, u.name, u.email FROM users u
+       WHERE NOT EXISTS (SELECT 1 FROM organization_members om WHERE om.user_id = u.id)`
+    )
+    for (const user of usersWithoutOrg.rows) {
+      const orgName = user.name ? `${user.name}'s Organization` : 'My Organization'
+      const slug = (user.email.split('@')[0] || 'org') + '-' + Date.now().toString(36)
+      await client.query('BEGIN')
+      const orgResult = await client.query(
+        'INSERT INTO organizations (name, slug, owner_id) VALUES ($1, $2, $3) RETURNING id',
+        [orgName, slug, user.id]
+      )
+      const orgId = orgResult.rows[0].id
+      await client.query(
+        'INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)',
+        [orgId, user.id, 'owner']
+      )
+      // Assign existing cloud providers to this org
+      await client.query(
+        'UPDATE cloud_provider_credentials SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL',
+        [orgId, user.id]
+      )
+      // Assign existing cost data
+      await client.query('UPDATE cost_data SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL', [orgId, user.id])
+      await client.query('UPDATE daily_cost_data SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL', [orgId, user.id])
+      await client.query('UPDATE budgets SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL', [orgId, user.id])
+      await client.query('UPDATE notifications SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL', [orgId, user.id])
+      await client.query('UPDATE subscriptions SET organization_id = $1 WHERE user_id = $2 AND organization_id IS NULL', [orgId, user.id])
+      await client.query('COMMIT')
+      logger.info(`Migrated user ${user.id} to org ${orgId}`)
+    }
+    return usersWithoutOrg.rows.length
+  } catch (error) {
+    await client.query('ROLLBACK')
+    logger.error('Error migrating users to orgs', { error: error.message })
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+// ============================================================
+// Anomaly events CRUD
+// ============================================================
+
+export const createAnomalyEvent = async (data) => {
+  const result = await pool.query(
+    `INSERT INTO anomaly_events (user_id, organization_id, account_id, provider_id, service_name,
+       detected_date, anomaly_type, severity, expected_cost, actual_cost, variance_percent,
+       root_cause, contributing_services)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     RETURNING *`,
+    [data.userId, data.organizationId, data.accountId, data.providerId, data.serviceName,
+     data.detectedDate, data.anomalyType, data.severity, data.expectedCost, data.actualCost,
+     data.variancePercent, data.rootCause, JSON.stringify(data.contributingServices || [])]
+  )
+  return result.rows[0]
+}
+
+export const getAnomalyEvents = async (userId, { orgId, status, severity, providerId, limit = 50, offset = 0 } = {}) => {
+  const conditions = ['user_id = $1']
+  const params = [userId]
+  let idx = 2
+  if (orgId) { conditions.push(`organization_id = $${idx++}`); params.push(orgId) }
+  if (status) { conditions.push(`resolution_status = $${idx++}`); params.push(status) }
+  if (severity) { conditions.push(`severity = $${idx++}`); params.push(severity) }
+  if (providerId) { conditions.push(`provider_id = $${idx++}`); params.push(providerId) }
+  const countResult = await pool.query(
+    `SELECT COUNT(*) FROM anomaly_events WHERE ${conditions.join(' AND ')}`, params
+  )
+  params.push(limit, offset)
+  const result = await pool.query(
+    `SELECT * FROM anomaly_events WHERE ${conditions.join(' AND ')}
+     ORDER BY detected_date DESC, created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+    params
+  )
+  return { events: result.rows, total: parseInt(countResult.rows[0].count) }
+}
+
+export const updateAnomalyEventStatus = async (eventId, userId, status) => {
+  const result = await pool.query(
+    `UPDATE anomaly_events SET resolution_status = $3,
+       resolved_at = CASE WHEN $3 IN ('resolved', 'false_positive') THEN NOW() ELSE resolved_at END,
+       resolved_by = CASE WHEN $3 IN ('resolved', 'false_positive') THEN $2 ELSE resolved_by END
+     WHERE id = $1 AND user_id = $2 RETURNING *`,
+    [eventId, userId, status]
+  )
+  return result.rows[0]
+}
+
+export const getRecentAnomalyForService = async (userId, providerId, serviceName, date) => {
+  const result = await pool.query(
+    `SELECT id FROM anomaly_events
+     WHERE user_id = $1 AND provider_id = $2 AND service_name = $3 AND detected_date = $4`,
+    [userId, providerId, serviceName, date]
+  )
+  return result.rows[0]
+}
+
+// ============================================================
+// Cost policies CRUD
+// ============================================================
+
+export const createCostPolicy = async (userId, orgId, data) => {
+  const result = await pool.query(
+    `INSERT INTO cost_policies (user_id, organization_id, name, description, policy_type,
+       conditions, actions, scope_provider_id, scope_account_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [userId, orgId, data.name, data.description, data.policyType,
+     JSON.stringify(data.conditions), JSON.stringify(data.actions || ['notify']),
+     data.scopeProviderId, data.scopeAccountId]
+  )
+  return result.rows[0]
+}
+
+export const getCostPolicies = async (userId, orgId = null) => {
+  const conditions = ['user_id = $1']
+  const params = [userId]
+  if (orgId) { conditions.push('organization_id = $2'); params.push(orgId) }
+  const result = await pool.query(
+    `SELECT * FROM cost_policies WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`,
+    params
+  )
+  return result.rows
+}
+
+export const getCostPolicyById = async (policyId, userId) => {
+  const result = await pool.query(
+    'SELECT * FROM cost_policies WHERE id = $1 AND user_id = $2',
+    [policyId, userId]
+  )
+  return result.rows[0]
+}
+
+export const updateCostPolicy = async (policyId, userId, data) => {
+  const fields = []
+  const params = [policyId, userId]
+  let idx = 3
+  if (data.name !== undefined) { fields.push(`name = $${idx++}`); params.push(data.name) }
+  if (data.description !== undefined) { fields.push(`description = $${idx++}`); params.push(data.description) }
+  if (data.conditions !== undefined) { fields.push(`conditions = $${idx++}`); params.push(JSON.stringify(data.conditions)) }
+  if (data.actions !== undefined) { fields.push(`actions = $${idx++}`); params.push(JSON.stringify(data.actions)) }
+  if (data.isEnabled !== undefined) { fields.push(`is_enabled = $${idx++}`); params.push(data.isEnabled) }
+  if (fields.length === 0) return null
+  fields.push('updated_at = NOW()')
+  const result = await pool.query(
+    `UPDATE cost_policies SET ${fields.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+export const deleteCostPolicy = async (policyId, userId) => {
+  await pool.query('DELETE FROM cost_policies WHERE id = $1 AND user_id = $2', [policyId, userId])
+}
+
+export const getEnabledPolicies = async (userId, orgId = null) => {
+  const conditions = ['user_id = $1', 'is_enabled = true']
+  const params = [userId]
+  if (orgId) { conditions.push('organization_id = $2'); params.push(orgId) }
+  const result = await pool.query(
+    `SELECT * FROM cost_policies WHERE ${conditions.join(' AND ')}`,
+    params
+  )
+  return result.rows
+}
+
+export const createPolicyViolation = async (data) => {
+  const result = await pool.query(
+    `INSERT INTO policy_violations (policy_id, user_id, organization_id, violation_type, violation_details, severity)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [data.policyId, data.userId, data.organizationId, data.violationType,
+     JSON.stringify(data.violationDetails), data.severity]
+  )
+  return result.rows[0]
+}
+
+export const getPolicyViolations = async (userId, { orgId, policyId, resolved, limit = 50, offset = 0 } = {}) => {
+  const conditions = ['pv.user_id = $1']
+  const params = [userId]
+  let idx = 2
+  if (orgId) { conditions.push(`pv.organization_id = $${idx++}`); params.push(orgId) }
+  if (policyId) { conditions.push(`pv.policy_id = $${idx++}`); params.push(policyId) }
+  if (resolved !== undefined) { conditions.push(`pv.resolved = $${idx++}`); params.push(resolved) }
+  params.push(limit, offset)
+  const result = await pool.query(
+    `SELECT pv.*, cp.name AS policy_name, cp.policy_type
+     FROM policy_violations pv
+     INNER JOIN cost_policies cp ON pv.policy_id = cp.id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY pv.created_at DESC LIMIT $${idx++} OFFSET $${idx++}`,
+    params
+  )
+  return result.rows
+}
+
+export const resolvePolicyViolation = async (violationId, userId) => {
+  const result = await pool.query(
+    'UPDATE policy_violations SET resolved = true, resolved_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING *',
+    [violationId, userId]
+  )
+  return result.rows[0]
+}
+
+// ============================================================
+// Forecast scenarios CRUD
+// ============================================================
+
+export const createForecastScenario = async (userId, orgId, data) => {
+  const result = await pool.query(
+    `INSERT INTO forecast_scenarios (user_id, organization_id, name, description,
+       base_monthly_cost, adjustments, forecast_months)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [userId, orgId, data.name, data.description, data.baseMonthlyCost,
+     JSON.stringify(data.adjustments || []), data.forecastMonths || 6]
+  )
+  return result.rows[0]
+}
+
+export const getForecastScenarios = async (userId, orgId = null) => {
+  const conditions = ['user_id = $1']
+  const params = [userId]
+  if (orgId) { conditions.push('organization_id = $2'); params.push(orgId) }
+  const result = await pool.query(
+    `SELECT * FROM forecast_scenarios WHERE ${conditions.join(' AND ')} ORDER BY updated_at DESC`,
+    params
+  )
+  return result.rows
+}
+
+export const getForecastScenarioById = async (scenarioId, userId) => {
+  const result = await pool.query(
+    'SELECT * FROM forecast_scenarios WHERE id = $1 AND user_id = $2',
+    [scenarioId, userId]
+  )
+  return result.rows[0]
+}
+
+export const updateForecastScenario = async (scenarioId, userId, data) => {
+  const result = await pool.query(
+    `UPDATE forecast_scenarios SET
+       name = COALESCE($3, name),
+       description = COALESCE($4, description),
+       adjustments = COALESCE($5, adjustments),
+       forecast_months = COALESCE($6, forecast_months),
+       forecast_data = COALESCE($7, forecast_data),
+       ai_narrative = COALESCE($8, ai_narrative),
+       updated_at = NOW()
+     WHERE id = $1 AND user_id = $2 RETURNING *`,
+    [scenarioId, userId, data.name, data.description,
+     data.adjustments ? JSON.stringify(data.adjustments) : null,
+     data.forecastMonths, data.forecastData ? JSON.stringify(data.forecastData) : null,
+     data.aiNarrative]
+  )
+  return result.rows[0]
+}
+
+export const deleteForecastScenario = async (scenarioId, userId) => {
+  await pool.query('DELETE FROM forecast_scenarios WHERE id = $1 AND user_id = $2', [scenarioId, userId])
+}
+
+// ============================================================
+// Kubernetes cost allocation CRUD
+// ============================================================
+
+export const createK8sCluster = async (userId, orgId, data) => {
+  const result = await pool.query(
+    `INSERT INTO k8s_clusters (user_id, organization_id, account_id, cluster_name, cluster_id,
+       provider_id, region, node_count, total_cost)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (user_id, cluster_name) DO UPDATE SET
+       node_count = COALESCE(EXCLUDED.node_count, k8s_clusters.node_count),
+       total_cost = COALESCE(EXCLUDED.total_cost, k8s_clusters.total_cost),
+       updated_at = NOW()
+     RETURNING *`,
+    [userId, orgId, data.accountId, data.clusterName, data.clusterId,
+     data.providerId, data.region, data.nodeCount || 0, data.totalCost || 0]
+  )
+  return result.rows[0]
+}
+
+export const getK8sClusters = async (userId, orgId = null) => {
+  const conditions = ['user_id = $1']
+  const params = [userId]
+  if (orgId) { conditions.push('organization_id = $2'); params.push(orgId) }
+  const result = await pool.query(
+    `SELECT * FROM k8s_clusters WHERE ${conditions.join(' AND ')} ORDER BY cluster_name`,
+    params
+  )
+  return result.rows
+}
+
+export const getK8sClusterById = async (clusterId, userId) => {
+  const result = await pool.query(
+    'SELECT * FROM k8s_clusters WHERE id = $1 AND user_id = $2',
+    [clusterId, userId]
+  )
+  return result.rows[0]
+}
+
+export const deleteK8sCluster = async (clusterId, userId) => {
+  await pool.query('DELETE FROM k8s_clusters WHERE id = $1 AND user_id = $2', [clusterId, userId])
+}
+
+export const upsertK8sNamespaceCosts = async (clusterId, data) => {
+  const result = await pool.query(
+    `INSERT INTO k8s_namespace_costs (cluster_id, namespace, date, cpu_request_cores, cpu_usage_cores,
+       memory_request_bytes, memory_usage_bytes, cpu_cost, memory_cost, total_cost, pod_count)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (cluster_id, namespace, date) DO UPDATE SET
+       cpu_request_cores = EXCLUDED.cpu_request_cores,
+       cpu_usage_cores = EXCLUDED.cpu_usage_cores,
+       memory_request_bytes = EXCLUDED.memory_request_bytes,
+       memory_usage_bytes = EXCLUDED.memory_usage_bytes,
+       cpu_cost = EXCLUDED.cpu_cost,
+       memory_cost = EXCLUDED.memory_cost,
+       total_cost = EXCLUDED.total_cost,
+       pod_count = EXCLUDED.pod_count
+     RETURNING *`,
+    [clusterId, data.namespace, data.date, data.cpuRequestCores, data.cpuUsageCores,
+     data.memoryRequestBytes, data.memoryUsageBytes, data.cpuCost, data.memoryCost,
+     data.totalCost, data.podCount || 0]
+  )
+  return result.rows[0]
+}
+
+export const getK8sNamespaceCosts = async (clusterId, startDate, endDate) => {
+  const result = await pool.query(
+    `SELECT namespace, date, cpu_request_cores, cpu_usage_cores,
+       memory_request_bytes, memory_usage_bytes, cpu_cost, memory_cost,
+       total_cost, pod_count
+     FROM k8s_namespace_costs
+     WHERE cluster_id = $1 AND date >= $2 AND date <= $3
+     ORDER BY total_cost DESC, date DESC`,
+    [clusterId, startDate, endDate]
+  )
+  return result.rows
+}
+
+export const getK8sNamespaceSummary = async (clusterId, startDate, endDate) => {
+  const result = await pool.query(
+    `SELECT namespace,
+       SUM(total_cost)::float AS total_cost,
+       AVG(cpu_request_cores)::float AS avg_cpu_request,
+       AVG(cpu_usage_cores)::float AS avg_cpu_usage,
+       AVG(memory_request_bytes)::float AS avg_memory_request,
+       AVG(memory_usage_bytes)::float AS avg_memory_usage,
+       AVG(pod_count)::float AS avg_pod_count,
+       COUNT(*)::int AS days
+     FROM k8s_namespace_costs
+     WHERE cluster_id = $1 AND date >= $2 AND date <= $3
+     GROUP BY namespace
+     ORDER BY total_cost DESC`,
+    [clusterId, startDate, endDate]
+  )
+  return result.rows
+}
+
+export const upsertK8sWorkloadCosts = async (clusterId, data) => {
+  const result = await pool.query(
+    `INSERT INTO k8s_workload_costs (cluster_id, namespace, workload_name, workload_type, date,
+       cpu_request_cores, cpu_usage_cores, memory_request_bytes, memory_usage_bytes,
+       cpu_cost, memory_cost, total_cost, replica_count, idle_cost)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     ON CONFLICT (cluster_id, namespace, workload_name, date) DO UPDATE SET
+       workload_type = EXCLUDED.workload_type,
+       cpu_request_cores = EXCLUDED.cpu_request_cores,
+       cpu_usage_cores = EXCLUDED.cpu_usage_cores,
+       memory_request_bytes = EXCLUDED.memory_request_bytes,
+       memory_usage_bytes = EXCLUDED.memory_usage_bytes,
+       cpu_cost = EXCLUDED.cpu_cost,
+       memory_cost = EXCLUDED.memory_cost,
+       total_cost = EXCLUDED.total_cost,
+       replica_count = EXCLUDED.replica_count,
+       idle_cost = EXCLUDED.idle_cost
+     RETURNING *`,
+    [clusterId, data.namespace, data.workloadName, data.workloadType, data.date,
+     data.cpuRequestCores, data.cpuUsageCores, data.memoryRequestBytes, data.memoryUsageBytes,
+     data.cpuCost, data.memoryCost, data.totalCost, data.replicaCount || 1, data.idleCost || 0]
+  )
+  return result.rows[0]
+}
+
+export const getK8sWorkloadCosts = async (clusterId, namespace, startDate, endDate) => {
+  const conditions = ['cluster_id = $1', 'date >= $2', 'date <= $3']
+  const params = [clusterId, startDate, endDate]
+  if (namespace) { conditions.push('namespace = $4'); params.push(namespace) }
+  const result = await pool.query(
+    `SELECT namespace, workload_name, workload_type,
+       SUM(total_cost)::float AS total_cost,
+       SUM(idle_cost)::float AS total_idle_cost,
+       AVG(cpu_request_cores)::float AS avg_cpu_request,
+       AVG(cpu_usage_cores)::float AS avg_cpu_usage,
+       AVG(replica_count)::float AS avg_replicas,
+       COUNT(*)::int AS days
+     FROM k8s_workload_costs
+     WHERE ${conditions.join(' AND ')}
+     GROUP BY namespace, workload_name, workload_type
+     ORDER BY total_cost DESC`,
+    params
+  )
+  return result.rows
+}
+
+export const updateK8sClusterMetrics = async (clusterId, userId, { nodeCount, totalCost }) => {
+  const result = await pool.query(
+    `UPDATE k8s_clusters SET node_count = COALESCE($3, node_count),
+       total_cost = COALESCE($4, total_cost), last_metrics_at = NOW(), updated_at = NOW()
+     WHERE id = $1 AND user_id = $2 RETURNING *`,
+    [clusterId, userId, nodeCount, totalCost]
+  )
+  return result.rows[0]
 }
 
 // Close database connection pool

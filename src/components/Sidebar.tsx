@@ -9,7 +9,11 @@ import {
   FileText,
   ArrowLeftRight,
   MessageCircle,
-  X
+  X,
+  AlertTriangle,
+  Shield,
+  TrendingUp,
+  Container,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
@@ -184,6 +188,82 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
               <FileText className="h-5 w-5" />
             </div>
             <span className="text-sm">Reports</span>
+          </Link>
+
+          {/* Anomalies */}
+          <Link
+            to="/anomalies"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
+              ${isActive('/anomalies')
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <div className={`${isActive('/anomalies') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <span className="text-sm">Anomalies</span>
+          </Link>
+
+          {/* Forecasts */}
+          <Link
+            to="/forecasts"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
+              ${isActive('/forecasts')
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <div className={`${isActive('/forecasts') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <TrendingUp className="h-5 w-5" />
+            </div>
+            <span className="text-sm">Forecasts</span>
+          </Link>
+
+          {/* Policies */}
+          <Link
+            to="/policies"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
+              ${isActive('/policies')
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <div className={`${isActive('/policies') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <Shield className="h-5 w-5" />
+            </div>
+            <span className="text-sm">Policies</span>
+          </Link>
+
+          {/* Kubernetes */}
+          <Link
+            to="/kubernetes"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
+              ${isActive('/kubernetes')
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <div className={`${isActive('/kubernetes') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <Container className="h-5 w-5" />
+            </div>
+            <span className="text-sm">Kubernetes</span>
           </Link>
 
           {/* Compare */}

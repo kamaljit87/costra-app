@@ -1,5 +1,8 @@
 import express from 'express'
 import {
+  getAnomalyEvents, updateAnomalyEventStatus,
+} from '../database.js'
+import {
   getCostVsUsage,
   getUntaggedResources,
   getAnomalies,
@@ -1118,6 +1121,51 @@ router.post('/recommendations/refresh', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('Refresh recommendations error', { userId: req.user?.userId, error: error.message })
     res.status(500).json({ error: 'Failed to start optimization analysis' })
+  }
+})
+
+// ============================================================
+// Anomaly Events (ML-powered anomaly detection)
+// ============================================================
+
+/**
+ * GET /api/insights/anomalies/events
+ * Get ML-detected anomaly events with root cause analysis
+ */
+router.get('/anomalies/events', async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const { status, severity, providerId, limit = 50, offset = 0 } = req.query
+    const result = await getAnomalyEvents(userId, {
+      status, severity, providerId,
+      limit: parseInt(limit), offset: parseInt(offset),
+    })
+    res.json(result)
+  } catch (error) {
+    logger.error('Get anomaly events error', { userId: req.user?.userId, error: error.message })
+    res.status(500).json({ error: 'Failed to get anomaly events' })
+  }
+})
+
+/**
+ * PUT /api/insights/anomalies/events/:id/status
+ * Update anomaly event resolution status
+ */
+router.put('/anomalies/events/:id/status', async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const eventId = parseInt(req.params.id)
+    const { status } = req.body
+    const validStatuses = ['open', 'acknowledged', 'investigating', 'resolved', 'false_positive']
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` })
+    }
+    const event = await updateAnomalyEventStatus(eventId, userId, status)
+    if (!event) return res.status(404).json({ error: 'Anomaly event not found' })
+    res.json({ event })
+  } catch (error) {
+    logger.error('Update anomaly status error', { userId: req.user?.userId, error: error.message })
+    res.status(500).json({ error: 'Failed to update anomaly status' })
   }
 })
 

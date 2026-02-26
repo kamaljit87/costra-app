@@ -25,6 +25,10 @@ import contactRoutes from './contact.js'
 import adminRoutes from './admin.js'
 import awsCallbackRoutes from './awsCallback.js'
 import healthRoutes from './health.js'
+import organizationsRoutes from './organizations.js'
+import policiesRoutes from './policies.js'
+import forecastsRoutes from './forecasts.js'
+import kubernetesRoutes from './kubernetes.js'
 
 const routes = [
   { path: '/api/auth', handler: authRoutes },
@@ -50,6 +54,10 @@ const routes = [
   { path: '/api/contact', handler: contactRoutes },
   { path: '/api/admin', handler: adminRoutes },
   { path: '/api/health', handler: healthRoutes },
+  { path: '/api/organizations', handler: organizationsRoutes },
+  { path: '/api/policies', handler: policiesRoutes },
+  { path: '/api/forecasts', handler: forecastsRoutes },
+  { path: '/api/kubernetes', handler: kubernetesRoutes },
 ]
 
 /**

@@ -37,6 +37,11 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const BlogListPage = lazy(() => import('./pages/BlogListPage'))
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage'))
 const DocsPage = lazy(() => import('./pages/DocsPage'))
+const OrganizationPage = lazy(() => import('./pages/OrganizationPage'))
+const AnomaliesPage = lazy(() => import('./pages/AnomaliesPage'))
+const PoliciesPage = lazy(() => import('./pages/PoliciesPage'))
+const ForecastPage = lazy(() => import('./pages/ForecastPage'))
+const KubernetesPage = lazy(() => import('./pages/KubernetesPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -199,6 +204,46 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/organization"
+              element={
+                <ProtectedRoute>
+                  <OrganizationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/anomalies"
+              element={
+                <ProtectedRoute>
+                  <AnomaliesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/policies"
+              element={
+                <ProtectedRoute>
+                  <PoliciesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/forecasts"
+              element={
+                <ProtectedRoute>
+                  <ForecastPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/kubernetes"
+              element={
+                <ProtectedRoute>
+                  <KubernetesPage />
                 </ProtectedRoute>
               }
             />

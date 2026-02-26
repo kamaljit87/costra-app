@@ -33,6 +33,8 @@ function getDateRangeForMonth(month, year) {
 import { enhanceCostData } from '../utils/costCalculations.js'
 import { sanitizeCostData, validateCostDataResponse } from '../utils/dataValidator.js'
 import { runOptimizationForUser } from '../services/optimizationEngine.js'
+import { detectAnomalies } from '../services/anomalyService.js'
+import { evaluatePolicies } from '../services/policyEngine.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -160,6 +162,14 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
     // Run optimization analysis (async, non-blocking)
     runOptimizationForUser(userId)
       .catch(err => logger.error('Optimization analysis failed after sync', { userId, error: err.message }))
+
+    // Run ML anomaly detection with root cause analysis (async, non-blocking)
+    detectAnomalies(userId, req.orgId || null, account.provider_id, account.id)
+      .catch(err => logger.error('Anomaly detection failed after sync', { userId, error: err.message }))
+
+    // Evaluate cost policies (async, non-blocking)
+    evaluatePolicies(userId, req.orgId || null)
+      .catch(err => logger.error('Policy evaluation failed after sync', { userId, error: err.message }))
 
     await updateCloudProviderSyncTime(userId, account.id)
 

@@ -1310,3 +1310,252 @@ export const complianceAPI = {
     return response.json()
   },
 }
+
+// ============================================================
+// Organizations API
+// ============================================================
+export const organizationsAPI = {
+  list: async () => {
+    const response = await apiRequest('/organizations')
+    return response.json()
+  },
+  create: async (name: string) => {
+    const response = await apiRequest('/organizations', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    })
+    return response.json()
+  },
+  get: async (id: number) => {
+    const response = await apiRequest(`/organizations/${id}`)
+    return response.json()
+  },
+  update: async (id: number, name: string) => {
+    const response = await apiRequest(`/organizations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    })
+    return response.json()
+  },
+  getMembers: async (id: number) => {
+    const response = await apiRequest(`/organizations/${id}/members`)
+    return response.json()
+  },
+  updateMemberRole: async (orgId: number, userId: number, role: string) => {
+    const response = await apiRequest(`/organizations/${orgId}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    })
+    return response.json()
+  },
+  removeMember: async (orgId: number, userId: number) => {
+    const response = await apiRequest(`/organizations/${orgId}/members/${userId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+  createInvite: async (orgId: number, email: string, role: string = 'member') => {
+    const response = await apiRequest(`/organizations/${orgId}/invites`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    })
+    return response.json()
+  },
+  getInvites: async (orgId: number) => {
+    const response = await apiRequest(`/organizations/${orgId}/invites`)
+    return response.json()
+  },
+  deleteInvite: async (orgId: number, inviteId: number) => {
+    const response = await apiRequest(`/organizations/${orgId}/invites/${inviteId}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+  acceptInvite: async (token: string) => {
+    const response = await apiRequest('/organizations/accept-invite', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    })
+    return response.json()
+  },
+}
+
+// ============================================================
+// Anomaly Events API (ML-powered)
+// ============================================================
+export const anomalyEventsAPI = {
+  getEvents: async (params?: { status?: string; severity?: string; providerId?: string; limit?: number; offset?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.severity) query.set('severity', params.severity)
+    if (params?.providerId) query.set('providerId', params.providerId)
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.offset) query.set('offset', String(params.offset))
+    const response = await apiRequest(`/insights/anomalies/events?${query.toString()}`)
+    return response.json()
+  },
+  updateStatus: async (eventId: number, status: string) => {
+    const response = await apiRequest(`/insights/anomalies/events/${eventId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    })
+    return response.json()
+  },
+}
+
+// ============================================================
+// Cost Policies API
+// ============================================================
+export const policiesAPI = {
+  list: async () => {
+    const response = await apiRequest('/policies')
+    return response.json()
+  },
+  create: async (data: { name: string; description?: string; policyType: string; conditions: Record<string, unknown>; actions?: string[]; scopeProviderId?: string; scopeAccountId?: number }) => {
+    const response = await apiRequest('/policies', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+  get: async (id: number) => {
+    const response = await apiRequest(`/policies/${id}`)
+    return response.json()
+  },
+  update: async (id: number, data: Record<string, unknown>) => {
+    const response = await apiRequest(`/policies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest(`/policies/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+  getViolations: async (params?: { policyId?: number; resolved?: boolean; limit?: number; offset?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.policyId) query.set('policyId', String(params.policyId))
+    if (params?.resolved !== undefined) query.set('resolved', String(params.resolved))
+    if (params?.limit) query.set('limit', String(params.limit))
+    if (params?.offset) query.set('offset', String(params.offset))
+    const response = await apiRequest(`/policies/violations/list?${query.toString()}`)
+    return response.json()
+  },
+  resolveViolation: async (violationId: number) => {
+    const response = await apiRequest(`/policies/violations/${violationId}/resolve`, {
+      method: 'PUT',
+    })
+    return response.json()
+  },
+}
+
+// ============================================================
+// Forecasts API
+// ============================================================
+export const forecastsAPI = {
+  getBaseForecast: async (months: number = 6, providerId?: string, accountId?: number) => {
+    const query = new URLSearchParams({ months: String(months) })
+    if (providerId) query.set('providerId', providerId)
+    if (accountId) query.set('accountId', String(accountId))
+    const response = await apiRequest(`/forecasts?${query.toString()}`)
+    return response.json()
+  },
+  listScenarios: async () => {
+    const response = await apiRequest('/forecasts/scenarios')
+    return response.json()
+  },
+  createScenario: async (data: { name: string; description?: string; adjustments: unknown[]; forecastMonths?: number }) => {
+    const response = await apiRequest('/forecasts/scenarios', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+  getScenario: async (id: number) => {
+    const response = await apiRequest(`/forecasts/scenarios/${id}`)
+    return response.json()
+  },
+  updateScenario: async (id: number, data: Record<string, unknown>) => {
+    const response = await apiRequest(`/forecasts/scenarios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+  computeScenario: async (id: number) => {
+    const response = await apiRequest(`/forecasts/scenarios/${id}/compute`, {
+      method: 'POST',
+    })
+    return response.json()
+  },
+  deleteScenario: async (id: number) => {
+    const response = await apiRequest(`/forecasts/scenarios/${id}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+  preview: async (adjustments: unknown[], forecastMonths: number = 6) => {
+    const response = await apiRequest('/forecasts/preview', {
+      method: 'POST',
+      body: JSON.stringify({ adjustments, forecastMonths }),
+    })
+    return response.json()
+  },
+}
+
+// ============================================================
+// Kubernetes API
+// ============================================================
+export const kubernetesAPI = {
+  listClusters: async () => {
+    const response = await apiRequest('/kubernetes/clusters')
+    return response.json()
+  },
+  createCluster: async (data: { clusterName: string; clusterId?: string; providerId?: string; accountId?: number; region?: string; nodeCount?: number; totalCost?: number }) => {
+    const response = await apiRequest('/kubernetes/clusters', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    return response.json()
+  },
+  getCluster: async (id: number) => {
+    const response = await apiRequest(`/kubernetes/clusters/${id}`)
+    return response.json()
+  },
+  deleteCluster: async (id: number) => {
+    const response = await apiRequest(`/kubernetes/clusters/${id}`, {
+      method: 'DELETE',
+    })
+    return response.json()
+  },
+  ingestMetrics: async (clusterId: number, payload: Record<string, unknown>) => {
+    const response = await apiRequest(`/kubernetes/clusters/${clusterId}/metrics`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    return response.json()
+  },
+  getNamespaces: async (clusterId: number, startDate?: string, endDate?: string) => {
+    const query = new URLSearchParams()
+    if (startDate) query.set('startDate', startDate)
+    if (endDate) query.set('endDate', endDate)
+    const response = await apiRequest(`/kubernetes/clusters/${clusterId}/namespaces?${query.toString()}`)
+    return response.json()
+  },
+  getWorkloads: async (clusterId: number, namespace?: string, startDate?: string, endDate?: string) => {
+    const query = new URLSearchParams()
+    if (namespace) query.set('namespace', namespace)
+    if (startDate) query.set('startDate', startDate)
+    if (endDate) query.set('endDate', endDate)
+    const response = await apiRequest(`/kubernetes/clusters/${clusterId}/workloads?${query.toString()}`)
+    return response.json()
+  },
+  getIdleResources: async (clusterId: number, startDate?: string, endDate?: string) => {
+    const query = new URLSearchParams()
+    if (startDate) query.set('startDate', startDate)
+    if (endDate) query.set('endDate', endDate)
+    const response = await apiRequest(`/kubernetes/clusters/${clusterId}/idle?${query.toString()}`)
+    return response.json()
+  },
+}
