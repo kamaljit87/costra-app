@@ -11,12 +11,20 @@ import {
   FileText,
   ArrowLeftRight,
   ShieldCheck,
+  AlertTriangle,
+  TrendingUp,
+  Shield,
+  Container,
 } from 'lucide-react'
 
 const BASE_NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/budgets', label: 'Budgets', icon: Wallet },
   { to: '/reports', label: 'Reports', icon: FileText },
+  { to: '/anomalies', label: 'Anomalies', icon: AlertTriangle },
+  { to: '/forecasts', label: 'Forecasts', icon: TrendingUp },
+  { to: '/policies', label: 'Policies', icon: Shield },
+  { to: '/kubernetes', label: 'Kubernetes', icon: Container },
   { to: '/compare', label: 'Compare', icon: ArrowLeftRight },
 ]
 
