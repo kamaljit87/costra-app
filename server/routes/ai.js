@@ -139,11 +139,10 @@ Return ONLY a valid JSON array, no other text.`
     res.json({ insights })
 
   } catch (error) {
-    logger.error('AI Insights: Error', { 
-      userId, 
-      providerId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('AI Insights: Error', {
+      userId,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to generate insights' })
   }
@@ -202,11 +201,10 @@ Return ONLY a valid JSON array of anomalies, no other text. If no anomalies are 
     res.json({ anomalies })
 
   } catch (error) {
-    logger.error('AI Anomalies: Error', { 
-      userId, 
-      providerId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('AI Anomalies: Error', {
+      userId,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to detect anomalies' })
   }
@@ -310,11 +308,10 @@ async function gatherCostContext(userId) {
     }
 
   } catch (error) {
-    logger.error('AI Context: Error gathering cost context', { 
-      userId, 
-      providerId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('AI Context: Error gathering cost context', {
+      userId,
+      error: error.message,
+      stack: error.stack
     })
     return { hasData: false, error: error.message }
   }

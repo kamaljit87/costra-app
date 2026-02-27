@@ -6920,7 +6920,7 @@ export const bulkUpsertRecommendations = async (userId, recommendations) => {
           userId, rec.account_id || null, rec.provider_id, rec.category, rec.subcategory || null,
           rec.service_name || null, rec.resource_id || null, rec.resource_name || null, rec.resource_type || null, rec.region || null,
           rec.title, rec.description, rec.action, rec.priority,
-          rec.estimated_monthly_savings || 0, rec.estimated_savings_percent || 0, rec.confidence,
+          rec.estimated_monthly_savings || 0, Math.min(parseFloat(rec.estimated_savings_percent) || 0, 999.99), rec.confidence,
           rec.current_cost || null, rec.current_usage || null, rec.usage_unit || null, JSON.stringify(rec.evidence || {}),
           rec.expires_at || null
         ]
@@ -7389,7 +7389,7 @@ export const createAnomalyEvent = async (data) => {
      RETURNING *`,
     [data.userId, data.organizationId, data.accountId, data.providerId, data.serviceName,
      data.detectedDate, data.anomalyType, data.severity, data.expectedCost, data.actualCost,
-     data.variancePercent, data.rootCause, JSON.stringify(data.contributingServices || [])]
+     Math.min(Math.max(parseFloat(data.variancePercent) || 0, -99999999.99), 99999999.99), data.rootCause, JSON.stringify(data.contributingServices || [])]
   )
   return result.rows[0]
 }

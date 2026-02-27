@@ -49,7 +49,7 @@ router.use(syncLimiter)
  * Sync a single account — extracted for parallel execution.
  * Returns { result } on success or { error } on failure.
  */
-async function syncSingleAccount({ account, userId, requestId, startDate, endDate, currentMonth, currentYear, forceRefresh }) {
+async function syncSingleAccount({ account, userId, requestId, startDate, endDate, currentMonth, currentYear, forceRefresh, orgId }) {
   const accountLabel = account.account_alias || `${account.provider_id} (${account.id})`
   logger.info('Processing account', { requestId, userId, accountId: account.id, accountLabel })
 
@@ -143,7 +143,7 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       dailyData: costData.dailyData || [],
       services: sanitizedData.services || [],
       total: sanitizedData.currentMonth,
-    }).catch(() => {})
+    }).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
 
     // Save service-level cost + usage for Cost vs Usage analytics (AWS returns serviceUsageMetrics)
     if (costData.serviceUsageMetrics?.length > 0) {
@@ -164,11 +164,11 @@ async function syncSingleAccount({ account, userId, requestId, startDate, endDat
       .catch(err => logger.error('Optimization analysis failed after sync', { userId, error: err.message }))
 
     // Run ML anomaly detection with root cause analysis (async, non-blocking)
-    detectAnomalies(userId, req.orgId || null, account.provider_id, account.id)
+    detectAnomalies(userId, orgId || null, account.provider_id, account.id)
       .catch(err => logger.error('Anomaly detection failed after sync', { userId, error: err.message }))
 
     // Evaluate cost policies (async, non-blocking)
-    evaluatePolicies(userId, req.orgId || null)
+    evaluatePolicies(userId, orgId || null)
       .catch(err => logger.error('Policy evaluation failed after sync', { userId, error: err.message }))
 
     await updateCloudProviderSyncTime(userId, account.id)
@@ -264,6 +264,7 @@ router.post('/', async (req, res) => {
       activeAccounts.map(account => syncSingleAccount({
         account, userId, requestId: req.requestId,
         startDate, endDate, currentMonth, currentYear, forceRefresh,
+        orgId: req.orgId || null,
       }))
     )
 
@@ -434,10 +435,10 @@ router.post('/fetch-month', async (req, res) => {
           dailyData: costData.dailyData || [],
           services: sanitizedData.services || [],
           total: sanitizedData.currentMonth,
-        }).catch(() => {})
+        }).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
 
-        await clearUserCache(userId).catch(() => {})
-        await cacheDel(`cost_data:${userId}:${monthNum}:${yearNum}`).catch(() => {})
+        await clearUserCache(userId).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
+        await cacheDel(`cost_data:${userId}:${monthNum}:${yearNum}`).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
         results.push({ accountId: account.id, accountAlias: account.account_alias, status: 'success' })
       } catch (err) {
         logger.error('Fetch-month: account failed', { userId, accountId: account.id, providerId, error: err.message, stack: err.stack })
@@ -585,7 +586,7 @@ router.post('/account/:accountId', async (req, res) => {
       dailyData: costData.dailyData || [],
       services: sanitizedData.services || [],
       total: sanitizedData.currentMonth,
-    }).catch(() => {})
+    }).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
 
     // Calculate anomaly baselines for all services (async, non-blocking)
     calculateBaselinesForServices(userId, providerId, accountId, costData)
@@ -718,7 +719,7 @@ router.post('/:providerId', async (req, res) => {
           dailyData: costData.dailyData || [],
           services: sanitizedData.services || [],
           total: sanitizedData.currentMonth,
-        }).catch(() => {})
+        }).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
 
         // Calculate anomaly baselines for all services (async, non-blocking)
         calculateBaselinesForServices(userId, providerId, account.id, costData)
@@ -738,7 +739,7 @@ router.post('/:providerId', async (req, res) => {
     }
 
     if (results.length > 0) {
-      await cacheDel(`cost_data:${userId}:${currentMonth}:${currentYear}`).catch(() => {})
+      await cacheDel(`cost_data:${userId}:${currentMonth}:${currentYear}`).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
     }
 
     const statusCode = errors.length > 0

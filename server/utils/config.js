@@ -140,10 +140,7 @@ export const validateConfig = () => {
 
   // Log errors and exit if critical
   if (errors.length > 0) {
-    logger.error('Configuration validation failed:', { errors })
-    console.error('\nConfiguration Errors:')
-    errors.forEach((error) => console.error(`  - ${error}`))
-    console.error('\nPlease fix these errors and restart the server.\n')
+    logger.error('Configuration validation failed. Please fix these errors and restart the server.', { errors })
     process.exit(1)
   }
 
