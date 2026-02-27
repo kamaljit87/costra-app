@@ -14,6 +14,7 @@ const NotFound = lazy(() => import('./components/ui/ghost-404-page').then(m => (
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const LoginTravelPage = lazy(() => import('./pages/LoginTravelPage'))
 const SignupTravelPage = lazy(() => import('./pages/SignupTravelPage'))
+const WaitlistPage = lazy(() => import('./pages/WaitlistPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const ProviderDetailPage = lazy(() => import('./pages/ProviderDetailPage'))
@@ -101,6 +102,7 @@ function App() {
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<PublicRoute><LoginTravelPage /></PublicRoute>} />
                   <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
+                  <Route path="/waitlist" element={<WaitlistPage />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />

@@ -16,7 +16,6 @@ import {
   Container,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { usePublicConfig } from '../contexts/PublicConfigContext'
 import { cloudProvidersAPI } from '../services/api'
 import { ProviderIcon } from './CloudProviderIcons'
 
@@ -40,7 +39,6 @@ interface CloudAccount {
 export default function Sidebar({ isOpen, onClose, isPermanent = false, onContactClick }: SidebarProps) {
   const location = useLocation()
   const { isDemoMode } = useAuth()
-  const { signupDisabled } = usePublicConfig()
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([])
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set())
 
@@ -379,10 +377,10 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
                   Connect cloud providers to track costs
                 </p>
                 <Link
-                  to={signupDisabled ? '/login' : '/signup'}
+                  to="/waitlist"
                   className="inline-flex items-center px-4 py-2 rounded-lg text-xs text-white bg-accent-500 hover:bg-accent-600 font-semibold transition-colors duration-150"
                 >
-                  {signupDisabled ? 'Sign in' : 'Get started'}
+                  Join waitlist
                 </Link>
               </div>
             </div>

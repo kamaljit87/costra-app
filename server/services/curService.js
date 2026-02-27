@@ -1008,18 +1008,17 @@ export const pollCURDataForAllAccounts = async () => {
       )
 
       if (isAccessError) {
-        // Disable CUR and notify user
-        await pool.query(
-          `UPDATE cloud_provider_credentials SET cur_enabled = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          [config.account_id]
-        )
+        // Keep cur_enabled = true so the poller retries on next cycle.
+        // The cur_status = 'error' above is sufficient to surface the issue in the UI.
+        // If the access issue is resolved (e.g. stack redeployed), the poller will
+        // transition back to 'active' automatically when data is found (line ~974).
         try {
           await createNotification(config.user_id, {
             type: 'warning',
             title: 'CUR Access Error',
-            message: 'Unable to read CUR data from S3. Please verify your AWS CloudFormation stack is intact.',
-            link: '/settings',
-            linkText: 'View Settings',
+            message: 'Unable to read CUR data from S3. Please verify your AWS CloudFormation stack is intact and the S3 bucket policy is correct.',
+            link: '/settings?tab=providers',
+            linkText: 'Check Cloud Providers',
           })
         } catch (notifErr) {
           logger.error('Failed to create CUR error notification', { error: notifErr.message })
@@ -1037,6 +1036,18 @@ export const getCURStatus = async (userId, accountId) => {
   const config = await getCurConfig(userId, accountId)
   if (!config) {
     return { curEnabled: false, curStatus: null, lastIngestion: null, billingPeriods: [], bucketEmpty: false }
+  }
+
+  // Self-heal: if cur_export_config exists but cur_enabled was set to false (e.g. by a past
+  // transient error), re-enable it so the poller picks it up again on the next cycle.
+  try {
+    await pool.query(
+      `UPDATE cloud_provider_credentials SET cur_enabled = true, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND user_id = $2 AND cur_enabled = false`,
+      [accountId, userId]
+    )
+  } catch (healErr) {
+    logger.debug('CUR self-heal update failed (non-fatal)', { userId, accountId, error: healErr.message })
   }
 
   // Get ingested billing periods

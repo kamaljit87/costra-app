@@ -946,6 +946,28 @@ export const initDatabase = async () => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_marketing_leads_active ON marketing_leads(is_active, subscribed_at)`)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_marketing_leads_email ON marketing_leads(email)`)
 
+      // Add company column and waitlist source to marketing_leads
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'marketing_leads' AND column_name = 'company'
+          ) THEN
+            ALTER TABLE marketing_leads ADD COLUMN company TEXT;
+          END IF;
+        END $$
+      `)
+      await client.query(`
+        DO $$
+        BEGIN
+          ALTER TABLE marketing_leads DROP CONSTRAINT IF EXISTS marketing_leads_source_check;
+          ALTER TABLE marketing_leads ADD CONSTRAINT marketing_leads_source_check
+            CHECK (source IN ('account_deletion', 'signup', 'landing_page', 'blog', 'waitlist', 'other'));
+        EXCEPTION WHEN others THEN NULL;
+        END $$
+      `)
+
       // Add auto_sync columns to cloud_provider_credentials
       await client.query(`
         DO $$ 
@@ -6583,19 +6605,20 @@ export const cancelDeletionRequest = async (userId, requestId) => {
 /**
  * Add a marketing lead (upsert — reactivates if previously unsubscribed)
  */
-export const addMarketingLead = async (email, name, source = 'account_deletion', ipAddress = null) => {
+export const addMarketingLead = async (email, name, source = 'account_deletion', ipAddress = null, company = null) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      `INSERT INTO marketing_leads (email, name, source, ip_address)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO marketing_leads (email, name, source, ip_address, company)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email) DO UPDATE SET
          name = COALESCE(EXCLUDED.name, marketing_leads.name),
+         company = COALESCE(EXCLUDED.company, marketing_leads.company),
          is_active = true,
          unsubscribed_at = NULL,
          subscribed_at = CURRENT_TIMESTAMP
        RETURNING *`,
-      [email, name, source, ipAddress]
+      [email, name, source, ipAddress, company]
     )
     return result.rows[0]
   } finally {

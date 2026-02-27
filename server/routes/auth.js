@@ -17,6 +17,7 @@ import {
 import { authenticateToken } from '../middleware/auth.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
 import { createTrialSubscription } from '../services/subscriptionService.js'
+import { addMarketingLead } from '../database.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
@@ -114,6 +115,37 @@ router.post('/forgot-password', (req, res) => {
   }
   // Always return success to avoid revealing whether the account exists
   res.json({ message: 'If an account exists for this email, you will receive reset instructions.' })
+})
+
+/** Waitlist: store lead details securely (no auth required) */
+router.post('/waitlist', async (req, res) => {
+  try {
+    const { name, email, company } = req.body
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required' })
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address' })
+    }
+
+    const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress
+    await addMarketingLead(
+      email.trim().toLowerCase(),
+      name.trim(),
+      'waitlist',
+      typeof ipAddress === 'string' ? ipAddress.split(',')[0].trim() : ipAddress,
+      company?.trim() || null
+    )
+
+    logger.info('Waitlist signup', { email: email.trim().toLowerCase(), name: name.trim() })
+    res.json({ message: 'Successfully joined the waitlist' })
+  } catch (error) {
+    logger.error('Waitlist error', { error: error.message })
+    res.status(500).json({ error: 'Something went wrong. Please try again.' })
+  }
 })
 
 router.post('/signup',

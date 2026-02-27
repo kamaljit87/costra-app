@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { Home, CreditCard, Mail, BookOpen, LayoutDashboard, BookMarked } from 'lucide-react'
 import Logo from './Logo'
 import { cn } from '@/lib/utils'
-import { usePublicConfig } from '../contexts/PublicConfigContext'
 import { useAuth } from '../contexts/AuthContext'
 
 const NAV_ITEMS = [
@@ -16,7 +15,6 @@ const NAV_ITEMS = [
 
 export default function LandingNav() {
   const location = useLocation()
-  const { signupDisabled } = usePublicConfig()
   const { isAuthenticated, user } = useAuth()
 
   const initials = user?.name
@@ -123,13 +121,13 @@ export default function LandingNav() {
                   Sign In
                 </Link>
                 <Link
-                  to={signupDisabled ? '/login' : '/signup'}
+                  to="/waitlist"
                   className={cn(
                     'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
                     'bg-primary text-white hover:bg-primary/90',
                   )}
                 >
-                  {signupDisabled ? 'Sign In' : 'Get Started'}
+                  Join Waitlist
                 </Link>
               </>
             )}

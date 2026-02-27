@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import CurrencySelector from '../components/CurrencySelector'
 import CloudProviderManager from '../components/CloudProviderManager'
 import { authAPI, emailPreferencesAPI, billingAPI, apiKeysAPI } from '../services/api'
-import { Settings, Globe, Cloud, Shield, ShieldCheck, Mail, Sun, Moon, Monitor, Key, Plus, Trash2, Copy } from 'lucide-react'
+import { Settings, Globe, Cloud, Shield, ShieldCheck, Mail, Sun, Moon, Monitor, Key, Plus, Trash2, Copy, Building2, ChevronRight } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 type Tab = 'general' | 'providers' | 'security' | 'api'
@@ -253,6 +253,20 @@ export default function SettingsPage() {
               )}
               {isPro === true && emailPrefs === null && <p className="text-gray-500 text-sm">Loading…</p>}
             </div>
+
+            {/* Organization */}
+            <Link to="/organization" className="card block hover:border-accent-300 transition-colors group">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-accent-700 shrink-0 dark:text-accent-400" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Organization</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Manage your organization, members, and roles</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-accent-500 transition-colors" />
+              </div>
+            </Link>
           </div>
         )}
 
