@@ -4,6 +4,7 @@ import { Home, CreditCard, Mail, BookOpen, LayoutDashboard, BookMarked } from 'l
 import Logo from './Logo'
 import { cn } from '@/lib/utils'
 import { useAuth } from '../contexts/AuthContext'
+import { usePublicConfig } from '../contexts/PublicConfigContext'
 
 const NAV_ITEMS = [
   { name: 'Home', url: '/', icon: Home },
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
 export default function LandingNav() {
   const location = useLocation()
   const { isAuthenticated, user } = useAuth()
+  const { signupDisabled } = usePublicConfig()
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -109,7 +111,7 @@ export default function LandingNav() {
                   )}
                 </Link>
               </>
-            ) : (
+            ) : !signupDisabled ? (
               <>
                 <Link
                   to="/login"
@@ -130,7 +132,7 @@ export default function LandingNav() {
                   Join Waitlist
                 </Link>
               </>
-            )}
+            ) : null}
           </nav>
         </div>
       </div>

@@ -246,18 +246,28 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
 
   if (existingArn) {
     // Check export health — an existing export may be UNHEALTHY (e.g. bucket policy removed)
-    let exportStatus = 'active'
+    // Default to 'provisioning' — only mark 'active' after confirming data has been ingested
+    let exportStatus = 'provisioning'
     try {
       const resp = await bcmClient.send(new GetExportCommand({ ExportArn: existingArn }))
       const statusCode = resp.ExportStatus?.StatusCode
       const statusReason = resp.ExportStatus?.StatusReason
       if (statusCode === 'UNHEALTHY') {
-        exportStatus = 'provisioning'
         logger.warn('CUR export exists but is UNHEALTHY — bucket policy re-applied, waiting for next delivery', {
           userId, accountId, exportName, statusReason,
         })
       } else {
-        logger.info('CUR export health check', { userId, accountId, exportName, statusCode, statusReason })
+        // Export is healthy in AWS; check if we have ingested data before marking active
+        const ingestionResult = await pool.query(
+          `SELECT 1 FROM cur_ingestion_log cl
+           JOIN cur_export_config ce ON cl.cur_config_id = ce.id
+           WHERE ce.user_id = $1 AND ce.account_id = $2 AND cl.ingestion_status = 'completed' LIMIT 1`,
+          [userId, accountId]
+        )
+        if (ingestionResult.rows.length > 0) {
+          exportStatus = 'active'
+        }
+        logger.info('CUR export health check', { userId, accountId, exportName, statusCode, statusReason, exportStatus })
       }
     } catch (healthErr) {
       logger.warn('Could not check export health', { error: healthErr.message })

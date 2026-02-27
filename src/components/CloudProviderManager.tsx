@@ -105,6 +105,53 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
     }
   }, [])
 
+  // Poll CUR status for accounts in provisioning state (every 30s)
+  const curStatusesRef = useRef(curStatuses)
+  curStatusesRef.current = curStatuses
+
+  const provisioningKey = Object.entries(curStatuses)
+    .filter(([, s]) => s.curStatus === 'provisioning')
+    .map(([id]) => id)
+    .sort()
+    .join(',')
+
+  useEffect(() => {
+    if (!provisioningKey) return
+
+    const pollCurStatuses = async () => {
+      const accountIds = provisioningKey.split(',').map(Number)
+      const results = await Promise.allSettled(
+        accountIds.map((accountId) =>
+          cloudProvidersAPI.getCurStatus(accountId).then((result) => ({ accountId, result }))
+        )
+      )
+      setCurStatuses(prev => {
+        const next = { ...prev }
+        results.forEach((r) => {
+          if (r.status === 'fulfilled' && r.value) {
+            const { accountId, result } = r.value
+            next[accountId] = {
+              curEnabled: result.curEnabled,
+              curStatus: result.curStatus,
+              lastIngestion: result.lastIngestion,
+              statusMessage: result.statusMessage ?? null,
+              billingPeriods: result.billingPeriods,
+              bucketEmpty: result.bucketEmpty,
+              bucketEmptyMessage: result.bucketEmptyMessage ?? null,
+              exportStatusCode: result.exportStatusCode ?? null,
+              exportStatusReason: result.exportStatusReason ?? null,
+              exportStatusMessage: result.exportStatusMessage ?? null,
+            }
+          }
+        })
+        return next
+      })
+    }
+
+    const interval = setInterval(pollCurStatuses, 30000)
+    return () => clearInterval(interval)
+  }, [provisioningKey])
+
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current)

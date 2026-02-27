@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
 import LandingNav from '../components/LandingNav'
+import { usePublicConfig } from '../contexts/PublicConfigContext'
 import { FlickeringGrid } from '@/components/ui/flickering-grid'
 
 const PLANS = {
@@ -77,6 +78,7 @@ const FEATURES = [
 
 export default function LandingPage() {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
+  const { signupDisabled } = usePublicConfig()
   const location = useLocation()
   // Scroll to pricing when navigating to /#pricing
   useEffect(() => {
@@ -123,15 +125,17 @@ export default function LandingPage() {
               Track, optimize, and manage your cloud spending across AWS, Azure, and GCP
               with AI-powered insights and global currency support.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <Link to="/waitlist" className="btn-primary text-base px-8 py-3 flex items-center">
-                Join Waitlist
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-              <Link to="/login" className="btn-secondary text-base px-8 py-3">
-                Sign In
-              </Link>
-            </div>
+            {!signupDisabled && (
+              <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                <Link to="/waitlist" className="btn-primary text-base px-8 py-3 flex items-center">
+                  Join Waitlist
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+                <Link to="/login" className="btn-secondary text-base px-8 py-3">
+                  Sign In
+                </Link>
+              </div>
+            )}
 
             {/* Trust indicators */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400">

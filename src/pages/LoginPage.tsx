@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { usePublicConfig } from '../contexts/PublicConfigContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import Logo from '../components/Logo'
 import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react'
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
+  const { signupDisabled } = usePublicConfig()
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -160,12 +162,14 @@ export default function LoginPage() {
           </form>
 
           {/* Sign Up Link */}
-          <p className="mt-8 text-center text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/signup" className="text-accent-600 hover:text-accent-500 font-semibold transition-colors">
-              Sign up for free
-            </Link>
-          </p>
+          {!signupDisabled && (
+            <p className="mt-8 text-center text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-accent-600 hover:text-accent-500 font-semibold transition-colors">
+                Sign up for free
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>
