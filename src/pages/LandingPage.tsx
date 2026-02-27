@@ -115,7 +115,7 @@ export default function LandingPage() {
           <div className="text-center">
             <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-accent-50 border border-accent-100 text-accent-700 text-sm font-medium mb-8">
               <Zap className="h-3.5 w-3.5 mr-1.5" />
-              Join the waitlist today
+              {signupDisabled ? 'Join the waitlist today' : 'Start optimizing today'}
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 tracking-tight leading-[1.15]">
               Multi-Cloud Cost
@@ -125,17 +125,24 @@ export default function LandingPage() {
               Track, optimize, and manage your cloud spending across AWS, Azure, and GCP
               with AI-powered insights and global currency support.
             </p>
-            {!signupDisabled && (
-              <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+              {signupDisabled ? (
                 <Link to="/waitlist" className="btn-primary text-base px-8 py-3 flex items-center">
                   Join Waitlist
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
-                <Link to="/login" className="btn-secondary text-base px-8 py-3">
-                  Sign In
-                </Link>
-              </div>
-            )}
+              ) : (
+                <>
+                  <Link to="/signup" className="btn-primary text-base px-8 py-3 flex items-center">
+                    Sign Up Free
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                  <Link to="/login" className="btn-secondary text-base px-8 py-3">
+                    Sign In
+                  </Link>
+                </>
+              )}
+            </div>
 
             {/* Trust indicators */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400">
@@ -279,10 +286,10 @@ export default function LandingPage() {
               </div>
 
               <Link
-                to="/waitlist"
+                to={signupDisabled ? '/waitlist' : '/signup'}
                 className="w-full btn-secondary text-center block py-3 rounded-lg font-semibold"
               >
-                Join Waitlist
+                {signupDisabled ? 'Join Waitlist' : 'Sign Up'}
               </Link>
             </div>
 
@@ -340,10 +347,10 @@ export default function LandingPage() {
               </div>
 
               <Link
-                to="/waitlist"
+                to={signupDisabled ? '/waitlist' : '/signup'}
                 className="w-full btn-primary text-center block py-3 rounded-lg font-semibold"
               >
-                Join Waitlist
+                {signupDisabled ? 'Join Waitlist' : 'Sign Up'}
               </Link>
             </div>
           </div>
@@ -363,8 +370,8 @@ export default function LandingPage() {
           <p className="text-xl text-accent-100 mb-10 max-w-2xl mx-auto">
             Join teams worldwide managing their multi-cloud infrastructure with Costra.
           </p>
-          <Link to="/waitlist" className="inline-flex items-center px-8 py-3.5 bg-white text-accent-700 rounded-lg font-semibold text-base hover:bg-accent-50 transition-colors duration-150">
-            Join Waitlist
+          <Link to={signupDisabled ? '/waitlist' : '/signup'} className="inline-flex items-center px-8 py-3.5 bg-white text-accent-700 rounded-lg font-semibold text-base hover:bg-accent-50 transition-colors duration-150">
+            {signupDisabled ? 'Join Waitlist' : 'Sign Up Free'}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
         </div>

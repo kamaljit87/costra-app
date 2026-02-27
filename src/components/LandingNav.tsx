@@ -111,7 +111,17 @@ export default function LandingNav() {
                   )}
                 </Link>
               </>
-            ) : !signupDisabled ? (
+            ) : signupDisabled ? (
+              <Link
+                to="/waitlist"
+                className={cn(
+                  'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
+                  'bg-primary text-white hover:bg-primary/90',
+                )}
+              >
+                Join Waitlist
+              </Link>
+            ) : (
               <>
                 <Link
                   to="/login"
@@ -123,16 +133,16 @@ export default function LandingNav() {
                   Sign In
                 </Link>
                 <Link
-                  to="/waitlist"
+                  to="/signup"
                   className={cn(
                     'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
                     'bg-primary text-white hover:bg-primary/90',
                   )}
                 >
-                  Join Waitlist
+                  Sign Up
                 </Link>
               </>
-            ) : null}
+            )}
           </nav>
         </div>
       </div>

@@ -161,15 +161,24 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Sign Up Link */}
-          {!signupDisabled && (
-            <p className="mt-8 text-center text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-accent-600 hover:text-accent-500 font-semibold transition-colors">
-                Sign up for free
-              </Link>
-            </p>
-          )}
+          {/* Sign Up / Waitlist Link */}
+          <p className="mt-8 text-center text-sm text-gray-600">
+            {signupDisabled ? (
+              <>
+                Want access?{' '}
+                <Link to="/waitlist" className="text-accent-600 hover:text-accent-500 font-semibold transition-colors">
+                  Join the waitlist
+                </Link>
+              </>
+            ) : (
+              <>
+                Don't have an account?{' '}
+                <Link to="/signup" className="text-accent-600 hover:text-accent-500 font-semibold transition-colors">
+                  Sign up for free
+                </Link>
+              </>
+            )}
+          </p>
         </div>
       </div>
     </div>

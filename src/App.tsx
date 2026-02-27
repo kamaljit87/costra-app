@@ -84,9 +84,24 @@ function SignupRoute() {
     )
   }
   if (signupDisabled) {
-    return <Navigate to="/login" replace state={{ signupDisabled: true }} />
+    return <Navigate to="/waitlist" replace />
   }
   return <SignupTravelPage />
+}
+
+function WaitlistRoute() {
+  const { signupDisabled, configReady } = usePublicConfig()
+  if (!configReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+      </div>
+    )
+  }
+  if (!signupDisabled) {
+    return <Navigate to="/signup" replace />
+  }
+  return <WaitlistPage />
 }
 
 function App() {
@@ -102,7 +117,7 @@ function App() {
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/login" element={<PublicRoute><LoginTravelPage /></PublicRoute>} />
                   <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
-                  <Route path="/waitlist" element={<WaitlistPage />} />
+                  <Route path="/waitlist" element={<WaitlistRoute />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />
