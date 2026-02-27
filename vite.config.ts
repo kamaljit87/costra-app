@@ -11,6 +11,10 @@ export default defineConfig({
     },
   },
   build: {
+    modulePreload: {
+      // Only preload chunks referenced in entry – not all manualChunks
+      resolveDependencies: (_filename, deps) => deps.filter(d => !d.includes('vendor-charts') && !d.includes('vendor-motion')),
+    },
     rollupOptions: {
       output: {
         manualChunks: {
