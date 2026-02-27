@@ -1091,6 +1091,7 @@ export const getCURStatus = async (userId, accountId) => {
     logger.debug('Export status fetch failed (non-fatal)', { userId, accountId, error: e.message })
   }
 
+  let effectiveStatus = config.cur_status
   try {
     const availability = await checkCURDataAvailability(userId, accountId)
     if (!availability.available && billingPeriods.length === 0) {
@@ -1100,6 +1101,24 @@ export const getCURStatus = async (userId, accountId) => {
       } else {
         bucketEmptyMessage = 'S3 bucket is empty. AWS typically delivers the first CUR report within 24–72 hours. Cost Explorer is used in the meantime.'
       }
+    } else if (availability.available && (config.cur_status === 'provisioning' || config.cur_status === 'error')) {
+      // Data is available but status hasn't transitioned yet — trigger immediate ingestion
+      logger.info('CUR data available during status check, triggering immediate ingestion', { userId, accountId })
+      try {
+        for (const period of availability.billingPeriods) {
+          const alreadyIngested = await checkIfPeriodIngested(config.id, period)
+          if (!alreadyIngested) {
+            await ingestCURData(userId, accountId, period)
+          }
+        }
+        await pool.query(
+          `UPDATE cur_export_config SET cur_status = 'active', status_message = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [config.id]
+        )
+        effectiveStatus = 'active'
+      } catch (ingestErr) {
+        logger.warn('Immediate CUR ingestion failed (will retry on next poll)', { userId, accountId, error: ingestErr.message })
+      }
     }
   } catch (availErr) {
     logger.debug('CUR availability check failed (non-fatal)', { userId, accountId, error: availErr.message })
@@ -1107,7 +1126,7 @@ export const getCURStatus = async (userId, accountId) => {
 
   return {
     curEnabled: true,
-    curStatus: config.cur_status,
+    curStatus: effectiveStatus,
     statusMessage: config.status_message,
     lastIngestion: config.last_successful_ingestion,
     s3Bucket: config.s3_bucket,
