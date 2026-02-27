@@ -7,7 +7,8 @@ import { PublicConfigProvider, usePublicConfig } from './contexts/PublicConfigCo
 import { NotificationProvider } from './contexts/NotificationContext'
 import CookieConsent from './components/CookieConsent'
 
-const LandingPage = lazy(() => import('./pages/LandingPage'))
+import LandingPage from './pages/LandingPage'
+
 const NotFound = lazy(() => import('./components/ui/ghost-404-page').then(m => ({ default: m.NotFound })))
 
 // Lazy-load all pages except landing (first paint)

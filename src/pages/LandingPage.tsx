@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
 import LandingNav from '../components/LandingNav'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
-import { FlickeringGrid } from '@/components/ui/flickering-grid'
+
+const FlickeringGrid = lazy(() => import('@/components/ui/flickering-grid').then(m => ({ default: m.FlickeringGrid })))
 
 const PLANS = {
   starter: {
     name: 'Starter Plan (Default)',
-    monthly: { inr: '₹1,249', usd: '$14.99' },
-    annual: { inr: '₹12,499', usd: '$149.99' },
-    annualSavings: { inr: '₹2,489', usd: '$29.89' },
+    monthly: '$14.99',
+    annual: '$149.99',
+    annualSavings: '$29.89',
     features: [
       'Up to 3 cloud provider accounts',
       'Up to 6 months of history',
@@ -25,9 +26,9 @@ const PLANS = {
   },
   pro: {
     name: 'Pro Plan (Active FinOps)',
-    monthly: { inr: '₹2,099', usd: '$24.99' },
-    annual: { inr: '₹20,999', usd: '$249.99' },
-    annualSavings: { inr: '₹4,189', usd: '$49.89' },
+    monthly: '$24.99',
+    annual: '$249.99',
+    annualSavings: '$49.89',
     features: [
       'Everything in Starter',
       'Unlimited cloud provider accounts',
@@ -103,14 +104,16 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative py-24 lg:py-32 bg-white overflow-hidden">
-        <FlickeringGrid
-          className="absolute inset-0 z-0 w-full h-full"
-          squareSize={4}
-          gridGap={6}
-          color="#8B91F3"
-          maxOpacity={0.35}
-          flickerChance={0.08}
-        />
+        <Suspense fallback={<div className="absolute inset-0 z-0 bg-white" />}>
+          <FlickeringGrid
+            className="absolute inset-0 z-0 w-full h-full"
+            squareSize={4}
+            gridGap={6}
+            color="#8B91F3"
+            maxOpacity={0.35}
+            flickerChance={0.08}
+          />
+        </Suspense>
         <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-accent-50 border border-accent-100 text-accent-700 text-sm font-medium mb-8">
@@ -133,9 +136,9 @@ export default function LandingPage() {
                 </Link>
               ) : (
                 <>
-                  <Link to="/signup" className="btn-primary text-base px-8 py-3 flex items-center">
-                    Sign Up Free
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                  <Link to="/signup" className="btn-primary text-lg px-10 py-4 flex items-center shadow-lg hover:shadow-xl transition-shadow">
+                    Start Free Trial
+                    <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
                   <Link to="/login" className="btn-secondary text-base px-8 py-3">
                     Sign In
@@ -143,6 +146,9 @@ export default function LandingPage() {
                 </>
               )}
             </div>
+            {!signupDisabled && (
+              <p className="mt-4 text-sm text-gray-400">No credit card required. 7-day free trial.</p>
+            )}
 
             {/* Trust indicators */}
             <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400">
@@ -245,20 +251,16 @@ export default function LandingPage() {
                 <div className="mt-3">
                   <div className="flex items-baseline space-x-2">
                     <span className="text-4xl font-bold text-gray-900">
-                      {billingPeriod === 'monthly' ? PLANS.starter.monthly.usd : PLANS.starter.annual.usd}
+                      {billingPeriod === 'monthly' ? PLANS.starter.monthly : PLANS.starter.annual}
                     </span>
                     <span className="text-gray-500">
                       / {billingPeriod === 'monthly' ? 'month' : 'year'}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    {billingPeriod === 'monthly' ? PLANS.starter.monthly.inr : PLANS.starter.annual.inr}
-                    {' '}/ {billingPeriod === 'monthly' ? 'month' : 'year'}
-                  </div>
                   {billingPeriod === 'annual' && (
                     <div className="mt-3">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent-50 text-accent-700 border border-accent-100">
-                        Save {PLANS.starter.annualSavings.usd}/year
+                        Save {PLANS.starter.annualSavings}/year
                       </span>
                     </div>
                   )}
@@ -289,8 +291,11 @@ export default function LandingPage() {
                 to={signupDisabled ? '/waitlist' : '/signup'}
                 className="w-full btn-secondary text-center block py-3 rounded-lg font-semibold"
               >
-                {signupDisabled ? 'Join Waitlist' : 'Sign Up'}
+                {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
               </Link>
+              {!signupDisabled && (
+                <p className="text-xs text-gray-400 text-center mt-2">No credit card required</p>
+              )}
             </div>
 
             {/* Pro Plan */}
@@ -306,20 +311,16 @@ export default function LandingPage() {
                 <div className="mt-3">
                   <div className="flex items-baseline space-x-2">
                     <span className="text-4xl font-bold text-gray-900">
-                      {billingPeriod === 'monthly' ? PLANS.pro.monthly.usd : PLANS.pro.annual.usd}
+                      {billingPeriod === 'monthly' ? PLANS.pro.monthly : PLANS.pro.annual}
                     </span>
                     <span className="text-gray-500">
                       / {billingPeriod === 'monthly' ? 'month' : 'year'}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    {billingPeriod === 'monthly' ? PLANS.pro.monthly.inr : PLANS.pro.annual.inr}
-                    {' '}/ {billingPeriod === 'monthly' ? 'month' : 'year'}
-                  </div>
                   {billingPeriod === 'annual' && (
                     <div className="mt-3">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent-50 text-accent-700 border border-accent-100">
-                        Save {PLANS.pro.annualSavings.usd}/year
+                        Save {PLANS.pro.annualSavings}/year
                       </span>
                     </div>
                   )}
@@ -350,8 +351,11 @@ export default function LandingPage() {
                 to={signupDisabled ? '/waitlist' : '/signup'}
                 className="w-full btn-primary text-center block py-3 rounded-lg font-semibold"
               >
-                {signupDisabled ? 'Join Waitlist' : 'Sign Up'}
+                {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
               </Link>
+              {!signupDisabled && (
+                <p className="text-xs text-white/60 text-center mt-2">No credit card required</p>
+              )}
             </div>
           </div>
 
@@ -370,10 +374,13 @@ export default function LandingPage() {
           <p className="text-xl text-accent-100 mb-10 max-w-2xl mx-auto">
             Join teams worldwide managing their multi-cloud infrastructure with Costra.
           </p>
-          <Link to={signupDisabled ? '/waitlist' : '/signup'} className="inline-flex items-center px-8 py-3.5 bg-white text-accent-700 rounded-lg font-semibold text-base hover:bg-accent-50 transition-colors duration-150">
-            {signupDisabled ? 'Join Waitlist' : 'Sign Up Free'}
+          <Link to={signupDisabled ? '/waitlist' : '/signup'} className="inline-flex items-center px-10 py-4 bg-white text-accent-700 rounded-lg font-semibold text-lg hover:bg-accent-50 transition-all duration-150 shadow-lg hover:shadow-xl">
+            {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
+          {!signupDisabled && (
+            <p className="mt-4 text-sm text-accent-200">No credit card required. Cancel anytime.</p>
+          )}
         </div>
       </section>
 

@@ -139,7 +139,7 @@ export default function LandingNav() {
                     'bg-primary text-white hover:bg-primary/90',
                   )}
                 >
-                  Sign Up
+                  Try Free
                 </Link>
               </>
             )}
