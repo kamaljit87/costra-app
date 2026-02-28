@@ -255,6 +255,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
             cloudProvidersAPI.getCurStatus(p.accountId).then((result) => ({ accountId: p.accountId, result }))
           )
         )
+        const accountsNeedingSetup: number[] = []
         setCurStatuses(prev => {
           const next = { ...prev }
           results.forEach((r) => {
@@ -272,10 +273,36 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                 exportStatusReason: result.exportStatusReason ?? null,
                 exportStatusMessage: result.exportStatusMessage ?? null,
               }
+              if (!result.curEnabled) {
+                accountsNeedingSetup.push(accountId)
+              }
             }
           })
           return next
         })
+        // Auto-setup detailed billing for accounts that don't have it yet
+        for (const accountId of accountsNeedingSetup) {
+          cloudProvidersAPI.setupCur(accountId)
+            .then(() => cloudProvidersAPI.getCurStatus(accountId))
+            .then((result) => {
+              setCurStatuses(prev => ({
+                ...prev,
+                [accountId]: {
+                  curEnabled: result.curEnabled,
+                  curStatus: result.curStatus,
+                  lastIngestion: result.lastIngestion,
+                  statusMessage: result.statusMessage ?? null,
+                  billingPeriods: result.billingPeriods,
+                  bucketEmpty: result.bucketEmpty,
+                  bucketEmptyMessage: result.bucketEmptyMessage ?? null,
+                  exportStatusCode: result.exportStatusCode ?? null,
+                  exportStatusReason: result.exportStatusReason ?? null,
+                  exportStatusMessage: result.exportStatusMessage ?? null,
+                },
+              }))
+            })
+            .catch(() => {}) // Silent — user can retry manually
+        }
       }
     } catch (error: any) {
       console.error('Failed to load providers:', error)
@@ -801,76 +828,76 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                   <>
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                       curStatuses[provider.accountId].curStatus === 'active'
-                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                                        : curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY'
-                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                                        : curStatuses[provider.accountId].curStatus === 'error'
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                        : (curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' || curStatuses[provider.accountId].curStatus === 'error')
                                         ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                                         : curStatuses[provider.accountId].curStatus === 'disabled'
                                         ? 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                                         : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
                                     }`} title={
                                       curStatuses[provider.accountId].curStatus === 'active'
-                                        ? `CUR active${curStatuses[provider.accountId].lastIngestion ? ` - Last ingestion: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}${curStatuses[provider.accountId].billingPeriods?.length ? ` • ${curStatuses[provider.accountId].billingPeriods!.length} period(s) ingested` : ''}`
-                                        : curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY'
-                                        ? (curStatuses[provider.accountId].exportStatusMessage || 'CUR export is unhealthy')
-                                        : curStatuses[provider.accountId].curStatus === 'provisioning'
-                                        ? (curStatuses[provider.accountId].bucketEmptyMessage || 'CUR export is being set up (data available within 24h)')
-                                        : curStatuses[provider.accountId].curStatus === 'error'
-                                        ? (curStatuses[provider.accountId].statusMessage ? `CUR error: ${curStatuses[provider.accountId].statusMessage}` : 'CUR setup encountered an error')
-                                        : 'CUR is pending setup'
+                                        ? `Detailed billing active${curStatuses[provider.accountId].lastIngestion ? ` — Last sync: ${new Date(curStatuses[provider.accountId].lastIngestion!).toLocaleDateString()}` : ''}${curStatuses[provider.accountId].billingPeriods?.length ? ` · ${curStatuses[provider.accountId].billingPeriods!.length} period(s)` : ''}`
+                                        : (curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' || curStatuses[provider.accountId].curStatus === 'error')
+                                        ? (curStatuses[provider.accountId].exportStatusMessage || curStatuses[provider.accountId].statusMessage || 'There was an issue setting up detailed billing')
+                                        : 'AWS is preparing your detailed billing data (24–72 hours)'
                                     }>
-                                      {curStatuses[provider.accountId].curStatus === 'active' ? 'CUR Active' :
-                                       curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' ? 'CUR Unhealthy' :
-                                       curStatuses[provider.accountId].curStatus === 'provisioning' ? 'CUR Pending' :
-                                       curStatuses[provider.accountId].curStatus === 'error' ? 'CUR Error' :
+                                      {curStatuses[provider.accountId].curStatus === 'active' ? 'Detailed Billing ✓' :
+                                       (curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' || curStatuses[provider.accountId].curStatus === 'error') ? 'Billing Setup Issue' :
+                                       curStatuses[provider.accountId].curStatus === 'provisioning' ? 'Detailed Billing Setup…' :
                                        null}
                                     </span>
                                     {curStatuses[provider.accountId].curStatus === 'active' && (
                                       <p className="text-xs text-green-600 dark:text-green-400 mt-1" role="status">
-                                        CUR integration successful. Cost data will appear on the Dashboard.
+                                        Detailed billing is active. Line-item cost data is being synced.
                                       </p>
                                     )}
-                                    {(curStatuses[provider.accountId].curStatus === 'provisioning' && curStatuses[provider.accountId].bucketEmptyMessage) && (
+                                    {curStatuses[provider.accountId].curStatus === 'provisioning' && (
                                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" role="status">
-                                        {curStatuses[provider.accountId].bucketEmptyMessage}
-                                      </p>
-                                    )}
-                                    {(curStatuses[provider.accountId].curStatus === 'provisioning' || curStatuses[provider.accountId].curStatus === 'active') && (
-                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                        <strong>Note:</strong> If you see a &quot;fine-grained permissions&quot; error in the AWS console, sign in as the <strong>root user</strong> and enable{' '}
-                                        <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_billing.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">IAM access to billing</a>.
-                                        {' '}This is a one-time AWS account setting.
-                                      </p>
-                                    )}
-                                    {curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' && curStatuses[provider.accountId].exportStatusMessage && (
-                                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" role="status">
-                                        {curStatuses[provider.accountId].exportStatusMessage}
+                                        AWS is preparing your detailed billing data. This usually takes 24–72 hours. Cost Explorer data is used in the meantime.
                                       </p>
                                     )}
                                     {curStatuses[provider.accountId].exportStatusReason === 'INSUFFICIENT_PERMISSION' && (
-                                      <div className="mt-1 flex items-center gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleFixCurPolicy(provider.accountId)}
-                                          disabled={curFixPolicyAccountId === provider.accountId}
-                                          className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-800/40 disabled:opacity-50"
-                                        >
-                                          {curFixPolicyAccountId === provider.accountId ? 'Applying…' : 'Fix CUR (re-apply bucket policy)'}
-                                        </button>
-                                      </div>
+                                      <>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                          <strong>Tip:</strong> Sign in as the AWS <strong>root user</strong> and enable{' '}
+                                          <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_billing.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">IAM access to billing</a>.
+                                        </p>
+                                        <div className="mt-1 flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleFixCurPolicy(provider.accountId)}
+                                            disabled={curFixPolicyAccountId === provider.accountId}
+                                            className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-800/40 disabled:opacity-50"
+                                          >
+                                            {curFixPolicyAccountId === provider.accountId ? 'Fixing…' : 'Fix Billing Permissions'}
+                                          </button>
+                                        </div>
+                                      </>
                                     )}
-                                    {(curStatuses[provider.accountId].curStatus === 'error' || !curStatuses[provider.accountId].curEnabled) && curStatuses[provider.accountId].exportStatusReason !== 'INSUFFICIENT_PERMISSION' && (
+                                    {(curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' || curStatuses[provider.accountId].curStatus === 'error') && curStatuses[provider.accountId].exportStatusReason !== 'INSUFFICIENT_PERMISSION' && (
                                       <div className="mt-1 flex items-center gap-2">
+                                        <p className="text-xs text-red-600 dark:text-red-400" role="status">
+                                          {curStatuses[provider.accountId].exportStatusMessage || curStatuses[provider.accountId].statusMessage || 'There was an issue setting up detailed billing.'}
+                                        </p>
                                         <button
                                           type="button"
                                           onClick={() => handleSetupCur(provider.accountId)}
                                           disabled={curSetupAccountId === provider.accountId}
-                                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50"
+                                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50 shrink-0"
                                         >
-                                          {curSetupAccountId === provider.accountId ? 'Setting up…' : 'Set up CUR'}
+                                          {curSetupAccountId === provider.accountId ? 'Retrying…' : 'Retry Setup'}
                                         </button>
                                       </div>
+                                    )}
+                                    {!curStatuses[provider.accountId].curEnabled && curStatuses[provider.accountId].curStatus !== 'error' && curStatuses[provider.accountId].exportStatusCode !== 'UNHEALTHY' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSetupCur(provider.accountId)}
+                                        disabled={curSetupAccountId === provider.accountId}
+                                        className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50 mt-1"
+                                      >
+                                        {curSetupAccountId === provider.accountId ? 'Enabling…' : 'Enable Detailed Billing'}
+                                      </button>
                                     )}
                                   </>
                                 )}
@@ -881,7 +908,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                     disabled={curSetupAccountId === provider.accountId}
                                     className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50"
                                   >
-                                    {curSetupAccountId === provider.accountId ? 'Setting up…' : 'Set up CUR'}
+                                    {curSetupAccountId === provider.accountId ? 'Enabling…' : 'Enable Detailed Billing'}
                                   </button>
                                 )}
                               </>

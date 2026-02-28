@@ -609,7 +609,7 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
       const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
 
       await parquetRead({
-        file: { arrayBuffer },
+        file: { byteLength: arrayBuffer.byteLength, slice: (start, end) => arrayBuffer.slice(start, end) },
         onComplete: (rows) => {
           for (const row of rows) {
             rowCount++
