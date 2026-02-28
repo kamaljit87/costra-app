@@ -75,7 +75,6 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [curStatuses, setCurStatuses] = useState<Record<number, CurStatusInfo>>({})
   const [curFixPolicyAccountId, setCurFixPolicyAccountId] = useState<number | null>(null)
-  const [curSetupAccountId, setCurSetupAccountId] = useState<number | null>(null)
   const [deleteModal, setDeleteModal] = useState<{
     accountId: number
     accountAlias: string
@@ -282,26 +281,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         })
         // Auto-setup detailed billing for accounts that don't have it yet
         for (const accountId of accountsNeedingSetup) {
-          cloudProvidersAPI.setupCur(accountId)
-            .then(() => cloudProvidersAPI.getCurStatus(accountId))
-            .then((result) => {
-              setCurStatuses(prev => ({
-                ...prev,
-                [accountId]: {
-                  curEnabled: result.curEnabled,
-                  curStatus: result.curStatus,
-                  lastIngestion: result.lastIngestion,
-                  statusMessage: result.statusMessage ?? null,
-                  billingPeriods: result.billingPeriods,
-                  bucketEmpty: result.bucketEmpty,
-                  bucketEmptyMessage: result.bucketEmptyMessage ?? null,
-                  exportStatusCode: result.exportStatusCode ?? null,
-                  exportStatusReason: result.exportStatusReason ?? null,
-                  exportStatusMessage: result.exportStatusMessage ?? null,
-                },
-              }))
-            })
-            .catch(() => {}) // Silent — user can retry manually
+          autoSetupCur(accountId)
         }
       }
     } catch (error: any) {
@@ -309,6 +289,52 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
       setError(error.message || 'Failed to load cloud providers')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const autoSetupCur = async (accountId: number, attempt = 1) => {
+    const MAX_RETRIES = 3
+    try {
+      await cloudProvidersAPI.setupCur(accountId)
+      const result = await cloudProvidersAPI.getCurStatus(accountId)
+      setCurStatuses(prev => ({
+        ...prev,
+        [accountId]: {
+          curEnabled: result.curEnabled,
+          curStatus: result.curStatus,
+          lastIngestion: result.lastIngestion,
+          statusMessage: result.statusMessage ?? null,
+          billingPeriods: result.billingPeriods,
+          bucketEmpty: result.bucketEmpty,
+          bucketEmptyMessage: result.bucketEmptyMessage ?? null,
+          exportStatusCode: result.exportStatusCode ?? null,
+          exportStatusReason: result.exportStatusReason ?? null,
+          exportStatusMessage: result.exportStatusMessage ?? null,
+        },
+      }))
+    } catch (err: any) {
+      console.error(`Auto CUR setup failed for account ${accountId} (attempt ${attempt}/${MAX_RETRIES}):`, err?.message)
+      if (attempt < MAX_RETRIES) {
+        const delay = attempt * 2000 // 2s, 4s
+        setTimeout(() => autoSetupCur(accountId, attempt + 1), delay)
+      } else {
+        // After retries exhausted, set error status so the UI shows the issue
+        setCurStatuses(prev => ({
+          ...prev,
+          [accountId]: {
+            curEnabled: false,
+            curStatus: 'error',
+            lastIngestion: null,
+            statusMessage: err?.message || 'Automatic setup failed after retries',
+            billingPeriods: [],
+            bucketEmpty: false,
+            bucketEmptyMessage: null,
+            exportStatusCode: null,
+            exportStatusReason: null,
+            exportStatusMessage: err?.message || 'Automatic setup failed. Please try refreshing the page.',
+          },
+        }))
+      }
     }
   }
 
@@ -550,32 +576,6 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
     }
   }
 
-  const handleSetupCur = async (accountId: number) => {
-    setCurSetupAccountId(accountId)
-    try {
-      await cloudProvidersAPI.setupCur(accountId)
-      const result = await cloudProvidersAPI.getCurStatus(accountId)
-      setCurStatuses(prev => ({
-        ...prev,
-        [accountId]: {
-          curEnabled: result.curEnabled,
-          curStatus: result.curStatus,
-          lastIngestion: result.lastIngestion,
-          statusMessage: result.statusMessage ?? null,
-          billingPeriods: result.billingPeriods,
-          bucketEmpty: result.bucketEmpty,
-          bucketEmptyMessage: result.bucketEmptyMessage ?? null,
-          exportStatusCode: result.exportStatusCode ?? null,
-          exportStatusReason: result.exportStatusReason ?? null,
-          exportStatusMessage: result.exportStatusMessage ?? null,
-        },
-      }))
-    } catch (err: any) {
-      setError(err?.message || 'Failed to set up CUR')
-    } finally {
-      setCurSetupAccountId(null)
-    }
-  }
 
   const handleStartEditAlias = (accountId: number, currentAlias: string) => {
     setEditingAliasId(accountId)
@@ -875,41 +875,11 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                                       </>
                                     )}
                                     {(curStatuses[provider.accountId].exportStatusCode === 'UNHEALTHY' || curStatuses[provider.accountId].curStatus === 'error') && curStatuses[provider.accountId].exportStatusReason !== 'INSUFFICIENT_PERMISSION' && (
-                                      <div className="mt-1 flex items-center gap-2">
-                                        <p className="text-xs text-red-600 dark:text-red-400" role="status">
-                                          {curStatuses[provider.accountId].exportStatusMessage || curStatuses[provider.accountId].statusMessage || 'There was an issue setting up detailed billing.'}
-                                        </p>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleSetupCur(provider.accountId)}
-                                          disabled={curSetupAccountId === provider.accountId}
-                                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50 shrink-0"
-                                        >
-                                          {curSetupAccountId === provider.accountId ? 'Retrying…' : 'Retry Setup'}
-                                        </button>
-                                      </div>
-                                    )}
-                                    {!curStatuses[provider.accountId].curEnabled && curStatuses[provider.accountId].curStatus !== 'error' && curStatuses[provider.accountId].exportStatusCode !== 'UNHEALTHY' && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSetupCur(provider.accountId)}
-                                        disabled={curSetupAccountId === provider.accountId}
-                                        className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50 mt-1"
-                                      >
-                                        {curSetupAccountId === provider.accountId ? 'Enabling…' : 'Enable Detailed Billing'}
-                                      </button>
+                                      <p className="text-xs text-red-600 dark:text-red-400 mt-1" role="status">
+                                        {curStatuses[provider.accountId].exportStatusMessage || curStatuses[provider.accountId].statusMessage || 'There was an issue setting up detailed billing. Retrying automatically…'}
+                                      </p>
                                     )}
                                   </>
-                                )}
-                                {!curStatuses[provider.accountId] && provider.providerId === 'aws' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetupCur(provider.accountId)}
-                                    disabled={curSetupAccountId === provider.accountId}
-                                    className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-800/40 disabled:opacity-50"
-                                  >
-                                    {curSetupAccountId === provider.accountId ? 'Enabling…' : 'Enable Detailed Billing'}
-                                  </button>
                                 )}
                               </>
                             )}

@@ -15,7 +15,7 @@ import {
 import { BCMDataExportsClient, CreateExportCommand, ListExportsCommand, DeleteExportCommand, GetExportCommand } from '@aws-sdk/client-bcm-data-exports'
 import { getAssumedRoleCredentials } from './awsAuth.js'
 import { pool } from '../database.js'
-import { clearUserCache, clearCostExplanationsCache, createNotification, saveServiceUsageMetrics } from '../database.js'
+import { clearUserCache, clearCostExplanationsCache, createNotification, saveServiceUsageMetrics, updateCloudProviderSyncTime } from '../database.js'
 import logger from '../utils/logger.js'
 
 const MAX_PARQUET_FILE_SIZE = 200 * 1024 * 1024 // 200MB
@@ -753,6 +753,9 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
        WHERE id = $2`,
       [manifestKey, config.id]
     )
+
+    // Update last sync time on the cloud provider account
+    await updateCloudProviderSyncTime(userId, accountId)
 
     // Clear caches so next request gets fresh data
     try {
