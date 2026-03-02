@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Sidebar, type NavItem } from './ui/sidebar'
+import { Sidebar, type NavGroup } from './ui/sidebar'
 import TopNav from './TopNav'
 import AIChat from './AIChat'
 import ContactChat from './ContactChat'
@@ -23,21 +23,36 @@ import {
   LayoutGrid,
 } from 'lucide-react'
 
-const BASE_NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/custom-dashboard', label: 'My Dashboards', icon: LayoutGrid },
-  { to: '/budgets', label: 'Budgets', icon: Wallet },
-  { to: '/reports', label: 'Reports', icon: FileText },
-  { to: '/anomalies', label: 'Anomalies', icon: AlertTriangle },
-  { to: '/workflows', label: 'Reviews', icon: ClipboardList },
-  { to: '/forecasts', label: 'Forecasts', icon: TrendingUp },
-  { to: '/policies', label: 'Policies', icon: Shield },
-  { to: '/savings-plans', label: 'RI/SP Plans', icon: Percent },
-  { to: '/allocations', label: 'Allocations', icon: Split },
-  { to: '/kubernetes', label: 'Kubernetes', icon: Container },
-  { to: '/terraform', label: 'Terraform', icon: FileCode },
-  { to: '/saas', label: 'SaaS Spend', icon: Cloud },
-  { to: '/compare', label: 'Compare', icon: ArrowLeftRight },
+const BASE_NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Overview',
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/custom-dashboard', label: 'My Dashboards', icon: LayoutGrid },
+      { to: '/budgets', label: 'Budgets', icon: Wallet },
+      { to: '/reports', label: 'Reports', icon: FileText },
+    ],
+  },
+  {
+    label: 'Cost Management',
+    items: [
+      { to: '/anomalies', label: 'Anomalies', icon: AlertTriangle },
+      { to: '/workflows', label: 'Reviews', icon: ClipboardList },
+      { to: '/forecasts', label: 'Forecasts', icon: TrendingUp },
+      { to: '/policies', label: 'Policies', icon: Shield },
+      { to: '/savings-plans', label: 'RI/SP Plans', icon: Percent },
+      { to: '/allocations', label: 'Allocations', icon: Split },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    items: [
+      { to: '/kubernetes', label: 'Kubernetes', icon: Container },
+      { to: '/terraform', label: 'Terraform', icon: FileCode },
+      { to: '/saas', label: 'SaaS Spend', icon: Cloud },
+      { to: '/compare', label: 'Compare', icon: ArrowLeftRight },
+    ],
+  },
 ]
 
 interface LayoutProps {
@@ -49,11 +64,14 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [contactChatOpen, setContactChatOpen] = useState(false)
 
-  const navItems = useMemo(() => {
+  const navGroups = useMemo(() => {
     if (user?.isAdmin) {
-      return [...BASE_NAV_ITEMS, { to: '/admin/tickets', label: 'Admin', icon: ShieldCheck }]
+      return [
+        ...BASE_NAV_GROUPS,
+        { label: 'Admin', items: [{ to: '/admin/tickets', label: 'Admin', icon: ShieldCheck }] },
+      ]
     }
-    return BASE_NAV_ITEMS
+    return BASE_NAV_GROUPS
   }, [user?.isAdmin])
 
   useEffect(() => {
@@ -72,7 +90,7 @@ export default function Layout({ children }: LayoutProps) {
     <Sidebar
       isOpen={sidebarOpen}
       onToggle={() => setSidebarOpen((o) => !o)}
-      navItems={navItems}
+      navGroups={navGroups}
       onContactClick={() => setContactChatOpen(true)}
     >
       <div className="flex flex-col min-h-screen">

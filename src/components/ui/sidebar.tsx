@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Sparkles, Plus, Lightbulb } from 'lucide-react'
+import { MessageCircle, Sparkles, Plus, Lightbulb, ChevronDown } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { cloudProvidersAPI } from '../../services/api'
 import { ProviderIcon } from '../CloudProviderIcons'
@@ -72,6 +72,11 @@ export interface NavItem {
   icon: LucideIcon
 }
 
+export interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
 interface CloudAccount {
   id: number
   accountId: number
@@ -92,22 +97,36 @@ interface SidebarProps {
   isOpen?: boolean
   /** Called when menu toggle is clicked or a nav link is clicked on mobile (close) */
   onToggle?: () => void
-  /** Nav items (links with icons) */
+  /** Nav items (links with icons) — flat list fallback */
   navItems?: NavItem[]
+  /** Nav groups — grouped sections with labels */
+  navGroups?: NavGroup[]
   /** Callback when "Contact Us" is clicked */
   onContactClick?: () => void
 }
 
 const defaultNavItems: NavItem[] = []
 
+const sidebarTransition = {
+  type: 'tween' as const,
+  ease: 'easeOut' as const,
+  duration: 0.2,
+}
+
+const COLLAPSED_WIDTH = 56
+const EXPANDED_WIDTH = 288
+
 const Sidebar = ({
   children,
   isOpen: controlledOpen,
   onToggle,
   navItems = defaultNavItems,
+  navGroups,
   onContactClick,
 }: SidebarProps) => {
   const [internalOpen, setInternalOpen] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>(() => cloudProvidersCache?.providers ?? [])
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
     () => new Set(cloudProvidersCache?.expandedIds ?? [])
@@ -144,7 +163,6 @@ const Sidebar = ({
       setExpandedProviders(new Set())
       return
     }
-    // If we have cached data, use it and skip fetch (avoids refetch on remount)
     if (cloudProvidersCache?.providers?.length && !cloudFetchedRef.current) {
       cloudFetchedRef.current = true
       return
@@ -154,7 +172,6 @@ const Sidebar = ({
     fetchCloudAccounts()
   }, [isDemoMode])
 
-  // Refetch when providers change (add/delete/update from Settings)
   useEffect(() => {
     if (isDemoMode) return
     const onProvidersChanged = () => {
@@ -178,6 +195,15 @@ const Sidebar = ({
     })
   }
 
+  const toggleGroup = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      return next
+    })
+  }
+
   const groupedAccounts = cloudAccounts.reduce((acc, account) => {
     if (!acc[account.providerId]) acc[account.providerId] = []
     acc[account.providerId].push(account)
@@ -195,32 +221,116 @@ const Sidebar = ({
     visible: { x: 0 },
   }
 
-  const linkClass = (path: string) =>
-    `flex gap-2 font-medium text-sm items-center w-full py-2 px-4 rounded-xl transition-colors text-left ${
+  const linkClass = (path: string, collapsed: boolean) =>
+    `flex gap-2 font-medium text-sm items-center w-full py-2 ${collapsed ? 'px-0 justify-center' : 'px-4'} rounded-xl transition-colors text-left ${
       isActive(path)
         ? 'bg-accent-50 dark:bg-accent-900/50 text-accent-700 dark:text-accent-200'
         : 'text-gray-700 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'
     }`
 
-  const renderNav = () => (
-    <ul>
-      {navItems.map(({ to, label, icon: Icon }) => (
-        <li key={to} className="mb-2">
-          <Link
-            to={to}
-            onClick={closeOnNav}
-            className={linkClass(to)}
-          >
-            <Icon className="h-5 w-5 flex-shrink-0" />
-            {label}
-          </Link>
-        </li>
-      ))}
-    </ul>
-  )
+  // Check if any item in a group is active
+  const isGroupActive = (group: NavGroup) =>
+    group.items.some((item) => isActive(item.to))
 
-  const renderFooter = () => (
-    <div className="p-4 border-t border-surface-200 dark:border-gray-700 space-y-2">
+  // Render nav for expanded sidebar (both desktop expanded + mobile)
+  const renderExpandedNav = (grouped: boolean) => {
+    if (grouped && navGroups) {
+      return (
+        <div className="space-y-3">
+          {navGroups.map((group) => {
+            const groupIsCollapsed = collapsedGroups.has(group.label)
+            const active = isGroupActive(group)
+            return (
+              <div key={group.label}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.label)}
+                  className="flex items-center w-full px-3 py-1 mb-1 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  <span className="flex-1 text-left">{group.label}</span>
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform duration-200 ${groupIsCollapsed ? '-rotate-90' : ''}`}
+                  />
+                </button>
+                {!groupIsCollapsed && (
+                  <ul>
+                    {group.items.map(({ to, label, icon: Icon }) => (
+                      <li key={to} className="mb-0.5">
+                        <Link
+                          to={to}
+                          onClick={closeOnNav}
+                          className={linkClass(to, false)}
+                        >
+                          <Icon className="h-5 w-5 flex-shrink-0" />
+                          {label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {groupIsCollapsed && active && (
+                  <ul>
+                    {group.items
+                      .filter((item) => isActive(item.to))
+                      .map(({ to, label, icon: Icon }) => (
+                        <li key={to} className="mb-0.5">
+                          <Link to={to} onClick={closeOnNav} className={linkClass(to, false)}>
+                            <Icon className="h-5 w-5 flex-shrink-0" />
+                            {label}
+                          </Link>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+    // Flat fallback
+    return (
+      <ul>
+        {navItems.map(({ to, label, icon: Icon }) => (
+          <li key={to} className="mb-2">
+            <Link to={to} onClick={closeOnNav} className={linkClass(to, false)}>
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  // Render nav for collapsed desktop sidebar (icons only)
+  const renderCollapsedNav = () => {
+    const allItems = navGroups
+      ? navGroups.flatMap((g) => g.items)
+      : navItems
+    return (
+      <ul className="flex flex-col items-center gap-0.5">
+        {allItems.map(({ to, icon: Icon }) => (
+          <li key={to}>
+            <Link
+              to={to}
+              className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${
+                isActive(to)
+                  ? 'bg-accent-50 dark:bg-accent-900/50 text-accent-700 dark:text-accent-200'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'
+              }`}
+              title={navGroups?.flatMap((g) => g.items).find((i) => i.to === to)?.label || navItems.find((i) => i.to === to)?.label}
+            >
+              <Icon className="h-5 w-5" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  const renderFooter = (collapsed: boolean) => (
+    <div className={`p-2 border-t border-surface-200 dark:border-gray-700 space-y-1 ${collapsed ? 'flex flex-col items-center' : ''}`}>
       {onContactClick && (
         <button
           type="button"
@@ -228,19 +338,21 @@ const Sidebar = ({
             onContactClick()
             closeOnNav()
           }}
-          className="flex items-center gap-2 w-full font-medium text-sm py-2 px-4 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          className={`flex items-center ${collapsed ? 'justify-center w-10 h-10' : 'gap-2 w-full py-2 px-4'} font-medium text-sm rounded-xl text-gray-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100 transition-colors`}
+          title={collapsed ? 'Contact Us' : undefined}
         >
-          <MessageCircle className="h-4 w-4" />
-          Contact Us
+          <MessageCircle className="h-4 w-4 flex-shrink-0" />
+          {!collapsed && 'Contact Us'}
         </button>
       )}
       <Link
         to="/settings?tab=providers"
         onClick={closeOnNav}
-        className="flex items-center justify-center gap-2 font-medium text-sm p-2 text-center bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-200 rounded-xl hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors"
+        className={`flex items-center ${collapsed ? 'justify-center w-10 h-10' : 'justify-center gap-2 w-full p-2'} font-medium text-sm ${collapsed ? '' : 'text-center'} bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-200 rounded-xl hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors`}
+        title={collapsed ? 'Add provider' : undefined}
       >
-        <Plus className="h-4 w-4" />
-        Add provider
+        <Plus className="h-4 w-4 flex-shrink-0" />
+        {!collapsed && 'Add provider'}
       </Link>
     </div>
   )
@@ -339,13 +451,25 @@ const Sidebar = ({
     )
   }
 
-  const sidebarContent = (
+  // Mobile sidebar content (always expanded, with groups)
+  const mobileSidebarContent = (
     <>
       <nav className="flex-1 p-4 overflow-y-auto">
-        {renderNav()}
+        {renderExpandedNav(true)}
         {renderCloudProviders()}
       </nav>
-      {renderFooter()}
+      {renderFooter(false)}
+    </>
+  )
+
+  // Desktop sidebar content changes based on collapsed state
+  const desktopSidebarContent = (
+    <>
+      <nav className={`flex-1 ${isCollapsed ? 'px-1 py-2' : 'p-4'} overflow-y-auto`}>
+        {isCollapsed ? renderCollapsedNav() : renderExpandedNav(true)}
+        {!isCollapsed && renderCloudProviders()}
+      </nav>
+      {renderFooter(isCollapsed)}
     </>
   )
 
@@ -386,27 +510,39 @@ const Sidebar = ({
                   <span className="text-xl leading-none">×</span>
                 </button>
               </div>
-              {sidebarContent}
+              {mobileSidebarContent}
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex flex-col fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-sm z-20">
-        <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0">
-          <Link to="/dashboard" className="w-full flex justify-center items-center">
-            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
-              <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
-            </span>
+      <motion.div
+        className="hidden lg:flex flex-col fixed top-0 left-0 h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-sm z-20 overflow-hidden"
+        initial={{ width: COLLAPSED_WIDTH }}
+        animate={{ width: isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
+        transition={sidebarTransition}
+        onMouseEnter={() => setIsCollapsed(false)}
+        onMouseLeave={() => setIsCollapsed(true)}
+      >
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-center'} h-16 px-2 border-b border-surface-200 dark:border-gray-800 shrink-0`}>
+          <Link to="/dashboard" className="flex items-center justify-center">
+            {isCollapsed ? (
+              <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:p-1">
+                <img src="/favicon-192.png" alt="Costra" className="h-8 w-8 block object-contain" />
+              </span>
+            ) : (
+              <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
+                <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
+              </span>
+            )}
           </Link>
         </div>
-        {sidebarContent}
-      </div>
+        {desktopSidebarContent}
+      </motion.div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-72 transition-all duration-300">
-        {/* When no children, show placeholder and mobile menu toggle */}
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-14 transition-all duration-300">
         {children === undefined ? (
           <>
             <div className="lg:hidden flex justify-end items-center pr-4 pt-3 pb-2 bg-surface-100 border-b border-surface-200">
