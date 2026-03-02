@@ -287,6 +287,24 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Regenerate cost summaries in the background (don't block the response)
+    if (results.length > 0) {
+      const now = new Date()
+      const currentMonth = now.getUTCMonth() + 1
+      const currentYear = now.getUTCFullYear()
+      import('../database.js').then(({ generateCostExplanation }) => {
+        // Regenerate for each successfully synced provider/account
+        const seen = new Set()
+        for (const r of results) {
+          const key = `${r.providerId}|${r.accountId ?? 'null'}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          generateCostExplanation(userId, r.providerId, currentMonth, currentYear, r.accountId ?? null)
+            .catch(err => logger.warn('Auto-regenerate cost summary failed', { userId, providerId: r.providerId, error: err.message }))
+        }
+      }).catch(() => {})
+    }
+
     // Use appropriate status code based on results
     const statusCode = errors.length > 0
       ? (results.length > 0 ? 207 : 500)  // 207 partial success, 500 total failure
@@ -595,6 +613,12 @@ router.post('/account/:accountId', async (req, res) => {
     // Update last sync time for this account
     await updateCloudProviderSyncTime(userId, accountId)
 
+    // Regenerate cost summary in the background
+    import('../database.js').then(({ generateCostExplanation }) => {
+      generateCostExplanation(userId, providerId, currentMonth, currentYear, accountId)
+        .catch(err => logger.warn('Auto-regenerate cost summary failed', { userId, providerId, accountId, error: err.message }))
+    }).catch(() => {})
+
     res.json({
       message: 'Sync completed successfully',
       accountId,
@@ -740,6 +764,18 @@ router.post('/:providerId', async (req, res) => {
 
     if (results.length > 0) {
       await cacheDel(`cost_data:${userId}:${currentMonth}:${currentYear}`).catch(err => logger.warn('Non-critical operation failed', { error: err.message }))
+
+      // Regenerate cost summaries in the background
+      import('../database.js').then(({ generateCostExplanation }) => {
+        const seen = new Set()
+        for (const r of results) {
+          const key = `${providerId}|${r.accountId ?? 'null'}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          generateCostExplanation(userId, providerId, currentMonth, currentYear, r.accountId ?? null)
+            .catch(err => logger.warn('Auto-regenerate cost summary failed', { userId, providerId, accountId: r.accountId, error: err.message }))
+        }
+      }).catch(() => {})
     }
 
     const statusCode = errors.length > 0
