@@ -429,7 +429,7 @@ export default function Dashboard() {
                   <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">By Provider</h2>
                   <div className="space-y-4">
                     {providersToShow.map((data) => {
-                      const hasData = data.currentMonth > 0 || data.services.length > 0
+                      const hasData = data.currentMonth > 0 || data.lastMonth > 0 || data.services.length > 0
                       return (
                         <div key={data.provider.id} className="animate-fade-in">
                           {hasData ? (

@@ -63,14 +63,62 @@ router.get('/', async (req, res) => {
 
     // Use cache with 5-minute TTL for cost data
     const cacheKey = `cost_data:${userId}:${month}:${year}`
-    const costData = await cached(
+    let costData = await cached(
       cacheKey,
       async () => await getCostDataForUser(userId, month, year),
       300 // 5 minutes TTL
     )
 
-    // For current month, get last month same date range (e.g. 1st–14th vs 1st–14th) for apples-to-apples % comparison
+    // When querying the current month and there's no data yet (month just rolled over,
+    // no sync has run), fetch last month's data so the dashboard isn't empty.
     const isCurrentMonth = (month === now.getMonth() + 1 && year === now.getFullYear())
+    let prevMonthData = null
+    if (isCurrentMonth) {
+      const prevDate = new Date(year, month - 2, 1) // month is 1-based, Date() month is 0-based
+      const prevMonth = prevDate.getMonth() + 1
+      const prevYear = prevDate.getFullYear()
+      const prevCacheKey = `cost_data:${userId}:${prevMonth}:${prevYear}`
+      prevMonthData = await cached(
+        prevCacheKey,
+        async () => await getCostDataForUser(userId, prevMonth, prevYear),
+        300
+      )
+
+      if (costData.length === 0 && prevMonthData.length > 0) {
+        // No current month data yet — show previous month's costs as "lastMonth"
+        // with currentMonth = 0 so the user sees their last month's spend
+        costData = prevMonthData.map(prev => ({
+          ...prev,
+          current_month_cost: '0',
+          last_month_cost: prev.current_month_cost,
+          forecast_cost: '0',
+          tax_current_month: '0',
+          tax_last_month: prev.tax_current_month || '0',
+        }))
+        logger.info('No current month data yet, using previous month as lastMonth', { userId, month, year, prevMonth, prevYear, providers: costData.length })
+      }
+
+      // Backfill lastMonth from previous month's data when the sync didn't populate it
+      if (costData.length > 0 && prevMonthData.length > 0) {
+        const prevMap = new Map()
+        for (const prev of prevMonthData) {
+          const key = `${prev.provider_code || prev.provider_id}|${prev.account_id ?? 'null'}`
+          prevMap.set(key, prev)
+        }
+        for (const cost of costData) {
+          if (parseFloat(cost.last_month_cost) === 0) {
+            const key = `${cost.provider_code || cost.provider_id}|${cost.account_id ?? 'null'}`
+            const prev = prevMap.get(key)
+            if (prev && parseFloat(prev.current_month_cost) > 0) {
+              cost.last_month_cost = prev.current_month_cost
+              logger.debug('Backfilled lastMonth from previous month record', { userId, provider: cost.provider_code, lastMonth: cost.last_month_cost })
+            }
+          }
+        }
+      }
+    }
+
+    // For current month, get last month same date range (e.g. 1st–14th vs 1st–14th) for apples-to-apples % comparison
     let lastMonthSamePeriodMap = new Map()
     if (isCurrentMonth) {
       try {
