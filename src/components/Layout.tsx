@@ -15,16 +15,28 @@ import {
   TrendingUp,
   Shield,
   Container,
+  ClipboardList,
+  Percent,
+  Split,
+  FileCode,
+  Cloud,
+  LayoutGrid,
 } from 'lucide-react'
 
 const BASE_NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/custom-dashboard', label: 'My Dashboards', icon: LayoutGrid },
   { to: '/budgets', label: 'Budgets', icon: Wallet },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/anomalies', label: 'Anomalies', icon: AlertTriangle },
+  { to: '/workflows', label: 'Reviews', icon: ClipboardList },
   { to: '/forecasts', label: 'Forecasts', icon: TrendingUp },
   { to: '/policies', label: 'Policies', icon: Shield },
+  { to: '/savings-plans', label: 'RI/SP Plans', icon: Percent },
+  { to: '/allocations', label: 'Allocations', icon: Split },
   { to: '/kubernetes', label: 'Kubernetes', icon: Container },
+  { to: '/terraform', label: 'Terraform', icon: FileCode },
+  { to: '/saas', label: 'SaaS Spend', icon: Cloud },
   { to: '/compare', label: 'Compare', icon: ArrowLeftRight },
 ]
 

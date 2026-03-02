@@ -1397,6 +1397,192 @@ export const initDatabase = async () => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_k8s_ns_costs_cluster ON k8s_namespace_costs(cluster_id, date DESC)`)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_k8s_wl_costs_cluster ON k8s_workload_costs(cluster_id, namespace, date DESC)`)
 
+      // ── Workflow Items (FinOps Review Workflows) ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS workflow_items (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          type TEXT NOT NULL CHECK (type IN ('anomaly_review', 'optimization_approval', 'budget_review')),
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_review', 'approved', 'rejected', 'resolved')),
+          assignee_user_id INTEGER REFERENCES users(id),
+          related_id INTEGER,
+          related_type TEXT,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS workflow_comments (
+          id SERIAL PRIMARY KEY,
+          workflow_item_id INTEGER NOT NULL REFERENCES workflow_items(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          comment TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_workflow_items_user ON workflow_items(user_id, status)`)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_workflow_items_org ON workflow_items(org_id, status)`)
+
+      // ── Savings Plan Utilization History ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS savings_plan_utilization_history (
+          id SERIAL PRIMARY KEY,
+          savings_plan_id INTEGER NOT NULL REFERENCES savings_plans(id) ON DELETE CASCADE,
+          date DATE NOT NULL,
+          utilization_percent DECIMAL(5, 2),
+          coverage_percent DECIMAL(5, 2),
+          unused_value DECIMAL(15, 2),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(savings_plan_id, date)
+        )
+      `)
+      // Add new columns to savings_plans if they don't exist
+      await client.query(`
+        DO $$ BEGIN
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS commitment_amount DECIMAL(15, 2);
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS utilization_percent DECIMAL(5, 2);
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS coverage_percent DECIMAL(5, 2);
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS unused_value DECIMAL(15, 2);
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS expiration_alert_days INTEGER DEFAULT 30;
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id);
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS plan_type TEXT;
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS service TEXT;
+          ALTER TABLE savings_plans ADD COLUMN IF NOT EXISTS region TEXT;
+        END $$
+      `)
+
+      // ── Cost Allocation Rules ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS cost_allocation_rules (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          name TEXT NOT NULL,
+          description TEXT,
+          source_filter JSONB NOT NULL DEFAULT '{}',
+          split_method TEXT NOT NULL CHECK (split_method IN ('even', 'proportional', 'fixed')),
+          split_targets JSONB NOT NULL DEFAULT '[]',
+          is_enabled BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      // ── Slack Integrations ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS slack_integrations (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          team_id TEXT,
+          team_name TEXT,
+          channel_id TEXT,
+          channel_name TEXT,
+          webhook_url TEXT,
+          daily_digest BOOLEAN DEFAULT false,
+          anomaly_alerts BOOLEAN DEFAULT true,
+          budget_alerts BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, org_id)
+        )
+      `)
+
+      // ── Report Schedules ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS report_schedules (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          report_type TEXT NOT NULL,
+          report_name TEXT NOT NULL,
+          frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+          day_of_week INTEGER,
+          day_of_month INTEGER,
+          recipients JSONB NOT NULL DEFAULT '[]',
+          filters JSONB DEFAULT '{}',
+          file_format TEXT DEFAULT 'pdf',
+          is_enabled BOOLEAN DEFAULT true,
+          last_run_at TIMESTAMP,
+          next_run_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      // ── Terraform Estimates ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS terraform_estimates (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          plan_name TEXT NOT NULL,
+          plan_data JSONB,
+          estimated_monthly_cost DECIMAL(15, 2),
+          resource_breakdown JSONB DEFAULT '[]',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
+      // ── SaaS Providers & Costs ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS saas_providers (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          provider_name TEXT NOT NULL,
+          provider_type TEXT NOT NULL CHECK (provider_type IN ('datadog', 'snowflake', 'github', 'custom')),
+          api_key_encrypted TEXT,
+          api_endpoint TEXT,
+          is_active BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS saas_costs (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          saas_provider_id INTEGER NOT NULL REFERENCES saas_providers(id) ON DELETE CASCADE,
+          service_name TEXT,
+          date DATE NOT NULL,
+          cost DECIMAL(15, 2) NOT NULL DEFAULT 0,
+          usage_quantity DECIMAL(15, 2),
+          usage_unit TEXT,
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_saas_costs_provider ON saas_costs(saas_provider_id, date DESC)`)
+
+      // ── Custom Dashboards ──
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS custom_dashboards (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          org_id INTEGER REFERENCES organizations(id),
+          name TEXT NOT NULL,
+          description TEXT,
+          layout JSONB DEFAULT '[]',
+          is_default BOOLEAN DEFAULT false,
+          is_shared BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS dashboard_widgets (
+          id SERIAL PRIMARY KEY,
+          dashboard_id INTEGER NOT NULL REFERENCES custom_dashboards(id) ON DELETE CASCADE,
+          widget_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          config JSONB DEFAULT '{}',
+          position JSONB DEFAULT '{"x":0,"y":0,"w":4,"h":3}',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -7808,6 +7994,505 @@ export const updateK8sClusterMetrics = async (clusterId, userId, { nodeCount, to
     [clusterId, userId, nodeCount, totalCost]
   )
   return result.rows[0]
+}
+
+// ═══════════════════════════════════════════════════
+// Workflow Items (FinOps Review Workflows)
+// ═══════════════════════════════════════════════════
+
+export const createWorkflowItem = async (userId, orgId, { type, title, description, assigneeUserId, relatedId, relatedType, metadata }) => {
+  const result = await pool.query(
+    `INSERT INTO workflow_items (user_id, org_id, type, title, description, assignee_user_id, related_id, related_type, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [userId, orgId, type, title, description || null, assigneeUserId || null, relatedId || null, relatedType || null, JSON.stringify(metadata || {})]
+  )
+  return result.rows[0]
+}
+
+export const getWorkflowItems = async (userId, orgId, { status, type, assigneeUserId, limit = 50, offset = 0 } = {}) => {
+  const conditions = ['wi.org_id = $1']
+  const params = [orgId]
+  let idx = 2
+  if (status) { conditions.push(`wi.status = $${idx++}`); params.push(status) }
+  if (type) { conditions.push(`wi.type = $${idx++}`); params.push(type) }
+  if (assigneeUserId) { conditions.push(`wi.assignee_user_id = $${idx++}`); params.push(assigneeUserId) }
+  params.push(limit, offset)
+  const result = await pool.query(
+    `SELECT wi.*, u.name AS creator_name, a.name AS assignee_name
+     FROM workflow_items wi
+     LEFT JOIN users u ON u.id = wi.user_id
+     LEFT JOIN users a ON a.id = wi.assignee_user_id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY wi.created_at DESC LIMIT $${idx++} OFFSET $${idx}`,
+    params
+  )
+  return result.rows
+}
+
+export const getWorkflowItem = async (itemId, orgId) => {
+  const result = await pool.query(
+    `SELECT wi.*, u.name AS creator_name, a.name AS assignee_name
+     FROM workflow_items wi
+     LEFT JOIN users u ON u.id = wi.user_id
+     LEFT JOIN users a ON a.id = wi.assignee_user_id
+     WHERE wi.id = $1 AND wi.org_id = $2`,
+    [itemId, orgId]
+  )
+  return result.rows[0]
+}
+
+export const updateWorkflowItemStatus = async (itemId, orgId, { status, assigneeUserId }) => {
+  const sets = ['updated_at = NOW()']
+  const params = [itemId, orgId]
+  let idx = 3
+  if (status) { sets.push(`status = $${idx++}`); params.push(status) }
+  if (assigneeUserId !== undefined) { sets.push(`assignee_user_id = $${idx++}`); params.push(assigneeUserId) }
+  const result = await pool.query(
+    `UPDATE workflow_items SET ${sets.join(', ')} WHERE id = $1 AND org_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+export const addWorkflowComment = async (workflowItemId, userId, comment) => {
+  const result = await pool.query(
+    `INSERT INTO workflow_comments (workflow_item_id, user_id, comment) VALUES ($1, $2, $3) RETURNING *`,
+    [workflowItemId, userId, comment]
+  )
+  return result.rows[0]
+}
+
+export const getWorkflowComments = async (workflowItemId) => {
+  const result = await pool.query(
+    `SELECT wc.*, u.name AS user_name FROM workflow_comments wc
+     LEFT JOIN users u ON u.id = wc.user_id
+     WHERE wc.workflow_item_id = $1 ORDER BY wc.created_at ASC`,
+    [workflowItemId]
+  )
+  return result.rows
+}
+
+// ═══════════════════════════════════════════════════
+// Savings Plan Utilization
+// ═══════════════════════════════════════════════════
+
+export const updateSavingsPlanUtilization = async (planId, { utilizationPercent, coveragePercent, unusedValue }) => {
+  await pool.query(
+    `UPDATE savings_plans SET utilization_percent = $2, coverage_percent = $3, unused_value = $4, updated_at = NOW()
+     WHERE id = $1`,
+    [planId, utilizationPercent, coveragePercent, unusedValue]
+  )
+  await pool.query(
+    `INSERT INTO savings_plan_utilization_history (savings_plan_id, date, utilization_percent, coverage_percent, unused_value)
+     VALUES ($1, CURRENT_DATE, $2, $3, $4)
+     ON CONFLICT (savings_plan_id, date) DO UPDATE SET utilization_percent = $2, coverage_percent = $3, unused_value = $4`,
+    [planId, utilizationPercent, coveragePercent, unusedValue]
+  )
+}
+
+export const getSavingsPlanUtilizationHistory = async (planId, days = 30) => {
+  const result = await pool.query(
+    `SELECT * FROM savings_plan_utilization_history
+     WHERE savings_plan_id = $1 AND date >= CURRENT_DATE - $2::int
+     ORDER BY date ASC`,
+    [planId, days]
+  )
+  return result.rows
+}
+
+export const getSavingsPlansUtilizationSummary = async (userId, orgId) => {
+  const result = await pool.query(
+    `SELECT sp.*,
+       (SELECT json_agg(h ORDER BY h.date DESC) FROM (
+         SELECT date, utilization_percent, coverage_percent, unused_value
+         FROM savings_plan_utilization_history WHERE savings_plan_id = sp.id ORDER BY date DESC LIMIT 7
+       ) h) AS recent_history
+     FROM savings_plans sp
+     WHERE sp.user_id = $1 AND (sp.org_id = $2 OR sp.org_id IS NULL)
+     ORDER BY sp.created_at DESC`,
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+export const deleteSavingsPlan = async (planId, userId) => {
+  const result = await pool.query('DELETE FROM savings_plans WHERE id = $1 AND user_id = $2 RETURNING id', [planId, userId])
+  return result.rows[0]
+}
+
+export const updateSavingsPlan = async (planId, userId, data) => {
+  const fields = []
+  const params = [planId, userId]
+  let idx = 3
+  for (const [key, value] of Object.entries(data)) {
+    const col = key.replace(/([A-Z])/g, '_$1').toLowerCase()
+    fields.push(`${col} = $${idx++}`)
+    params.push(value)
+  }
+  if (fields.length === 0) return null
+  fields.push('updated_at = NOW()')
+  const result = await pool.query(
+    `UPDATE savings_plans SET ${fields.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+// ═══════════════════════════════════════════════════
+// Cost Allocation Rules
+// ═══════════════════════════════════════════════════
+
+export const createAllocationRule = async (userId, orgId, { name, description, sourceFilter, splitMethod, splitTargets }) => {
+  const result = await pool.query(
+    `INSERT INTO cost_allocation_rules (user_id, org_id, name, description, source_filter, split_method, split_targets)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [userId, orgId, name, description || null, JSON.stringify(sourceFilter), splitMethod, JSON.stringify(splitTargets)]
+  )
+  return result.rows[0]
+}
+
+export const getAllocationRules = async (userId, orgId) => {
+  const result = await pool.query(
+    'SELECT * FROM cost_allocation_rules WHERE user_id = $1 AND (org_id = $2 OR org_id IS NULL) ORDER BY created_at DESC',
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+export const updateAllocationRule = async (ruleId, userId, data) => {
+  const fields = []
+  const params = [ruleId, userId]
+  let idx = 3
+  if (data.name !== undefined) { fields.push(`name = $${idx++}`); params.push(data.name) }
+  if (data.description !== undefined) { fields.push(`description = $${idx++}`); params.push(data.description) }
+  if (data.sourceFilter !== undefined) { fields.push(`source_filter = $${idx++}`); params.push(JSON.stringify(data.sourceFilter)) }
+  if (data.splitMethod !== undefined) { fields.push(`split_method = $${idx++}`); params.push(data.splitMethod) }
+  if (data.splitTargets !== undefined) { fields.push(`split_targets = $${idx++}`); params.push(JSON.stringify(data.splitTargets)) }
+  if (data.isEnabled !== undefined) { fields.push(`is_enabled = $${idx++}`); params.push(data.isEnabled) }
+  if (fields.length === 0) return null
+  const result = await pool.query(
+    `UPDATE cost_allocation_rules SET ${fields.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+export const deleteAllocationRule = async (ruleId, userId) => {
+  const result = await pool.query('DELETE FROM cost_allocation_rules WHERE id = $1 AND user_id = $2 RETURNING id', [ruleId, userId])
+  return result.rows[0]
+}
+
+// ═══════════════════════════════════════════════════
+// Slack Integrations
+// ═══════════════════════════════════════════════════
+
+export const saveSlackIntegration = async (userId, orgId, { teamId, teamName, channelId, channelName, webhookUrl, dailyDigest, anomalyAlerts, budgetAlerts }) => {
+  const result = await pool.query(
+    `INSERT INTO slack_integrations (user_id, org_id, team_id, team_name, channel_id, channel_name, webhook_url, daily_digest, anomaly_alerts, budget_alerts)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (user_id, org_id) DO UPDATE SET
+       team_id = EXCLUDED.team_id, team_name = EXCLUDED.team_name, channel_id = EXCLUDED.channel_id,
+       channel_name = EXCLUDED.channel_name, webhook_url = EXCLUDED.webhook_url, daily_digest = EXCLUDED.daily_digest,
+       anomaly_alerts = EXCLUDED.anomaly_alerts, budget_alerts = EXCLUDED.budget_alerts
+     RETURNING *`,
+    [userId, orgId, teamId || null, teamName || null, channelId || null, channelName || null, webhookUrl, dailyDigest ?? false, anomalyAlerts ?? true, budgetAlerts ?? true]
+  )
+  return result.rows[0]
+}
+
+export const getSlackIntegration = async (userId, orgId) => {
+  const result = await pool.query(
+    'SELECT * FROM slack_integrations WHERE user_id = $1 AND (org_id = $2 OR org_id IS NULL)',
+    [userId, orgId]
+  )
+  return result.rows[0]
+}
+
+export const deleteSlackIntegration = async (userId, orgId) => {
+  const result = await pool.query('DELETE FROM slack_integrations WHERE user_id = $1 AND org_id = $2 RETURNING id', [userId, orgId])
+  return result.rows[0]
+}
+
+export const getSlackIntegrationsForAlerts = async () => {
+  const result = await pool.query(
+    'SELECT si.*, u.email FROM slack_integrations si JOIN users u ON u.id = si.user_id WHERE si.webhook_url IS NOT NULL'
+  )
+  return result.rows
+}
+
+// ═══════════════════════════════════════════════════
+// Report Schedules
+// ═══════════════════════════════════════════════════
+
+export const createReportSchedule = async (userId, orgId, { reportType, reportName, frequency, dayOfWeek, dayOfMonth, recipients, filters, fileFormat }) => {
+  const nextRun = calculateNextRunAt(frequency, dayOfWeek, dayOfMonth)
+  const result = await pool.query(
+    `INSERT INTO report_schedules (user_id, org_id, report_type, report_name, frequency, day_of_week, day_of_month, recipients, filters, file_format, next_run_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+    [userId, orgId, reportType, reportName, frequency, dayOfWeek || null, dayOfMonth || null, JSON.stringify(recipients), JSON.stringify(filters || {}), fileFormat || 'pdf', nextRun]
+  )
+  return result.rows[0]
+}
+
+export const getReportSchedules = async (userId, orgId) => {
+  const result = await pool.query(
+    'SELECT * FROM report_schedules WHERE user_id = $1 AND (org_id = $2 OR org_id IS NULL) ORDER BY created_at DESC',
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+export const updateReportSchedule = async (scheduleId, userId, data) => {
+  const fields = []
+  const params = [scheduleId, userId]
+  let idx = 3
+  for (const [key, value] of Object.entries(data)) {
+    const col = key.replace(/([A-Z])/g, '_$1').toLowerCase()
+    if (col === 'recipients' || col === 'filters') {
+      fields.push(`${col} = $${idx++}`); params.push(JSON.stringify(value))
+    } else {
+      fields.push(`${col} = $${idx++}`); params.push(value)
+    }
+  }
+  if (fields.length === 0) return null
+  const result = await pool.query(
+    `UPDATE report_schedules SET ${fields.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+export const deleteReportSchedule = async (scheduleId, userId) => {
+  const result = await pool.query('DELETE FROM report_schedules WHERE id = $1 AND user_id = $2 RETURNING id', [scheduleId, userId])
+  return result.rows[0]
+}
+
+export const getDueReportSchedules = async () => {
+  const result = await pool.query(
+    `SELECT rs.*, u.email AS user_email FROM report_schedules rs
+     JOIN users u ON u.id = rs.user_id
+     WHERE rs.is_enabled = true AND rs.next_run_at <= NOW()`
+  )
+  return result.rows
+}
+
+export const updateLastRunAt = async (scheduleId, frequency, dayOfWeek, dayOfMonth) => {
+  const nextRun = calculateNextRunAt(frequency, dayOfWeek, dayOfMonth)
+  await pool.query(
+    'UPDATE report_schedules SET last_run_at = NOW(), next_run_at = $2 WHERE id = $1',
+    [scheduleId, nextRun]
+  )
+}
+
+function calculateNextRunAt(frequency, dayOfWeek, dayOfMonth) {
+  const now = new Date()
+  const next = new Date(now)
+  next.setHours(7, 0, 0, 0)
+  if (frequency === 'daily') {
+    if (now.getHours() >= 7) next.setDate(next.getDate() + 1)
+  } else if (frequency === 'weekly') {
+    const dow = dayOfWeek || 1
+    const daysUntil = ((dow - now.getDay()) + 7) % 7 || 7
+    next.setDate(next.getDate() + daysUntil)
+  } else if (frequency === 'monthly') {
+    const dom = dayOfMonth || 1
+    next.setMonth(next.getMonth() + 1)
+    next.setDate(Math.min(dom, new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()))
+  }
+  return next
+}
+
+// ═══════════════════════════════════════════════════
+// Terraform Estimates
+// ═══════════════════════════════════════════════════
+
+export const saveTerraformEstimate = async (userId, orgId, { planName, planData, estimatedMonthlyCost, resourceBreakdown }) => {
+  const result = await pool.query(
+    `INSERT INTO terraform_estimates (user_id, org_id, plan_name, plan_data, estimated_monthly_cost, resource_breakdown)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [userId, orgId, planName, JSON.stringify(planData || {}), estimatedMonthlyCost, JSON.stringify(resourceBreakdown || [])]
+  )
+  return result.rows[0]
+}
+
+export const getTerraformEstimates = async (userId, orgId) => {
+  const result = await pool.query(
+    'SELECT * FROM terraform_estimates WHERE user_id = $1 AND (org_id = $2 OR org_id IS NULL) ORDER BY created_at DESC',
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+export const deleteTerraformEstimate = async (estimateId, userId) => {
+  const result = await pool.query('DELETE FROM terraform_estimates WHERE id = $1 AND user_id = $2 RETURNING id', [estimateId, userId])
+  return result.rows[0]
+}
+
+// ═══════════════════════════════════════════════════
+// SaaS Providers & Costs
+// ═══════════════════════════════════════════════════
+
+export const createSaaSProvider = async (userId, orgId, { providerName, providerType, apiKeyEncrypted, apiEndpoint }) => {
+  const result = await pool.query(
+    `INSERT INTO saas_providers (user_id, org_id, provider_name, provider_type, api_key_encrypted, api_endpoint)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [userId, orgId, providerName, providerType, apiKeyEncrypted || null, apiEndpoint || null]
+  )
+  return result.rows[0]
+}
+
+export const getSaaSProviders = async (userId, orgId) => {
+  const result = await pool.query(
+    `SELECT sp.*, COALESCE(
+       (SELECT SUM(sc.cost) FROM saas_costs sc WHERE sc.saas_provider_id = sp.id AND sc.date >= DATE_TRUNC('month', CURRENT_DATE)), 0
+     ) AS current_month_cost
+     FROM saas_providers sp
+     WHERE sp.user_id = $1 AND (sp.org_id = $2 OR sp.org_id IS NULL)
+     ORDER BY sp.created_at DESC`,
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+export const deleteSaaSProvider = async (providerId, userId) => {
+  const result = await pool.query('DELETE FROM saas_providers WHERE id = $1 AND user_id = $2 RETURNING id', [providerId, userId])
+  return result.rows[0]
+}
+
+export const saveSaaSCost = async (userId, orgId, { saasProviderId, serviceName, date, cost, usageQuantity, usageUnit, metadata }) => {
+  const result = await pool.query(
+    `INSERT INTO saas_costs (user_id, org_id, saas_provider_id, service_name, date, cost, usage_quantity, usage_unit, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [userId, orgId, saasProviderId, serviceName || null, date, cost, usageQuantity || null, usageUnit || null, JSON.stringify(metadata || {})]
+  )
+  return result.rows[0]
+}
+
+export const getSaaSCosts = async (userId, orgId, { startDate, endDate, providerId } = {}) => {
+  const conditions = ['sc.user_id = $1', '(sc.org_id = $2 OR sc.org_id IS NULL)']
+  const params = [userId, orgId]
+  let idx = 3
+  if (startDate) { conditions.push(`sc.date >= $${idx++}`); params.push(startDate) }
+  if (endDate) { conditions.push(`sc.date <= $${idx++}`); params.push(endDate) }
+  if (providerId) { conditions.push(`sc.saas_provider_id = $${idx++}`); params.push(providerId) }
+  const result = await pool.query(
+    `SELECT sc.*, sp.provider_name, sp.provider_type
+     FROM saas_costs sc JOIN saas_providers sp ON sp.id = sc.saas_provider_id
+     WHERE ${conditions.join(' AND ')} ORDER BY sc.date DESC`,
+    params
+  )
+  return result.rows
+}
+
+export const getSaaSTotalsByProvider = async (userId, orgId) => {
+  const result = await pool.query(
+    `SELECT sp.id, sp.provider_name, sp.provider_type,
+       COALESCE(SUM(CASE WHEN sc.date >= DATE_TRUNC('month', CURRENT_DATE) THEN sc.cost END), 0) AS current_month,
+       COALESCE(SUM(CASE WHEN sc.date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' AND sc.date < DATE_TRUNC('month', CURRENT_DATE) THEN sc.cost END), 0) AS last_month
+     FROM saas_providers sp LEFT JOIN saas_costs sc ON sc.saas_provider_id = sp.id
+     WHERE sp.user_id = $1 AND (sp.org_id = $2 OR sp.org_id IS NULL)
+     GROUP BY sp.id, sp.provider_name, sp.provider_type ORDER BY current_month DESC`,
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+// ═══════════════════════════════════════════════════
+// Custom Dashboards
+// ═══════════════════════════════════════════════════
+
+export const createDashboard = async (userId, orgId, { name, description }) => {
+  const result = await pool.query(
+    'INSERT INTO custom_dashboards (user_id, org_id, name, description) VALUES ($1, $2, $3, $4) RETURNING *',
+    [userId, orgId, name, description || null]
+  )
+  return result.rows[0]
+}
+
+export const getDashboards = async (userId, orgId) => {
+  const result = await pool.query(
+    `SELECT cd.*, (SELECT COUNT(*) FROM dashboard_widgets dw WHERE dw.dashboard_id = cd.id)::int AS widget_count
+     FROM custom_dashboards cd WHERE cd.user_id = $1 AND (cd.org_id = $2 OR cd.org_id IS NULL)
+     ORDER BY cd.is_default DESC, cd.created_at DESC`,
+    [userId, orgId]
+  )
+  return result.rows
+}
+
+export const getDashboard = async (dashboardId, userId, orgId) => {
+  const result = await pool.query(
+    `SELECT * FROM custom_dashboards WHERE id = $1 AND (user_id = $2 OR (org_id = $3 AND is_shared = true))`,
+    [dashboardId, userId, orgId]
+  )
+  return result.rows[0]
+}
+
+export const updateDashboard = async (dashboardId, userId, data) => {
+  const fields = ['updated_at = NOW()']
+  const params = [dashboardId, userId]
+  let idx = 3
+  if (data.name !== undefined) { fields.push(`name = $${idx++}`); params.push(data.name) }
+  if (data.description !== undefined) { fields.push(`description = $${idx++}`); params.push(data.description) }
+  if (data.layout !== undefined) { fields.push(`layout = $${idx++}`); params.push(JSON.stringify(data.layout)) }
+  if (data.isDefault !== undefined) { fields.push(`is_default = $${idx++}`); params.push(data.isDefault) }
+  if (data.isShared !== undefined) { fields.push(`is_shared = $${idx++}`); params.push(data.isShared) }
+  const result = await pool.query(
+    `UPDATE custom_dashboards SET ${fields.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+export const deleteDashboard = async (dashboardId, userId) => {
+  const result = await pool.query('DELETE FROM custom_dashboards WHERE id = $1 AND user_id = $2 RETURNING id', [dashboardId, userId])
+  return result.rows[0]
+}
+
+export const addWidget = async (dashboardId, { widgetType, title, config, position }) => {
+  const result = await pool.query(
+    `INSERT INTO dashboard_widgets (dashboard_id, widget_type, title, config, position)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [dashboardId, widgetType, title, JSON.stringify(config || {}), JSON.stringify(position || { x: 0, y: 0, w: 4, h: 3 })]
+  )
+  return result.rows[0]
+}
+
+export const getWidgets = async (dashboardId) => {
+  const result = await pool.query(
+    'SELECT * FROM dashboard_widgets WHERE dashboard_id = $1 ORDER BY created_at ASC',
+    [dashboardId]
+  )
+  return result.rows
+}
+
+export const updateWidget = async (widgetId, dashboardId, data) => {
+  const fields = []
+  const params = [widgetId, dashboardId]
+  let idx = 3
+  if (data.title !== undefined) { fields.push(`title = $${idx++}`); params.push(data.title) }
+  if (data.config !== undefined) { fields.push(`config = $${idx++}`); params.push(JSON.stringify(data.config)) }
+  if (data.position !== undefined) { fields.push(`position = $${idx++}`); params.push(JSON.stringify(data.position)) }
+  if (fields.length === 0) return null
+  const result = await pool.query(
+    `UPDATE dashboard_widgets SET ${fields.join(', ')} WHERE id = $1 AND dashboard_id = $2 RETURNING *`,
+    params
+  )
+  return result.rows[0]
+}
+
+export const removeWidget = async (widgetId, dashboardId) => {
+  const result = await pool.query('DELETE FROM dashboard_widgets WHERE id = $1 AND dashboard_id = $2 RETURNING id', [widgetId, dashboardId])
+  return result.rows[0]
+}
+
+export const getSharedDashboards = async (orgId) => {
+  const result = await pool.query(
+    `SELECT cd.*, u.name AS creator_name, (SELECT COUNT(*) FROM dashboard_widgets dw WHERE dw.dashboard_id = cd.id)::int AS widget_count
+     FROM custom_dashboards cd JOIN users u ON u.id = cd.user_id
+     WHERE cd.org_id = $1 AND cd.is_shared = true ORDER BY cd.created_at DESC`,
+    [orgId]
+  )
+  return result.rows
 }
 
 // Close database connection pool

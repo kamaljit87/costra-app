@@ -29,6 +29,12 @@ import organizationsRoutes from './organizations.js'
 import policiesRoutes from './policies.js'
 import forecastsRoutes from './forecasts.js'
 import kubernetesRoutes from './kubernetes.js'
+import workflowsRoutes from './workflows.js'
+import allocationsRoutes from './allocations.js'
+import slackRoutes from './slack.js'
+import terraformRoutes from './terraform.js'
+import saasRoutes from './saas.js'
+import dashboardsRoutes from './dashboards.js'
 
 const routes = [
   { path: '/api/auth', handler: authRoutes },
@@ -58,6 +64,12 @@ const routes = [
   { path: '/api/policies', handler: policiesRoutes },
   { path: '/api/forecasts', handler: forecastsRoutes },
   { path: '/api/kubernetes', handler: kubernetesRoutes },
+  { path: '/api/workflows', handler: workflowsRoutes },
+  { path: '/api/allocations', handler: allocationsRoutes },
+  { path: '/api/slack', handler: slackRoutes },
+  { path: '/api/terraform', handler: terraformRoutes },
+  { path: '/api/saas', handler: saasRoutes },
+  { path: '/api/dashboards', handler: dashboardsRoutes },
 ]
 
 /**

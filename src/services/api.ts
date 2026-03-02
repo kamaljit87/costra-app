@@ -303,12 +303,31 @@ export const savingsPlansAPI = {
     const response = await apiRequest('/savings-plans')
     return response.json()
   },
-
   saveSavingsPlan: async (plan: any) => {
     const response = await apiRequest('/savings-plans', {
       method: 'POST',
       body: JSON.stringify(plan),
     })
+    return response.json()
+  },
+  create: async (data: any) => {
+    const response = await apiRequest('/savings-plans', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  getUtilization: async () => {
+    const response = await apiRequest('/savings-plans/utilization')
+    return response.json()
+  },
+  getHistory: async (id: number, days?: number) => {
+    const response = await apiRequest(`/savings-plans/${id}/history${days ? `?days=${days}` : ''}`)
+    return response.json()
+  },
+  update: async (id: number, data: any) => {
+    const response = await apiRequest(`/savings-plans/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest(`/savings-plans/${id}`, { method: 'DELETE' })
     return response.json()
   },
 }
@@ -1556,6 +1575,203 @@ export const kubernetesAPI = {
     if (startDate) query.set('startDate', startDate)
     if (endDate) query.set('endDate', endDate)
     const response = await apiRequest(`/kubernetes/clusters/${clusterId}/idle?${query.toString()}`)
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// Workflows API
+// ══════════════════════════════════════
+export const workflowsAPI = {
+  list: async (params?: { status?: string; type?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.status) query.set('status', params.status)
+    if (params?.type) query.set('type', params.type)
+    const response = await apiRequest(`/workflows?${query.toString()}`)
+    return response.json()
+  },
+  get: async (id: number) => {
+    const response = await apiRequest(`/workflows/${id}`)
+    return response.json()
+  },
+  create: async (data: { type: string; title: string; description?: string }) => {
+    const response = await apiRequest('/workflows', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  update: async (id: number, data: { status?: string; assigneeUserId?: number }) => {
+    const response = await apiRequest(`/workflows/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    return response.json()
+  },
+  addComment: async (id: number, comment: string) => {
+    const response = await apiRequest(`/workflows/${id}/comments`, { method: 'POST', body: JSON.stringify({ comment }) })
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// Allocations API
+// ══════════════════════════════════════
+export const allocationsAPI = {
+  list: async () => {
+    const response = await apiRequest('/allocations')
+    return response.json()
+  },
+  create: async (data: { name: string; description?: string; sourceFilter: any; splitMethod: string; splitTargets: any[] }) => {
+    const response = await apiRequest('/allocations', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  update: async (id: number, data: any) => {
+    const response = await apiRequest(`/allocations/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest(`/allocations/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// Slack API
+// ══════════════════════════════════════
+export const slackAPI = {
+  getSettings: async () => {
+    const response = await apiRequest('/slack/settings')
+    return response.json()
+  },
+  saveSettings: async (data: { webhookUrl: string; channelName?: string; dailyDigest?: boolean; anomalyAlerts?: boolean; budgetAlerts?: boolean }) => {
+    const response = await apiRequest('/slack/settings', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  deleteSettings: async () => {
+    const response = await apiRequest('/slack/settings', { method: 'DELETE' })
+    return response.json()
+  },
+  sendTest: async () => {
+    const response = await apiRequest('/slack/test', { method: 'POST' })
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// Report Schedules API
+// ══════════════════════════════════════
+export const reportSchedulesAPI = {
+  list: async () => {
+    const response = await apiRequest('/reports/schedules')
+    return response.json()
+  },
+  create: async (data: { reportName: string; frequency: string; recipients: string[]; reportType?: string; dayOfWeek?: number; dayOfMonth?: number; fileFormat?: string; filters?: any }) => {
+    const response = await apiRequest('/reports/schedules', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  update: async (id: number, data: any) => {
+    const response = await apiRequest(`/reports/schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest(`/reports/schedules/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// Terraform API
+// ══════════════════════════════════════
+export const terraformAPI = {
+  estimate: async (data: { planName?: string; planJson: string }) => {
+    const response = await apiRequest('/terraform/estimate', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  listEstimates: async () => {
+    const response = await apiRequest('/terraform/estimates')
+    return response.json()
+  },
+  deleteEstimate: async (id: number) => {
+    const response = await apiRequest(`/terraform/estimates/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// SaaS API
+// ══════════════════════════════════════
+export const saasAPI = {
+  listProviders: async () => {
+    const response = await apiRequest('/saas/providers')
+    return response.json()
+  },
+  addProvider: async (data: { providerName: string; providerType: string; apiKey?: string; apiEndpoint?: string }) => {
+    const response = await apiRequest('/saas/providers', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  deleteProvider: async (id: number) => {
+    const response = await apiRequest(`/saas/providers/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+  getCosts: async (params?: { startDate?: string; endDate?: string; providerId?: number }) => {
+    const query = new URLSearchParams()
+    if (params?.startDate) query.set('startDate', params.startDate)
+    if (params?.endDate) query.set('endDate', params.endDate)
+    if (params?.providerId) query.set('providerId', String(params.providerId))
+    const response = await apiRequest(`/saas/costs?${query.toString()}`)
+    return response.json()
+  },
+  getTotals: async () => {
+    const response = await apiRequest('/saas/totals')
+    return response.json()
+  },
+  uploadCosts: async (data: { providerId: number; costs: any[] }) => {
+    const response = await apiRequest('/saas/costs/upload', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+}
+
+// ══════════════════════════════════════
+// Dashboards API
+// ══════════════════════════════════════
+export const dashboardsAPI = {
+  list: async () => {
+    const response = await apiRequest('/dashboards')
+    return response.json()
+  },
+  get: async (id: number) => {
+    const response = await apiRequest(`/dashboards/${id}`)
+    return response.json()
+  },
+  create: async (data: { name: string; description?: string }) => {
+    const response = await apiRequest('/dashboards', { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  update: async (id: number, data: any) => {
+    const response = await apiRequest(`/dashboards/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    return response.json()
+  },
+  delete: async (id: number) => {
+    const response = await apiRequest(`/dashboards/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+  addWidget: async (dashboardId: number, data: { widgetType: string; title: string; config?: any; position?: any }) => {
+    const response = await apiRequest(`/dashboards/${dashboardId}/widgets`, { method: 'POST', body: JSON.stringify(data) })
+    return response.json()
+  },
+  updateWidget: async (dashboardId: number, widgetId: number, data: any) => {
+    const response = await apiRequest(`/dashboards/${dashboardId}/widgets/${widgetId}`, { method: 'PUT', body: JSON.stringify(data) })
+    return response.json()
+  },
+  removeWidget: async (dashboardId: number, widgetId: number) => {
+    const response = await apiRequest(`/dashboards/${dashboardId}/widgets/${widgetId}`, { method: 'DELETE' })
+    return response.json()
+  },
+  share: async (dashboardId: number) => {
+    const response = await apiRequest(`/dashboards/${dashboardId}/share`, { method: 'POST' })
+    return response.json()
+  },
+  getShared: async () => {
+    const response = await apiRequest('/dashboards/shared')
+    return response.json()
+  },
+  getWidgetData: async (data: { widgetType: string; config: any }) => {
+    const response = await apiRequest('/dashboards/widget-data', { method: 'POST', body: JSON.stringify(data) })
     return response.json()
   },
 }

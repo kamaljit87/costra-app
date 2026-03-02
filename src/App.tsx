@@ -44,6 +44,12 @@ const AnomaliesPage = lazy(() => import('./pages/AnomaliesPage'))
 const PoliciesPage = lazy(() => import('./pages/PoliciesPage'))
 const ForecastPage = lazy(() => import('./pages/ForecastPage'))
 const KubernetesPage = lazy(() => import('./pages/KubernetesPage'))
+const WorkflowsPage = lazy(() => import('./pages/WorkflowsPage'))
+const SavingsPlansPage = lazy(() => import('./pages/SavingsPlansPage'))
+const AllocationsPage = lazy(() => import('./pages/AllocationsPage'))
+const TerraformPage = lazy(() => import('./pages/TerraformPage'))
+const SaaSPage = lazy(() => import('./pages/SaaSPage'))
+const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -262,6 +268,62 @@ function App() {
               element={
                 <ProtectedRoute>
                   <KubernetesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflows"
+              element={
+                <ProtectedRoute>
+                  <WorkflowsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/savings-plans"
+              element={
+                <ProtectedRoute>
+                  <SavingsPlansPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/allocations"
+              element={
+                <ProtectedRoute>
+                  <AllocationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/terraform"
+              element={
+                <ProtectedRoute>
+                  <TerraformPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/saas"
+              element={
+                <ProtectedRoute>
+                  <SaaSPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/custom-dashboard"
+              element={
+                <ProtectedRoute>
+                  <CustomDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/custom-dashboard/:id"
+              element={
+                <ProtectedRoute>
+                  <CustomDashboardPage />
                 </ProtectedRoute>
               }
             />

@@ -515,4 +515,72 @@ async function generateReportFile(reportId, reportData, format, userId) {
   return filePath
 }
 
+// ══════════════════════════════════════
+// Report Schedules
+// ══════════════════════════════════════
+
+import { attachOrg } from '../middleware/orgAuth.js'
+import {
+  createReportSchedule,
+  getReportSchedules,
+  updateReportSchedule,
+  deleteReportSchedule,
+} from '../database.js'
+
+// GET /api/reports/schedules
+router.get('/schedules', attachOrg, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const schedules = await getReportSchedules(userId, req.orgId)
+    res.json({ schedules })
+  } catch (error) {
+    logger.error('Error listing report schedules', { error: error.message })
+    res.status(500).json({ error: 'Failed to list report schedules' })
+  }
+})
+
+// POST /api/reports/schedules
+router.post('/schedules', attachOrg, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const { reportType, reportName, frequency, dayOfWeek, dayOfMonth, recipients, filters, fileFormat } = req.body
+    if (!reportName || !frequency || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({ error: 'reportName, frequency, and recipients are required' })
+    }
+    const schedule = await createReportSchedule(userId, req.orgId, {
+      reportType: reportType || 'showback', reportName, frequency, dayOfWeek, dayOfMonth, recipients, filters, fileFormat,
+    })
+    res.status(201).json({ schedule })
+  } catch (error) {
+    logger.error('Error creating report schedule', { error: error.message })
+    res.status(500).json({ error: 'Failed to create report schedule' })
+  }
+})
+
+// PUT /api/reports/schedules/:id
+router.put('/schedules/:id', attachOrg, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const schedule = await updateReportSchedule(parseInt(req.params.id), userId, req.body)
+    if (!schedule) return res.status(404).json({ error: 'Schedule not found' })
+    res.json({ schedule })
+  } catch (error) {
+    logger.error('Error updating report schedule', { error: error.message })
+    res.status(500).json({ error: 'Failed to update report schedule' })
+  }
+})
+
+// DELETE /api/reports/schedules/:id
+router.delete('/schedules/:id', attachOrg, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const result = await deleteReportSchedule(parseInt(req.params.id), userId)
+    if (!result) return res.status(404).json({ error: 'Schedule not found' })
+    res.json({ message: 'Report schedule deleted' })
+  } catch (error) {
+    logger.error('Error deleting report schedule', { error: error.message })
+    res.status(500).json({ error: 'Failed to delete report schedule' })
+  }
+})
+
 export default router

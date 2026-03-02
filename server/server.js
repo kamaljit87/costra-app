@@ -74,6 +74,13 @@ if (isProduction) {
   import('./services/weeklySummaryScheduler.js').then(({ initWeeklySummarySchedule }) => {
     initWeeklySummarySchedule()
   }).catch((e) => logger.warn('Weekly summary scheduler init failed', { error: e.message }))
+  import('./services/reportScheduler.js').then(({ initReportScheduler }) => {
+    initReportScheduler()
+  }).catch((e) => logger.warn('Report scheduler init failed', { error: e.message }))
+  Promise.all([import('./services/slackService.js'), import('node-cron')]).then(([{ runDailyDigests }, cronMod]) => {
+    cronMod.default.schedule('0 9 * * *', async () => { await runDailyDigests() })
+    logger.info('Slack daily digest cron initialized (9 AM UTC)')
+  }).catch((e) => logger.warn('Slack digest scheduler init failed', { error: e.message }))
 }
 
 // Create Express app
