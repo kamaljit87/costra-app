@@ -112,10 +112,12 @@ jobs:
           printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: Checkout (for deploy script)
+      - name: Checkout (deploy script + k8s manifests)
         uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts
+          sparse-checkout: |
+            scripts
+            k8s
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -157,8 +159,15 @@ jobs:
             [ -z "$HOST" ] && continue
             echo "::group::Deploying to $HOST"
             ssh-keyscan -p "$PORT" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-            echo "Transferring images..."
+
+            # Ensure sparse checkout is configured on the server
+            $SSH "$USER@$HOST" "cd $DIR && git sparse-checkout set k8s scripts 2>/dev/null || true"
+
+            echo "Transferring images and manifests..."
             $SCP /tmp/backend.tar.gz /tmp/frontend.tar.gz scripts/k8s-deploy.sh "$USER@$HOST:/tmp/"
+            # Sync k8s manifests to the server
+            $SCP -r k8s "$USER@$HOST:$DIR/"
+
             echo "Importing images into k3s..."
             $SSH "$USER@$HOST" "gunzip -c /tmp/backend.tar.gz | sudo k3s ctr images import - && gunzip -c /tmp/frontend.tar.gz | sudo k3s ctr images import - && bash /tmp/k8s-deploy.sh $REGISTRY $NS $TAG $DIR"
             echo "::endgroup::"

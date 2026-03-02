@@ -13,13 +13,13 @@ DIR="$4"
 
 echo "Deploying $REGISTRY/costra-{backend,frontend}:$TAG to namespace $NS"
 
-# Pull latest code
+# Pull latest k8s manifests (works with both full clone and sparse checkout)
 cd "$DIR" && [ -d .git ] && git pull --ff-only || true
 
 # Apply k8s manifests (infra + app configs)
-sudo kubectl apply -f "$DIR/k8s/cluster/redis/" 2>/dev/null || true
-sudo kubectl apply -f "$DIR/k8s/costra/middleware.yaml" 2>/dev/null || true
-sudo kubectl apply -f "$DIR/k8s/costra/ingress.yaml" 2>/dev/null || true
+[ -d "$DIR/k8s/cluster/redis" ] && sudo kubectl apply -f "$DIR/k8s/cluster/redis/" 2>/dev/null || true
+[ -f "$DIR/k8s/costra/middleware.yaml" ] && sudo kubectl apply -f "$DIR/k8s/costra/middleware.yaml" 2>/dev/null || true
+[ -f "$DIR/k8s/costra/ingress.yaml" ] && sudo kubectl apply -f "$DIR/k8s/costra/ingress.yaml" 2>/dev/null || true
 
 # Update deployments
 sudo kubectl set image deployment/costra-backend backend="$REGISTRY/costra-backend:$TAG" -n "$NS"
