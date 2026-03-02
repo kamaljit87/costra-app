@@ -51,12 +51,18 @@ export default function AnomalyDetection({ providerId, thresholdPercent = 20, ac
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-accent-100">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Activity className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
-            <p className="text-accent-700">Analyzing cost patterns...</p>
-          </div>
+      <div className="card bg-white border-accent-100 animate-pulse">
+        <div className="flex items-center justify-between mb-4">
+          <div className="h-5 bg-gray-200 rounded w-40" />
+          <div className="w-5 h-5 bg-gray-200 rounded" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2].map(i => (
+            <div key={i} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="h-4 bg-gray-200 rounded w-48 mb-2" />
+              <div className="h-3 bg-gray-100 rounded w-64" />
+            </div>
+          ))}
         </div>
       </div>
     )

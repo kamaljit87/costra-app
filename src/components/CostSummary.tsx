@@ -188,12 +188,22 @@ export default function CostSummary({ providerId, month, year, accountId, startD
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <FileText className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
-            <p className="text-gray-600">Generating cost summary...</p>
+      <div className="card bg-white border-accent-100 animate-pulse">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <div className="h-5 bg-gray-200 rounded w-32 mb-2" />
+            <div className="h-3 bg-gray-100 rounded w-48" />
           </div>
+          <div className="w-5 h-5 bg-gray-200 rounded" />
+        </div>
+        <div className="mb-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
+          <div className="h-3 bg-gray-200 rounded w-28 mb-2" />
+          <div className="h-7 bg-gray-200 rounded w-36" />
+        </div>
+        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+          <div className="h-4 bg-gray-200 rounded w-full" />
+          <div className="h-4 bg-gray-200 rounded w-2/3" />
         </div>
       </div>
     )

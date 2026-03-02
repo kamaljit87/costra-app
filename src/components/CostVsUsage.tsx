@@ -61,12 +61,15 @@ export default function CostVsUsage({ providerId, startDate, endDate, accountId 
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-accent-100">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Activity className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
-            <p className="text-accent-700">Loading cost vs usage data...</p>
-          </div>
+      <div className="card bg-white border-accent-100 animate-pulse">
+        <div className="h-5 bg-gray-200 rounded w-44 mb-4" />
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="h-4 bg-gray-200 rounded w-32" />
+              <div className="h-4 bg-gray-200 rounded w-20" />
+            </div>
+          ))}
         </div>
       </div>
     )

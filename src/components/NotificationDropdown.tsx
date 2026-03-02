@@ -252,7 +252,7 @@ function getDateGroup(dateString: string): string {
 export default function NotificationDropdown({ isOpen, onClose }: NotificationDropdownProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isFirstLoad, setIsFirstLoad] = useState(true)
   const [isMarkingAll, setIsMarkingAll] = useState(false)
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -260,7 +260,6 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
 
   const fetchNotifications = useCallback(async () => {
     try {
-      setIsLoading(true)
       const [notificationsResponse, countResponse] = await Promise.all([
         notificationsAPI.getNotifications({ limit: 20 }),
         notificationsAPI.getUnreadCount()
@@ -269,11 +268,14 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
       setUnreadCount(countResponse.count || 0)
     } catch (error) {
       console.error('Failed to fetch notifications:', error)
-      showError('Failed to load notifications', 'Please try again later')
+      // Only show error toast on first load failure when there's nothing cached
+      if (isFirstLoad) {
+        showError('Failed to load notifications', 'Please try again later')
+      }
     } finally {
-      setIsLoading(false)
+      setIsFirstLoad(false)
     }
-  }, [showError])
+  }, [showError, isFirstLoad])
 
   useEffect(() => {
     if (isOpen) {
@@ -462,9 +464,18 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
 
       {/* Notifications List */}
       <div className="overflow-y-auto flex-1 overscroll-contain">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader className="h-5 w-5 animate-spin text-accent-500" />
+        {isFirstLoad && notifications.length === 0 ? (
+          <div className="space-y-px py-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="px-4 py-3 flex items-start gap-3 animate-pulse">
+                <div className="w-2 pt-4"><div className="w-2 h-2 rounded-full bg-gray-200 dark:bg-gray-700" /></div>
+                <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                  <div className="h-3 bg-gray-100 dark:bg-gray-700/50 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4">

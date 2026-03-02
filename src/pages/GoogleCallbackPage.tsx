@@ -52,7 +52,7 @@ export default function GoogleCallbackPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+      <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
       <p className="mt-4 text-gray-600">Completing sign-in...</p>
     </div>
   )

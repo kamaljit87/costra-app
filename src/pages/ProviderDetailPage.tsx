@@ -1382,10 +1382,7 @@ export default function ProviderDetailPage() {
                   {/* Chart Content */}
                   {isLoadingChartData ? (
                     <div className="card flex items-center justify-center h-64">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600 mx-auto mb-4"></div>
-                        <p className="text-gray-500">Loading chart data...</p>
-                      </div>
+                      <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
                     </div>
                   ) : (
                     <ProviderCostChart
@@ -1424,7 +1421,7 @@ export default function ProviderDetailPage() {
                       </div>
                       {isLoadingServices ? (
                         <div className="flex items-center justify-center h-64">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
+                          <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
                         </div>
                       ) : serviceCostData.length > 0 ? (
                         <div className="relative">
@@ -1499,7 +1496,7 @@ export default function ProviderDetailPage() {
                       </div>
                       {isLoadingServices ? (
                         <div className="flex items-center justify-center h-64">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
+                          <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
                         </div>
                       ) : serviceCostData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={300}>
@@ -1649,7 +1646,7 @@ export default function ProviderDetailPage() {
                                         <div className="px-8 py-6">
                                           {isLoadingSubServices ? (
                                             <div className="flex items-center justify-center py-6">
-                                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent-600"></div>
+                                              <div className="h-6 w-6 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
                                               <span className="ml-3 text-accent-700">Loading sub-service details...</span>
                                             </div>
                                           ) : subServices.length > 0 ? (
@@ -1865,7 +1862,7 @@ export default function ProviderDetailPage() {
                   if (isLoadingProducts) {
                     return (
                       <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
+                        <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
                       </div>
                     )
                   }
@@ -1916,7 +1913,7 @@ export default function ProviderDetailPage() {
                   if (isLoadingTeams) {
                     return (
                       <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
+                        <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
                       </div>
                     )
                   }

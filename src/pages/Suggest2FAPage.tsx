@@ -74,7 +74,7 @@ export default function Suggest2FAPage() {
         <Link to="/" className="inline-block mb-6">
           <Logo height={40} />
         </Link>
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
         <p className="mt-4 text-gray-600">Loading…</p>
       </div>
     )

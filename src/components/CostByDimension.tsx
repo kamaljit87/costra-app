@@ -107,12 +107,15 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
 
   if (isLoading) {
     return (
-      <div className="card bg-white border-accent-100">
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Filter className="h-8 w-8 text-accent-600 animate-pulse mx-auto mb-4" />
-            <p className="text-accent-700">Loading dimensions...</p>
-          </div>
+      <div className="card bg-white border-accent-100 animate-pulse">
+        <div className="h-5 bg-gray-200 rounded w-40 mb-4" />
+        <div className="flex gap-2 mb-4">
+          {[1, 2, 3].map(i => <div key={i} className="h-8 bg-gray-200 rounded-lg w-20" />)}
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-10 bg-gray-50 rounded-lg border border-gray-200" />
+          ))}
         </div>
       </div>
     )
@@ -428,7 +431,7 @@ export default function CostByDimension({ providerId, accountId }: CostByDimensi
       {/* Loading State */}
       {isLoadingData && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600"></div>
+          <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin"></div>
         </div>
       )}
 

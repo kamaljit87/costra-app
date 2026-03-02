@@ -205,7 +205,7 @@ export default function ForecastPage() {
           <h2 className="text-lg font-semibold mb-4">Base Forecast (6 Months)</h2>
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800" />
+              <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-gray-600 animate-spin" />
             </div>
           ) : baseForecast.length === 0 ? (
             <p className="text-sm text-gray-500 py-4">Not enough historical data to generate a forecast. Sync your cloud costs first.</p>

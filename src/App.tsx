@@ -47,7 +47,7 @@ const KubernetesPage = lazy(() => import('./pages/KubernetesPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
-    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+    <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
   </div>
 )
 
@@ -56,7 +56,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
       </div>
     )
   }
@@ -68,7 +68,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   if (!authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
       </div>
     )
   }
@@ -80,7 +80,7 @@ function SignupRoute() {
   if (!configReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
       </div>
     )
   }
@@ -95,7 +95,7 @@ function WaitlistRoute() {
   if (!configReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-800" />
+        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
       </div>
     )
   }

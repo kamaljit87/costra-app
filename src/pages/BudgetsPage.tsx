@@ -150,10 +150,7 @@ export default function BudgetsPage() {
         {/* Budgets Grid */}
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-600 mx-auto mb-4" />
-              <p className="text-gray-500">Loading budgets...</p>
-            </div>
+            <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-accent-600 animate-spin" />
           </div>
         ) : budgets.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">

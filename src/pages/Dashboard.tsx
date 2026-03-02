@@ -284,11 +284,34 @@ export default function Dashboard() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <RefreshCw className="h-8 w-8 text-accent-600 dark:text-accent-400 animate-spin mx-auto mb-4" />
-              <p className="text-gray-500 dark:text-gray-400">Loading cost data...</p>
+          <div className="animate-pulse">
+            {/* Skeleton: Total Bill Summary */}
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-lg w-48 mb-3" />
+              <div className="h-3 bg-gray-100 dark:bg-gray-700/50 rounded w-64 mb-4" />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-7xl mx-auto mb-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="rounded-2xl p-4 bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-700 shadow-sm">
+                  <div className="w-9 h-9 rounded-xl bg-gray-200 dark:bg-gray-700 mb-3" />
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-2" />
+                  <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded w-32" />
+                </div>
+              ))}
+            </div>
+            {/* Skeleton: Provider cards */}
+            {[1, 2].map(i => (
+              <div key={i} className="rounded-2xl p-5 bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-700 shadow-sm mb-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2" />
+                    <div className="h-3 bg-gray-100 dark:bg-gray-700/50 rounded w-20" />
+                  </div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <>

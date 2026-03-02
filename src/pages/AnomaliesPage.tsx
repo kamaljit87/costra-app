@@ -130,7 +130,7 @@ export default function AnomaliesPage() {
         {/* Events List */}
         {isLoading ? (
           <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800" />
+            <div className="h-8 w-8 rounded-full border-2 border-gray-200 dark:border-gray-700 border-t-gray-600 animate-spin" />
           </div>
         ) : events.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl border">
