@@ -525,17 +525,11 @@ const Sidebar = ({
         onMouseEnter={() => setIsCollapsed(false)}
         onMouseLeave={() => setIsCollapsed(true)}
       >
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-center'} h-16 px-2 border-b border-surface-200 dark:border-gray-800 shrink-0`}>
-          <Link to="/dashboard" className="flex items-center justify-center">
-            {isCollapsed ? (
-              <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:p-1">
-                <img src="/favicon-192.png" alt="Costra" className="h-8 w-8 block object-contain" />
-              </span>
-            ) : (
-              <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
-                <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
-              </span>
-            )}
+        <div className="flex items-center justify-center h-16 px-2 border-b border-surface-200 dark:border-gray-800 shrink-0 overflow-hidden whitespace-nowrap">
+          <Link to="/dashboard" className="flex items-center justify-center shrink-0">
+            <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
+              <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
+            </span>
           </Link>
         </div>
         {desktopSidebarContent}
