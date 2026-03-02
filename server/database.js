@@ -3853,14 +3853,47 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
     const lastMonthCost = parseFloat(currentCostResult.rows[0].last_month_cost) || 0
     const credits = parseFloat(currentCostResult.rows[0].credits) || 0
     const savings = parseFloat(currentCostResult.rows[0].savings) || 0
-    
+
+    // Determine if we're early in the month (month-to-date vs full last month is misleading)
+    const now = new Date()
+    const dayOfMonth = now.getUTCDate()
+    const isPartialMonth = parseInt(month) === (now.getUTCMonth() + 1) && parseInt(year) === now.getUTCFullYear()
+
+    // For partial months, compare same-period: current month 1st-today vs last month 1st-same day
+    let samePeriodLastMonthCost = lastMonthCost
+    let usingPartialComparison = false
+    if (isPartialMonth && dayOfMonth <= 28) {
+      // Get last month's cost for the same date range (1st through same day)
+      const lastMonthDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 2, 1))
+      const lastMonthStart = lastMonthDate.toISOString().split('T')[0]
+      const lastMonthSameDay = new Date(Date.UTC(lastMonthDate.getUTCFullYear(), lastMonthDate.getUTCMonth(), dayOfMonth))
+      const lastMonthEnd = lastMonthSameDay.toISOString().split('T')[0]
+
+      const samePeriodResult = await client.query(
+        `SELECT COALESCE(SUM(cost), 0)::numeric as total_cost
+         FROM daily_cost_data
+         WHERE user_id = $1 AND provider_id = $2
+           AND date >= $3::date AND date <= $4::date
+           ${accountId ? 'AND account_id = $5' : ''}`,
+        accountId
+          ? [userId, providerId, lastMonthStart, lastMonthEnd, accountId]
+          : [userId, providerId, lastMonthStart, lastMonthEnd]
+      )
+      const samePeriodCost = parseFloat(samePeriodResult.rows[0]?.total_cost) || 0
+      if (samePeriodCost > 0) {
+        samePeriodLastMonthCost = samePeriodCost
+        usingPartialComparison = true
+      }
+    }
+
     // Calculate gross cost (before credits) and net cost (after credits)
     const grossCost = currentCost + credits + savings
     const netCost = currentCost
-    const netCostChange = netCost - lastMonthCost
-    const grossCostChange = grossCost - lastMonthCost
-    const changePercent = lastMonthCost > 0 ? (grossCostChange / lastMonthCost) * 100 : 0
-    
+    const comparisonBase = usingPartialComparison ? samePeriodLastMonthCost : lastMonthCost
+    const netCostChange = netCost - comparisonBase
+    const grossCostChange = grossCost - comparisonBase
+    const changePercent = comparisonBase > 0 ? (grossCostChange / comparisonBase) * 100 : 0
+
     // Get service-level changes
     const serviceParams = accountId ? [userId, providerId, month, year, accountId] : [userId, providerId, month, year]
     const servicesResult = await client.query(
@@ -3875,13 +3908,28 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
     )
     
     // Build explanation in markdown format
+    const comparisonLabel = usingPartialComparison
+      ? `compared to the same period last month (1st–${dayOfMonth}${['th','st','nd','rd'][(dayOfMonth % 10 > 3 || Math.floor(dayOfMonth % 100 / 10) === 1) ? 0 : dayOfMonth % 10]})`
+      : 'compared to last month'
     let explanation = `## Period Overview\n\n`
     explanation += `Your **${providerId.toUpperCase()}** cloud spend `
+
+    if (isPartialMonth) {
+      explanation += `so far this month (${dayOfMonth} day${dayOfMonth > 1 ? 's' : ''}) is **$${currentCost.toFixed(2)}**`
+      if (lastMonthCost > 0) {
+        explanation += ` (last month total: **$${lastMonthCost.toFixed(2)}**)`
+      }
+      explanation += `.\n\n`
+    }
 
     // If credits are applied, explain the net cost vs gross cost
     if (credits > 0 || savings > 0) {
       const totalDiscounts = credits + savings
-      explanation += `this month is **$${grossCost.toFixed(2)}** before credits and savings. `
+      if (!isPartialMonth) {
+        explanation += `this month is **$${grossCost.toFixed(2)}** before credits and savings. `
+      } else {
+        explanation += `Before credits and savings, your gross spend is **$${grossCost.toFixed(2)}**. `
+      }
       explanation += `After applying **$${totalDiscounts.toFixed(2)}** in credits`
       if (savings > 0) {
         explanation += ` and **$${savings.toFixed(2)}** in savings`
@@ -3891,12 +3939,12 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
       // Compare gross costs month-over-month
       if (grossCostChange > 0) {
         explanation += `Your actual spending **increased** by **$${Math.abs(grossCostChange).toFixed(2)}** `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase) compared to last month.\n\n`
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase) ${comparisonLabel}.\n\n`
       } else if (grossCostChange < 0) {
         explanation += `Your actual spending **decreased** by **$${Math.abs(grossCostChange).toFixed(2)}** `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease) compared to last month.\n\n`
+        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease) ${comparisonLabel}.\n\n`
       } else {
-        explanation += `Your actual spending remained the same compared to last month.\n\n`
+        explanation += `Your actual spending remained the same ${comparisonLabel}.\n\n`
       }
 
       // Add credits information
@@ -3905,14 +3953,27 @@ export const generateCostExplanation = async (userId, providerId, month, year, a
       }
     } else {
       // No credits - standard explanation
-      if (netCostChange > 0) {
-        explanation += `**increased** by **$${Math.abs(netCostChange).toFixed(2)}** this month `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% increase).\n\n`
-      } else if (netCostChange < 0) {
-        explanation += `**decreased** by **$${Math.abs(netCostChange).toFixed(2)}** this month `
-        explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease).\n\n`
+      if (!isPartialMonth) {
+        if (netCostChange > 0) {
+          explanation += `**increased** by **$${Math.abs(netCostChange).toFixed(2)}** this month `
+          explanation += `(${Math.abs(changePercent).toFixed(1)}% increase).\n\n`
+        } else if (netCostChange < 0) {
+          explanation += `**decreased** by **$${Math.abs(netCostChange).toFixed(2)}** this month `
+          explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease).\n\n`
+        } else {
+          explanation += `remained the same this month.\n\n`
+        }
       } else {
-        explanation += `remained the same this month.\n\n`
+        // Partial month — use same-period comparison
+        if (netCostChange > 0) {
+          explanation += `Spending **increased** by **$${Math.abs(netCostChange).toFixed(2)}** `
+          explanation += `(${Math.abs(changePercent).toFixed(1)}% increase) ${comparisonLabel}.\n\n`
+        } else if (netCostChange < 0) {
+          explanation += `Spending **decreased** by **$${Math.abs(netCostChange).toFixed(2)}** `
+          explanation += `(${Math.abs(changePercent).toFixed(1)}% decrease) ${comparisonLabel}.\n\n`
+        } else {
+          explanation += `Spending is on the same pace ${comparisonLabel}.\n\n`
+        }
       }
     }
 

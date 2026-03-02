@@ -204,16 +204,23 @@ router.get('/cost-summary/:providerId/:month/:year', authenticateToken, async (r
     const { providerId, month, year } = req.params
     const { accountId } = req.query
     
-    // Try to get existing explanation
-    let explanation = await getCostExplanation(
-      userId,
-      providerId,
-      parseInt(month),
-      parseInt(year),
-      accountId ? parseInt(accountId) : null
-    )
-    
-    // If no explanation exists, generate one
+    // For the current month, always regenerate (data changes daily, same-period comparison shifts)
+    const now = new Date()
+    const isCurrentMonth = parseInt(month) === (now.getUTCMonth() + 1) && parseInt(year) === now.getUTCFullYear()
+
+    let explanation = null
+    if (!isCurrentMonth) {
+      // Try to get existing explanation for past months
+      explanation = await getCostExplanation(
+        userId,
+        providerId,
+        parseInt(month),
+        parseInt(year),
+        accountId ? parseInt(accountId) : null
+      )
+    }
+
+    // If no explanation exists (or current month), generate one
     if (!explanation) {
       explanation = await generateCostExplanation(
         userId,
