@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { insightsAPI } from '../services/api'
-import { AlertTriangle, TrendingUp, TrendingDown, Activity, Zap, Info, X } from 'lucide-react'
+import { AlertTriangle, TrendingUp, TrendingDown, Zap, Info, X } from 'lucide-react'
 
 interface Anomaly {
   providerId: string
