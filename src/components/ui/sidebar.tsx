@@ -541,8 +541,13 @@ const Sidebar = ({
         {desktopSidebarContent}
       </motion.div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-14 transition-all duration-300">
+      {/* Main Content Area — on lg+ the margin tracks the sidebar width */}
+      <motion.div
+        className="flex-1 flex flex-col min-w-0 max-lg:!ml-0"
+        initial={false}
+        animate={{ marginLeft: isCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH }}
+        transition={sidebarTransition}
+      >
         {children === undefined ? (
           <>
             <div className="lg:hidden flex justify-end items-center pr-4 pt-3 pb-2 bg-surface-100 border-b border-surface-200">
@@ -556,7 +561,7 @@ const Sidebar = ({
         ) : (
           children
         )}
-      </div>
+      </motion.div>
     </div>
   )
 }
