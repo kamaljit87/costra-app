@@ -6,12 +6,13 @@ import type { Plugin } from 'vite'
 const BLOG_DIR = path.resolve(__dirname, '../src/content/blog')
 const SITE_URL = 'https://costra.app'
 
-const STATIC_ROUTES = [
-  '/',
-  '/blog',
-  '/privacy',
-  '/terms',
-  '/contact',
+const STATIC_ROUTES: { path: string; changefreq: string; priority: string }[] = [
+  { path: '/', changefreq: 'weekly', priority: '1.0' },
+  { path: '/blog', changefreq: 'weekly', priority: '0.8' },
+  { path: '/docs', changefreq: 'monthly', priority: '0.7' },
+  { path: '/contact', changefreq: 'monthly', priority: '0.6' },
+  { path: '/privacy', changefreq: 'yearly', priority: '0.3' },
+  { path: '/terms', changefreq: 'yearly', priority: '0.3' },
 ]
 
 function getBlogPosts() {
@@ -55,13 +56,15 @@ export default function blogPlugin(): Plugin {
       const today = new Date().toISOString().split('T')[0]
       const urls = [
         ...STATIC_ROUTES.map(route => ({
-          loc: `${SITE_URL}${route}`,
+          loc: `${SITE_URL}${route.path}`,
           lastmod: today,
-          priority: route === '/' ? '1.0' : '0.8',
+          changefreq: route.changefreq,
+          priority: route.priority,
         })),
         ...posts.map(p => ({
           loc: `${SITE_URL}/blog/${p.slug}`,
           lastmod: p.date || today,
+          changefreq: 'yearly',
           priority: '0.7',
         })),
       ]
@@ -71,6 +74,7 @@ export default function blogPlugin(): Plugin {
 ${urls.map(u => `  <url>
     <loc>${u.loc}</loc>
     <lastmod>${u.lastmod}</lastmod>
+    <changefreq>${u.changefreq}</changefreq>
     <priority>${u.priority}</priority>
   </url>`).join('\n')}
 </urlset>`
