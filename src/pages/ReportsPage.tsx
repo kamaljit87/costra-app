@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { reportsAPI, productTeamAPI, cloudProvidersAPI } from '../services/api'
 import Layout from '../components/Layout'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 
 interface Report {
   id: number
@@ -273,6 +274,7 @@ export default function ReportsPage() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <FileText className="h-6 w-6 text-accent-600" />
               Reports
+              <FeatureInfoButton featureId="reports" />
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Generate cost visibility and allocation reports

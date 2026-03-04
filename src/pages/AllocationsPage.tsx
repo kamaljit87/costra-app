@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { allocationsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { Split, Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 
 interface AllocationRule {
@@ -113,6 +114,7 @@ export default function AllocationsPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Split className="h-8 w-8 text-indigo-600" />
               Cost Allocation Rules
+              <FeatureInfoButton featureId="allocations" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Define rules for splitting shared costs between teams and products</p>
           </div>

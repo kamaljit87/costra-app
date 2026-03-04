@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { terraformAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { FileCode, Upload, Trash2, DollarSign, Plus, Minus, RefreshCw } from 'lucide-react'
 
 interface ResourceEstimate {
@@ -112,6 +113,7 @@ export default function TerraformPage() {
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3 mb-1">
           <FileCode className="h-8 w-8 text-indigo-600" />
           Terraform Cost Estimation
+          <FeatureInfoButton featureId="terraform" />
         </h1>
         <p className="text-sm text-gray-500 mb-6">Estimate infrastructure costs from <code className="bg-gray-100 px-1 rounded">terraform plan -json</code> output</p>
 

@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { workflowsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { ClipboardList, Plus, MessageSquare, ChevronRight, ArrowLeft } from 'lucide-react'
 
 interface WorkflowItem {
@@ -190,6 +191,7 @@ export default function WorkflowsPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <ClipboardList className="h-8 w-8 text-indigo-600" />
               FinOps Reviews
+              <FeatureInfoButton featureId="workflows" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Review anomalies, approve optimizations, and track cost decisions</p>
           </div>

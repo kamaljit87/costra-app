@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { saasAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { Cloud, Plus, Trash2, Upload, TrendingUp, TrendingDown } from 'lucide-react'
 
 interface SaaSProvider {
@@ -128,6 +129,7 @@ export default function SaaSPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Cloud className="h-8 w-8 text-indigo-600" />
               SaaS Spend
+              <FeatureInfoButton featureId="saas" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Track costs for Datadog, Snowflake, GitHub, and other SaaS tools</p>
           </div>

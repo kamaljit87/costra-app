@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { policiesAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { Shield, Plus, Trash2, ToggleLeft, ToggleRight, AlertCircle, CheckCircle } from 'lucide-react'
 
 interface Policy {
@@ -163,6 +164,7 @@ export default function PoliciesPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Shield className="h-8 w-8 text-indigo-600" />
               Cost Policies
+              <FeatureInfoButton featureId="policies" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Define guardrails to catch overspending and governance issues</p>
           </div>

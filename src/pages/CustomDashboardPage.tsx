@@ -5,6 +5,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { dashboardsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import {
   LayoutGrid, Plus, Trash2, Share2, ArrowLeft,
   TrendingUp, PieChart, Wallet, AlertTriangle, BarChart3, DollarSign,
@@ -377,6 +378,7 @@ export default function CustomDashboardPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <LayoutGrid className="h-8 w-8 text-indigo-600" />
               Custom Dashboards
+              <FeatureInfoButton featureId="custom-dashboards" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Build personalized views with drag-and-drop cost widgets</p>
           </div>

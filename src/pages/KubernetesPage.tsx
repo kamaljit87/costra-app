@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { kubernetesAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { Container, Plus, Trash2, ArrowLeft, AlertTriangle } from 'lucide-react'
 
 interface Cluster {
@@ -350,6 +351,7 @@ export default function KubernetesPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Container className="h-8 w-8 text-accent-600" />
               Kubernetes Costs
+              <FeatureInfoButton featureId="kubernetes" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Namespace and workload cost allocation for K8s clusters</p>
           </div>

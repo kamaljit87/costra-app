@@ -6,6 +6,7 @@ import { costDataAPI, cloudProvidersAPI, syncAPI } from '../services/api'
 import { CostData, getCostData } from '../services/costService'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { ProviderIcon, getProviderColor } from '../components/CloudProviderIcons'
 import {
   ArrowLeftRight,
@@ -636,6 +637,7 @@ export default function CostComparePage() {
               <div className="flex items-center space-x-3 mb-1">
                 <ArrowLeftRight className="h-6 w-6 text-accent-600" />
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Cost Comparison</h1>
+                <FeatureInfoButton featureId="compare" />
               </div>
               <p className="text-xs text-gray-500 ml-9">
                 Compare costs across all your cloud providers and months

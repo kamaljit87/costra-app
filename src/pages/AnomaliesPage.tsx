@@ -5,6 +5,7 @@ import { useCurrency } from '../contexts/CurrencyContext'
 import { anomalyEventsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { AlertTriangle, CheckCircle, Eye, Search, XCircle, Clock, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
 interface AnomalyEvent {
@@ -100,6 +101,7 @@ export default function AnomaliesPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <AlertTriangle className="h-8 w-8 text-orange-500" />
               Cost Anomalies
+              <FeatureInfoButton featureId="anomalies" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">ML-powered anomaly detection with AI root cause analysis</p>
           </div>

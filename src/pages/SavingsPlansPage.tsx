@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { savingsPlansAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { Percent, Plus, Trash2, AlertTriangle } from 'lucide-react'
 
 interface SavingsPlan {
@@ -135,6 +136,7 @@ export default function SavingsPlansPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Percent className="h-8 w-8 text-indigo-600" />
               RI/SP Utilization
+              <FeatureInfoButton featureId="savings-plans" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Track Reserved Instance and Savings Plan coverage and utilization</p>
           </div>

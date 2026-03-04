@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { forecastsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import { TrendingUp, Plus, Trash2, Play, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface ForecastMonth {
@@ -191,6 +192,7 @@ export default function ForecastPage() {
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <TrendingUp className="h-8 w-8 text-accent-600" />
               Forecast & Scenarios
+              <FeatureInfoButton featureId="forecasts" />
             </h1>
             <p className="text-sm text-gray-500 mt-1">Multi-month cost projections with what-if scenario modeling</p>
           </div>

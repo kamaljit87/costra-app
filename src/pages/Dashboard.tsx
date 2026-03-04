@@ -7,6 +7,7 @@ import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services
 import { cloudProvidersAPI, syncAPI, budgetsAPI, costDataAPI, goalsAPI, billingAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
@@ -233,8 +234,9 @@ export default function Dashboard() {
         {/* Header with Sync and Add Provider - Compact */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-0.5">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-0.5 flex items-center gap-2">
               Dashboard
+              <FeatureInfoButton featureId="dashboard" />
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-300">
               Multi-cloud cost overview across all your providers

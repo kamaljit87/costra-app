@@ -5,6 +5,7 @@ import { useNotification } from '../contexts/NotificationContext'
 import { budgetsAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
+import FeatureInfoButton from '../components/FeatureInfoButton'
 import BudgetCard from '../components/BudgetCard'
 import BudgetForm from '../components/BudgetForm'
 
@@ -101,7 +102,10 @@ export default function BudgetsPage() {
         {/* Header */}
         <div className="mt-6 mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Budgets</h1>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              Budgets
+              <FeatureInfoButton featureId="budgets" />
+            </h1>
             <p className="mt-2 text-gray-600">
               Set and monitor budgets for your cloud spending
             </p>
