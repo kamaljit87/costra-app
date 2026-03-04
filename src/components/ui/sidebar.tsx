@@ -126,7 +126,9 @@ const Sidebar = ({
 }: SidebarProps) => {
   const [internalOpen, setInternalOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(navGroups?.map((g) => g.label) ?? [])
+  )
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>(() => cloudProvidersCache?.providers ?? [])
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(
     () => new Set(cloudProvidersCache?.expandedIds ?? [])
