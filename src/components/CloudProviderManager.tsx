@@ -1080,7 +1080,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             <strong>Required for automated connections.</strong> The name will be automatically converted to lowercase with hyphens for CloudFormation compatibility (e.g., "My Account" → "my-account").
                           </>
                         ) : (
-                          'Give this account a recognizable name to differentiate it from other accounts'
+                          'Give this account a friendly name to tell it apart from other connected accounts'
                         )}
                       </p>
                     </div>
@@ -1128,8 +1128,8 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
                           {awsConnectionType === 'simple'
-                            ? 'Use Cost Explorer API - quick setup, no S3 bucket needed'
-                            : 'One-click CloudFormation setup with CUR - penny-perfect billing accuracy'}
+                            ? 'Uses the Cost Explorer API with IAM keys. Quick to set up, no S3 bucket required.'
+                            : 'Deploys a CloudFormation stack that sets up Cost and Usage Reports automatically. Provides the most accurate, line-item billing data.'}
                         </p>
                       </div>
                     )}
@@ -1198,6 +1198,22 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             How to set up IAM permissions
                           </button>
                         </div>
+                        {(() => {
+                          const hints: Record<string, string> = {
+                            aws: 'Create an IAM user with read-only Cost Explorer access. We recommend using the CostExplorerReadOnly managed policy.',
+                            azure: 'Register an app in Azure AD, then grant it Cost Management Reader access on your subscription.',
+                            gcp: 'Create a service account with Billing Viewer role, then generate a JSON key.',
+                            digitalocean: 'Generate a read-only personal access token from your DigitalOcean API settings.',
+                            linode: 'Generate a personal access token with read-only access from your Linode account settings.',
+                            vultr: 'Generate an API key from your Vultr account under API settings. Enable the key for billing access.',
+                            ibm: 'Create an API key from your IBM Cloud IAM settings. Your account ID is found under Manage → Account.',
+                            mongodb: 'Create an API key pair in your MongoDB Atlas organization settings with Organization Read Only access.',
+                          }
+                          const hint = hints[selectedProvider]
+                          return hint ? (
+                            <p className="text-xs text-gray-500 mt-1">{hint}</p>
+                          ) : null
+                        })()}
                         {selectedProvider === 'aws' && awsConnectionType === 'automated' ? (
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
