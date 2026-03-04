@@ -1195,7 +1195,19 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                             className="flex items-center gap-2 px-3 py-1.5 text-sm text-accent-500 hover:text-accent-700 hover:bg-accent-50 rounded-lg transition-colors"
                           >
                             <HelpCircle className="h-4 w-4" />
-                            How to set up IAM permissions
+                            {(() => {
+                              const labels: Record<string, string> = {
+                                aws: 'How to set up IAM permissions',
+                                azure: 'How to set up a Service Principal',
+                                gcp: 'How to set up a Service Account',
+                                digitalocean: 'How to generate an API token',
+                                linode: 'How to generate an API token',
+                                vultr: 'How to generate an API key',
+                                ibm: 'How to create an API key',
+                                mongodb: 'How to create an API key',
+                              }
+                              return labels[selectedProvider] || 'How to set up credentials'
+                            })()}
                           </button>
                         </div>
                         {(() => {
