@@ -23,7 +23,7 @@ export const featureInfoContent: Record<string, FeatureInfoSection> = {
       'CSV and PDF export of cost data',
     ],
     howToUse: [
-      'Connect at least one cloud provider from Settings → Cloud Providers',
+      'Connect at least one cloud provider from Settings',
       'Click "Sync" to pull the latest billing data',
       'Expand provider cards to see service-level breakdowns',
       'Click a provider name to see detailed cost analytics',
@@ -319,7 +319,7 @@ export const featureInfoContent: Record<string, FeatureInfoSection> = {
       'Integration with cloud provider billing data',
     ],
     howToUse: [
-      'Connect your Kubernetes clusters via the Settings page',
+      'Navigate to Kubernetes from the sidebar under Infrastructure',
       'View cost breakdowns by cluster, namespace, or deployment',
       'Check the efficiency scores to find over-provisioned workloads',
       'Apply right-sizing recommendations to reduce waste',

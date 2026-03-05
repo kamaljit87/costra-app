@@ -4,17 +4,17 @@ import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import CurrencySelector from '../components/CurrencySelector'
 import CloudProviderManager from '../components/CloudProviderManager'
-import { authAPI, emailPreferencesAPI, billingAPI, apiKeysAPI } from '../services/api'
-import { Settings, Globe, Cloud, Shield, ShieldCheck, Mail, Sun, Moon, Monitor, Key, Plus, Trash2, Copy, Building2, ChevronRight } from 'lucide-react'
+import { authAPI, emailPreferencesAPI, billingAPI, apiKeysAPI, slackAPI } from '../services/api'
+import { Settings, Globe, Cloud, Shield, ShieldCheck, Mail, Sun, Moon, Monitor, Key, Plus, Trash2, Copy, Building2, ChevronRight, Bell, MessageSquare, Send, Unplug } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
-type Tab = 'general' | 'providers' | 'security' | 'api'
+type Tab = 'general' | 'providers' | 'notifications' | 'security' | 'api'
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState<Tab>(
-    tabParam === 'providers' ? 'providers' : tabParam === 'security' ? 'security' : tabParam === 'api' ? 'api' : 'general'
+    tabParam === 'providers' ? 'providers' : tabParam === 'notifications' ? 'notifications' : tabParam === 'security' ? 'security' : tabParam === 'api' ? 'api' : 'general'
   )
   const [twoFAEnabled, setTwoFAEnabled] = useState<boolean | null>(null)
   const [twoFALoading, setTwoFALoading] = useState(false)
@@ -38,8 +38,20 @@ export default function SettingsPage() {
   const [createKeyLoading, setCreateKeyLoading] = useState(false)
   const [newKeyShown, setNewKeyShown] = useState<string | null>(null)
 
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState('')
+  const [slackChannelName, setSlackChannelName] = useState('')
+  const [slackDailyDigest, setSlackDailyDigest] = useState(false)
+  const [slackAnomalyAlerts, setSlackAnomalyAlerts] = useState(true)
+  const [slackBudgetAlerts, setSlackBudgetAlerts] = useState(true)
+  const [slackConnected, setSlackConnected] = useState(false)
+  const [slackLoading, setSlackLoading] = useState(false)
+  const [slackSaving, setSlackSaving] = useState(false)
+  const [slackTestSending, setSlackTestSending] = useState(false)
+  const [slackMessage, setSlackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   useEffect(() => {
     if (tabParam === 'providers') setActiveTab('providers')
+    else if (tabParam === 'notifications') setActiveTab('notifications')
     else if (tabParam === 'security') setActiveTab('security')
     else if (tabParam === 'api') setActiveTab('api')
     else setActiveTab('general')
@@ -55,6 +67,27 @@ export default function SettingsPage() {
   }, [activeTab])
 
   useEffect(() => {
+    if (activeTab !== 'notifications') return
+    let cancelled = false
+    setSlackLoading(true)
+    slackAPI.getSettings().then((res: any) => {
+      if (cancelled) return
+      if (res.integration) {
+        setSlackWebhookUrl(res.integration.webhook_url || '')
+        setSlackChannelName(res.integration.channel_name || '')
+        setSlackDailyDigest(!!res.integration.daily_digest)
+        setSlackAnomalyAlerts(res.integration.anomaly_alerts !== false)
+        setSlackBudgetAlerts(res.integration.budget_alerts !== false)
+        setSlackConnected(true)
+      } else {
+        setSlackConnected(false)
+      }
+    }).catch(() => { if (!cancelled) setSlackConnected(false) })
+      .finally(() => { if (!cancelled) setSlackLoading(false) })
+    return () => { cancelled = true }
+  }, [activeTab])
+
+  useEffect(() => {
     if (activeTab === 'api') {
       setApiKeysLoading(true)
       apiKeysAPI.getList().then(setApiKeys).catch(() => setApiKeys([])).finally(() => setApiKeysLoading(false))
@@ -62,11 +95,11 @@ export default function SettingsPage() {
   }, [activeTab])
 
   useEffect(() => {
-    if (activeTab !== 'general') return
+    if (activeTab !== 'general' && activeTab !== 'notifications') return
     let cancelled = false
     Promise.all([
-      billingAPI.getSubscription().then((r) => (r.subscription?.planType || r.planType) === 'pro'),
-      emailPreferencesAPI.getPreferences().then((r) => r.preferences),
+      billingAPI.getSubscription().then((r: any) => (r.subscription?.planType || r.planType) === 'pro'),
+      emailPreferencesAPI.getPreferences().then((r: any) => r.preferences),
     ]).then(([pro, prefs]) => {
       if (!cancelled) {
         setIsPro(pro)
@@ -128,6 +161,22 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2">
               <Cloud className="h-4 w-4" />
               <span>Cloud Providers</span>
+            </div>
+          </button>
+          <button
+            onClick={() => { setActiveTab('notifications'); setSearchParams({ tab: 'notifications' }) }}
+            className={`
+              py-4 px-1 border-b-2 font-medium text-sm -mb-px
+              ${
+                activeTab === 'notifications'
+                  ? 'border-accent-500 text-accent-700 dark:text-accent-300'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
+              }
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              <span>Notifications</span>
             </div>
           </button>
           <button
@@ -218,42 +267,6 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="card">
-              <div className="flex items-center gap-2 mb-4">
-                <Mail className="h-5 w-5 text-accent-700 shrink-0" />
-                <h2 className="text-lg font-semibold text-gray-900">Email reports and alerts</h2>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">Receive cost summaries and alerts by email. Available on Pro.</p>
-              {isPro === false && (
-                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">Upgrade to Pro to enable email reports and alerts.</p>
-              )}
-              {isPro === true && emailPrefs && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={!!emailPrefs.emailAlertsEnabled} disabled={emailPrefsSaving} className="rounded border-gray-300"
-                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailAlertsEnabled: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailAlertsEnabled: v }); } finally { setEmailPrefsSaving(false); } }} />
-                    <span className="text-sm text-gray-700">Enable all email alerts</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={!!emailPrefs.emailWeeklySummary} disabled={emailPrefsSaving} className="rounded border-gray-300"
-                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailWeeklySummary: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailWeeklySummary: v }); } finally { setEmailPrefsSaving(false); } }} />
-                    <span className="text-sm text-gray-700">Weekly cost summary (Mondays)</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={!!emailPrefs.emailBudgetAlerts} disabled={emailPrefsSaving} className="rounded border-gray-300"
-                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailBudgetAlerts: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailBudgetAlerts: v }); } finally { setEmailPrefsSaving(false); } }} />
-                    <span className="text-sm text-gray-700">Budget alerts</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={!!emailPrefs.emailAnomalyAlerts} disabled={emailPrefsSaving} className="rounded border-gray-300"
-                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailAnomalyAlerts: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailAnomalyAlerts: v }); } finally { setEmailPrefsSaving(false); } }} />
-                    <span className="text-sm text-gray-700">Anomaly alerts</span>
-                  </label>
-                </div>
-              )}
-              {isPro === true && emailPrefs === null && <p className="text-gray-500 text-sm">Loading…</p>}
-            </div>
-
             {/* Organization */}
             <Link to="/organization" className="card block hover:border-accent-300 transition-colors group">
               <div className="flex items-center justify-between">
@@ -267,6 +280,188 @@ export default function SettingsPage() {
                 <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-accent-500 transition-colors" />
               </div>
             </Link>
+          </div>
+        )}
+
+        {activeTab === 'notifications' && (
+          <div className="space-y-6">
+            {/* Email Alerts (moved from General) */}
+            <div className="card">
+              <div className="flex items-center gap-2 mb-4">
+                <Mail className="h-5 w-5 text-accent-700 shrink-0 dark:text-accent-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Email alerts</h2>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Receive cost summaries and alerts by email. Available on Pro.</p>
+              {isPro === false && (
+                <p className="text-sm text-amber-700 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">Upgrade to Pro to enable email reports and alerts.</p>
+              )}
+              {isPro === true && emailPrefs && (
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={!!emailPrefs.emailAlertsEnabled} disabled={emailPrefsSaving} className="rounded border-gray-300"
+                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailAlertsEnabled: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailAlertsEnabled: v }); } finally { setEmailPrefsSaving(false); } }} />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Enable all email alerts</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={!!emailPrefs.emailWeeklySummary} disabled={emailPrefsSaving} className="rounded border-gray-300"
+                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailWeeklySummary: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailWeeklySummary: v }); } finally { setEmailPrefsSaving(false); } }} />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Weekly cost summary (Mondays)</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={!!emailPrefs.emailBudgetAlerts} disabled={emailPrefsSaving} className="rounded border-gray-300"
+                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailBudgetAlerts: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailBudgetAlerts: v }); } finally { setEmailPrefsSaving(false); } }} />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Budget alerts</span>
+                  </label>
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={!!emailPrefs.emailAnomalyAlerts} disabled={emailPrefsSaving} className="rounded border-gray-300"
+                      onChange={async (e) => { const v = e.target.checked; setEmailPrefs((p) => p ? { ...p, emailAnomalyAlerts: v } : null); setEmailPrefsSaving(true); try { await emailPreferencesAPI.updatePreferences({ ...emailPrefs, emailAnomalyAlerts: v }); } finally { setEmailPrefsSaving(false); } }} />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Anomaly alerts</span>
+                  </label>
+                </div>
+              )}
+              {isPro === true && emailPrefs === null && <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>}
+            </div>
+
+            {/* Slack Integration */}
+            <div className="card">
+              <div className="flex items-center gap-2 mb-4">
+                <MessageSquare className="h-5 w-5 text-accent-700 shrink-0 dark:text-accent-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Slack integration</h2>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                Send cost alerts and daily digests to a Slack channel using an incoming webhook.
+              </p>
+
+              {slackLoading ? (
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Loading…</p>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook URL</label>
+                    <input
+                      type="url"
+                      value={slackWebhookUrl}
+                      onChange={(e) => setSlackWebhookUrl(e.target.value)}
+                      placeholder="https://hooks.slack.com/services/..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Create one at <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">api.slack.com/messaging/webhooks</a>
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Channel name (optional)</label>
+                    <input
+                      type="text"
+                      value={slackChannelName}
+                      onChange={(e) => setSlackChannelName(e.target.value)}
+                      placeholder="#cost-alerts"
+                      className="w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Alert types</p>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={slackDailyDigest} onChange={(e) => setSlackDailyDigest(e.target.checked)} className="rounded border-gray-300" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Daily cost digest</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={slackAnomalyAlerts} onChange={(e) => setSlackAnomalyAlerts(e.target.checked)} className="rounded border-gray-300" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Anomaly alerts</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox" checked={slackBudgetAlerts} onChange={(e) => setSlackBudgetAlerts(e.target.checked)} className="rounded border-gray-300" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Budget alerts</span>
+                    </label>
+                  </div>
+
+                  {slackMessage && (
+                    <p className={`text-sm ${slackMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {slackMessage.text}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={slackSaving || !slackWebhookUrl.startsWith('https://')}
+                      onClick={async () => {
+                        setSlackSaving(true)
+                        setSlackMessage(null)
+                        try {
+                          await slackAPI.saveSettings({
+                            webhookUrl: slackWebhookUrl,
+                            channelName: slackChannelName || undefined,
+                            dailyDigest: slackDailyDigest,
+                            anomalyAlerts: slackAnomalyAlerts,
+                            budgetAlerts: slackBudgetAlerts,
+                          })
+                          setSlackConnected(true)
+                          setSlackMessage({ type: 'success', text: 'Slack integration saved.' })
+                        } catch (e: any) {
+                          setSlackMessage({ type: 'error', text: e.message || 'Failed to save' })
+                        } finally {
+                          setSlackSaving(false)
+                        }
+                      }}
+                      className="btn-primary"
+                    >
+                      {slackSaving ? 'Saving…' : slackConnected ? 'Update' : 'Connect'}
+                    </button>
+
+                    {slackConnected && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={slackTestSending}
+                          onClick={async () => {
+                            setSlackTestSending(true)
+                            setSlackMessage(null)
+                            try {
+                              await slackAPI.sendTest()
+                              setSlackMessage({ type: 'success', text: 'Test message sent — check your Slack channel.' })
+                            } catch (e: any) {
+                              setSlackMessage({ type: 'error', text: e.message || 'Failed to send test' })
+                            } finally {
+                              setSlackTestSending(false)
+                            }
+                          }}
+                          className="btn-secondary"
+                        >
+                          <Send className="h-4 w-4" />
+                          {slackTestSending ? 'Sending…' : 'Send test'}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setSlackMessage(null)
+                            try {
+                              await slackAPI.deleteSettings()
+                              setSlackConnected(false)
+                              setSlackWebhookUrl('')
+                              setSlackChannelName('')
+                              setSlackDailyDigest(false)
+                              setSlackAnomalyAlerts(true)
+                              setSlackBudgetAlerts(true)
+                              setSlackMessage({ type: 'success', text: 'Slack disconnected.' })
+                            } catch (e: any) {
+                              setSlackMessage({ type: 'error', text: e.message || 'Failed to disconnect' })
+                            }
+                          }}
+                          className="btn-secondary border-red-200 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                        >
+                          <Unplug className="h-4 w-4" />
+                          Disconnect
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
