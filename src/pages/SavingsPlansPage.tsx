@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { savingsPlansAPI } from '../services/api'
@@ -57,6 +58,7 @@ export default function SavingsPlansPage() {
   const { showSuccess, showError } = useNotification()
   const [plans, setPlans] = useState<SavingsPlan[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formProvider, setFormProvider] = useState('aws')
@@ -97,15 +99,19 @@ export default function SavingsPlansPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this savings plan?')) return
-    try {
-      await savingsPlansAPI.delete(id)
-      showSuccess('Savings plan deleted')
-      await loadData()
-    } catch {
-      showError('Failed to delete savings plan')
-    }
+  const handleDelete = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await savingsPlansAPI.delete(id)
+          showSuccess('Savings plan deleted')
+          await loadData()
+        } catch {
+          showError('Failed to delete savings plan')
+        }
+      }
+    })
   }
 
   if (isDemoMode) {
@@ -259,6 +265,15 @@ export default function SavingsPlansPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Savings Plan"
+        description="Delete this savings plan?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

@@ -1,6 +1,14 @@
-import { X, Info, Lightbulb, BookOpen, Star, ArrowRight } from 'lucide-react'
+import { Info, Lightbulb, BookOpen, Star, ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { featureInfoContent } from '../data/featureInfoContent'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 interface FeatureInfoDialogProps {
   featureId: string
@@ -9,35 +17,26 @@ interface FeatureInfoDialogProps {
 }
 
 export default function FeatureInfoDialog({ featureId, isOpen, onClose }: FeatureInfoDialogProps) {
-  if (!isOpen) return null
-
   const content = featureInfoContent[featureId]
   if (!content) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-surface-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-3xl !rounded-2xl p-0 gap-0 sm:max-h-[90vh] flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b border-surface-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-accent-50 dark:bg-accent-900/30 flex items-center justify-center">
               <Info className="h-5 w-5 text-accent-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{content.title}</h3>
+              <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-white">{content.title}</DialogTitle>
               <p className="text-sm text-gray-500 dark:text-gray-400">{content.subtitle}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-surface-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        </DialogHeader>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Description */}
           <div className="bg-accent-50 dark:bg-accent-900/20 border border-accent-100 dark:border-accent-800 rounded-xl p-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">{content.description}</p>
@@ -112,15 +111,12 @@ export default function FeatureInfoDialog({ featureId, isOpen, onClose }: Featur
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-surface-200 dark:border-gray-700 px-6 py-4 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 bg-primary-800 text-white rounded-xl hover:bg-[#1a2f4d] transition-colors font-medium"
-          >
+        <DialogFooter className="border-t border-surface-200 dark:border-gray-700 px-6 py-4">
+          <Button onClick={onClose} className="rounded-xl">
             Got it!
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { PromptDialog } from '@/components/ui/prompt-dialog'
 import { Filter, X, CreditCard, Layers, ChevronDown, Bookmark, Trash2 } from 'lucide-react'
 import { useFilters } from '../contexts/FilterContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,6 +30,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
   const { isAuthenticated } = useAuth()
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false)
   const [isSavedViewsOpen, setIsSavedViewsOpen] = useState(false)
+  const [promptOpen, setPromptOpen] = useState(false)
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [savedViewsLoading, setSavedViewsLoading] = useState(false)
   const [saveViewLoading, setSaveViewLoading] = useState(false)
@@ -53,12 +55,14 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
     setIsSavedViewsOpen(false)
   }
 
-  const handleSaveView = async () => {
-    const name = window.prompt('Name this view')
-    if (!name?.trim()) return
+  const handleSaveView = () => {
+    setPromptOpen(true)
+  }
+
+  const handleSaveViewSubmit = async (name: string) => {
     setSaveViewLoading(true)
     try {
-      const created = await savedViewsAPI.create(name.trim(), currentFilters())
+      const created = await savedViewsAPI.create(name, currentFilters())
       setSavedViews((prev) => [{ ...created, created_at: created.created_at || new Date().toISOString() }, ...prev])
       setIsSavedViewsOpen(false)
     } catch (_) {
@@ -272,6 +276,15 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
           )}
         </div>
       )}
+      <PromptDialog
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        title="Save View"
+        description="Enter a name for this saved view"
+        placeholder="My view..."
+        confirmLabel="Save"
+        onConfirm={handleSaveViewSubmit}
+      />
     </div>
   )
 }

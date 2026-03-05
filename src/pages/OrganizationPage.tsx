@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { organizationsAPI } from '../services/api'
@@ -52,6 +53,7 @@ export default function OrganizationPage() {
   const { showSuccess, showError } = useNotification()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [members, setMembers] = useState<Member[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -135,15 +137,20 @@ export default function OrganizationPage() {
     }
   }
 
-  const handleRemoveMember = async (userId: number) => {
-    if (!selectedOrg || !confirm('Remove this member?')) return
-    try {
-      await organizationsAPI.removeMember(selectedOrg.id, userId)
-      showSuccess('Member removed')
-      await selectOrg(selectedOrg)
-    } catch {
-      showError('Failed to remove member')
-    }
+  const handleRemoveMember = (userId: number) => {
+    if (!selectedOrg) return
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await organizationsAPI.removeMember(selectedOrg.id, userId)
+          showSuccess('Member removed')
+          await selectOrg(selectedOrg)
+        } catch {
+          showError('Failed to remove member')
+        }
+      }
+    })
   }
 
   const isAdmin = selectedOrg?.member_role === 'owner' || selectedOrg?.member_role === 'admin'
@@ -320,6 +327,15 @@ export default function OrganizationPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Remove Member"
+        description="Remove this member from the organization?"
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

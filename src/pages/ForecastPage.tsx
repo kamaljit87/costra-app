@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { forecastsAPI } from '../services/api'
@@ -40,6 +41,7 @@ export default function ForecastPage() {
   const { showSuccess, showError } = useNotification()
   const [baseForecast, setBaseForecast] = useState<ForecastMonth[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [expandedScenario, setExpandedScenario] = useState<number | null>(null)
@@ -149,15 +151,19 @@ export default function ForecastPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this scenario?')) return
-    try {
-      await forecastsAPI.deleteScenario(id)
-      showSuccess('Scenario deleted')
-      await loadData()
-    } catch {
-      showError('Failed to delete scenario')
-    }
+  const handleDelete = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await forecastsAPI.deleteScenario(id)
+          showSuccess('Scenario deleted')
+          await loadData()
+        } catch {
+          showError('Failed to delete scenario')
+        }
+      }
+    })
   }
 
   const formatCurrency = (v: number) => `$${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -428,6 +434,15 @@ export default function ForecastPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Scenario"
+        description="Delete this scenario?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

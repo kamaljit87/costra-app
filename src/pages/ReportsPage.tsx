@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Helmet } from 'react-helmet-async'
 import {
   FileText,
@@ -84,6 +85,7 @@ export default function ReportsPage() {
   const { showSuccess, showError } = useNotification()
   const [reports, setReports] = useState<Report[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [isGenerating, setIsGenerating] = useState(false)
   const [providers, setProviders] = useState<CloudProviderAccount[]>([])
   const [teams, setTeams] = useState<string[]>([])
@@ -220,16 +222,19 @@ export default function ReportsPage() {
     }
   }
 
-  const handleDelete = async (reportId: number) => {
-    if (!confirm('Are you sure you want to delete this report?')) return
-
-    try {
-      await reportsAPI.deleteReport(reportId)
-      showSuccess('Report deleted')
-      loadReports()
-    } catch (error: any) {
-      showError(error.message || 'Failed to delete report')
-    }
+  const handleDelete = (reportId: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await reportsAPI.deleteReport(reportId)
+          showSuccess('Report deleted')
+          loadReports()
+        } catch (error: any) {
+          showError(error.message || 'Failed to delete report')
+        }
+      }
+    })
   }
 
   const formatDate = (dateStr: string) => {
@@ -535,6 +540,15 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Report"
+        description="Are you sure you want to delete this report?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

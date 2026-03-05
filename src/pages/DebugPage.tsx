@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AlertDialog } from '@/components/ui/alert-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { costDataAPI, cloudProvidersAPI, syncAPI } from '../services/api'
@@ -19,6 +20,7 @@ export default function DebugPage() {
   const { isDemoMode } = useAuth()
   const [providers, setProviders] = useState<any[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [alertOpen, setAlertOpen] = useState(false)
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
   const [responses, setResponses] = useState<DebugResponse[]>([])
@@ -72,7 +74,7 @@ export default function DebugPage() {
 
   const fetchDailyCostData = async () => {
     if (!selectedProvider || !startDate || !endDate) {
-      alert('Please select a provider and date range')
+      setAlertOpen(true)
       return
     }
 
@@ -526,6 +528,13 @@ export default function DebugPage() {
           </div>
         </div>
       </div>
+      <AlertDialog
+        open={alertOpen}
+        onOpenChange={setAlertOpen}
+        title="Missing Selection"
+        description="Please select a provider and date range."
+        variant="warning"
+      />
     </Layout>
   )
 }

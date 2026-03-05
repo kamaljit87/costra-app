@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Helmet } from 'react-helmet-async'
 import {
   ScanLine,
@@ -116,6 +117,7 @@ export default function BillAnalyzerPage() {
 
   const [credits, setCredits] = useState<CreditBalance | null>(null)
   const [analyses, setAnalyses] = useState<BillAnalysis[]>([])
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [currentAnalysis, setCurrentAnalysis] = useState<BillAnalysis | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -199,16 +201,20 @@ export default function BillAnalyzerPage() {
     }
   }
 
-  const handleDeleteAnalysis = async (id: number) => {
-    if (!window.confirm('Delete this analysis? This cannot be undone.')) return
-    try {
-      await billAnalyzerAPI.deleteAnalysis(id)
-      setAnalyses(prev => prev.filter(a => a.id !== id))
-      if (currentAnalysis?.id === id) setCurrentAnalysis(null)
-      showSuccess('Analysis deleted')
-    } catch (err: any) {
-      showError(err.message || 'Failed to delete')
-    }
+  const handleDeleteAnalysis = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await billAnalyzerAPI.deleteAnalysis(id)
+          setAnalyses(prev => prev.filter(a => a.id !== id))
+          if (currentAnalysis?.id === id) setCurrentAnalysis(null)
+          showSuccess('Analysis deleted')
+        } catch (err: any) {
+          showError(err.message || 'Failed to delete')
+        }
+      }
+    })
   }
 
   const formatCost = (amount: number, currency?: string) => {
@@ -599,6 +605,15 @@ export default function BillAnalyzerPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Analysis"
+        description="Delete this analysis? This cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

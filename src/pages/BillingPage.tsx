@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Check, Loader2, CreditCard, Calendar, AlertCircle } from 'lucide-react'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
@@ -83,6 +84,7 @@ const PLANS = {
 export default function BillingPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [status, setStatus] = useState<SubscriptionStatus | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -124,20 +126,22 @@ export default function BillingPage() {
     }
   }
 
-  const handleCancelSubscription = async () => {
-    if (!window.confirm('Are you sure you want to cancel your subscription? You will lose access to paid features at the end of your current billing period.')) {
-      return
-    }
-    try {
-      setIsProcessing(true)
-      setError(null)
-      await billingAPI.cancelSubscription()
-      await loadSubscription()
-    } catch (err: any) {
-      setError(err.message || 'Failed to cancel subscription')
-    } finally {
-      setIsProcessing(false)
-    }
+  const handleCancelSubscription = () => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          setIsProcessing(true)
+          setError(null)
+          await billingAPI.cancelSubscription()
+          await loadSubscription()
+        } catch (err: any) {
+          setError(err.message || 'Failed to cancel subscription')
+        } finally {
+          setIsProcessing(false)
+        }
+      }
+    })
   }
 
   if (isLoading) {
@@ -464,6 +468,15 @@ export default function BillingPage() {
         </div>
       </div>
     </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Cancel Subscription"
+        description="Are you sure you want to cancel your subscription? You will lose access to paid features at the end of your current billing period."
+        confirmLabel="Cancel Subscription"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

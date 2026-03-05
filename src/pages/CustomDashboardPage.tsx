@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
@@ -159,6 +160,7 @@ export default function CustomDashboardPage() {
 
   const [dashboards, setDashboards] = useState<Dashboard[]>([])
   const [currentDashboard, setCurrentDashboard] = useState<Dashboard | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [widgets, setWidgets] = useState<Widget[]>([])
   const [widgetData, setWidgetData] = useState<Record<number, Record<string, unknown>>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -227,19 +229,23 @@ export default function CustomDashboardPage() {
     }
   }
 
-  const handleDelete = async (dashboardId: number) => {
-    if (!confirm('Delete this dashboard and all its widgets?')) return
-    try {
-      await dashboardsAPI.delete(dashboardId)
-      showSuccess('Dashboard deleted')
-      if (id) {
-        navigate('/custom-dashboard')
-      } else {
-        await loadDashboards()
+  const handleDelete = (dashboardId: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await dashboardsAPI.delete(dashboardId)
+          showSuccess('Dashboard deleted')
+          if (id) {
+            navigate('/custom-dashboard')
+          } else {
+            await loadDashboards()
+          }
+        } catch {
+          showError('Failed to delete dashboard')
+        }
       }
-    } catch {
-      showError('Failed to delete dashboard')
-    }
+    })
   }
 
   const handleAddWidget = async (widgetType: string) => {
@@ -443,6 +449,15 @@ export default function CustomDashboardPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Dashboard"
+        description="Delete this dashboard and all its widgets?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

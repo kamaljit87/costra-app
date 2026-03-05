@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { saasAPI } from '../services/api'
@@ -36,6 +37,7 @@ export default function SaaSPage() {
   const { showSuccess, showError } = useNotification()
   const [providers, setProviders] = useState<SaaSProvider[]>([])
   const [totals, setTotals] = useState<SaaSTotals[]>([])
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [isLoading, setIsLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
@@ -77,15 +79,19 @@ export default function SaaSPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this SaaS provider and all its costs?')) return
-    try {
-      await saasAPI.deleteProvider(id)
-      showSuccess('Provider deleted')
-      await loadData()
-    } catch {
-      showError('Failed to delete provider')
-    }
+  const handleDelete = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await saasAPI.deleteProvider(id)
+          showSuccess('Provider deleted')
+          await loadData()
+        } catch {
+          showError('Failed to delete provider')
+        }
+      }
+    })
   }
 
   const handleUpload = async () => {
@@ -255,6 +261,15 @@ export default function SaaSPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete SaaS Provider"
+        description="Delete this SaaS provider and all its costs?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

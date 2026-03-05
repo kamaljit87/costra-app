@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { policiesAPI } from '../services/api'
@@ -50,6 +51,7 @@ export default function PoliciesPage() {
   const { showSuccess, showError } = useNotification()
   const [policies, setPolicies] = useState<Policy[]>([])
   const [violations, setViolations] = useState<Violation[]>([])
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [isLoading, setIsLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [activeTab, setActiveTab] = useState<'policies' | 'violations'>('policies')
@@ -126,15 +128,19 @@ export default function PoliciesPage() {
     }
   }
 
-  const handleDelete = async (policyId: number) => {
-    if (!confirm('Delete this policy and all its violations?')) return
-    try {
-      await policiesAPI.delete(policyId)
-      showSuccess('Policy deleted')
-      await loadData()
-    } catch {
-      showError('Failed to delete policy')
-    }
+  const handleDelete = (policyId: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await policiesAPI.delete(policyId)
+          showSuccess('Policy deleted')
+          await loadData()
+        } catch {
+          showError('Failed to delete policy')
+        }
+      }
+    })
   }
 
   const handleResolveViolation = async (violationId: number) => {
@@ -334,6 +340,15 @@ export default function PoliciesPage() {
           )
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Policy"
+        description="Delete this policy and all its violations?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

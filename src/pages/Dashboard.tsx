@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { PromptDialog } from '@/components/ui/prompt-dialog'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const { showSuccess, showError, showWarning } = useNotification()
   const [costData, setCostData] = useState<CostData[]>([])
   const [savingsPlans, setSavingsPlans] = useState<SavingsPlan[]>([])
+  const [promptOpen, setPromptOpen] = useState(false)
   const [configuredProviders, setConfiguredProviders] = useState<ConfiguredProvider[]>([])
   const [providerBudgetCounts, setProviderBudgetCounts] = useState<Record<string, number>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -142,9 +144,11 @@ export default function Dashboard() {
     }
   }
 
-  const handleAddGoal = async () => {
-    const raw = window.prompt('Target reduction (%): e.g. 10 for 10%')
-    if (raw == null) return
+  const handleAddGoal = () => {
+    setPromptOpen(true)
+  }
+
+  const handleGoalSubmit = async (raw: string) => {
     const n = parseFloat(raw)
     if (Number.isNaN(n) || n < 0) {
       showError('Invalid target', 'Enter a number (e.g. 10 for 10% reduction).')
@@ -524,6 +528,15 @@ export default function Dashboard() {
         )}
 
       </div>
+      <PromptDialog
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        title="Add Cost Reduction Goal"
+        description="Enter a target reduction percentage (e.g. 10 for 10%)"
+        placeholder="10"
+        confirmLabel="Add Goal"
+        onConfirm={handleGoalSubmit}
+      />
     </Layout>
   )
 }

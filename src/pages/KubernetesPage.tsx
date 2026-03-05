@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import FeatureInfoButton from '../components/FeatureInfoButton'
 import { Container, Plus, Trash2, ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface Cluster {
   id: number
@@ -66,6 +67,7 @@ export default function KubernetesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'namespaces' | 'workloads' | 'idle'>('namespaces')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
 
   // Create form
   const [formName, setFormName] = useState('')
@@ -139,20 +141,24 @@ export default function KubernetesPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Delete this cluster and all associated cost data?')) return
-    try {
-      await kubernetesAPI.deleteCluster(id)
-      showSuccess('Cluster deleted')
-      if (selectedCluster?.id === id) {
-        setSelectedCluster(null)
-        setNamespaceSummary([])
-        setWorkloads([])
+  const handleDelete = (id: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await kubernetesAPI.deleteCluster(id)
+          showSuccess('Cluster deleted')
+          if (selectedCluster?.id === id) {
+            setSelectedCluster(null)
+            setNamespaceSummary([])
+            setWorkloads([])
+          }
+          await loadClusters()
+        } catch {
+          showError('Failed to delete cluster')
+        }
       }
-      await loadClusters()
-    } catch {
-      showError('Failed to delete cluster')
-    }
+    })
   }
 
   const formatCost = (v: number) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -439,6 +445,15 @@ export default function KubernetesPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Cluster"
+        description="Delete this cluster and all associated cost data?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }

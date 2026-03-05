@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { AlertTriangle, DollarSign, Calendar, Target, MoreVertical, Edit, Trash2, Pause, Play } from 'lucide-react'
 import { budgetsAPI } from '../services/api'
 import { useNotification } from '../contexts/NotificationContext'
@@ -30,6 +31,7 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
   const { showSuccess, showError } = useNotification()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
 
   const getStatusColor = () => {
     if (budget.percentage >= 100) return 'text-red-600 bg-red-50 border-red-200'
@@ -65,20 +67,23 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete "${budget.budgetName}"?`)) return
-    
-    setIsUpdating(true)
-    try {
-      await budgetsAPI.deleteBudget(budget.id)
-      showSuccess('Budget deleted successfully')
-      onUpdate()
-    } catch (error) {
-      showError('Failed to delete budget')
-    } finally {
-      setIsUpdating(false)
-      setIsMenuOpen(false)
-    }
+  const handleDelete = () => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        setIsUpdating(true)
+        try {
+          await budgetsAPI.deleteBudget(budget.id)
+          showSuccess('Budget deleted successfully')
+          onUpdate()
+        } catch (error) {
+          showError('Failed to delete budget')
+        } finally {
+          setIsUpdating(false)
+          setIsMenuOpen(false)
+        }
+      }
+    })
   }
 
   const progressWidth = Math.min(budget.percentage, 100)
@@ -202,6 +207,15 @@ export default function BudgetCard({ budget, onUpdate, onEdit }: BudgetCardProps
           <span>Alert at {budget.alertThreshold}%</span>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Budget"
+        description={`Are you sure you want to delete "${budget.budgetName}"?`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </div>
   )
 }

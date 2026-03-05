@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { allocationsAPI } from '../services/api'
@@ -29,6 +30,7 @@ export default function AllocationsPage() {
   const { showSuccess, showError } = useNotification()
   const [rules, setRules] = useState<AllocationRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; onConfirm: () => void }>({ open: false, onConfirm: () => {} })
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formDescription, setFormDescription] = useState('')
@@ -86,15 +88,19 @@ export default function AllocationsPage() {
     }
   }
 
-  const handleDelete = async (ruleId: number) => {
-    if (!confirm('Delete this allocation rule?')) return
-    try {
-      await allocationsAPI.delete(ruleId)
-      showSuccess('Rule deleted')
-      await loadData()
-    } catch {
-      showError('Failed to delete rule')
-    }
+  const handleDelete = (ruleId: number) => {
+    setConfirmDialog({
+      open: true,
+      onConfirm: async () => {
+        try {
+          await allocationsAPI.delete(ruleId)
+          showSuccess('Rule deleted')
+          await loadData()
+        } catch {
+          showError('Failed to delete rule')
+        }
+      }
+    })
   }
 
   if (isDemoMode) {
@@ -224,6 +230,15 @@ export default function AllocationsPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
+        title="Delete Allocation Rule"
+        description="Delete this allocation rule?"
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={confirmDialog.onConfirm}
+      />
     </Layout>
   )
 }
