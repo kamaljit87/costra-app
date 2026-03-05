@@ -112,7 +112,7 @@ export default function BillingPage() {
       setError(null)
       const response = await billingAPI.createCheckoutSession(planType, billingPeriod)
       
-      // Redirect to Stripe checkout
+      // Redirect to checkout
       if (response.url) {
         window.location.href = response.url
       } else {
@@ -130,7 +130,7 @@ export default function BillingPage() {
       setError(null)
       const response = await billingAPI.createPortalSession()
       
-      // Redirect to Stripe portal
+      // Redirect to billing portal
       if (response.url) {
         window.location.href = response.url
       } else {

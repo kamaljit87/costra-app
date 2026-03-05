@@ -117,12 +117,7 @@ export const handleWebhook = async (rawBody, headers) => {
         const billingPeriod = metadata.billingPeriod || 'monthly'
 
         if (userId && planType) {
-          await upgradeSubscription(userId, planType, {
-            customerId: data.customer_id,
-            subscriptionId: data.subscription_id || null,
-            priceId: null,
-            billingPeriod,
-          })
+          await upgradeSubscription(userId, planType, { billingPeriod })
           logger.info('Subscription upgraded from Dodo payment.succeeded', { userId, planType, billingPeriod })
         }
         break
@@ -136,12 +131,7 @@ export const handleWebhook = async (rawBody, headers) => {
         const billingPeriod = metadata.billingPeriod || 'monthly'
 
         if (userId && planType) {
-          await upgradeSubscription(userId, planType, {
-            customerId: data.customer_id,
-            subscriptionId: data.subscription_id || data.id,
-            priceId: null,
-            billingPeriod,
-          })
+          await upgradeSubscription(userId, planType, { billingPeriod })
           logger.info('Subscription upgraded from Dodo subscription event', { userId, planType, eventType })
         }
         break
@@ -173,11 +163,5 @@ export const handleWebhook = async (rawBody, headers) => {
  * Cancel Dodo subscription (DB only - Dodo cancel via dashboard or their API)
  */
 export const cancelDodoSubscription = async (userId) => {
-  const subscription = await getUserSubscription(userId)
-  if (!subscription.stripe_subscription_id) {
-    return await cancelSubscription(userId)
-  }
   return await cancelSubscription(userId)
 }
-
-export const isConfigured = () => !!dodoClient

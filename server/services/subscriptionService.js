@@ -124,64 +124,47 @@ export const createTrialSubscription = async (userId) => {
 /**
  * Upgrade subscription to paid plan
  */
-export const upgradeSubscription = async (userId, planType, stripeData = {}) => {
+export const upgradeSubscription = async (userId, planType, paymentData = {}) => {
   const client = await pool.connect()
   try {
     const subscription = await getUserSubscription(userId)
     const now = new Date()
-    
-    // Determine billing period from price ID or stripeData
-    let billingPeriod = stripeData.billingPeriod || 'monthly'
-    if (stripeData.priceId) {
-      // Check if price ID contains 'annual' or matches annual price IDs
-      const annualPriceIds = [
-        process.env.STRIPE_STARTER_PRICE_ID_ANNUAL,
-        process.env.STRIPE_PRO_PRICE_ID_ANNUAL,
-      ]
-      if (annualPriceIds.includes(stripeData.priceId)) {
-        billingPeriod = 'annual'
-      }
-    }
-    
+
+    const billingPeriod = paymentData.billingPeriod || 'monthly'
+
     // If upgrading from trial, set subscription dates
     const subscriptionStart = subscription.plan_type === 'trial' ? now : subscription.subscription_start_date || now
     const subscriptionEnd = new Date(subscriptionStart)
-    
+
     // Set subscription end date based on billing period
     if (billingPeriod === 'annual') {
       subscriptionEnd.setFullYear(subscriptionEnd.getFullYear() + 1)
     } else {
       subscriptionEnd.setMonth(subscriptionEnd.getMonth() + 1)
     }
-    
+
     const result = await client.query(
-      `UPDATE subscriptions 
+      `UPDATE subscriptions
        SET plan_type = $1,
            status = 'active',
            subscription_start_date = COALESCE($2, subscription_start_date, CURRENT_TIMESTAMP),
            subscription_end_date = COALESCE($3, subscription_end_date),
-           stripe_customer_id = COALESCE($4, stripe_customer_id),
-           stripe_subscription_id = COALESCE($5, stripe_subscription_id),
-           stripe_price_id = COALESCE($6, stripe_price_id),
-           billing_period = COALESCE($7, billing_period, 'monthly'),
-           currency = COALESCE($8, currency, 'USD'),
+           billing_period = COALESCE($4, billing_period, 'monthly'),
+           currency = COALESCE($5, currency, 'USD'),
            updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $9
+       WHERE user_id = $6
        RETURNING *`,
       [
         planType,
         subscriptionStart,
         subscriptionEnd,
-        stripeData.customerId || null,
-        stripeData.subscriptionId || null,
-        stripeData.priceId || null,
         billingPeriod,
-        stripeData.currency || 'USD',
+        paymentData.currency || 'USD',
         userId,
       ]
     )
-    
-    logger.info('Upgraded subscription', { userId, planType, billingPeriod, stripeData })
+
+    logger.info('Upgraded subscription', { userId, planType, billingPeriod })
     return result.rows[0]
   } catch (error) {
     logger.error('Error upgrading subscription', { userId, planType, error: error.message, stack: error.stack })

@@ -36,8 +36,6 @@ These must be stored in AWS Secrets Manager and referenced in the task definitio
 |-------------|-------------|-------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/database-url` | ✅ Yes |
 | `JWT_SECRET` | Secret key for JWT token signing (min 32 chars) | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/jwt-secret` | ✅ Yes |
-| `STRIPE_SECRET_KEY` | Stripe API secret key | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/stripe-secret-key` | ✅ Yes (for billing) |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/stripe-webhook-secret` | ✅ Yes (for billing) |
 | `FRONTEND_URL` | Frontend ALB URL for CORS | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/frontend-url` | ✅ Yes |
 
 ### Optional Environment Variables
@@ -67,18 +65,6 @@ aws secretsmanager create-secret \
 aws secretsmanager create-secret \
   --name costra/jwt-secret \
   --secret-string "$(openssl rand -base64 32)" \
-  --region us-east-1
-
-# Stripe Secret Key
-aws secretsmanager create-secret \
-  --name costra/stripe-secret-key \
-  --secret-string "sk_live_..." \
-  --region us-east-1
-
-# Stripe Webhook Secret
-aws secretsmanager create-secret \
-  --name costra/stripe-webhook-secret \
-  --secret-string "whsec_..." \
   --region us-east-1
 
 # Frontend URL (get from CloudFormation output)
@@ -131,7 +117,7 @@ The ECS task execution role needs permission to read secrets:
 
 ### Backend
 - **2 environment variables**: `NODE_ENV`, `PORT`
-- **5 required secrets**: `DATABASE_URL`, `JWT_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `FRONTEND_URL`
+- **3 required secrets**: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`
 - **Optional secrets**: `SENTRY_DSN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 
 ## Quick Reference
@@ -145,8 +131,6 @@ PORT=3002
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
 JWT_SECRET=your-secret-key-change-this-min-32-chars-long
 FRONTEND_URL=http://localhost:5173
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 Create `.env` in project root:

@@ -18,9 +18,8 @@
 
 ### Billing & Payments
 - [ ] Free trial (14-day) starts on signup
-- [ ] Stripe checkout session → payment → subscription active
 - [ ] Dodo Payments checkout → payment → subscription active
-- [ ] Webhook signature verification (Stripe + Dodo)
+- [ ] Webhook signature verification (Dodo)
 - [ ] Upgrade/downgrade between Starter ↔ Pro
 - [ ] Cancel subscription flow
 - [ ] Billing portal access

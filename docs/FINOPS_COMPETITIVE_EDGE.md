@@ -76,7 +76,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 | 5 additional providers | **Basic** | API-based cost fetching (DO, IBM, Linode, Vultr, MongoDB) |
 | Slack | **Minimal** | Webhook mention but no deep integration |
 | AI (Claude) | **Strong** | Chat, explanations, recommendation enhancement |
-| Payments | **Present** | Stripe (legacy) + Dodo Payments (primary) |
+| Payments | **Present** | Dodo Payments |
 
 ### Admin & Platform
 | Feature | Status | Implementation |
@@ -84,7 +84,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 | Auth | **Strong** | Email/password + Google OAuth + TOTP 2FA |
 | RBAC | **Minimal** | Only user/admin roles via `is_admin` flag |
 | API keys | **Present** | Read-only key generation |
-| Subscription management | **Present** | Trial → Starter → Pro; Stripe + Dodo |
+| Subscription management | **Present** | Trial → Starter → Pro; Dodo Payments |
 | Support tickets | **Present** | Contact form with admin ticket management |
 | Monitoring | **Present** | Prometheus metrics, Sentry, Winston logging, health checks |
 
@@ -240,7 +240,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 - **Competitive advantage**: CloudZero requires complex instrumentation. Costra can offer simple webhook/API integrations.
 - **Implementation**:
   - Webhook endpoint: `POST /api/business-metrics/ingest` (accepts metric_type, value, date)
-  - Pre-built integrations: Stripe (customer count, MRR via API), custom metric polling
+  - Pre-built integrations: Dodo Payments (customer count, MRR via API), custom metric polling
   - Auto-calculate cost-per-customer, cost-per-transaction without manual entry
   - Trend charts: unit cost trajectory over time with anomaly flagging
   - Reuse existing `business_metrics` table and `getUnitEconomics` logic
@@ -383,7 +383,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 ## 6. Long-Term Vision (6–12 Months)
 
 ### Months 4–6: Platform Maturity
-- Automated unit economics via Stripe/webhook integrations (eliminate manual metric entry)
+- Automated unit economics via webhook integrations (eliminate manual metric entry)
 - Cost allocation rules engine for shared resource splitting
 - Enhanced RBAC: custom roles, SSO/SAML for enterprise buyers
 - Natural language cost queries powered by Claude

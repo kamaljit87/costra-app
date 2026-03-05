@@ -129,7 +129,7 @@
 ## 15. Billing (`/settings/billing`)
 
 - **Plans:** Starter (e.g. 3 accounts, 6 months history), Pro (unlimited, 12+ months, email summaries, CSV exports, etc.).
-- Upgrade, manage subscription (Stripe portal).
+- Upgrade, manage subscription.
 
 ---
 
@@ -326,7 +326,7 @@ Used for showback/chargeback and reporting.
 
 - **Current plan** and **trial** status (e.g. days remaining).
 - **Upgrade** – Start Pro (checkout).
-- **Manage subscription** – Open Stripe Customer Portal (update payment, cancel, etc.).
+- **Manage subscription** – Update payment method, cancel, etc.
 
 ---
 

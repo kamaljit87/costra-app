@@ -308,7 +308,7 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 ## Billing and subscription
 
-**What it does:** The **Billing** page (often under **Settings → Billing** or a direct **Billing** link) shows your current plan, trial status, renewal date, and history limit (e.g. 6 or 12 months). You can upgrade or manage payment (e.g. via Stripe).
+**What it does:** The **Billing** page (often under **Settings → Billing** or a direct **Billing** link) shows your current plan, trial status, renewal date, and history limit (e.g. 6 or 12 months). You can upgrade or manage your payment.
 
 **Plans (as implemented in the app; confirm with product):**
 
@@ -321,7 +321,7 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 1. Open **Billing** (or **Settings → Billing**).
 2. View **Current plan**, **Billing cycle** (monthly/annual), **Next billing** or **Trial ends in**, and **History** (months of data).
 3. To **upgrade:** Choose Starter or Pro, monthly or annual, and complete checkout (you may be redirected to a payment provider).
-4. To **manage payment method or subscription:** Use **Manage billing** (or similar) to open the customer portal (e.g. Stripe), where you can update card or cancel.
+4. To **manage payment method or subscription:** Use **Manage billing** to update your payment method or cancel.
 
 **Common messages:**
 
