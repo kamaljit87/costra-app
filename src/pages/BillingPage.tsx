@@ -124,20 +124,18 @@ export default function BillingPage() {
     }
   }
 
-  const handleManageBilling = async () => {
+  const handleCancelSubscription = async () => {
+    if (!window.confirm('Are you sure you want to cancel your subscription? You will lose access to paid features at the end of your current billing period.')) {
+      return
+    }
     try {
       setIsProcessing(true)
       setError(null)
-      const response = await billingAPI.createPortalSession()
-      
-      // Redirect to billing portal
-      if (response.url) {
-        window.location.href = response.url
-      } else {
-        throw new Error('No portal URL received')
-      }
+      await billingAPI.cancelSubscription()
+      await loadSubscription()
     } catch (err: any) {
-      setError(err.message || 'Failed to open billing portal')
+      setError(err.message || 'Failed to cancel subscription')
+    } finally {
       setIsProcessing(false)
     }
   }
@@ -282,20 +280,17 @@ export default function BillingPage() {
 
         {subscription?.status === 'active' && !status?.isTrial && (
           <button
-            onClick={handleManageBilling}
+            onClick={handleCancelSubscription}
             disabled={isProcessing}
-            className="btn-secondary"
+            className="btn-secondary text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
           >
             {isProcessing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                <span>Loading...</span>
+                <span>Processing...</span>
               </>
             ) : (
-              <>
-                <CreditCard className="h-4 w-4 shrink-0" />
-                <span>Manage Billing</span>
-              </>
+              'Cancel Subscription'
             )}
           </button>
         )}

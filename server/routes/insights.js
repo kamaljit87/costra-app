@@ -1139,7 +1139,7 @@ router.post('/recommendations/refresh', authenticateToken, async (req, res) => {
  * GET /api/insights/anomalies/events
  * Get ML-detected anomaly events with root cause analysis
  */
-router.get('/anomalies/events', async (req, res) => {
+router.get('/anomalies/events', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
     const { status, severity, providerId, limit = 50, offset = 0 } = req.query
@@ -1158,7 +1158,7 @@ router.get('/anomalies/events', async (req, res) => {
  * PUT /api/insights/anomalies/events/:id/status
  * Update anomaly event resolution status
  */
-router.put('/anomalies/events/:id/status', async (req, res) => {
+router.put('/anomalies/events/:id/status', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId || req.user.id
     const eventId = parseInt(req.params.id)

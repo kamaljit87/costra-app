@@ -1218,13 +1218,6 @@ export const billingAPI = {
     return response.json()
   },
 
-  createPortalSession: async () => {
-    const response = await apiRequest('/billing/create-portal-session', {
-      method: 'POST',
-    })
-    return response.json()
-  },
-
   cancelSubscription: async () => {
     const response = await apiRequest('/billing/cancel', {
       method: 'POST',
