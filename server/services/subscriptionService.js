@@ -22,7 +22,7 @@ const FEATURE_DEFINITIONS = {
       'custom_date_ranges',
       'monthly_summaries',
     ],
-    restrictedFeatures: ['csv_export', 'email_alerts', 'scheduled_sync', 'unit_economics'],
+    restrictedFeatures: ['csv_export', 'email_alerts', 'scheduled_sync', 'unit_economics', 'bill_analyzer'],
   },
   starter: {
     historicalDataMonths: 6,
@@ -38,6 +38,7 @@ const FEATURE_DEFINITIONS = {
       'monthly_summaries',
       'scheduled_sync',
       'csv_export',
+      'bill_analyzer',
     ],
     restrictedFeatures: ['email_alerts', 'unit_economics'],
   },
@@ -57,6 +58,7 @@ const FEATURE_DEFINITIONS = {
       'csv_export',
       'email_alerts',
       'unit_economics',
+      'bill_analyzer',
     ],
     restrictedFeatures: [],
   },
@@ -290,7 +292,7 @@ export const getRequiredPlan = (featureName) => {
   if (['email_alerts', 'unit_economics'].includes(featureName)) {
     return 'Pro'
   }
-  if (['csv_export'].includes(featureName)) {
+  if (['csv_export', 'bill_analyzer'].includes(featureName)) {
     return 'Starter'
   }
   if (['scheduled_sync'].includes(featureName)) {

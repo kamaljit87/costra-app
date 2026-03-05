@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
-import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain } from 'lucide-react'
+import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain, ScanLine } from 'lucide-react'
 import LandingNav from '../components/LandingNav'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
 
@@ -20,6 +20,7 @@ const PLANS = {
       'Custom date ranges',
       'Monthly "What changed & why"',
       'Daily auto-sync',
+      '50 AI bill analysis credits/month',
     ],
     whoThisIsFor: 'Indie founders, Small startups, DevOps who want clarity without heavy FinOps tooling',
     priceWorksBecause: '$14.99 is less than 15 minutes of wasted cloud spend.',
@@ -38,6 +39,7 @@ const PLANS = {
       'Baseline anomaly detection',
       'Email summaries',
       'CSV exports',
+      '300 AI bill analysis credits/month',
     ],
     whoThisIsFor: 'Teams actively managing FinOps',
     priceWorksBecause: 'Unlimited accounts and advanced features for serious cost optimization',
@@ -74,6 +76,11 @@ const FEATURES = [
     icon: Globe,
     title: 'Global Currency Support',
     description: 'View costs in USD, EUR, GBP, INR, JPY, and more with real-time exchange rates.',
+  },
+  {
+    icon: ScanLine,
+    title: 'AI Bill Analyzer',
+    description: 'Upload cloud bills (PDF, CSV, Excel, or image) and get instant AI-powered cost breakdowns and optimization insights.',
   },
 ]
 

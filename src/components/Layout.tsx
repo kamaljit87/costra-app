@@ -21,6 +21,7 @@ import {
   FileCode,
   Cloud,
   LayoutGrid,
+  ScanLine,
 } from 'lucide-react'
 
 const BASE_NAV_GROUPS: NavGroup[] = [
@@ -42,6 +43,7 @@ const BASE_NAV_GROUPS: NavGroup[] = [
       { to: '/policies', label: 'Policies', icon: Shield },
       { to: '/savings-plans', label: 'RI/SP Plans', icon: Percent },
       { to: '/allocations', label: 'Allocations', icon: Split },
+      { to: '/bill-analyzer', label: 'Bill Analyzer', icon: ScanLine },
     ],
   },
   {

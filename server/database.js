@@ -1580,6 +1580,43 @@ export const initDatabase = async () => {
         )
       `)
 
+      // Bill Analyzer tables
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS bill_analyses (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          file_name TEXT NOT NULL,
+          file_size INTEGER NOT NULL,
+          file_type TEXT NOT NULL,
+          provider TEXT,
+          billing_period TEXT,
+          total_cost NUMERIC(12,2),
+          currency TEXT DEFAULT 'USD',
+          services JSONB,
+          regions JSONB,
+          cost_drivers JSONB,
+          optimizations JSONB,
+          summary TEXT,
+          raw_analysis JSONB NOT NULL,
+          credits_consumed INTEGER NOT NULL DEFAULT 5,
+          status TEXT DEFAULT 'completed',
+          error_message TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_bill_analyses_user ON bill_analyses(user_id, created_at DESC)`)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS bill_analyzer_credits (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          credits_used INTEGER NOT NULL DEFAULT 0,
+          credits_limit INTEGER NOT NULL DEFAULT 0,
+          period_start DATE NOT NULL DEFAULT CURRENT_DATE,
+          period_end DATE,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -8490,6 +8527,43 @@ export const getSharedDashboards = async (orgId) => {
     [orgId]
   )
   return result.rows
+}
+
+// Bill Analyzer operations
+export const saveBillAnalysis = async (userId, data) => {
+  const result = await pool.query(
+    `INSERT INTO bill_analyses (user_id, file_name, file_size, file_type, provider, billing_period, total_cost, currency, services, regions, cost_drivers, optimizations, summary, raw_analysis, credits_consumed, status, error_message)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+    [userId, data.fileName, data.fileSize, data.fileType, data.provider, data.billingPeriod, data.totalCost, data.currency,
+     JSON.stringify(data.services), JSON.stringify(data.regions), JSON.stringify(data.costDrivers), JSON.stringify(data.optimizations),
+     data.summary, JSON.stringify(data.rawAnalysis), data.creditsConsumed, data.status || 'completed', data.errorMessage || null]
+  )
+  return result.rows[0]
+}
+
+export const getBillAnalyses = async (userId, limit = 20, offset = 0) => {
+  const result = await pool.query(
+    `SELECT id, file_name, file_size, file_type, provider, billing_period, total_cost, currency, credits_consumed, status, created_at
+     FROM bill_analyses WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+    [userId, limit, offset]
+  )
+  return result.rows
+}
+
+export const getBillAnalysisById = async (userId, analysisId) => {
+  const result = await pool.query(
+    'SELECT * FROM bill_analyses WHERE id = $1 AND user_id = $2',
+    [analysisId, userId]
+  )
+  return result.rows[0]
+}
+
+export const deleteBillAnalysis = async (userId, analysisId) => {
+  const result = await pool.query(
+    'DELETE FROM bill_analyses WHERE id = $1 AND user_id = $2 RETURNING id',
+    [analysisId, userId]
+  )
+  return result.rows[0]
 }
 
 // Close database connection pool

@@ -418,4 +418,35 @@ export const featureInfoContent: Record<string, FeatureInfoSection> = {
       { label: 'Reports', path: '/reports' },
     ],
   },
+
+  billAnalyzer: {
+    title: 'AI Bill Analyzer',
+    subtitle: 'Upload and analyze cloud bills with AI',
+    description:
+      'Upload your cloud billing statements (PDF, CSV, Excel, or image) and get AI-powered analysis including cost breakdowns, top cost drivers, regional distribution, and optimization recommendations.',
+    keyFeatures: [
+      'Support for PDF, CSV, Excel, and image formats',
+      'Automatic cloud provider detection (AWS, Azure, GCP, etc.)',
+      'Service-level cost breakdown with charts',
+      'Regional cost distribution analysis',
+      'AI-generated optimization recommendations',
+      'Historical analysis tracking',
+    ],
+    howToUse: [
+      'Navigate to Bill Analyzer from the sidebar',
+      'Drag and drop or click to upload a cloud bill',
+      'Wait for AI analysis to complete (usually 10-30 seconds)',
+      'Review the cost breakdown, charts, and optimization suggestions',
+      'View past analyses in the History section',
+    ],
+    tips: [
+      'PDF bills from AWS, Azure, and GCP are best supported',
+      'Larger files consume more credits (5/10/20 based on size)',
+      'Credits reset monthly based on your billing cycle',
+    ],
+    relatedPages: [
+      { label: 'Dashboard', path: '/dashboard' },
+      { label: 'Recommendations', path: '/recommendations' },
+    ],
+  },
 }

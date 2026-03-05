@@ -370,6 +370,46 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 ---
 
+## AI Bill Analyzer
+
+The Bill Analyzer lets you upload cloud billing files and get AI-powered cost analysis.
+
+### How to use
+
+1. Navigate to **Bill Analyzer** from the sidebar.
+2. Drag and drop or click to upload a billing file (PDF, CSV, Excel, or image).
+3. Wait for the AI to analyze your bill (10-60 seconds depending on file size).
+4. Review the results: cost summary, service breakdown, regional distribution, cost drivers, and optimization suggestions.
+
+### Supported file formats
+
+- **PDF** invoices from AWS, Azure, GCP, and other cloud providers
+- **CSV** billing exports
+- **Excel** (.xlsx, .xls) billing reports
+- **Images** (JPEG, PNG, GIF, WebP) of billing screenshots
+
+### AI credits
+
+Each analysis consumes credits based on file size:
+- Small files (<5MB): 5 credits
+- Medium files (5-15MB): 10 credits
+- Large files (>15MB): 20 credits
+
+Credit limits per plan:
+- **Starter**: 50 credits/month
+- **Pro**: 300 credits/month
+- Credits reset monthly
+
+### Analysis history
+
+All past analyses are saved and accessible from the History section on the Bill Analyzer page. You can view or delete past analyses at any time.
+
+### Privacy
+
+Uploaded files are processed in memory and never stored on disk. Only the extracted analysis results are saved to your account.
+
+---
+
 ## Support and contact
 
 - **Contact form:** Use the **Contact** page (linked in the footer as "Contact us"). Choose a category (e.g. Bug report, Help, Feature request), enter your name, email, subject, and message, then submit. You'll see a confirmation when the message is sent.

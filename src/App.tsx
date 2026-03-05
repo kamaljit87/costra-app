@@ -50,6 +50,7 @@ const AllocationsPage = lazy(() => import('./pages/AllocationsPage'))
 const TerraformPage = lazy(() => import('./pages/TerraformPage'))
 const SaaSPage = lazy(() => import('./pages/SaaSPage'))
 const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
+const BillAnalyzerPage = lazy(() => import('./pages/BillAnalyzerPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -324,6 +325,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CustomDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bill-analyzer"
+              element={
+                <ProtectedRoute>
+                  <BillAnalyzerPage />
                 </ProtectedRoute>
               }
             />

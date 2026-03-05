@@ -1768,3 +1768,38 @@ export const dashboardsAPI = {
     return response.json()
   },
 }
+
+// Bill Analyzer API
+export const billAnalyzerAPI = {
+  upload: async (file: File) => {
+    const token = getToken()
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch(`${API_BASE_URL}/bill-analyzer/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Upload failed' }))
+      throw new Error(err.error || `Upload failed: ${response.status}`)
+    }
+    return response.json()
+  },
+  getCredits: async () => {
+    const response = await apiRequest('/bill-analyzer/credits')
+    return response.json()
+  },
+  getAnalyses: async (limit = 20, offset = 0) => {
+    const response = await apiRequest(`/bill-analyzer/analyses?limit=${limit}&offset=${offset}`)
+    return response.json()
+  },
+  getAnalysis: async (id: number) => {
+    const response = await apiRequest(`/bill-analyzer/analyses/${id}`)
+    return response.json()
+  },
+  deleteAnalysis: async (id: number) => {
+    const response = await apiRequest(`/bill-analyzer/analyses/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+}

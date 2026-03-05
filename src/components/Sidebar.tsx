@@ -14,6 +14,7 @@ import {
   Shield,
   TrendingUp,
   Container,
+  ScanLine,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cloudProvidersAPI } from '../services/api'
@@ -281,6 +282,25 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
               <ArrowLeftRight className="h-5 w-5" />
             </div>
             <span className="text-sm">Compare</span>
+          </Link>
+
+          {/* Bill Analyzer */}
+          <Link
+            to="/bill-analyzer"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-3 rounded-lg
+              transition-colors duration-150 group relative
+              ${isActive('/bill-analyzer')
+                ? 'bg-accent-50 text-accent-600 font-semibold border-l-[3px] border-accent-500'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <div className={`${isActive('/bill-analyzer') ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+              <ScanLine className="h-5 w-5" />
+            </div>
+            <span className="text-sm">Bill Analyzer</span>
           </Link>
 
           {/* Cloud Accounts Section */}
