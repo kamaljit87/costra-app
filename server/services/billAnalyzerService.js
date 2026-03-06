@@ -138,7 +138,7 @@ Return ONLY a valid JSON object with this exact structure:
   "optimizations": [
     { "title": "Suggestion title", "description": "Detailed suggestion", "estimatedSavings": "$50-100/month", "priority": "high|medium|low" }
   ],
-  "summary": "Brief 2-3 sentence summary of the bill highlighting the total amount, highest cost service, and any notable patterns."
+  "summary": "Structured summary with each key finding on its own line, separated by \\n. Format:\\n• Account: ID and billing entity\\n• Period: dates, gross charges, credits applied, amount due\\n• Top cost driver: service name at $X (Y% of gross)\\n• Key insight: one notable pattern, risk, or recommendation"
 }
 
 CRITICAL guidelines for cost extraction:

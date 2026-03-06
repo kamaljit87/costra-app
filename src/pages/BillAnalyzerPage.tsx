@@ -458,9 +458,11 @@ export default function BillAnalyzerPage() {
                 </div>
               )}
               {currentAnalysis.summary && (
-                <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 leading-relaxed">
-                  {currentAnalysis.summary}
-                </p>
+                <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 leading-relaxed space-y-1">
+                  {currentAnalysis.summary.split('\n').filter(Boolean).map((line: string, i: number) => (
+                    <p key={i}>{line}</p>
+                  ))}
+                </div>
               )}
             </div>
 
