@@ -123,12 +123,14 @@ Return ONLY a valid JSON object with this exact structure:
   "provider": "AWS|Azure|GCP|DigitalOcean|Other|Unknown",
   "billingPeriod": "YYYY-MM to YYYY-MM or description",
   "totalCost": 1234.56,
+  "grossCost": 1500.00,
+  "credits": 265.44,
   "currency": "USD",
   "services": [
     { "name": "Service Name", "cost": 123.45, "percentage": 10.0, "region": "us-east-1" }
   ],
   "regions": [
-    { "name": "Region Name", "cost": 456.78, "percentage": 37.0 }
+    { "name": "us-east-1", "cost": 456.78, "percentage": 37.0 }
   ],
   "costDrivers": [
     { "description": "What is driving cost", "impact": "high|medium|low", "amount": 100.00 }
@@ -139,10 +141,17 @@ Return ONLY a valid JSON object with this exact structure:
   "summary": "Brief 2-3 sentence summary of the bill highlighting the total amount, highest cost service, and any notable patterns."
 }
 
-Guidelines:
+CRITICAL guidelines for cost extraction:
+- "totalCost" is the final amount due (net, after credits/discounts)
+- "grossCost" is the total charges BEFORE credits and discounts are applied
+- "credits" is the total amount of credits/discounts applied
+- For services: ALWAYS use the GROSS cost (pre-credit, pre-discount) for each service, NOT the net/zero amount. The breakdown must show what each service actually costs before credits are applied. This is essential for a meaningful breakdown.
+- Calculate percentages relative to grossCost (not totalCost)
+- For regions: use short names like "us-east-1", "eu-west-1", "ap-south-1" — NOT long descriptions. If the exact region is unknown, use the billing entity location (e.g. "ap-south-1" for India)
+
+Other guidelines:
 - Identify the cloud provider from logos, headers, or service names
 - Extract ALL services with their individual costs
-- Calculate percentages of total for each service
 - Identify regions from service details or headers
 - Highlight the top cost drivers (services causing the most spend)
 - Provide actionable optimization suggestions with estimated savings

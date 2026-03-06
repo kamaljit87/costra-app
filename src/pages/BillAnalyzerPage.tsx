@@ -17,7 +17,7 @@ import {
   Clock,
   Zap,
 } from 'lucide-react'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useNotification } from '../contexts/NotificationContext'
 import { billAnalyzerAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -49,6 +49,13 @@ interface Optimization {
   priority: 'high' | 'medium' | 'low'
 }
 
+interface RawAnalysis {
+  grossCost?: number
+  credits?: number
+  totalCost?: number
+  [key: string]: any
+}
+
 interface BillAnalysis {
   id: number
   file_name: string
@@ -63,6 +70,7 @@ interface BillAnalysis {
   cost_drivers: CostDriver[]
   optimizations: Optimization[]
   summary: string
+  raw_analysis: RawAnalysis
   credits_consumed: number
   status: string
   created_at: string
@@ -258,6 +266,12 @@ export default function BillAnalyzerPage() {
   const creditPercentage = credits ? Math.round((credits.used / Math.max(credits.limit, 1)) * 100) : 0
   const creditColor = creditPercentage > 80 ? 'bg-red-500' : creditPercentage > 50 ? 'bg-amber-500' : 'bg-green-500'
 
+  // Extract gross/net/credits from raw_analysis (new AI prompt) or fall back to total_cost
+  const raw = currentAnalysis?.raw_analysis
+  const netCost = parseFloat(String(currentAnalysis?.total_cost)) || 0
+  const grossCost = parseFloat(String(raw?.grossCost)) || 0
+  const billCredits = parseFloat(String(raw?.credits)) || 0
+
   // Normalize chart data — parseFloat all costs, handle zero-cost bills
   const chartServices = normalizeServices(currentAnalysis?.services).slice(0, 8)
   const chartRegions = normalizeRegions(currentAnalysis?.regions)
@@ -383,34 +397,68 @@ export default function BillAnalyzerPage() {
             {/* Summary Card */}
             <div className="bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-700 rounded-xl p-6 shadow-card">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-accent-50 dark:bg-accent-900/20 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-accent-600 dark:text-accent-400" />
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-accent-50 dark:bg-accent-900/20 rounded-xl">
+                    <DollarSign className="h-7 w-7 text-accent-600 dark:text-accent-400" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                      {formatCost(parseFloat(String(currentAnalysis.total_cost)), currentAnalysis.currency)}
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {formatCost(grossCost > 0 ? grossCost : netCost, currentAnalysis.currency)}
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Bill Amount</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {grossCost > 0 && grossCost !== netCost ? 'Gross Charges' : 'Total Bill Amount'}
+                    </p>
                   </div>
+                  {billCredits > 0 && (
+                    <>
+                      <div className="hidden sm:block h-10 w-px bg-surface-300 dark:bg-gray-700" />
+                      <div className="hidden sm:block">
+                        <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                          -{formatCost(billCredits, currentAnalysis.currency)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Credits / Discounts</p>
+                      </div>
+                      <div className="hidden sm:block h-10 w-px bg-surface-300 dark:bg-gray-700" />
+                      <div className="hidden sm:block">
+                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {formatCost(netCost, currentAnalysis.currency)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Amount Due</p>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                  <span className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1 rounded-md">
                     <Globe className="h-4 w-4" />
                     {getProviderIcon(currentAnalysis.provider)}
                   </span>
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1 rounded-md">
                     <Clock className="h-4 w-4" />
                     {currentAnalysis.billing_period || 'N/A'}
                   </span>
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1 rounded-md">
                     <FileText className="h-4 w-4" />
                     {currentAnalysis.file_name}
                   </span>
                 </div>
               </div>
+              {/* Mobile credits breakdown */}
+              {billCredits > 0 && (
+                <div className="sm:hidden flex items-center gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">-{formatCost(billCredits, currentAnalysis.currency)}</p>
+                    <p className="text-xs text-gray-500">Credits</p>
+                  </div>
+                  <div className="h-6 w-px bg-surface-300 dark:bg-gray-700" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCost(netCost, currentAnalysis.currency)}</p>
+                    <p className="text-xs text-gray-500">Amount Due</p>
+                  </div>
+                </div>
+              )}
               {currentAnalysis.summary && (
-                <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3">
+                <p className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 leading-relaxed">
                   {currentAnalysis.summary}
                 </p>
               )}
@@ -431,24 +479,31 @@ export default function BillAnalyzerPage() {
                         cx="50%"
                         cy="50%"
                         outerRadius={90}
-                        innerRadius={40}
+                        innerRadius={45}
                         paddingAngle={2}
-                        label={({ name, percentage }) => {
-                          const short = name.length > 18 ? name.slice(0, 17) + '…' : name
-                          return `${short} (${percentage?.toFixed(1) || 0}%)`
-                        }}
-                        labelLine={{ strokeWidth: 1 }}
                       >
                         {chartServices.map((_: BillService, i: number) => (
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number, _name: string, props: any) => {
+                        formatter={(_value: number, _name: string, props: any) => {
                           const entry = props.payload
-                          if (pieTotalCost > 0) return formatCost(value, currentAnalysis.currency)
-                          return `${entry.percentage?.toFixed(1) || 0}% (${formatCost(entry.cost, currentAnalysis.currency)})`
+                          const cost = formatCost(entry.cost, currentAnalysis.currency)
+                          return `${cost} (${entry.percentage?.toFixed(1) || 0}%)`
                         }}
+                      />
+                      <Legend
+                        layout="vertical"
+                        align="right"
+                        verticalAlign="middle"
+                        iconType="circle"
+                        iconSize={8}
+                        formatter={(value: string, entry: any) => {
+                          const item = entry.payload
+                          return `${value} — ${item.percentage?.toFixed(1) || 0}%`
+                        }}
+                        wrapperStyle={{ fontSize: '12px', lineHeight: '20px', paddingLeft: '12px' }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
