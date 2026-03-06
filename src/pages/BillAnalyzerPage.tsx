@@ -78,6 +78,34 @@ interface CreditBalance {
 
 const CHART_COLORS = ['#3F4ABF', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE', '#E0E7FF', '#22C55E', '#F59E0B']
 
+/**
+ * Normalize services/regions arrays from the API.
+ * DB numeric columns may arrive as strings, so we parseFloat everything.
+ * Also computes percentage from cost when the AI returns 0-cost items with non-zero percentages.
+ */
+function normalizeServices(services: any[] | null | undefined): BillService[] {
+  if (!services || !Array.isArray(services)) return []
+  return services.map(s => ({
+    name: s.name || 'Unknown',
+    cost: parseFloat(s.cost) || 0,
+    percentage: parseFloat(s.percentage) || 0,
+    region: s.region,
+  }))
+}
+
+function normalizeRegions(regions: any[] | null | undefined): BillRegion[] {
+  if (!regions || !Array.isArray(regions)) return []
+  return regions.map(r => ({
+    name: truncateLabel(r.name || 'Unknown', 30),
+    cost: parseFloat(r.cost) || 0,
+    percentage: parseFloat(r.percentage) || 0,
+  }))
+}
+
+function truncateLabel(text: string, maxLen: number): string {
+  return text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : text
+}
+
 const PRIORITY_STYLES = {
   high: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
   medium: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
@@ -229,6 +257,13 @@ export default function BillAnalyzerPage() {
 
   const creditPercentage = credits ? Math.round((credits.used / Math.max(credits.limit, 1)) * 100) : 0
   const creditColor = creditPercentage > 80 ? 'bg-red-500' : creditPercentage > 50 ? 'bg-amber-500' : 'bg-green-500'
+
+  // Normalize chart data — parseFloat all costs, handle zero-cost bills
+  const chartServices = normalizeServices(currentAnalysis?.services).slice(0, 8)
+  const chartRegions = normalizeRegions(currentAnalysis?.regions)
+  const pieTotalCost = chartServices.reduce((sum, s) => sum + s.cost, 0)
+  const barTotalCost = chartRegions.reduce((sum, r) => sum + r.cost, 0)
+  const allServices = normalizeServices(currentAnalysis?.services)
 
   return (
     <Layout>
@@ -384,42 +419,71 @@ export default function BillAnalyzerPage() {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Cost by Service */}
-              {currentAnalysis.services && currentAnalysis.services.length > 0 && (
+              {chartServices.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-700 rounded-xl p-6 shadow-card">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Cost by Service</h3>
-                  <ResponsiveContainer width="100%" height={280}>
+                  <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
-                        data={currentAnalysis.services.slice(0, 8)}
-                        dataKey="cost"
+                        data={chartServices}
+                        dataKey={pieTotalCost > 0 ? 'cost' : 'percentage'}
                         nameKey="name"
                         cx="50%"
                         cy="50%"
-                        outerRadius={100}
-                        label={({ name, percentage }) => `${name} (${percentage?.toFixed(1) || 0}%)`}
-                        labelLine={false}
+                        outerRadius={90}
+                        innerRadius={40}
+                        paddingAngle={2}
+                        label={({ name, percentage }) => {
+                          const short = name.length > 18 ? name.slice(0, 17) + '…' : name
+                          return `${short} (${percentage?.toFixed(1) || 0}%)`
+                        }}
+                        labelLine={{ strokeWidth: 1 }}
                       >
-                        {currentAnalysis.services.slice(0, 8).map((_: BillService, i: number) => (
+                        {chartServices.map((_: BillService, i: number) => (
                           <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => formatCost(value, currentAnalysis.currency)} />
+                      <Tooltip
+                        formatter={(value: number, _name: string, props: any) => {
+                          const entry = props.payload
+                          if (pieTotalCost > 0) return formatCost(value, currentAnalysis.currency)
+                          return `${entry.percentage?.toFixed(1) || 0}% (${formatCost(entry.cost, currentAnalysis.currency)})`
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
               )}
 
               {/* Cost by Region */}
-              {currentAnalysis.regions && currentAnalysis.regions.length > 0 && (
+              {chartRegions.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-700 rounded-xl p-6 shadow-card">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Cost by Region</h3>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={currentAnalysis.regions} layout="vertical">
+                  <ResponsiveContainer width="100%" height={Math.max(280, chartRegions.length * 50)}>
+                    <BarChart data={chartRegions} layout="vertical" margin={{ left: 10, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                      <XAxis type="number" tickFormatter={(v: number) => formatCost(v, currentAnalysis.currency)} />
-                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12 }} />
-                      <Tooltip formatter={(value: number) => formatCost(value, currentAnalysis.currency)} />
-                      <Bar dataKey="cost" fill="#3F4ABF" radius={[0, 4, 4, 0]} />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(v: number) =>
+                          barTotalCost > 0 ? formatCost(v, currentAnalysis.currency) : `${v}%`
+                        }
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={150}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => formatCost(value, currentAnalysis.currency)}
+                        labelStyle={{ fontWeight: 600 }}
+                      />
+                      <Bar
+                        dataKey={barTotalCost > 0 ? 'cost' : 'percentage'}
+                        fill="#3F4ABF"
+                        radius={[0, 4, 4, 0]}
+                        barSize={24}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -427,13 +491,13 @@ export default function BillAnalyzerPage() {
             </div>
 
             {/* Cost Breakdown Table */}
-            {currentAnalysis.services && currentAnalysis.services.length > 0 && (
+            {allServices.length > 0 && (
               <div className="bg-white dark:bg-gray-800 border border-surface-300 dark:border-gray-700 rounded-xl shadow-card overflow-hidden">
                 <div className="px-6 py-4 border-b border-surface-300 dark:border-gray-700">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">Service Breakdown</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[500px]">
                     <thead>
                       <tr className="bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         <th className="px-6 py-3">Service</th>
@@ -443,7 +507,7 @@ export default function BillAnalyzerPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-surface-300 dark:divide-gray-700">
-                      {currentAnalysis.services.map((service: BillService, i: number) => (
+                      {allServices.map((service: BillService, i: number) => (
                         <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-900/30">
                           <td className="px-6 py-3 text-sm font-medium text-gray-900 dark:text-white">{service.name}</td>
                           <td className="px-6 py-3 text-sm text-right text-gray-900 dark:text-white">
