@@ -193,7 +193,7 @@ export default function ForecastPage() {
     <Layout>
       <div className="p-6 max-w-5xl mx-auto">
         <Breadcrumbs />
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <TrendingUp className="h-8 w-8 text-accent-600" />
@@ -394,8 +394,8 @@ export default function ForecastPage() {
                               {results.narrative}
                             </div>
                           )}
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 px-1">
+                          <div className="space-y-2 overflow-x-auto">
+                            <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 px-1 min-w-[400px]">
                               <span>Month</span>
                               <span className="text-right">Base</span>
                               <span className="text-right">Scenario</span>
@@ -406,7 +406,7 @@ export default function ForecastPage() {
                               const diff = sf.forecast - (base?.forecast || 0)
                               const diffPct = base?.forecast ? (diff / base.forecast) * 100 : 0
                               return (
-                                <div key={i} className="grid grid-cols-4 gap-2 text-sm px-1 py-1 hover:bg-gray-50 rounded">
+                                <div key={i} className="grid grid-cols-4 gap-2 text-sm px-1 py-1 hover:bg-gray-50 rounded min-w-[400px]">
                                   <span className="text-gray-600">{sf.month}</span>
                                   <span className="text-right">{base ? formatCurrency(base.forecast) : '—'}</span>
                                   <span className="text-right font-medium">{formatCurrency(sf.forecast)}</span>

@@ -314,7 +314,7 @@ export default function CustomDashboardPage() {
               <ArrowLeft className="h-4 w-4" /> Dashboards
             </button>
           </div>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{currentDashboard.name}</h1>
               {currentDashboard.description && <p className="text-sm text-gray-500">{currentDashboard.description}</p>}
@@ -379,7 +379,7 @@ export default function CustomDashboardPage() {
     <Layout>
       <div className="p-6 max-w-5xl mx-auto">
         <Breadcrumbs />
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <LayoutGrid className="h-8 w-8 text-indigo-600" />

@@ -398,7 +398,7 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 top-full mt-2 w-[400px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-surface-200 dark:border-gray-700 z-50 max-h-[560px] flex flex-col animate-fade-in"
+      className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-[400px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-surface-200 dark:border-gray-700 z-50 max-h-[560px] flex flex-col animate-fade-in"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-4 pb-3">

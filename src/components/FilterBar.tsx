@@ -114,7 +114,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
               className="fixed inset-0 z-10" 
               onClick={() => setIsServiceDropdownOpen(false)}
             />
-            <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-gray-200 rounded-2xl shadow-xl z-20 max-h-80 overflow-hidden animate-fade-in">
+            <div className="absolute top-full left-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-2xl shadow-xl z-20 max-h-80 overflow-hidden animate-fade-in">
               <div className="p-2 max-h-72 overflow-y-auto">
                 <button
                   onClick={() => {
@@ -195,7 +195,7 @@ export default function FilterBar({ services, hasCredits }: FilterBarProps) {
           {isSavedViewsOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setIsSavedViewsOpen(false)} />
-              <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl z-20 py-2 animate-fade-in">
+              <div className="absolute top-full left-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl z-20 py-2 animate-fade-in">
                 {savedViewsLoading ? (
                   <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-300">Loading…</div>
                 ) : savedViews.length === 0 ? (

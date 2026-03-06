@@ -184,7 +184,7 @@ export default function BillingPage() {
 
       {/* Current Plan */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Current Plan</h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -218,7 +218,7 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
           <div className="flex items-center gap-3">
             <Calendar className="h-5 w-5 text-gray-400 shrink-0" />
             <div>

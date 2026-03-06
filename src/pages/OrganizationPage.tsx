@@ -170,7 +170,7 @@ export default function OrganizationPage() {
     <Layout>
       <div className="p-6 max-w-5xl mx-auto">
         <Breadcrumbs />
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
             <Building2 className="h-8 w-8 text-accent-600" />
             Organization

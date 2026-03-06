@@ -47,7 +47,7 @@ export default function TrialBanner() {
 
   return (
     <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/40 dark:to-orange-900/40 border-b border-amber-200 dark:border-amber-800 px-4 sm:px-6 lg:px-8 py-3">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-3">
           <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
           <div className="flex-1">

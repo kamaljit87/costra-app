@@ -224,7 +224,7 @@ const Sidebar = ({
   }
 
   const linkClass = (path: string, collapsed: boolean) =>
-    `flex gap-2 font-medium text-sm items-center w-full py-2 ${collapsed ? 'px-0 justify-center' : 'px-4'} rounded-xl transition-colors text-left ${
+    `flex gap-2 font-medium text-sm items-center w-full py-2.5 ${collapsed ? 'px-0 justify-center' : 'px-4'} rounded-xl transition-colors text-left ${
       isActive(path)
         ? 'bg-accent-50 dark:bg-accent-900/50 text-accent-700 dark:text-accent-200'
         : 'text-gray-700 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'
@@ -476,7 +476,7 @@ const Sidebar = ({
   )
 
   return (
-    <div className="flex h-screen bg-surface-100 dark:bg-gray-900">
+    <div className="flex h-screen bg-white dark:bg-gray-900 lg:bg-surface-100">
       {/* Mobile Sidebar */}
       <AnimatePresence>
         {isOpen && (
@@ -485,7 +485,7 @@ const Sidebar = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="md:hidden fixed inset-0 bg-black/60 z-30"
+              className="lg:hidden fixed inset-0 bg-black/60 z-30"
               onClick={toggleSidebar}
               aria-hidden
             />
@@ -495,7 +495,7 @@ const Sidebar = ({
               exit="hidden"
               variants={mobileSidebarVariants}
               transition={{ duration: 0.3 }}
-              className="md:hidden fixed inset-y-0 left-0 w-72 z-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-xl flex flex-col"
+              className="lg:hidden fixed inset-y-0 left-0 w-72 z-40 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-surface-200 dark:border-gray-800 shadow-xl flex flex-col"
             >
               <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0 relative">
                 <Link to="/dashboard" onClick={closeOnNav} className="w-full flex justify-center items-center">
@@ -507,7 +507,7 @@ const Sidebar = ({
                   type="button"
                   onClick={toggleSidebar}
                   aria-label="Close menu"
-                  className="absolute right-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100"
+                  className="absolute right-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
                   <span className="text-xl leading-none">×</span>
                 </button>

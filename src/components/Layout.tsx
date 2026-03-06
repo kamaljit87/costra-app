@@ -101,7 +101,7 @@ export default function Layout({ children }: LayoutProps) {
         </div>
         <TrialBanner />
         <main className="flex-1 overflow-y-auto bg-surface-100 dark:bg-gray-900">
-          <div className="min-h-full px-6 lg:px-8 py-6 lg:py-8">
+          <div className="min-h-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             {children}
           </div>
         </main>

@@ -250,7 +250,7 @@ export default function ProviderSection({
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div className="bg-surface-50 rounded-xl p-3 border border-surface-200">
                     <div className="flex items-center space-x-1.5 text-gray-500 mb-1">
                       <Target className="h-3 w-3" />

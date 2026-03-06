@@ -186,7 +186,7 @@ export default function KubernetesPage() {
             <ArrowLeft className="h-4 w-4" /> Back to clusters
           </button>
 
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{selectedCluster.cluster_name}</h1>
               <p className="text-sm text-gray-500 mt-1">
@@ -263,8 +263,8 @@ export default function KubernetesPage() {
                   No workload data available.
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border overflow-hidden">
-                  <table className="w-full text-sm">
+                <div className="bg-white rounded-xl border overflow-x-auto">
+                  <table className="w-full text-sm min-w-[600px]">
                     <thead className="bg-gray-50 text-gray-600">
                       <tr>
                         <th className="text-left px-4 py-3 font-medium">Workload</th>
@@ -352,7 +352,7 @@ export default function KubernetesPage() {
     <Layout>
       <div className="p-6 max-w-5xl mx-auto">
         <Breadcrumbs />
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Container className="h-8 w-8 text-accent-600" />
@@ -423,7 +423,7 @@ export default function KubernetesPage() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <p className="text-xs text-gray-500">Region</p>
                     <p className="text-sm font-medium">{cluster.region || '—'}</p>
