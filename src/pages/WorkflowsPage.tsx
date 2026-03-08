@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { workflowsAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -41,7 +41,6 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 export default function WorkflowsPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [items, setItems] = useState<WorkflowItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -55,8 +54,8 @@ export default function WorkflowsPage() {
   const [formDescription, setFormDescription] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) loadItems()
-  }, [isDemoMode, filterStatus])
+    loadItems()
+  }, [filterStatus])
 
   const loadItems = async () => {
     try {
@@ -118,13 +117,6 @@ export default function WorkflowsPage() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Workflows are not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   if (selectedItem) {
     return (

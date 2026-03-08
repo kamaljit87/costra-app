@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { organizationsAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -49,7 +49,6 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 export default function OrganizationPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
@@ -64,8 +63,8 @@ export default function OrganizationPage() {
   const [newOrgName, setNewOrgName] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) loadOrganizations()
-  }, [isDemoMode])
+    loadOrganizations()
+  }, [])
 
   const loadOrganizations = async () => {
     try {
@@ -155,16 +154,6 @@ export default function OrganizationPage() {
 
   const isAdmin = selectedOrg?.member_role === 'owner' || selectedOrg?.member_role === 'admin'
 
-  if (isDemoMode) {
-    return (
-      <Layout>
-        <div className="p-6">
-          <Breadcrumbs />
-          <div className="text-center py-12 text-gray-500">Organization management is not available in demo mode.</div>
-        </div>
-      </Layout>
-    )
-  }
 
   return (
     <Layout>

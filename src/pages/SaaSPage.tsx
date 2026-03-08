@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { saasAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -33,7 +33,6 @@ const PROVIDER_TYPES = [
 ]
 
 export default function SaaSPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [providers, setProviders] = useState<SaaSProvider[]>([])
   const [totals, setTotals] = useState<SaaSTotals[]>([])
@@ -47,8 +46,8 @@ export default function SaaSPage() {
   const [uploadCsv, setUploadCsv] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) loadData()
-  }, [isDemoMode])
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -114,13 +113,6 @@ export default function SaaSPage() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">SaaS tracking is not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   const totalCurrentMonth = totals.reduce((s, t) => s + parseFloat(t.current_month || '0'), 0)
   const totalLastMonth = totals.reduce((s, t) => s + parseFloat(t.last_month || '0'), 0)

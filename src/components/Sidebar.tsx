@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   ChevronDown,
-  Sparkles,
   ChevronUp,
   Wallet,
   FileText,
@@ -16,7 +15,6 @@ import {
   Container,
   ScanLine,
 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
 import { cloudProvidersAPI } from '../services/api'
 import { ProviderIcon } from './CloudProviderIcons'
 
@@ -39,15 +37,12 @@ interface CloudAccount {
 
 export default function Sidebar({ isOpen, onClose, isPermanent = false, onContactClick }: SidebarProps) {
   const location = useLocation()
-  const { isDemoMode } = useAuth()
   const [cloudAccounts, setCloudAccounts] = useState<CloudAccount[]>([])
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    if (!isDemoMode) {
-      loadCloudAccounts()
-    }
-  }, [isDemoMode])
+    loadCloudAccounts()
+  }, [])
 
 
   const loadCloudAccounts = async () => {
@@ -304,7 +299,7 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
           </Link>
 
           {/* Cloud Accounts Section */}
-          {!isDemoMode && Object.keys(groupedAccounts).length > 0 && (
+          {Object.keys(groupedAccounts).length > 0 && (
             <div className="pt-6 mt-6 border-t border-surface-300">
               <div className="px-4 pb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                 Cloud Providers
@@ -383,28 +378,6 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
             </div>
           )}
 
-          {/* Demo Mode Placeholder */}
-          {isDemoMode && (
-            <div className="pt-6 mt-6 border-t border-surface-300">
-              <div className="px-4 pb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Cloud Providers
-              </div>
-              <div className="px-4 py-8 text-center">
-                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-accent-50 flex items-center justify-center">
-                  <Sparkles className="w-7 h-7 text-accent-500" />
-                </div>
-                <p className="text-xs text-gray-500 mb-4 font-medium">
-                  Connect cloud providers to track costs
-                </p>
-                <Link
-                  to="/waitlist"
-                  className="inline-flex items-center px-4 py-2 rounded-lg text-xs text-white bg-accent-500 hover:bg-accent-600 font-semibold transition-colors duration-150"
-                >
-                  Join waitlist
-                </Link>
-              </div>
-            </div>
-          )}
 
         </nav>
 

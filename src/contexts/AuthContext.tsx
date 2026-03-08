@@ -12,7 +12,6 @@ interface User {
 interface AuthContextType {
   authReady: boolean
   isAuthenticated: boolean
-  isDemoMode: boolean
   user: User | null
   login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; twoFactorRequired?: boolean; temporaryToken?: string; user?: User }>
   signup: (name: string, email: string, password: string, consentAccepted?: boolean) => Promise<boolean>
@@ -28,12 +27,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authReady, setAuthReady] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isDemoMode, setIsDemoMode] = useState(false)
   const [user, setUser] = useState<User | null>(null)
 
   const logout = () => {
     setIsAuthenticated(false)
-    setIsDemoMode(false)
     setUser(null)
     authAPI.logout()
     localStorage.removeItem('authToken')
@@ -54,7 +51,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (refreshed.token && refreshed.user) {
             setUser(refreshed.user)
             setIsAuthenticated(true)
-            setIsDemoMode(false)
             localStorage.setItem('authToken', refreshed.token)
             localStorage.setItem('user', JSON.stringify(refreshed.user))
           } else {
@@ -72,14 +68,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const token = localStorage.getItem('authToken')
     const savedUser = localStorage.getItem('user')
-    localStorage.removeItem('demoMode')
-
     if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser)
         setUser(userData)
         setIsAuthenticated(true)
-        setIsDemoMode(false)
         verifyAndRefreshToken()
       } catch (error) {
         console.error('Error parsing user data:', error)
@@ -90,7 +83,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [])
 
   useEffect(() => {
-    if (!isAuthenticated || isDemoMode) return
+    if (!isAuthenticated) return
     const token = localStorage.getItem('authToken')
     if (!token) return
     try {
@@ -109,7 +102,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Invalid token format:', error)
       logout()
     }
-  }, [isAuthenticated, isDemoMode])
+  }, [isAuthenticated])
 
   const login = async (email: string, password: string): Promise<{ ok: true } | { ok: false; twoFactorRequired?: boolean; temporaryToken?: string; user?: User }> => {
     try {
@@ -120,7 +113,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (response.token && response.user) {
         setUser(response.user as User)
         setIsAuthenticated(true)
-        setIsDemoMode(false)
         localStorage.setItem('authToken', response.token)
         localStorage.setItem('user', JSON.stringify(response.user))
         return { ok: true }
@@ -142,7 +134,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (response.token && response.user) {
         setUser(response.user as User)
         setIsAuthenticated(true)
-        setIsDemoMode(false)
         return true
       }
       return false
@@ -161,7 +152,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userData = JSON.parse(savedUser) as User
         setUser(userData)
         setIsAuthenticated(true)
-        setIsDemoMode(false)
       } catch {
         // ignore invalid stored user
       }
@@ -174,7 +164,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (response.token && response.user) {
         setUser(response.user as User)
         setIsAuthenticated(true)
-        setIsDemoMode(false)
         return true
       }
       return false
@@ -197,7 +186,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         authReady,
         isAuthenticated,
-        isDemoMode,
         user,
         login,
         signup,

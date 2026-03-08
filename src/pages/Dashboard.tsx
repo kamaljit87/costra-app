@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { PromptDialog } from '@/components/ui/prompt-dialog'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-
 import { useNotification } from '../contexts/NotificationContext'
 import { getCostData, getSavingsPlans, CostData, SavingsPlan } from '../services/costService'
 import { cloudProvidersAPI, syncAPI, budgetsAPI, costDataAPI, goalsAPI, billingAPI } from '../services/api'
@@ -13,7 +11,7 @@ import TotalBillSummary from '../components/TotalBillSummary'
 import ProviderSection from '../components/ProviderSection'
 import SavingsPlansList from '../components/SavingsPlansList'
 import OptimizationSummary from '../components/OptimizationSummary'
-import { Sparkles, Plus, Cloud, ArrowRight, Download, Target, Trash2 } from 'lucide-react'
+import { Plus, Cloud, ArrowRight, Download, Target, Trash2 } from 'lucide-react'
 import { Spinner } from '@/components/ui/spinner'
 import { ProviderIcon } from '../components/CloudProviderIcons'
 
@@ -27,7 +25,6 @@ interface ConfiguredProvider {
 }
 
 export default function Dashboard() {
-  const { isDemoMode } = useAuth()
   const navigate = useNavigate()
 
   const { showSuccess, showError, showWarning } = useNotification()
@@ -49,11 +46,11 @@ export default function Dashboard() {
   const loadData = async () => {
     try {
       const [costs, plans, providersResponse, budgetsResponse, subscriptionResponse] = await Promise.all([
-        getCostData(isDemoMode),
-        getSavingsPlans(isDemoMode),
-        isDemoMode ? Promise.resolve({ providers: [] }) : cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
-        isDemoMode ? Promise.resolve({ budgets: [] }) : budgetsAPI.getBudgets().catch(() => ({ budgets: [] })),
-        isDemoMode ? Promise.resolve(null) : billingAPI.getSubscription().catch(() => null),
+        getCostData(),
+        getSavingsPlans(),
+        cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
+        budgetsAPI.getBudgets().catch(() => ({ budgets: [] })),
+        billingAPI.getSubscription().catch(() => null),
       ])
       setCostData(costs)
       setSavingsPlans(plans)
@@ -81,10 +78,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData()
-  }, [isDemoMode])
+  }, [])
 
   useEffect(() => {
-    if (isDemoMode) return
     setGoalsLoading(true)
     // Single batch request for goals + progress instead of N+1 calls
     Promise.all([
@@ -100,17 +96,9 @@ export default function Dashboard() {
       }
       setGoalsProgress(map)
     }).catch(() => {}).finally(() => setGoalsLoading(false))
-  }, [isDemoMode])
+  }, [])
 
   const handleSync = async () => {
-    if (isDemoMode) {
-      showWarning(
-        'Demo Mode',
-        'Sync is not available in demo mode. Please sign up to sync your cloud providers.'
-      )
-      return
-    }
-
     setIsSyncing(true)
     try {
       // Clear cache and sync fresh data
@@ -176,10 +164,6 @@ export default function Dashboard() {
   }
 
   const handleExport = async (format: 'csv' | 'pdf') => {
-    if (isDemoMode) {
-      showWarning('Demo Mode', 'Export is not available in demo mode.')
-      return
-    }
     const now = new Date()
     const month = now.getMonth() + 1
     const year = now.getFullYear()
@@ -221,20 +205,6 @@ export default function Dashboard() {
         <Breadcrumbs />
 
         {/* Demo Mode Banner */}
-        {isDemoMode && (
-          <div className="mb-4 bg-accent-50 dark:bg-accent-900/30 border border-accent-100 dark:border-accent-800 rounded-xl px-4 py-3 flex items-center space-x-2.5 animate-fade-in">
-            <div className="w-8 h-8 rounded-lg bg-accent-100 dark:bg-accent-800/50 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-accent-500 dark:text-accent-400" />
-            </div>
-            <div>
-              <span className="text-accent-700 dark:text-accent-300 font-semibold text-sm">Demo Mode</span>
-              <span className="text-gray-500 dark:text-gray-400 text-xs ml-2">
-                You're viewing sample data. Sign up to connect your cloud accounts.
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Header with Sync and Add Provider - Compact */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div>
@@ -246,9 +216,8 @@ export default function Dashboard() {
               Multi-cloud cost overview across all your providers
             </p>
           </div>
-          {!isDemoMode && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-              <button
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            <button
                 onClick={() => navigate('/settings?tab=providers')}
                 className="btn-secondary"
                 title="Add a new cloud provider account"
@@ -285,8 +254,7 @@ export default function Dashboard() {
                   <span className="text-sm">Export PDF</span>
                 </button>
               </div>
-            </div>
-          )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -335,11 +303,10 @@ export default function Dashboard() {
               />
             </div>
             {/* Optimization Insights */}
-            {!isDemoMode && <OptimizationSummary />}
+            <OptimizationSummary />
             {/* Spend goals */}
-            {!isDemoMode && (
-              <div className="mb-6">
-                <div className="card">
+            <div className="mb-6">
+              <div className="card">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-accent-600 dark:text-accent-400" />
@@ -387,8 +354,7 @@ export default function Dashboard() {
                     </ul>
                   )}
                 </div>
-              </div>
-            )}
+            </div>
             {/* Provider Sections with Charts */}
             {(() => {
               const providerDataMap = new Map<string, CostData>()
@@ -399,8 +365,7 @@ export default function Dashboard() {
               })
 
               // Add configured providers without cost data
-              if (!isDemoMode) {
-                configuredProviders
+              configuredProviders
                   .filter(p => p.isActive)
                   .forEach(provider => {
                     if (!providerDataMap.has(provider.providerId)) {
@@ -427,12 +392,11 @@ export default function Dashboard() {
                       })
                     }
                   })
-              }
 
               // Only show providers that have been added (have cost data or are configured)
               const providersToShow = Array.from(providerDataMap.values())
 
-              if (providersToShow.length === 0 && !isDemoMode) {
+              if (providersToShow.length === 0) {
                 return (
                   <div className="flex flex-col items-center justify-center py-16 px-4">
                     <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-6">

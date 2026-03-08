@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { dashboardsAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -153,7 +153,6 @@ function WidgetCard({ widget, onRemove, data }: { widget: Widget; onRemove: () =
 }
 
 export default function CustomDashboardPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const { id } = useParams()
   const navigate = useNavigate()
@@ -170,14 +169,12 @@ export default function CustomDashboardPage() {
   const [formDescription, setFormDescription] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) {
-      if (id) {
-        loadDashboard(parseInt(id))
-      } else {
-        loadDashboards()
-      }
+    if (id) {
+      loadDashboard(parseInt(id))
+    } else {
+      loadDashboards()
     }
-  }, [isDemoMode, id])
+  }, [id])
 
   const loadDashboards = async () => {
     try {
@@ -295,13 +292,6 @@ export default function CustomDashboardPage() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Custom dashboards are not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   // Dashboard detail view
   if (currentDashboard) {

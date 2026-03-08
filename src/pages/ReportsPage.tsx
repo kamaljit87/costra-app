@@ -15,7 +15,6 @@ import {
   BarChart3,
   Loader2,
 } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { reportsAPI, productTeamAPI, cloudProvidersAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -81,7 +80,6 @@ function TypeBadge({ type }: { type: string }) {
 const INPUT_CLASS = 'w-full px-4 py-2.5 border border-gray-300/60 rounded-xl bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 focus:ring-2 focus:ring-accent-500/20 focus:border-accent-500/60 text-sm transition-colors'
 
 export default function ReportsPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [reports, setReports] = useState<Report[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -117,13 +115,11 @@ export default function ReportsPage() {
   }), [reports])
 
   useEffect(() => {
-    if (!isDemoMode) {
-      loadReports()
-      loadProviders()
-      loadTeamsAndProducts()
-      loadSubscriptionStatus()
-    }
-  }, [isDemoMode])
+    loadReports()
+    loadProviders()
+    loadTeamsAndProducts()
+    loadSubscriptionStatus()
+  }, [])
 
   const loadSubscriptionStatus = async () => {
     try {
@@ -136,13 +132,13 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
-    if (!isDemoMode && reports.some(r => r.status === 'generating' || r.status === 'pending')) {
+    if (reports.some(r => r.status === 'generating' || r.status === 'pending')) {
       const interval = setInterval(() => {
         loadReports()
       }, 3000)
       return () => clearInterval(interval)
     }
-  }, [isDemoMode, reports])
+  }, [reports])
 
   const loadReports = async () => {
     try {
@@ -250,23 +246,6 @@ export default function ReportsPage() {
   const filteredAccounts = selectedProvider
     ? providers.filter(p => p.providerId === selectedProvider)
     : providers
-
-  if (isDemoMode) {
-    return (
-      <Layout>
-        <Helmet><title>Reports | Costra</title></Helmet>
-        <div className="max-w-6xl mx-auto">
-          <div className="mt-8 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6 text-center">
-            <FileText className="h-12 w-12 text-yellow-600 dark:text-yellow-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Reports Not Available in Demo Mode</h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Please sign in to create cost visibility and allocation reports.
-            </p>
-          </div>
-        </div>
-      </Layout>
-    )
-  }
 
   return (
     <Layout>

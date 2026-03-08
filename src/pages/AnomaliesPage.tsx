@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { anomalyEventsAPI } from '../services/api'
@@ -40,7 +40,6 @@ const STATUS_STYLES: Record<string, { color: string; icon: typeof Clock }> = {
 }
 
 export default function AnomaliesPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const { formatCurrency } = useCurrency()
   const [events, setEvents] = useState<AnomalyEvent[]>([])
@@ -51,8 +50,8 @@ export default function AnomaliesPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!isDemoMode) loadEvents()
-  }, [isDemoMode, statusFilter, severityFilter])
+    loadEvents()
+  }, [statusFilter, severityFilter])
 
   const loadEvents = async () => {
     try {
@@ -81,16 +80,6 @@ export default function AnomaliesPage() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout>
-        <div className="p-6">
-          <Breadcrumbs />
-          <div className="text-center py-12 text-gray-500">Anomaly detection is not available in demo mode.</div>
-        </div>
-      </Layout>
-    )
-  }
 
   return (
     <Layout>

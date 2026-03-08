@@ -25,7 +25,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
     const loadUserPreferences = async () => {
       try {
         const token = localStorage.getItem('authToken')
-        if (token && !localStorage.getItem('demoMode')) {
+        if (token) {
           // Use cached preference immediately, then refresh in background
           const cachedCurrency = localStorage.getItem('costra_currency')
           if (cachedCurrency) {
@@ -67,9 +67,9 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
   const handleCurrencyChange = useCallback(async (currency: Currency) => {
     setSelectedCurrency(currency)
     localStorage.setItem('costra_currency', currency)
-    // Save to database if user is authenticated (not demo mode)
+    // Save to database if user is authenticated
     const token = localStorage.getItem('authToken')
-    if (token && !localStorage.getItem('demoMode')) {
+    if (token) {
       try {
         await costDataAPI.updateCurrency(currency)
       } catch (error) {

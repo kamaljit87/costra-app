@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Plus, AlertTriangle, Info } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { budgetsAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -25,7 +25,6 @@ interface Budget {
 }
 
 export default function BudgetsPage() {
-  const { isDemoMode } = useAuth()
   const { showError } = useNotification()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
@@ -34,11 +33,9 @@ export default function BudgetsPage() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
 
   useEffect(() => {
-    if (!isDemoMode) {
-      loadBudgets()
-      loadAlerts()
-    }
-  }, [isDemoMode])
+    loadBudgets()
+    loadAlerts()
+  }, [])
 
   const loadBudgets = async () => {
     try {
@@ -77,22 +74,6 @@ export default function BudgetsPage() {
     loadAlerts()
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout>
-        <div className="p-6">
-          <Breadcrumbs />
-          <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-            <AlertTriangle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Budgets Not Available in Demo Mode</h2>
-            <p className="text-gray-600">
-              Please sign in to create and manage budgets for your cloud providers.
-            </p>
-          </div>
-        </div>
-      </Layout>
-    )
-  }
 
   return (
     <Layout>

@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Sparkles, Plus, Lightbulb, ChevronDown } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
+import { MessageCircle, Plus, Lightbulb, ChevronDown } from 'lucide-react'
 import { cloudProvidersAPI } from '../../services/api'
 import { ProviderIcon } from '../CloudProviderIcons'
 
@@ -134,14 +133,12 @@ const Sidebar = ({
     () => new Set(cloudProvidersCache?.expandedIds ?? [])
   )
   const cloudFetchedRef = useRef(false)
-  const { isDemoMode } = useAuth()
   const isControlled = controlledOpen !== undefined && onToggle !== undefined
   const isOpen = isControlled ? controlledOpen : internalOpen
   const toggleSidebar = isControlled ? onToggle! : () => setInternalOpen((o) => !o)
   const location = useLocation()
 
   const fetchCloudAccounts = () => {
-    if (isDemoMode) return
     cloudProvidersAPI.getCloudProviders().then((res) => {
       const providers = res.providers || []
       const expandedIds =
@@ -158,13 +155,6 @@ const Sidebar = ({
   }
 
   useEffect(() => {
-    if (isDemoMode) {
-      cloudFetchedRef.current = false
-      cloudProvidersCache = null
-      setCloudAccounts([])
-      setExpandedProviders(new Set())
-      return
-    }
     if (cloudProvidersCache?.providers?.length && !cloudFetchedRef.current) {
       cloudFetchedRef.current = true
       return
@@ -172,10 +162,9 @@ const Sidebar = ({
     if (cloudFetchedRef.current) return
     cloudFetchedRef.current = true
     fetchCloudAccounts()
-  }, [isDemoMode])
+  }, [])
 
   useEffect(() => {
-    if (isDemoMode) return
     const onProvidersChanged = () => {
       cloudProvidersCache = null
       cloudFetchedRef.current = false
@@ -183,7 +172,7 @@ const Sidebar = ({
     }
     window.addEventListener('cloud-providers-changed', onProvidersChanged)
     return () => window.removeEventListener('cloud-providers-changed', onProvidersChanged)
-  }, [isDemoMode])
+  }, [])
 
   const toggleProviderExpand = (providerId: string) => {
     setExpandedProviders((prev) => {
@@ -360,28 +349,6 @@ const Sidebar = ({
   )
 
   const renderCloudProviders = () => {
-    if (isDemoMode) {
-      return (
-        <div className="mt-4 pt-4 border-t border-surface-200">
-          <div className="px-2 pb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-            Cloud providers
-          </div>
-          <div className="px-2 py-6 text-center">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-accent-50 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-accent-500" />
-            </div>
-            <p className="text-xs text-gray-500 mb-3 font-medium">Connect cloud providers to track costs</p>
-            <Link
-              to="/waitlist"
-              onClick={closeOnNav}
-              className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs text-white bg-accent-500 hover:bg-accent-600 font-semibold transition-colors"
-            >
-              Join waitlist
-            </Link>
-          </div>
-        </div>
-      )
-    }
     if (Object.keys(groupedAccounts).length === 0) return null
     return (
       <div className="mt-4 pt-4 border-t border-surface-200">

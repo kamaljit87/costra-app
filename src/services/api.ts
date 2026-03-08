@@ -728,7 +728,7 @@ export const insightsAPI = {
             return { explanation: null }
           }
         } else {
-          // No token available, return null (user might be in demo mode)
+          // No token available, return null
           return { explanation: null }
         }
       }

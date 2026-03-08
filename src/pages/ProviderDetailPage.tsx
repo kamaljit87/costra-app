@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { getProviderCostDetails, CostData, CostDataPoint, fetchDailyCostDataForRange, getDateRangeForPeriod, aggregateToMonthly, PeriodType, getPeriodLabel, ServiceCost } from '../services/costService'
@@ -41,7 +40,6 @@ const getCategoryColor = (category: string): string => {
 export default function ProviderDetailPage() {
   const { providerId } = useParams<{ providerId: string }>()
   const location = useLocation()
-  const { isDemoMode } = useAuth()
   const { formatCurrency, convertAmount, getCurrencySymbol } = useCurrency()
   const { showSuccess, showError, showWarning } = useNotification()
   const [providerData, setProviderData] = useState<CostData | null>(null)
@@ -127,68 +125,62 @@ export default function ProviderDetailPage() {
       
       try {
         setIsLoading(true)
-        let data = await getProviderCostDetails(providerId, isDemoMode)
+        let data = await getProviderCostDetails(providerId)
         
         // Load provider accounts for analytics components
-        if (!isDemoMode) {
-          try {
-            const providersResponse = await cloudProvidersAPI.getCloudProviders()
-            const accounts = providersResponse.providers?.filter(
-              (p: any) => p.providerId === providerId && p.isActive
-            ) || []
-            setProviderAccounts(accounts)
-            
-            // If no cost data found, check if provider is configured
-            if (!data && accounts.length > 0) {
-              const configuredProvider = accounts[0]
-              // Create empty cost data structure for configured provider without cost data
-              data = {
-                provider: {
-                  id: configuredProvider.providerId,
-                  name: configuredProvider.providerName,
-                },
-                currentMonth: 0,
-                lastMonth: 0,
-                forecast: 0,
-                credits: 0,
-                savings: 0,
-                taxCurrentMonth: 0,
-                taxLastMonth: 0,
-                services: [],
-                chartData1Month: [],
-                chartData2Months: [],
-                chartData3Months: [],
-                chartData4Months: [],
-                chartData6Months: [],
-                chartData12Months: [],
-                allHistoricalData: [],
-              }
+        try {
+          const providersResponse = await cloudProvidersAPI.getCloudProviders()
+          const accounts = providersResponse.providers?.filter(
+            (p: any) => p.providerId === providerId && p.isActive
+          ) || []
+          setProviderAccounts(accounts)
+
+          // If no cost data found, check if provider is configured
+          if (!data && accounts.length > 0) {
+            const configuredProvider = accounts[0]
+            // Create empty cost data structure for configured provider without cost data
+            data = {
+              provider: {
+                id: configuredProvider.providerId,
+                name: configuredProvider.providerName,
+              },
+              currentMonth: 0,
+              lastMonth: 0,
+              forecast: 0,
+              credits: 0,
+              savings: 0,
+              taxCurrentMonth: 0,
+              taxLastMonth: 0,
+              services: [],
+              chartData1Month: [],
+              chartData2Months: [],
+              chartData3Months: [],
+              chartData4Months: [],
+              chartData6Months: [],
+              chartData12Months: [],
+              allHistoricalData: [],
             }
-          } catch (error) {
-            console.error('Failed to load configured providers:', error)
           }
+        } catch (error) {
+          console.error('Failed to load configured providers:', error)
         }
 
         // Load budgets and subscription info
-        if (!isDemoMode) {
-          try {
-            const budgetsResponse = await budgetsAPI.getBudgets(providerId)
-            const budgets = budgetsResponse.budgets || []
-            setProviderBudgetCount(budgets.length)
-          } catch (error) {
-            console.error('Failed to load provider budgets:', error)
-            setProviderBudgetCount(0)
-          }
-          try {
-            const subResponse = await billingAPI.getSubscription()
-            if (subResponse?.limits?.historicalDataMonths) {
-              setMaxHistoricalMonths(subResponse.limits.historicalDataMonths)
-            }
-          } catch (error) {
-            console.error('Failed to load subscription info:', error)
-          }
-        } else {
+        try {
+          const budgetsResponse = await budgetsAPI.getBudgets(providerId)
+          const budgets = budgetsResponse.budgets || []
+          setProviderBudgetCount(budgets.length)
+        } catch (error) {
+          console.error('Failed to load provider budgets:', error)
           setProviderBudgetCount(0)
+        }
+        try {
+          const subResponse = await billingAPI.getSubscription()
+          if (subResponse?.limits?.historicalDataMonths) {
+            setMaxHistoricalMonths(subResponse.limits.historicalDataMonths)
+          }
+        } catch (error) {
+          console.error('Failed to load subscription info:', error)
         }
 
         setProviderData(data)
@@ -209,7 +201,7 @@ export default function ProviderDetailPage() {
     }
 
     loadData()
-  }, [providerId, isDemoMode])
+  }, [providerId])
 
   // Handle service filter from URL parameter
   useEffect(() => {
@@ -227,13 +219,6 @@ export default function ProviderDetailPage() {
   // Fetch data when period changes (especially for custom, 4months, 6months, 12months)
   useEffect(() => {
     if (!providerData || !providerId) {
-      setFilteredData([])
-      setIsLoadingChartData(false)
-      return
-    }
-
-    // In demo mode, use preloaded data for all periods
-    if (isDemoMode) {
       setFilteredData([])
       setIsLoadingChartData(false)
       return
@@ -267,7 +252,7 @@ export default function ProviderDetailPage() {
           providerId
         })
 
-        const data = await fetchDailyCostDataForRange(providerId, startDate, endDate, isDemoMode)
+        const data = await fetchDailyCostDataForRange(providerId, startDate, endDate)
         
         console.log(`Fetched ${data.length} data points for ${selectedPeriod}`)
 
@@ -311,11 +296,11 @@ export default function ProviderDetailPage() {
     }
 
     fetchDataForPeriod()
-  }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId, isDemoMode])
+  }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId])
 
   // Load products and teams when tab is active
   useEffect(() => {
-    if ((activeTab === 'products' || activeTab === 'teams') && !isDemoMode && providerId) {
+    if ((activeTab === 'products' || activeTab === 'teams') && providerId) {
       const loadData = async () => {
         const range = selectedPeriod === 'custom' && customStartDate && customEndDate
           ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
@@ -351,18 +336,12 @@ export default function ProviderDetailPage() {
       }
       loadData()
     }
-  }, [activeTab, selectedPeriod, customStartDate, customEndDate, providerId, providerAccounts, isDemoMode])
+  }, [activeTab, selectedPeriod, customStartDate, customEndDate, providerId, providerAccounts])
 
   // Fetch services when period changes
   useEffect(() => {
     if (!providerData || !providerId) {
       setPeriodServices([])
-      return
-    }
-
-    // In demo mode, use provider's services directly
-    if (isDemoMode) {
-      setPeriodServices(providerData.services)
       return
     }
 
@@ -400,7 +379,7 @@ export default function ProviderDetailPage() {
     }
 
     fetchServicesForPeriod()
-  }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId, isDemoMode])
+  }, [selectedPeriod, customStartDate, customEndDate, providerData, providerId])
 
   // Handle service expansion to show sub-services
   const handleServiceExpand = async (serviceName: string, serviceCost: number) => {
@@ -505,14 +484,6 @@ export default function ProviderDetailPage() {
   }, [periodServices, providerData, selectedService, serviceSearch, minCost, maxCost, costChangeFilter, sortBy, sortOrder])
 
   const handleSync = async () => {
-    if (isDemoMode) {
-      showWarning(
-        'Demo Mode',
-        'Sync is not available in demo mode. Please sign up to sync your cloud providers.'
-      )
-      return
-    }
-
     setIsSyncing(true)
     try {
       const result = await syncAPI.syncAll()
@@ -533,7 +504,7 @@ export default function ProviderDetailPage() {
         )
       }
       // Reload data after sync
-      const data = await getProviderCostDetails(providerId!, isDemoMode)
+      const data = await getProviderCostDetails(providerId!)
       setProviderData(data)
     } catch (error: any) {
       console.error('Sync error:', error)
@@ -674,8 +645,8 @@ export default function ProviderDetailPage() {
 
   // Handle download report
   const handleDownloadReport = async (format: 'pdf' | 'json') => {
-    if (!providerId || !providerData || isDemoMode) {
-      showWarning('Download not available', 'Please sign in to download reports.')
+    if (!providerId || !providerData) {
+      showWarning('Download not available', 'No provider data available for download.')
       return
     }
 
@@ -768,17 +739,15 @@ export default function ProviderDetailPage() {
             </div>
             
             {/* Sync Button */}
-            {!isDemoMode && (
-              <button
-                onClick={handleSync}
-                disabled={isSyncing}
-                className="btn-primary flex items-center space-x-2"
-                title="Sync fresh data from cloud provider (clears cache)"
-              >
-                {isSyncing && <Spinner variant="bars" size={16} />}
-                <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
-              </button>
-            )}
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="btn-primary flex items-center space-x-2"
+              title="Sync fresh data from cloud provider (clears cache)"
+            >
+              {isSyncing && <Spinner variant="bars" size={16} />}
+              <span className="text-sm">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
+            </button>
           </div>
 
           {/* Summary Cards - Compact, Equal Heights */}
@@ -972,9 +941,9 @@ export default function ProviderDetailPage() {
               <div className="relative">
                 <button
                   onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                  disabled={isDownloading || isDemoMode}
+                  disabled={isDownloading}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1 ${
-                    isDownloading || isDemoMode
+                    isDownloading
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-accent-500 text-white hover:bg-[#1ea890]'
                   }`}
@@ -984,7 +953,7 @@ export default function ProviderDetailPage() {
                   <span>{isDownloading ? 'Generating...' : 'Download Report'}</span>
                 </button>
 
-                {showDownloadMenu && !isDownloading && !isDemoMode && (
+                {showDownloadMenu && !isDownloading && (
                   <>
                     <div 
                       className="fixed inset-0 z-10" 
@@ -1767,7 +1736,7 @@ export default function ProviderDetailPage() {
                 })()}
 
                 {/* Untagged Resources - Provider Specific */}
-                {!isDemoMode && providerId && (
+                {providerId && (
                   <UntaggedResources 
                     providerId={providerId} 
                     accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
@@ -1775,7 +1744,7 @@ export default function ProviderDetailPage() {
                 )}
 
                 {/* Cost by Dimension - Provider Specific */}
-                {!isDemoMode && providerId && (
+                {providerId && (
                   <CostByDimension 
                     providerId={providerId} 
                     accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
@@ -1783,7 +1752,7 @@ export default function ProviderDetailPage() {
                 )}
 
                 {/* Cost Anomalies - Provider Specific */}
-                {!isDemoMode && providerId && (
+                {providerId && (
                   <AnomalyDetection 
                     providerId={providerId} 
                     thresholdPercent={20}
@@ -1792,7 +1761,7 @@ export default function ProviderDetailPage() {
                 )}
 
                 {/* Unit Economics - Provider Specific */}
-                {!isDemoMode && providerId && (() => {
+                {providerId && (() => {
                   const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
                   if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
                     return (
@@ -1815,7 +1784,7 @@ export default function ProviderDetailPage() {
                 })()}
 
                 {/* Cost Efficiency Metrics - Provider Specific */}
-                {!isDemoMode && providerId && (() => {
+                {providerId && (() => {
                   const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
                   if (selectedPeriod === 'custom' && customStartDate && customEndDate) {
                     return (
@@ -1838,7 +1807,7 @@ export default function ProviderDetailPage() {
                 })()}
 
                 {/* Rightsizing Recommendations - Provider Specific */}
-                {!isDemoMode && providerId && (
+                {providerId && (
                   <RightsizingRecommendations 
                     providerId={providerId} 
                     accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}

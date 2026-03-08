@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { kubernetesAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -56,7 +56,6 @@ interface IdleResource {
 }
 
 export default function KubernetesPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [clusters, setClusters] = useState<Cluster[]>([])
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null)
@@ -76,8 +75,8 @@ export default function KubernetesPage() {
   const [formCost, setFormCost] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) loadClusters()
-  }, [isDemoMode])
+    loadClusters()
+  }, [])
 
   const loadClusters = async () => {
     try {
@@ -164,13 +163,6 @@ export default function KubernetesPage() {
   const formatCost = (v: number) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const formatPct = (v: number) => `${(Number(v) * 100).toFixed(1)}%`
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Kubernetes cost allocation is not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   // Cluster detail view
   if (selectedCluster) {

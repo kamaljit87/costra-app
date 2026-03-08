@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { terraformAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -48,7 +48,6 @@ const ACTION_ICONS: Record<string, typeof Plus> = {
 }
 
 export default function TerraformPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [planJson, setPlanJson] = useState('')
   const [planName, setPlanName] = useState('')
@@ -58,8 +57,8 @@ export default function TerraformPage() {
   const [activeTab, setActiveTab] = useState<'estimate' | 'history'>('estimate')
 
   useEffect(() => {
-    if (!isDemoMode) loadSaved()
-  }, [isDemoMode])
+    loadSaved()
+  }, [])
 
   const loadSaved = async () => {
     try {
@@ -98,13 +97,6 @@ export default function TerraformPage() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Terraform estimation is not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   return (
     <Layout>

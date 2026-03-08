@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { policiesAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -47,7 +47,6 @@ const SEVERITY_COLORS: Record<string, string> = {
 }
 
 export default function PoliciesPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [policies, setPolicies] = useState<Policy[]>([])
   const [violations, setViolations] = useState<Violation[]>([])
@@ -64,8 +63,8 @@ export default function PoliciesPage() {
   const [formService, setFormService] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) loadData()
-  }, [isDemoMode])
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -153,13 +152,6 @@ export default function PoliciesPage() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Policies are not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   return (
     <Layout>

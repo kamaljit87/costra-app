@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Package, Info, RefreshCw } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { productTeamAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -17,7 +17,6 @@ interface ProductCost {
 }
 
 export default function ProductCostView() {
-  const { isDemoMode } = useAuth()
   const { showError } = useNotification()
   const [searchParams] = useSearchParams()
   const providerId = searchParams.get('providerId') || undefined
@@ -37,10 +36,8 @@ export default function ProductCostView() {
   })
 
   useEffect(() => {
-    if (!isDemoMode) {
-      loadProducts()
-    }
-  }, [isDemoMode, startDate, endDate, providerId, accountId])
+    loadProducts()
+  }, [startDate, endDate, providerId, accountId])
 
   const loadProducts = async () => {
     try {
@@ -60,22 +57,6 @@ export default function ProductCostView() {
     }
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout>
-        <div className="p-6">
-          <Breadcrumbs />
-          <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-            <Package className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Product Costs Not Available in Demo Mode</h2>
-            <p className="text-gray-600">
-              Please sign in to view product-level cost allocation.
-            </p>
-          </div>
-        </div>
-      </Layout>
-    )
-  }
 
   const totalCost = products.reduce((sum, p) => sum + p.totalCost, 0)
 

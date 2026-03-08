@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useAuth } from '../contexts/AuthContext'
 import { useCurrency } from '../contexts/CurrencyContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { costDataAPI, cloudProvidersAPI, syncAPI } from '../services/api'
@@ -73,7 +72,6 @@ function getMonthDateRange(month: number, year: number) {
 }
 
 export default function CostComparePage() {
-  const { isDemoMode } = useAuth()
   const { formatCurrency, convertAmount, selectedCurrency } = useCurrency()
   const { showError } = useNotification()
 
@@ -96,10 +94,8 @@ export default function CostComparePage() {
     const load = async () => {
       try {
         const [data, providersResponse] = await Promise.all([
-          getCostData(isDemoMode),
-          isDemoMode
-            ? Promise.resolve({ providers: [] })
-            : cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
+          getCostData(),
+          cloudProvidersAPI.getCloudProviders().catch(() => ({ providers: [] })),
         ])
         setAllCostData(data)
 
@@ -157,7 +153,7 @@ export default function CostComparePage() {
       }
     }
     load()
-  }, [isDemoMode])
+  }, [])
 
   // Fetch data for a panel
   const fetchPanelData = useCallback(
@@ -171,39 +167,6 @@ export default function CostComparePage() {
       try {
         const { startDate, endDate } = getMonthDateRange(month, year)
         const isCurrentMonth = month === currentMonth && year === currentYear
-
-        if (isDemoMode) {
-          // In demo mode, use existing mock data with slight variations for different months
-          const providerData = allCostData.find((d) => d.provider.id === providerId)
-          if (providerData) {
-            const monthFactor = isCurrentMonth ? 1 : 0.85 + Math.random() * 0.3
-            const dailyData = providerData.chartData1Month.map((d) => ({
-              date: d.date,
-              cost: d.cost * monthFactor,
-            }))
-            setPanels((prev) =>
-              prev.map((p) =>
-                p.id === panelId
-                  ? {
-                      ...p,
-                      totalCost: providerData.currentMonth * monthFactor,
-                      services: providerData.services.map((s) => ({
-                        ...s,
-                        cost: s.cost * monthFactor,
-                      })),
-                      dailyData,
-                      isLoading: false,
-                    }
-                  : p
-              )
-            )
-          } else {
-            setPanels((prev) =>
-              prev.map((p) => (p.id === panelId ? { ...p, isLoading: false } : p))
-            )
-          }
-          return
-        }
 
         // Fetch daily data, services, cost data, and (for historical months) the accurate
         // monthly total directly from the cloud provider API.
@@ -354,7 +317,7 @@ export default function CostComparePage() {
         )
       }
     },
-    [isDemoMode, allCostData, currentMonth, currentYear]
+    [allCostData, currentMonth, currentYear]
   )
 
   // Fetch data when panel selections change

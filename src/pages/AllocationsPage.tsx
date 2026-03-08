@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { allocationsAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -26,7 +26,6 @@ const SPLIT_METHODS = [
 ]
 
 export default function AllocationsPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [rules, setRules] = useState<AllocationRule[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -41,8 +40,8 @@ export default function AllocationsPage() {
   ])
 
   useEffect(() => {
-    if (!isDemoMode) loadData()
-  }, [isDemoMode])
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -103,13 +102,6 @@ export default function AllocationsPage() {
     })
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Allocations are not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   return (
     <Layout>

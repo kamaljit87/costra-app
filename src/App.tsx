@@ -31,7 +31,6 @@ const AdminTicketsPage = lazy(() => import('./pages/AdminTicketsPage'))
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'))
 const TermsOfServicePage = lazy(() => import('./pages/TermsOfServicePage'))
 const ContactPage = lazy(() => import('./pages/ContactPage'))
-const ChatBubbleDemoPage = lazy(() => import('./pages/ChatBubbleDemoPage'))
 const GoogleCallbackPage = lazy(() => import('./pages/GoogleCallbackPage'))
 const Verify2FAPage = lazy(() => import('./pages/Verify2FAPage'))
 const Suggest2FAPage = lazy(() => import('./pages/Suggest2FAPage'))
@@ -136,14 +135,6 @@ function App() {
                 <Route path="/blog" element={<BlogListPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/docs" element={<DocsPage />} />
-                <Route
-                  path="/chat-demo"
-                  element={
-                    <ProtectedRoute>
-                      <ChatBubbleDemoPage />
-                    </ProtectedRoute>
-                  }
-                />
             <Route
               path="/dashboard"
               element={

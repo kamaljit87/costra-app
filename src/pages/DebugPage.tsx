@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AlertDialog } from '@/components/ui/alert-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { costDataAPI, cloudProvidersAPI, syncAPI } from '../services/api'
 import { Bug, RefreshCw, Database, Calendar, Cloud, ArrowRight, AlertTriangle, CheckCircle } from 'lucide-react'
@@ -17,7 +17,6 @@ interface DebugResponse {
 }
 
 export default function DebugPage() {
-  const { isDemoMode } = useAuth()
   const [providers, setProviders] = useState<any[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>('')
   const [alertOpen, setAlertOpen] = useState(false)
@@ -175,19 +174,6 @@ export default function DebugPage() {
     setResponses([])
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-12">
-            <Bug className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Debug Page</h2>
-            <p className="text-gray-600">Debug page is not available in demo mode.</p>
-          </div>
-        </div>
-      </Layout>
-    )
-  }
 
   return (
     <Layout>

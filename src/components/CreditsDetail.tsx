@@ -19,10 +19,9 @@ interface CreditsDetailProps {
   accountId?: number
   startDate: string
   endDate: string
-  isDemoMode?: boolean
 }
 
-export default function CreditsDetail({ providerId, accountId, startDate, endDate, isDemoMode }: CreditsDetailProps) {
+export default function CreditsDetail({ providerId, accountId, startDate, endDate }: CreditsDetailProps) {
   const { formatCurrency } = useCurrency()
   const [credits, setCredits] = useState<CreditDetail[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -33,34 +32,11 @@ export default function CreditsDetail({ providerId, accountId, startDate, endDat
   })
 
   useEffect(() => {
-    if (isDemoMode) {
-      // Demo data - similar to AWS console
-      setCredits([
-        {
-          creditName: 'AWS Activate - Founders',
-          issuedAmount: 1000,
-          expirationDate: '2027-11-30',
-          amountUsed: 107.93,
-          amountRemaining: 892.07,
-          applicableProducts: ['All AWS Services'],
-          creditType: 'Promotional',
-          date: new Date().toISOString().split('T')[0]
-        }
-      ])
-      setSummary({
-        totalRemaining: 892.07,
-        totalUsed: 107.93,
-        activeCredits: 1
-      })
-      setIsLoading(false)
-      return
-    }
-
     loadCredits()
-  }, [providerId, accountId, startDate, endDate, isDemoMode])
+  }, [providerId, accountId, startDate, endDate])
 
   const loadCredits = async () => {
-    if (!providerId || isDemoMode) return
+    if (!providerId) return
 
     setIsLoading(true)
     try {

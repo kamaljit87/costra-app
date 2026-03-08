@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { savingsPlansAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -54,7 +54,6 @@ function UtilizationGauge({ percent, label }: { percent: number | null; label: s
 }
 
 export default function SavingsPlansPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [plans, setPlans] = useState<SavingsPlan[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -66,8 +65,8 @@ export default function SavingsPlansPage() {
   const [formExpiry, setFormExpiry] = useState('')
 
   useEffect(() => {
-    if (!isDemoMode) loadData()
-  }, [isDemoMode])
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -114,13 +113,6 @@ export default function SavingsPlansPage() {
     })
   }
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Savings plans are not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   const activePlans = plans.filter(p => p.status === 'active')
   const avgUtilization = activePlans.length > 0

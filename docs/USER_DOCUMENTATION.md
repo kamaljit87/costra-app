@@ -42,14 +42,10 @@ If you don’t receive an email, confirm the address is correct and try again, o
 
 <!-- Screenshot: Forgot password page -->
 
-### Demo mode
-
-If you use Costra without connecting any cloud accounts, you may see **Demo Mode**: sample data is shown so you can explore the dashboard, compare, and other features. To use your real data, sign up (or sign in) and connect at least one cloud provider in **Settings → Cloud Providers**.
-
 ### Onboarding flow (first-time setup)
 
 1. **Create an account** (or sign in).
-2. You land on the **Dashboard**. In demo mode you’ll see sample data; otherwise the dashboard may be empty until you connect a provider.
+2. You land on the **Dashboard**. The dashboard will be empty until you connect a provider.
 3. **Connect your first cloud provider:** go to **Settings → Cloud Providers**, click **Add provider**, choose a provider (e.g. AWS, Azure, GCP), and complete the steps (credentials or automated setup).
 4. Back on the **Dashboard**, click **Sync Data** to pull the first cost data (or wait for auto-sync if enabled).
 5. Optionally set **Budgets**, **Goals**, or explore **Compare** and **Reports** as needed.
@@ -80,7 +76,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 **Limits and tips:**
 
-- In **Demo Mode**, Sync and Export are not available; connect a real account to use them.
 - If you see “No Providers Connected”, add at least one cloud provider under **Settings → Cloud Providers**.
 - Export (CSV/PDF) may be limited to **Pro** plan; if export fails, the message may say you need to upgrade.
 - Historical data (how many months you can see) depends on your plan (e.g. trial: 12 months, Starter: 6 months, Pro: 12+ months).
@@ -93,7 +88,7 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 **What it does:** Costra pulls cost and usage data from your cloud accounts (e.g. AWS, Azure, Google Cloud, DigitalOcean, and others). You add and manage these connections in Settings. For AWS, you can use access keys or an automated (role-based) connection.
 
-**Who it’s for:** Anyone who needs to track real spend; you must connect at least one provider to see real data (aside from Demo Mode).
+**Who it’s for:** Anyone who needs to track real spend; you must connect at least one provider to see real data.
 
 **How to connect your first integration (overview):**
 
@@ -143,7 +138,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 
 **Limits and tips:**
 
-- In **Demo Mode**, Budgets may show a message that you need to connect real accounts.
 - Budget alerts (in-app and by email) depend on your plan and email preferences in **Settings → General**.
 
 <!-- Screenshot: Budgets list -->
@@ -388,7 +382,6 @@ If you use Costra without connecting any cloud accounts, you may see **Demo Mode
 ### Export (CSV/PDF) doesn’t work
 
 - Export may require a **Pro** plan. If you see “Could not export. You may need a Pro plan,” upgrade in Billing.
-- In **Demo Mode**, export is disabled; connect a real account and sign in.
 
 ### Compare shows “No data” for a month
 

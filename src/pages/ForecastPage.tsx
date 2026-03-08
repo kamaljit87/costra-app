@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { useAuth } from '../contexts/AuthContext'
+import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
 import { forecastsAPI } from '../services/api'
 import Layout from '../components/Layout'
@@ -37,7 +37,6 @@ interface Scenario {
 }
 
 export default function ForecastPage() {
-  const { isDemoMode } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [baseForecast, setBaseForecast] = useState<ForecastMonth[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -62,8 +61,8 @@ export default function ForecastPage() {
   const [adjAction, setAdjAction] = useState('add')
 
   useEffect(() => {
-    if (!isDemoMode) loadData()
-  }, [isDemoMode])
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -181,13 +180,6 @@ export default function ForecastPage() {
   // Find max forecast value for bar scaling
   const maxForecast = baseForecast.reduce((max, m) => Math.max(max, m.confidenceHigh || m.forecast), 0)
 
-  if (isDemoMode) {
-    return (
-      <Layout><div className="p-6"><Breadcrumbs />
-        <div className="text-center py-12 text-gray-500">Forecasts are not available in demo mode.</div>
-      </div></Layout>
-    )
-  }
 
   return (
     <Layout>

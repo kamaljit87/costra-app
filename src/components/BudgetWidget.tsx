@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, Wallet } from 'lucide-react'
 import { budgetsAPI } from '../services/api'
 import { useCurrency } from '../contexts/CurrencyContext'
-import { useAuth } from '../contexts/AuthContext'
 
 interface Budget {
   id: number
@@ -20,16 +19,13 @@ interface Budget {
 
 export default function BudgetWidget() {
   const { convertAmount } = useCurrency()
-  const { isDemoMode } = useAuth()
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!isDemoMode) {
-      loadData()
-    }
-  }, [isDemoMode])
+    loadData()
+  }, [])
 
   const loadData = async () => {
     try {
@@ -46,7 +42,7 @@ export default function BudgetWidget() {
     }
   }
 
-  if (isDemoMode || isLoading) {
+  if (isLoading) {
     return null
   }
 

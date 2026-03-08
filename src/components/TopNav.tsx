@@ -49,7 +49,7 @@ interface SearchResult {
 export default function TopNav({ onMenuClick }: TopNavProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { logout, user, isDemoMode } = useAuth()
+  const { logout, user } = useAuth()
   const { effectiveTheme, setTheme } = useTheme()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isProviderMenuOpen, setIsProviderMenuOpen] = useState(false)
@@ -72,15 +72,13 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
     // Fire all initial loads in parallel
     loadCloudAccounts()
     loadAllServices()
-    if (!isDemoMode) {
-      Promise.all([loadUnreadNotificationCount(), loadSubscriptionStatus()])
-      // Poll for new notifications only when tab is visible
-      const interval = setInterval(() => {
-        if (!document.hidden) loadUnreadNotificationCount()
-      }, 60000)
-      return () => clearInterval(interval)
-    }
-  }, [isDemoMode])
+    Promise.all([loadUnreadNotificationCount(), loadSubscriptionStatus()])
+    // Poll for new notifications only when tab is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) loadUnreadNotificationCount()
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [])
   
   const loadSubscriptionStatus = async () => {
     try {
@@ -111,29 +109,6 @@ export default function TopNav({ onMenuClick }: TopNavProps) {
   }
 
   const loadAllServices = async () => {
-    if (isDemoMode) {
-      // Mock services for demo mode
-      const mockServices = [
-        { providerId: 'aws', name: 'EC2 Instances' },
-        { providerId: 'aws', name: 'S3 Storage' },
-        { providerId: 'aws', name: 'RDS Databases' },
-        { providerId: 'aws', name: 'Lambda Functions' },
-        { providerId: 'aws', name: 'CloudFront CDN' },
-        { providerId: 'azure', name: 'Virtual Machines' },
-        { providerId: 'azure', name: 'Blob Storage' },
-        { providerId: 'azure', name: 'SQL Database' },
-        { providerId: 'azure', name: 'Functions' },
-        { providerId: 'azure', name: 'CDN' },
-        { providerId: 'gcp', name: 'Compute Engine' },
-        { providerId: 'gcp', name: 'Cloud Storage' },
-        { providerId: 'gcp', name: 'Cloud SQL' },
-        { providerId: 'gcp', name: 'Cloud Functions' },
-        { providerId: 'gcp', name: 'Cloud CDN' },
-      ]
-      setAllServices(mockServices)
-      return
-    }
-
     try {
       const providers = ['aws', 'azure', 'gcp', 'digitalocean', 'ibm', 'linode', 'vultr']
       const endDate = new Date()
