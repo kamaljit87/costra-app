@@ -1,12 +1,42 @@
-import matter from 'gray-matter'
 import { marked } from 'marked'
 import type { BlogPost } from '@/types/blog'
 
 const modules = import.meta.glob('/src/content/blog/*.md', { query: '?raw', import: 'default', eager: true })
 
+/**
+ * Parse YAML frontmatter without gray-matter (which requires Node.js Buffer).
+ * Handles simple key: value and key: [array] fields.
+ */
+function parseFrontmatter(raw: string): { data: Record<string, any>; content: string } {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/)
+  if (!match) return { data: {}, content: raw }
+
+  const yaml = match[1]
+  const content = match[2]
+  const data: Record<string, any> = {}
+
+  for (const line of yaml.split('\n')) {
+    const kvMatch = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/)
+    if (!kvMatch) continue
+    const key = kvMatch[1]
+    let value: any = kvMatch[2].trim()
+
+    // Handle YAML arrays: ["tag1", "tag2"]
+    if (value.startsWith('[') && value.endsWith(']')) {
+      value = value.slice(1, -1).split(',').map((s: string) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+    } else {
+      // Strip surrounding quotes
+      value = value.replace(/^["']|["']$/g, '')
+    }
+    data[key] = value
+  }
+
+  return { data, content }
+}
+
 export function getPostBySlug(slug: string): BlogPost | null {
   for (const [filepath, raw] of Object.entries(modules)) {
-    const { data, content } = matter(raw as string)
+    const { data, content } = parseFrontmatter(raw as string)
     const fileSlug = data.slug || filepath.split('/').pop()?.replace('.md', '')
     if (fileSlug === slug) {
       return {
@@ -15,7 +45,7 @@ export function getPostBySlug(slug: string): BlogPost | null {
         date: data.date || '',
         description: data.description || '',
         author: data.author || 'Costra Team',
-        tags: data.tags || [],
+        tags: Array.isArray(data.tags) ? data.tags : [],
         image: data.image,
         content,
       }
