@@ -1,15 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
-import { MessageSquare, X, Send, Sparkles, Bot, Loader2, AlertCircle, Lightbulb, TrendingUp, AlertTriangle } from 'lucide-react'
+import { MessageSquare, X, Send, Sparkles, Bot, Loader2, AlertCircle, Lightbulb, TrendingUp, AlertTriangle, Zap } from 'lucide-react'
 import {
   ChatBubble,
   ChatBubbleAvatar,
   ChatBubbleMessage,
 } from '@/components/ui/chat-bubble'
+import { aiAPI } from '@/services/api'
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+}
+
+interface ChatCredits {
+  used: number
+  limit: number
+  remaining: number
 }
 
 interface Insight {
@@ -28,6 +35,7 @@ export default function AIChat() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [isLoadingInsights, setIsLoadingInsights] = useState(false)
   const [activeTab, setActiveTab] = useState<'chat' | 'insights'>('chat')
+  const [credits, setCredits] = useState<ChatCredits | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -43,6 +51,13 @@ export default function AIChat() {
       inputRef.current?.focus()
     }
   }, [isOpen, activeTab])
+
+  // Fetch credits when chat opens
+  useEffect(() => {
+    if (isOpen && !credits) {
+      aiAPI.getCredits().then(setCredits).catch(() => {})
+    }
+  }, [isOpen])
 
   // Fetch insights when opening insights tab
   useEffect(() => {
@@ -76,6 +91,12 @@ export default function AIChat() {
   const sendMessage = async () => {
     if (!inputValue.trim() || isLoading) return
 
+    // Check credits before sending
+    if (credits && credits.remaining < 1) {
+      setError('Monthly message limit reached. Credits reset on the 1st of each month.')
+      return
+    }
+
     const userMessage: Message = {
       role: 'user',
       content: inputValue.trim(),
@@ -88,26 +109,14 @@ export default function AIChat() {
     setError(null)
 
     try {
-      const token = localStorage.getItem('authToken')
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: userMessage.content,
-          conversationHistory: messages.map(m => ({
-            role: m.role,
-            content: m.content
-          }))
-        })
-      })
+      const data = await aiAPI.chat(
+        userMessage.content,
+        messages.map(m => ({ role: m.role, content: m.content }))
+      )
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get response')
+      // Update credits from response
+      if (data.credits) {
+        setCredits(data.credits)
       }
 
       const assistantMessage: Message = {
@@ -118,7 +127,13 @@ export default function AIChat() {
 
       setMessages(prev => [...prev, assistantMessage])
     } catch (err: any) {
-      setError(err.message || 'Failed to send message')
+      // Handle credit limit error
+      if (err.message?.includes('limit reached')) {
+        setError('Monthly message limit reached. Credits reset on the 1st of each month.')
+        if (err.credits) setCredits(err.credits)
+      } else {
+        setError(err.message || 'Failed to send message')
+      }
       // Remove the user message if we couldn't get a response
       setMessages(prev => prev.slice(0, -1))
     } finally {
@@ -185,13 +200,22 @@ export default function AIChat() {
                   <p className="text-xs text-white/70 mt-0.5">Powered by Claude</p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-colors"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                {credits && (
+                  <div className="flex items-center gap-1.5 text-xs text-white/80 bg-white/10 rounded-lg px-2.5 py-1.5">
+                    <Zap className="h-3 w-3 text-amber-300" />
+                    <span className="font-medium">{credits.remaining}</span>
+                    <span className="text-white/50">/ {credits.limit}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl text-white/80 hover:bg-white/15 hover:text-white transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Tabs */}
@@ -295,26 +319,33 @@ export default function AIChat() {
 
               {/* Input */}
               <div className="p-4 border-t border-surface-100 bg-white shrink-0">
-                <div className="flex gap-2.5">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Ask about your cloud costs..."
-                    className="flex-1 px-4 py-2.5 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 text-sm text-gray-900 placeholder:text-gray-400 transition-shadow"
-                    disabled={isLoading}
-                  />
-                  <button
-                    onClick={sendMessage}
-                    disabled={!inputValue.trim() || isLoading}
-                    className="w-11 h-11 flex items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-                    aria-label="Send"
-                  >
-                    <Send className="h-5 w-5" />
-                  </button>
-                </div>
+                {credits && credits.remaining < 1 ? (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+                    <Zap className="h-4 w-4 shrink-0" />
+                    <span>Monthly message limit reached. Resets on the 1st.</span>
+                  </div>
+                ) : (
+                  <div className="flex gap-2.5">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Ask about your cloud costs..."
+                      className="flex-1 px-4 py-2.5 border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-400 text-sm text-gray-900 placeholder:text-gray-400 transition-shadow"
+                      disabled={isLoading}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={!inputValue.trim() || isLoading}
+                      className="w-11 h-11 flex items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                      aria-label="Send"
+                    >
+                      <Send className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </>
           ) : (

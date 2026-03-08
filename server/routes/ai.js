@@ -4,6 +4,7 @@ import { aiLimiter } from '../middleware/rateLimiter.js'
 import { getCostDataForUser, getDailyCostData, getServiceCostsForDateRange, pool } from '../database.js'
 import logger from '../utils/logger.js'
 import { getAnthropicClient } from '../utils/aiClient.js'
+import { getChatCreditBalance, consumeChatCredit } from '../services/aiChatCreditService.js'
 
 const router = express.Router()
 
@@ -12,6 +13,17 @@ router.use(authenticateToken)
 
 // Apply AI rate limiter to all AI routes
 router.use(aiLimiter)
+
+// Get AI chat credit balance
+router.get('/credits', async (req, res) => {
+  try {
+    const balance = await getChatCreditBalance(req.user.userId)
+    res.json(balance)
+  } catch (error) {
+    logger.error('AI Chat: Failed to get credit balance', { userId: req.user?.userId, error: error.message })
+    res.status(500).json({ error: 'Failed to get credit balance' })
+  }
+})
 
 // Chat with AI about cost data
 router.post('/chat', async (req, res) => {
@@ -23,9 +35,18 @@ router.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' })
     }
 
+    // Check chat credits before calling Claude
+    const balance = await getChatCreditBalance(userId)
+    if (balance.remaining < 1) {
+      return res.status(402).json({
+        error: 'Monthly AI chat message limit reached. Credits reset on the 1st of each month.',
+        credits: balance,
+      })
+    }
+
     const client = getAnthropicClient()
     if (!client) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: 'AI service not configured',
         message: 'Please configure ANTHROPIC_API_KEY in environment variables'
       })
@@ -46,9 +67,9 @@ router.post('/chat', async (req, res) => {
       { role: 'user', content: message }
     ]
 
-    logger.debug('AI Chat: Processing query', { 
-      userId, 
-      messagePreview: message.substring(0, 50) 
+    logger.debug('AI Chat: Processing query', {
+      userId,
+      messagePreview: message.substring(0, 50)
     })
 
     // Call Claude API
@@ -61,10 +82,15 @@ router.post('/chat', async (req, res) => {
 
     const aiResponse = response.content[0]?.text || 'I apologize, but I was unable to generate a response.'
 
+    // Consume 1 credit after successful response
+    await consumeChatCredit(userId)
+    const updatedBalance = await getChatCreditBalance(userId)
+
     logger.debug('AI Chat: Response generated successfully', { userId })
 
     res.json({
       response: aiResponse,
+      credits: updatedBalance,
       usage: {
         inputTokens: response.usage?.input_tokens,
         outputTokens: response.usage?.output_tokens

@@ -637,6 +637,11 @@ export const aiAPI = {
     return response.json()
   },
 
+  getCredits: async () => {
+    const response = await apiRequest('/ai/credits')
+    return response.json()
+  },
+
   getInsights: async () => {
     const response = await apiRequest('/ai/insights')
     return response.json()

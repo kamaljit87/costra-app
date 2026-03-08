@@ -1617,6 +1617,18 @@ export const initDatabase = async () => {
         )
       `)
 
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ai_chat_credits (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+          credits_used INTEGER NOT NULL DEFAULT 0,
+          credits_limit INTEGER NOT NULL DEFAULT 0,
+          period_start DATE NOT NULL DEFAULT CURRENT_DATE,
+          period_end DATE,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
