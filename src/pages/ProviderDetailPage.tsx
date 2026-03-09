@@ -80,7 +80,9 @@ export default function ProviderDetailPage() {
   const [isLoadingSubServices, setIsLoadingSubServices] = useState(false)
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'analytics' | 'products' | 'teams'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'analytics' | 'products' | 'teams' | 'rightsizing'>('overview')
+  const RIGHTSIZING_PROVIDERS = ['aws', 'azure', 'gcp']
+  const supportsRightsizing = providerId ? RIGHTSIZING_PROVIDERS.includes(providerId) : false
   
   // Products and Teams state
   const [products, setProducts] = useState<any[]>([])
@@ -1242,6 +1244,24 @@ export default function ProviderDetailPage() {
                   <span>Teams</span>
                 </div>
               </button>
+              {supportsRightsizing && (
+                <button
+                  onClick={() => setActiveTab('rightsizing')}
+                  className={`
+                    py-3 px-1 border-b-2 font-semibold text-xs transition-colors
+                    ${
+                      activeTab === 'rightsizing'
+                        ? 'border-accent-500 text-accent-500'
+                        : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-surface-200'
+                    }
+                  `}
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    <span>Rightsizing</span>
+                  </div>
+                </button>
+              )}
             </nav>
           </div>
         )}
@@ -1874,7 +1894,7 @@ export default function ProviderDetailPage() {
                   const range = selectedPeriod === 'custom' && customStartDate && customEndDate
                     ? getDateRangeForPeriod('custom', customStartDate, customEndDate)
                     : getDateRangeForPeriod(selectedPeriod)
-                  
+
                   const startDateStr = range.startDate.toISOString().split('T')[0]
                   const endDateStr = range.endDate.toISOString().split('T')[0]
                   const accountId = providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined
@@ -1915,6 +1935,18 @@ export default function ProviderDetailPage() {
                     </div>
                   )
                 })()}
+              </div>
+            )}
+
+            {/* Rightsizing Tab */}
+            {activeTab === 'rightsizing' && supportsRightsizing && (
+              <div className="space-y-6">
+                {providerId && (
+                  <RightsizingRecommendations
+                    providerId={providerId}
+                    accountId={providerAccounts.length === 1 ? providerAccounts[0].accountId : undefined}
+                  />
+                )}
               </div>
             )}
           </>
