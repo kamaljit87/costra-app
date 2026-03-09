@@ -480,10 +480,16 @@ router.post('/aws/automated',
       // Check if this AWS account is already connected
       const existingConnection = await getExistingAWSConnection(userId, awsAccountId)
       if (existingConnection) {
-        return res.status(409).json({
-          error: `An active connection for AWS account ${awsAccountId} already exists ("${existingConnection.account_alias}").`,
-          code: 'DUPLICATE_ACCOUNT',
-        })
+        if (existingConnection.connection_status === 'healthy') {
+          return res.status(409).json({
+            error: `An active connection for AWS account ${awsAccountId} already exists ("${existingConnection.account_alias}").`,
+            code: 'DUPLICATE_ACCOUNT',
+          })
+        }
+        // Remove stale pending/error connection so user can retry
+        await deleteCloudProvider(userId, existingConnection.id)
+        await cache.del(`user:${userId}:cloud_providers`)
+        logger.info('Removed stale AWS connection for re-setup', { userId, awsAccountId, oldStatus: existingConnection.connection_status })
       }
 
       // Generate external ID for secure access
@@ -613,10 +619,16 @@ router.post('/aws/automated/verify',
       // Check for duplicate AWS account
       const existingConnection = await getExistingAWSConnection(userId, awsAccountId)
       if (existingConnection) {
-        return res.status(409).json({
-          error: `An active connection for AWS account ${awsAccountId} already exists ("${existingConnection.account_alias}").`,
-          code: 'DUPLICATE_ACCOUNT',
-        })
+        if (existingConnection.connection_status === 'healthy') {
+          return res.status(409).json({
+            error: `An active connection for AWS account ${awsAccountId} already exists ("${existingConnection.account_alias}").`,
+            code: 'DUPLICATE_ACCOUNT',
+          })
+        }
+        // Remove stale pending/error connection so user can retry
+        await deleteCloudProvider(userId, existingConnection.id)
+        await cache.del(`user:${userId}:cloud_providers`)
+        logger.info('Removed stale AWS connection for re-setup', { userId, awsAccountId, oldStatus: existingConnection.connection_status })
       }
 
       // Check provider account limit
