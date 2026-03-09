@@ -194,6 +194,12 @@ Resources:
                   - 'cloudwatch:ListMetrics'
                   - 'cloudwatch:GetMetricStatistics'
                 Resource: '*'
+              - Sid: EC2ReadAccess
+                Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeRegions'
+                Resource: '*'
               - Sid: TaggingAccess
                 Effect: Allow
                 Action:

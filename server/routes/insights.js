@@ -38,6 +38,7 @@ import {
   fetchAzureRightsizingRecommendations,
   fetchGCPRightsizingRecommendations,
 } from '../services/cloudProviderIntegrations.js'
+import { fetchCloudWatchRightsizing } from '../services/rightsizingService.js'
 import logger from '../utils/logger.js'
 import { cached } from '../utils/cache.js'
 
@@ -1349,7 +1350,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
       try {
         const liveRecs = []
 
-        // AWS: Cost Explorer GetRightsizingRecommendation API
+        // AWS: CloudWatch-based rightsizing (no opt-in needed), falls back to Cost Explorer API
         const awsAccounts = accounts.filter(a => a.provider_id === 'aws')
         if (awsAccounts.length > 0 && (!providerId || providerId.toLowerCase() === 'aws')) {
           for (const account of awsAccounts) {
@@ -1376,29 +1377,53 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
                 }
               }
               if (!credentials?.accessKeyId || !credentials?.secretAccessKey) continue
-              const awsResult = await fetchAWSRightsizingRecommendations(credentials, {
-                linkedAccountId: account.aws_account_id || undefined,
-              })
-              for (const rec of (awsResult.recommendations || [])) {
-                liveRecs.push({ ...rec, providerId: 'aws', accountId: account.id, accountAlias: account.account_alias, awsAccountId: account.aws_account_id })
+
+              // Primary: CloudWatch + EC2 DescribeInstances (no opt-in required)
+              let gotRecs = false
+              try {
+                const cwResult = await fetchCloudWatchRightsizing(credentials, { lookbackDays: 14 })
+                if (cwResult.recommendations?.length > 0) {
+                  for (const rec of cwResult.recommendations) {
+                    liveRecs.push({ ...rec, providerId: 'aws', accountId: account.id, accountAlias: account.account_alias, awsAccountId: account.aws_account_id })
+                  }
+                  gotRecs = true
+                }
+              } catch (cwErr) {
+                logger.warn('Rightsizing explorer: CloudWatch approach failed, trying Cost Explorer', { accountId: account.id, error: cwErr.message })
+                // If DescribeInstances permission missing, add a helpful hint
+                if (cwErr.message?.includes('UnauthorizedOperation') || cwErr.message?.includes('AccessDenied')) {
+                  setupHints.push({
+                    provider: 'aws',
+                    type: 'permission_required',
+                    title: 'EC2 Read Permission Needed',
+                    message: 'The CloudFormation stack needs updating to include EC2 read permissions for rightsizing analysis.',
+                    steps: [
+                      'Go to AWS CloudFormation in your AWS Console',
+                      'Find the Costra stack and click Update',
+                      'Choose "Replace current template" and re-enter the Costra template URL',
+                      'Complete the update wizard to add the new ec2:DescribeInstances permission',
+                    ],
+                  })
+                }
+              }
+
+              // Fallback: Cost Explorer GetRightsizingRecommendation (requires opt-in)
+              if (!gotRecs) {
+                try {
+                  const awsResult = await fetchAWSRightsizingRecommendations(credentials, {
+                    linkedAccountId: account.aws_account_id || undefined,
+                  })
+                  for (const rec of (awsResult.recommendations || [])) {
+                    liveRecs.push({ ...rec, providerId: 'aws', accountId: account.id, accountAlias: account.account_alias, awsAccountId: account.aws_account_id })
+                  }
+                } catch (ceErr) {
+                  logger.warn('Rightsizing explorer: Cost Explorer API also failed', { accountId: account.id, error: ceErr.message })
+                  // Don't show opt-in hint if CloudWatch just found no instances (that's fine)
+                }
               }
             } catch (accErr) {
               logger.warn('Rightsizing explorer: failed to fetch AWS recs for account', { accountId: account.id, error: accErr.message })
-              if (accErr.message && accErr.message.includes('opt-in')) {
-                setupHints.push({
-                  provider: 'aws',
-                  type: 'opt_in_required',
-                  title: 'EC2 Rightsizing Recommendations Not Enabled',
-                  message: 'You need to enable EC2 rightsizing recommendations in your AWS account.',
-                  steps: [
-                    'Sign in to your AWS Management Console (payer/management account)',
-                    'Go to AWS Cost Explorer → Preferences (left sidebar)',
-                    'Check "Receive Amazon EC2 resource rightsizing recommendations"',
-                    'Click Save preferences',
-                    'Wait up to 24 hours for AWS to generate recommendations',
-                  ],
-                })
-              } else if (accErr.message) {
+              if (accErr.message) {
                 setupHints.push({ provider: 'aws', type: 'error', title: 'AWS Rightsizing Error', message: accErr.message, steps: [] })
               }
             }

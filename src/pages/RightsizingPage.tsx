@@ -408,7 +408,10 @@ export default function RightsizingPage() {
                             Setup required — click for details
                           </button>
                         ) : (
-                          'No resources found'
+                          <div className="space-y-1">
+                            <p>No rightsizing recommendations</p>
+                            <p className="text-[10px]">Your instances are right-sized, or no running EC2 instances were found</p>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -499,15 +502,27 @@ export default function RightsizingPage() {
                       <ExternalLink className="w-4 h-4" />
                     </a>
                   )}
+                  {hint.provider === 'aws' && hint.type === 'permission_required' && (
+                    <a
+                      href="https://console.aws.amazon.com/cloudformation"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors"
+                    >
+                      Open AWS CloudFormation
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
               ))}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">After enabling, allow up to 24 hours</p>
+                  <p className="font-medium mb-1">How rightsizing works</p>
                   <p className="text-blue-600">
-                    AWS needs time to analyze your EC2 instance utilization patterns and generate rightsizing recommendations.
-                    Come back to this page after enabling the feature.
+                    Costra analyzes your EC2 instance CPU, network, and disk utilization via CloudWatch metrics
+                    over the past 14 days to identify over-provisioned or idle instances. No manual opt-in is needed
+                    for the CloudWatch approach — just ensure the Costra IAM role has the required permissions.
                   </p>
                 </div>
               </div>
