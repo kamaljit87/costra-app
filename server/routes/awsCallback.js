@@ -63,6 +63,7 @@ router.post('/', async (req, res) => {
     if (existingConnection) {
       logger.info('AWS Callback: Connection already exists, skipping', { userId, awsAccountId })
       await cache.del(cacheKey)
+      await cache.del(`user:${userId}:cloud_providers`)
       // Update the status in Redis so frontend knows it's done
       await cache.set(`aws-connection-status:${externalId}`, { status: 'connected', accountId: existingConnection.id }, 600)
       return res.json({ message: 'Connection already exists', accountId: existingConnection.id })
@@ -111,8 +112,9 @@ router.post('/', async (req, res) => {
       connectionName: sanitizedName,
     }, 600)
 
-    // Clean up the pending connection from cache
+    // Clean up the pending connection and invalidate provider list cache
     await cache.del(cacheKey)
+    await cache.del(`user:${userId}:cloud_providers`)
 
     // Create notification
     try {

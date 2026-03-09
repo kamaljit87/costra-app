@@ -716,6 +716,9 @@ router.post('/aws/automated/verify',
         })
       }
 
+      // Invalidate provider list cache so frontend sees the new connection
+      await cache.del(`user:${userId}:cloud_providers`)
+
       res.json({
         message: 'Connection verified and created successfully',
         accountId: connection.id,
