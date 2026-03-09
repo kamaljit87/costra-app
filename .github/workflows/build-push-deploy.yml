@@ -4,6 +4,7 @@
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY  – ECR push + node ECR pull
 #   SSH_PRIVATE_KEY, SSH_HOST                 – deploy via SSH
 #   VITE_GOOGLE_CLIENT_ID                     – baked into frontend at build time
+#   CLOUDFLARE_ZONE_ID, CLOUDFLARE_API_TOKEN  – automatic CDN cache purge after deploy
 #
 # SSH_HOST: one IP/hostname, or comma-separated for multiple nodes.
 
@@ -172,3 +173,13 @@ jobs:
             $SSH "$USER@$HOST" "gunzip -c /tmp/backend.tar.gz | sudo k3s ctr images import - && gunzip -c /tmp/frontend.tar.gz | sudo k3s ctr images import - && bash /tmp/k8s-deploy.sh $REGISTRY $NS $TAG $DIR"
             echo "::endgroup::"
           done
+
+      - name: Purge Cloudflare CDN cache
+        if: ${{ secrets.CLOUDFLARE_ZONE_ID != '' && secrets.CLOUDFLARE_API_TOKEN != '' }}
+        run: |
+          echo "Purging Cloudflare cache..."
+          curl -s -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' | jq '.success'
