@@ -1341,9 +1341,172 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
     }
 
     // Sort services by total spend descending
-    const services = Object.values(serviceMap).sort((a, b) => b.totalSpend - a.totalSpend)
+    let services = Object.values(serviceMap).sort((a, b) => b.totalSpend - a.totalSpend)
 
-    // ── 5. Provider-level summary ───────────────────────────────────
+    // ── 5. If no resources from DB, try live cloud provider APIs ────
+    if (resourcesResult.rows.length === 0 && accounts.length > 0) {
+      try {
+        const liveRecs = []
+
+        // AWS: Cost Explorer GetRightsizingRecommendation API
+        const awsAccounts = accounts.filter(a => a.provider_id === 'aws')
+        if (awsAccounts.length > 0 && (!providerId || providerId.toLowerCase() === 'aws')) {
+          for (const account of awsAccounts) {
+            try {
+              const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
+              if (!accountData) continue
+              let credentials = accountData.credentials || {}
+              if (accountData.connectionType?.startsWith('automated') && accountData.roleArn && accountData.externalId) {
+                const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+                const stsClient = new STSClient({ region: 'us-east-1' })
+                const assumeRes = await stsClient.send(new AssumeRoleCommand({
+                  RoleArn: accountData.roleArn,
+                  RoleSessionName: `costra-explorer-${account.id}-${Date.now()}`,
+                  ExternalId: accountData.externalId,
+                  DurationSeconds: 3600,
+                }))
+                if (assumeRes.Credentials) {
+                  credentials = {
+                    accessKeyId: assumeRes.Credentials.AccessKeyId,
+                    secretAccessKey: assumeRes.Credentials.SecretAccessKey,
+                    sessionToken: assumeRes.Credentials.SessionToken,
+                    region: 'us-east-1',
+                  }
+                }
+              }
+              if (!credentials?.accessKeyId || !credentials?.secretAccessKey) continue
+              const awsResult = await fetchAWSRightsizingRecommendations(credentials, {
+                linkedAccountId: account.aws_account_id || undefined,
+              })
+              for (const rec of (awsResult.recommendations || [])) {
+                liveRecs.push({ ...rec, providerId: 'aws', accountId: account.id, accountAlias: account.account_alias, awsAccountId: account.aws_account_id })
+              }
+            } catch (accErr) {
+              logger.warn('Rightsizing explorer: failed to fetch AWS recs for account', { accountId: account.id, error: accErr.message })
+            }
+          }
+        }
+
+        // Azure: Advisor Cost Recommendations API
+        const azureAccounts = accounts.filter(a => a.provider_id === 'azure')
+        if (azureAccounts.length > 0 && (!providerId || providerId.toLowerCase() === 'azure')) {
+          for (const account of azureAccounts) {
+            try {
+              const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
+              const creds = accountData?.credentials
+              if (creds?.tenantId && creds?.clientId && creds?.clientSecret && creds?.subscriptionId) {
+                const azureResult = await fetchAzureRightsizingRecommendations(creds)
+                for (const rec of (azureResult.recommendations || [])) {
+                  liveRecs.push({ ...rec, providerId: 'azure', accountId: account.id, accountAlias: account.account_alias })
+                }
+              }
+            } catch (accErr) {
+              logger.warn('Rightsizing explorer: failed to fetch Azure recs for account', { accountId: account.id, error: accErr.message })
+            }
+          }
+        }
+
+        // GCP: Recommender API
+        const gcpAccounts = accounts.filter(a => a.provider_id === 'gcp' || a.provider_id === 'google')
+        if (gcpAccounts.length > 0 && (!providerId || providerId.toLowerCase() === 'gcp' || providerId.toLowerCase() === 'google')) {
+          for (const account of gcpAccounts) {
+            try {
+              const accountData = await getCloudProviderCredentialsByAccountId(userId, account.id)
+              const creds = accountData?.credentials
+              if (creds && (creds.projectId || creds.serviceAccountKey)) {
+                const gcpResult = await fetchGCPRightsizingRecommendations(creds)
+                for (const rec of (gcpResult.recommendations || [])) {
+                  liveRecs.push({ ...rec, providerId: account.provider_id, accountId: account.id, accountAlias: account.account_alias })
+                }
+              }
+            } catch (accErr) {
+              logger.warn('Rightsizing explorer: failed to fetch GCP recs for account', { accountId: account.id, error: accErr.message })
+            }
+          }
+        }
+
+        // Convert live API recs into explorer format
+        if (liveRecs.length > 0) {
+          const liveServiceMap = {}
+          totalSpend = 0
+          for (const rec of liveRecs) {
+            const svc = rec.serviceName || 'Compute'
+            const cost = rec.currentCost || 0
+            totalSpend += cost
+            if (!liveServiceMap[svc]) {
+              liveServiceMap[svc] = { serviceName: svc, totalSpend: 0, resourceCount: 0, resources: [] }
+            }
+            liveServiceMap[svc].totalSpend += cost
+            liveServiceMap[svc].resourceCount += 1
+
+            const savings = rec.potentialSavings || 0
+            const newCost = Math.max(0, cost - savings)
+
+            liveServiceMap[svc].resources.push({
+              id: rec.resourceId,
+              resourceId: rec.resourceId,
+              resourceName: rec.resourceName || rec.resourceId,
+              resourceType: rec.resourceType || 'Instance',
+              serviceName: svc,
+              region: rec.region,
+              providerId: rec.providerId,
+              accountId: rec.accountId,
+              cost,
+              estimatedNewCost: newCost,
+              savingsPercent: rec.savingsPercent ? Math.round(rec.savingsPercent) : 0,
+              metadata: {
+                instanceType: rec.resourceType || null,
+                memory: null,
+                vcpus: null,
+                storageType: null,
+                sizeGib: null,
+                iops: null,
+                engine: null,
+                clusterId: null,
+                accountName: rec.accountAlias || null,
+                awsAccountId: rec.awsAccountId || null,
+              },
+              usageQuantity: rec.utilization?.cpuUtilization || 0,
+              usageUnit: '%',
+              lastSeen: new Date().toISOString().split('T')[0],
+              recommendations: [{
+                title: rec.recommendation === 'terminate'
+                  ? 'Terminate Instance'
+                  : `Downsize to ${rec.suggestedInstanceType || 'smaller instance'}`,
+                description: rec.reason,
+                action: rec.recommendation === 'terminate' ? 'Terminate' : 'Rightsize',
+                priority: rec.priority,
+                savings,
+                savingsPercent: rec.savingsPercent || 0,
+                confidence: rec.priority === 'high' ? 'high' : 'medium',
+                category: rec.recommendation === 'terminate' ? 'idle_resources' : 'rightsizing',
+                subcategory: rec.source || rec.providerId,
+                evidence: {
+                  instance_type: rec.resourceType,
+                  suggested_instance_type: rec.suggestedInstanceType,
+                  cpuUtilization: rec.utilization?.cpuUtilization,
+                  memoryUtilization: rec.utilization?.memoryUtilization,
+                },
+              }],
+              instanceOptions: rec.suggestedInstanceType ? [{
+                label: 'RECOMMENDED',
+                savings: rec.savingsPercent || 0,
+                costSavings: savings,
+                type: rec.suggestedInstanceType,
+                action: rec.recommendation === 'terminate' ? 'Terminate' : 'Rightsize',
+                risk: rec.priority === 'high' ? 1 : rec.priority === 'medium' ? 3 : 4,
+              }] : [],
+              storageOptions: [],
+            })
+          }
+          services = Object.values(liveServiceMap).sort((a, b) => b.totalSpend - a.totalSpend)
+        }
+      } catch (liveErr) {
+        logger.warn('Rightsizing explorer: live API fallback failed', { error: liveErr.message })
+      }
+    }
+
+    // ── 6. Provider-level summary ───────────────────────────────────
     const providerSummary = {}
     for (const acct of accounts) {
       const pid = acct.provider_id
@@ -1361,11 +1524,13 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
       }
     }
 
+    const totalResources = services.reduce((sum, s) => sum + s.resourceCount, 0)
+
     res.json({
       data: {
         services,
         totalSpend,
-        totalResources: resourcesResult.rows.length,
+        totalResources,
         providers: Object.values(providerSummary),
       },
     })
