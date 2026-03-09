@@ -10,7 +10,8 @@ import {
 } from 'recharts'
 import {
   Search, Filter, ChevronRight, Server, Database, HardDrive,
-  Cpu, MemoryStick, Activity, Info, Shield, X,
+  Cpu, MemoryStick, Activity, Info, Shield, X, AlertTriangle,
+  ExternalLink,
 } from 'lucide-react'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -150,6 +151,10 @@ export default function RightsizingPage() {
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
+  // Setup hints (returned when provider needs configuration)
+  const [setupHints, setSetupHints] = useState<any[]>([])
+  const [showSetupDialog, setShowSetupDialog] = useState(false)
+
   // Utilization data
   const [utilData, setUtilData] = useState<UtilData | null>(null)
   const [utilLoading, setUtilLoading] = useState(false)
@@ -185,6 +190,7 @@ export default function RightsizingPage() {
       const result = await insightsAPI.getRightsizingExplorer(selectedProvider)
       const data = result.data || {}
       setServices(data.services || [])
+      setSetupHints(data.setupHints || [])
 
       // Auto-select first service
       if (data.services?.length > 0 && !selectedService) {
@@ -394,7 +400,16 @@ export default function RightsizingPage() {
                   {filteredResources.length === 0 && (
                     <tr>
                       <td colSpan={2} className="text-center py-8 text-gray-400">
-                        No resources found
+                        {setupHints.length > 0 ? (
+                          <button
+                            onClick={() => setShowSetupDialog(true)}
+                            className="text-blue-600 hover:text-blue-700 underline underline-offset-2 text-xs"
+                          >
+                            Setup required — click for details
+                          </button>
+                        ) : (
+                          'No resources found'
+                        )}
                       </td>
                     </tr>
                   )}
@@ -405,7 +420,21 @@ export default function RightsizingPage() {
 
           {/* ─── RIGHT PANEL: Resource Detail ─────────────────── */}
           <div className="flex-1 overflow-y-auto">
-            {!selectedResource ? (
+            {!selectedResource && setupHints.length > 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-16 px-8">
+                <AlertTriangle className="w-12 h-12 mb-4 text-amber-400" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Setup Required</h3>
+                <p className="text-sm text-gray-500 mb-6 text-center max-w-md">
+                  Your cloud provider needs additional configuration before rightsizing recommendations can be generated.
+                </p>
+                <button
+                  onClick={() => setShowSetupDialog(true)}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  View Setup Instructions
+                </button>
+              </div>
+            ) : !selectedResource ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
                 <Server className="w-12 h-12 mb-3 text-gray-300" />
                 <p className="text-sm font-medium">Select a resource to view recommendations</p>
@@ -422,6 +451,75 @@ export default function RightsizingPage() {
                 onClose={() => setSelectedResource(null)}
               />
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Setup Instructions Dialog ──────────────────────────── */}
+      {showSetupDialog && setupHints.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowSetupDialog(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-semibold text-gray-900">Setup Required</h2>
+              </div>
+              <button onClick={() => setShowSetupDialog(false)} className="p-1 rounded-md hover:bg-gray-100 text-gray-400">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-6">
+              {setupHints.map((hint, i) => (
+                <div key={i}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ProviderIcon providerId={hint.provider} className="w-5 h-5" />
+                    <h3 className="text-sm font-bold text-gray-900">{hint.title}</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">{hint.message}</p>
+                  {hint.steps && hint.steps.length > 0 && (
+                    <ol className="space-y-2">
+                      {hint.steps.map((step: string, j: number) => (
+                        <li key={j} className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mt-0.5">
+                            {j + 1}
+                          </span>
+                          <span className="text-sm text-gray-700">{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {hint.provider === 'aws' && hint.type === 'opt_in_required' && (
+                    <a
+                      href="https://console.aws.amazon.com/cost-management/home#/settings"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors"
+                    >
+                      Open AWS Cost Explorer Preferences
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              ))}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-1">After enabling, allow up to 24 hours</p>
+                  <p className="text-blue-600">
+                    AWS needs time to analyze your EC2 instance utilization patterns and generate rightsizing recommendations.
+                    Come back to this page after enabling the feature.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowSetupDialog(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Got it
+              </button>
+            </div>
           </div>
         </div>
       )}

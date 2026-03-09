@@ -1344,6 +1344,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
     let services = Object.values(serviceMap).sort((a, b) => b.totalSpend - a.totalSpend)
 
     // ── 5. If no resources from DB, try live cloud provider APIs ────
+    const setupHints = []
     if (resourcesResult.rows.length === 0 && accounts.length > 0) {
       try {
         const liveRecs = []
@@ -1383,6 +1384,23 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
               }
             } catch (accErr) {
               logger.warn('Rightsizing explorer: failed to fetch AWS recs for account', { accountId: account.id, error: accErr.message })
+              if (accErr.message && accErr.message.includes('opt-in')) {
+                setupHints.push({
+                  provider: 'aws',
+                  type: 'opt_in_required',
+                  title: 'EC2 Rightsizing Recommendations Not Enabled',
+                  message: 'You need to enable EC2 rightsizing recommendations in your AWS account.',
+                  steps: [
+                    'Sign in to your AWS Management Console (payer/management account)',
+                    'Go to AWS Cost Explorer → Preferences (left sidebar)',
+                    'Check "Receive Amazon EC2 resource rightsizing recommendations"',
+                    'Click Save preferences',
+                    'Wait up to 24 hours for AWS to generate recommendations',
+                  ],
+                })
+              } else if (accErr.message) {
+                setupHints.push({ provider: 'aws', type: 'error', title: 'AWS Rightsizing Error', message: accErr.message, steps: [] })
+              }
             }
           }
         }
@@ -1402,6 +1420,9 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
               }
             } catch (accErr) {
               logger.warn('Rightsizing explorer: failed to fetch Azure recs for account', { accountId: account.id, error: accErr.message })
+              if (accErr.message) {
+                setupHints.push({ provider: 'azure', type: 'error', title: 'Azure Advisor Error', message: accErr.message, steps: [] })
+              }
             }
           }
         }
@@ -1421,6 +1442,9 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
               }
             } catch (accErr) {
               logger.warn('Rightsizing explorer: failed to fetch GCP recs for account', { accountId: account.id, error: accErr.message })
+              if (accErr.message) {
+                setupHints.push({ provider: 'gcp', type: 'error', title: 'GCP Recommender Error', message: accErr.message, steps: [] })
+              }
             }
           }
         }
@@ -1532,6 +1556,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
         totalSpend,
         totalResources,
         providers: Object.values(providerSummary),
+        setupHints: setupHints.length > 0 ? setupHints : undefined,
       },
     })
   } catch (error) {
