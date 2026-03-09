@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { insightsAPI } from '../services/api'
+import { insightsAPI, cloudProvidersAPI } from '../services/api'
 import { useCurrency } from '../contexts/CurrencyContext'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
@@ -93,13 +93,18 @@ interface UtilData {
   iops: UtilPoint[]
 }
 
-// ─── Provider tabs ──────────────────────────────────────────────────
+// ─── Provider label map ─────────────────────────────────────────────
 
-const PROVIDERS = [
-  { id: 'aws', label: 'AWS' },
-  { id: 'azure', label: 'Azure' },
-  { id: 'gcp', label: 'GCP' },
-]
+const PROVIDER_LABELS: Record<string, string> = {
+  aws: 'AWS',
+  azure: 'Azure',
+  gcp: 'GCP',
+  linode: 'Linode',
+  digitalocean: 'DigitalOcean',
+  vultr: 'Vultr',
+  ibm: 'IBM Cloud',
+  oci: 'OCI',
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -138,8 +143,9 @@ export default function RightsizingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Selection state
-  const [selectedProvider, setSelectedProvider] = useState('aws')
+  // Connected providers (fetched from API)
+  const [connectedProviders, setConnectedProviders] = useState<{ id: string; label: string }[]>([])
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
   const [selectedService, setSelectedService] = useState<string | null>(null)
   const [selectedResource, setSelectedResource] = useState<Resource | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -148,8 +154,31 @@ export default function RightsizingPage() {
   const [utilData, setUtilData] = useState<UtilData | null>(null)
   const [utilLoading, setUtilLoading] = useState(false)
 
+  // ── Fetch connected cloud providers on mount ──────────────────────
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        const result = await cloudProvidersAPI.getCloudProviders()
+        const accounts = result.accounts || result.providers || []
+        const uniqueIds = [...new Set(accounts.map((a: any) => a.provider_id || a.providerId))] as string[]
+        const providers = uniqueIds.map(id => ({
+          id,
+          label: PROVIDER_LABELS[id] || id.charAt(0).toUpperCase() + id.slice(1),
+        }))
+        setConnectedProviders(providers)
+        if (providers.length > 0 && !selectedProvider) {
+          setSelectedProvider(providers[0].id)
+        }
+      } catch {
+        // Fallback: show nothing until provider data loads
+      }
+    }
+    fetchProviders()
+  }, [])
+
   // ── Fetch explorer data ───────────────────────────────────────────
   const fetchData = useCallback(async () => {
+    if (!selectedProvider) return
     setIsLoading(true)
     setError(null)
     try {
@@ -233,25 +262,21 @@ export default function RightsizingPage() {
         </p>
       </div>
 
-      {isLoading ? (
+      {connectedProviders.length === 0 && !isLoading ? (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <Server className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">No cloud providers connected</h2>
+          <p className="text-sm text-gray-500 max-w-md mx-auto">
+            Connect at least one cloud provider in Settings → Cloud Providers to see rightsizing recommendations.
+          </p>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Spinner className="h-8 w-8" />
         </div>
       ) : error ? (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
           {error}
-        </div>
-      ) : services.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
-          <Server className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">No resource data available</h2>
-          <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
-            Rightsizing recommendations require resource-level data from your cloud providers.
-            Make sure you have connected at least one cloud account and synced cost data.
-          </p>
-          <p className="text-xs text-gray-400">
-            Try switching providers above, or check Settings → Cloud Providers to verify your connections.
-          </p>
         </div>
       ) : (
         <div className="flex gap-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" style={{ minHeight: 'calc(100vh - 220px)' }}>
@@ -261,7 +286,7 @@ export default function RightsizingPage() {
             <div className="border-b border-gray-200">
               <div className="flex px-4 pt-3 pb-0">
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-wider mr-3 py-2">Explorer</span>
-                {PROVIDERS.map(p => (
+                {connectedProviders.map(p => (
                   <button
                     key={p.id}
                     onClick={() => setSelectedProvider(p.id)}
