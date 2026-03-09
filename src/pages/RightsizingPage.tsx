@@ -107,6 +107,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   oci: 'OCI',
 }
 
+// Providers that support rightsizing recommendations
+const RIGHTSIZING_PROVIDERS = new Set(['aws', 'azure', 'gcp'])
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 const SERVICE_ICONS: Record<string, typeof Server> = {
@@ -165,7 +168,8 @@ export default function RightsizingPage() {
       try {
         const result = await cloudProvidersAPI.getCloudProviders()
         const accounts = result.accounts || result.providers || []
-        const uniqueIds = [...new Set(accounts.map((a: any) => a.provider_id || a.providerId))] as string[]
+        const uniqueIds = ([...new Set(accounts.map((a: any) => a.provider_id || a.providerId))] as string[])
+          .filter(id => RIGHTSIZING_PROVIDERS.has(id))
         const providers = uniqueIds.map(id => ({
           id,
           label: PROVIDER_LABELS[id] || id.charAt(0).toUpperCase() + id.slice(1),

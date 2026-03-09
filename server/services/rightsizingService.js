@@ -225,14 +225,39 @@ export const fetchCloudWatchRightsizing = async (credentials, options = {}) => {
 
   for (const inst of instances) {
     const metrics = metricsMap.get(inst.instanceId)
-    if (!metrics || metrics.dataPoints < 24) continue // Need at least 24 data points (1 day)
-
     const catalog = EC2_CATALOG[inst.instanceType]
     const currentPrice = catalog?.price || 0
     const currentMonthlyCost = currentPrice * 730
 
-    // Skip if we can't find pricing
-    if (currentMonthlyCost <= 0) continue
+    // If we have no metrics or no pricing, still show the instance as right-sized
+    if (!metrics || metrics.dataPoints < 24 || currentMonthlyCost <= 0) {
+      allRecs.push({
+        resourceId: inst.instanceId,
+        resourceName: inst.name,
+        serviceName: 'Amazon EC2',
+        resourceType: inst.instanceType,
+        region: inst.region,
+        currentCost: currentMonthlyCost,
+        utilization: {
+          estimated: metrics?.cpuAvg || 0,
+          cpuUtilization: metrics?.cpuAvg ?? null,
+          cpuMax: metrics?.cpuMax ?? null,
+          cpuP95: metrics?.cpuP95 ?? null,
+          memoryUtilization: null,
+        },
+        recommendation: 'right-sized',
+        potentialSavings: 0,
+        savingsPercent: 0,
+        priority: 'none',
+        reason: !metrics || metrics.dataPoints < 24
+          ? 'Insufficient CloudWatch data (less than 24 hours). Check back later.'
+          : 'Instance type not in pricing catalog.',
+        suggestedInstanceType: null,
+        findingReasonCodes: ['INSUFFICIENT_DATA'],
+        source: 'cloudwatch',
+      })
+      continue
+    }
 
     const cpuMax = metrics.cpuMax
     const cpuAvg = metrics.cpuAvg
@@ -343,6 +368,38 @@ export const fetchCloudWatchRightsizing = async (credentials, options = {}) => {
         }
       }
     }
+  }
+
+  // Add right-sized entries for instances with no recommendations
+  const recIds = new Set(allRecs.map(r => r.resourceId))
+  for (const inst of instances) {
+    if (recIds.has(inst.instanceId)) continue
+    const metrics = metricsMap.get(inst.instanceId)
+    const catalog = EC2_CATALOG[inst.instanceType]
+    const currentPrice = catalog?.price || 0
+    allRecs.push({
+      resourceId: inst.instanceId,
+      resourceName: inst.name,
+      serviceName: 'Amazon EC2',
+      resourceType: inst.instanceType,
+      region: inst.region,
+      currentCost: currentPrice * 730,
+      utilization: {
+        estimated: metrics?.cpuAvg || 0,
+        cpuUtilization: metrics?.cpuAvg ?? null,
+        cpuMax: metrics?.cpuMax ?? null,
+        cpuP95: metrics?.cpuP95 ?? null,
+        memoryUtilization: null,
+      },
+      recommendation: 'right-sized',
+      potentialSavings: 0,
+      savingsPercent: 0,
+      priority: 'none',
+      reason: 'Instance is properly sized based on CPU utilization over the last 14 days.',
+      suggestedInstanceType: null,
+      findingReasonCodes: ['RIGHT_SIZED'],
+      source: 'cloudwatch',
+    })
   }
 
   // Deduplicate: if same instance has both downsize + old-gen, keep the one with higher savings
