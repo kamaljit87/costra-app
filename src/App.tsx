@@ -50,6 +50,7 @@ const TerraformPage = lazy(() => import('./pages/TerraformPage'))
 const SaaSPage = lazy(() => import('./pages/SaaSPage'))
 const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
 const BillAnalyzerPage = lazy(() => import('./pages/BillAnalyzerPage'))
+const RightsizingPage = lazy(() => import('./pages/RightsizingPage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -212,6 +213,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <RecommendationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rightsizing"
+              element={
+                <ProtectedRoute>
+                  <RightsizingPage />
                 </ProtectedRoute>
               }
             />

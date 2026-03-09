@@ -1176,4 +1176,275 @@ router.put('/anomalies/events/:id/status', authenticateToken, async (req, res) =
   }
 })
 
+/**
+ * GET /api/insights/rightsizing-explorer
+ * Returns resources grouped by service with detailed metadata for the
+ * Rightsizing Explorer page.  Each resource includes instance/storage
+ * recommendations and (where available) utilization time-series data.
+ */
+router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const { providerId, accountId, service } = req.query
+    const parsedAccountId = accountId ? parseInt(accountId, 10) : null
+
+    // ── 1. Fetch cloud accounts for this user + provider ────────────
+    const accountQuery = `
+      SELECT id, provider_id, account_name, credentials->>'accountId' AS aws_account_id
+      FROM cloud_provider_credentials
+      WHERE user_id = $1 AND is_active = true
+      ${providerId ? "AND provider_id = $2" : ''}
+      ORDER BY created_at ASC
+    `
+    const accountParams = [userId]
+    if (providerId) accountParams.push(providerId.toLowerCase())
+    const accountsResult = await pool.query(accountQuery, accountParams)
+    const accounts = accountsResult.rows
+
+    // ── 2. Fetch resources with cost / usage data ───────────────────
+    let resourceQuery = `
+      SELECT
+        r.id, r.resource_id, r.resource_name, r.resource_type,
+        r.service_name, r.region, r.cost, r.usage_quantity, r.usage_unit,
+        r.usage_type, r.last_seen_date, r.provider_id, r.account_id,
+        r.metadata
+      FROM resources r
+      WHERE r.user_id = $1
+        AND r.cost > 0
+      ${providerId ? `AND r.provider_id = $${accountParams.length}` : ''}
+      ${parsedAccountId ? `AND r.account_id = $${accountParams.length + 1}` : ''}
+      ${service ? `AND LOWER(r.service_name) LIKE $${accountParams.length + (parsedAccountId ? 2 : 1)}` : ''}
+      ORDER BY r.cost DESC
+      LIMIT 500
+    `
+    const rParams = [userId]
+    if (providerId) rParams.push(providerId.toLowerCase())
+    if (parsedAccountId) rParams.push(parsedAccountId)
+    if (service) rParams.push(`%${service.toLowerCase()}%`)
+    const resourcesResult = await pool.query(resourceQuery, rParams)
+
+    // ── 3. Fetch existing optimization recommendations for these resources
+    const recQuery = `
+      SELECT resource_id, title, description, action, priority,
+             estimated_monthly_savings, estimated_savings_percent,
+             confidence, current_cost, evidence, category, subcategory,
+             service_name, resource_type
+      FROM optimization_recommendations
+      WHERE user_id = $1 AND status = 'active'
+        AND category IN ('rightsizing', 'idle_resources', 'storage_optimization')
+      ${providerId ? `AND provider_id = $2` : ''}
+      ORDER BY estimated_monthly_savings DESC
+    `
+    const recParams = [userId]
+    if (providerId) recParams.push(providerId.toLowerCase())
+    const recsResult = await pool.query(recQuery, recParams)
+
+    // Index recommendations by resource_id for fast lookup
+    const recsByResource = {}
+    for (const rec of recsResult.rows) {
+      const rid = rec.resource_id
+      if (!recsByResource[rid]) recsByResource[rid] = []
+      recsByResource[rid].push({
+        title: rec.title,
+        description: rec.description,
+        action: rec.action,
+        priority: rec.priority,
+        savings: parseFloat(rec.estimated_monthly_savings) || 0,
+        savingsPercent: parseFloat(rec.estimated_savings_percent) || 0,
+        confidence: rec.confidence,
+        category: rec.category,
+        subcategory: rec.subcategory,
+        evidence: rec.evidence || {},
+      })
+    }
+
+    // ── 4. Group resources by service ───────────────────────────────
+    const serviceMap = {}
+    let totalSpend = 0
+
+    for (const row of resourcesResult.rows) {
+      const svc = row.service_name || 'Other'
+      const cost = parseFloat(row.cost) || 0
+      totalSpend += cost
+
+      if (!serviceMap[svc]) {
+        serviceMap[svc] = { serviceName: svc, totalSpend: 0, resourceCount: 0, resources: [] }
+      }
+      serviceMap[svc].totalSpend += cost
+      serviceMap[svc].resourceCount += 1
+
+      const meta = row.metadata || {}
+      const recs = recsByResource[row.resource_id] || []
+
+      // Build instance recommendation options from evidence
+      const instanceOptions = []
+      const storageOptions = []
+      for (const rec of recs) {
+        const ev = rec.evidence || {}
+        if (rec.category === 'storage_optimization') {
+          storageOptions.push({
+            label: 'RECOMMENDED',
+            savings: rec.savingsPercent,
+            costSavings: rec.savings,
+            type: ev.suggested_type || ev.recommended_type || 'gp3',
+            sizeGib: ev.suggested_size || meta.sizeGib || null,
+            iops: ev.suggested_iops || null,
+            action: rec.action || 'Rightsize',
+            risk: rec.confidence === 'high' ? 1 : rec.confidence === 'medium' ? 3 : 4,
+          })
+        } else {
+          instanceOptions.push({
+            label: recs.indexOf(rec) === 0 ? 'RECOMMENDED' : null,
+            savings: rec.savingsPercent,
+            costSavings: rec.savings,
+            type: ev.suggested_instance_type || ev.recommendedType || null,
+            action: rec.action || 'Rightsize',
+            risk: rec.confidence === 'high' ? 1 : rec.confidence === 'medium' ? 3 : 4,
+          })
+        }
+      }
+
+      const totalSavings = recs.reduce((s, r) => s + r.savings, 0)
+      const estimatedNewCost = cost - totalSavings
+
+      serviceMap[svc].resources.push({
+        id: row.id,
+        resourceId: row.resource_id,
+        resourceName: row.resource_name || row.resource_id,
+        resourceType: row.resource_type,
+        serviceName: svc,
+        region: row.region,
+        providerId: row.provider_id,
+        accountId: row.account_id,
+        cost,
+        estimatedNewCost: Math.max(0, estimatedNewCost),
+        savingsPercent: cost > 0 ? Math.round((totalSavings / cost) * 100) : 0,
+        metadata: {
+          instanceType: meta.instanceType || row.resource_type || null,
+          memory: meta.memory || null,
+          vcpus: meta.vcpus || null,
+          storageType: meta.storageType || null,
+          sizeGib: meta.sizeGib || null,
+          iops: meta.iops || null,
+          engine: meta.engine || null,
+          clusterId: meta.clusterId || null,
+          accountName: accounts.find(a => a.id === row.account_id)?.account_name || null,
+          awsAccountId: accounts.find(a => a.id === row.account_id)?.aws_account_id || null,
+        },
+        usageQuantity: parseFloat(row.usage_quantity) || 0,
+        usageUnit: row.usage_unit,
+        lastSeen: row.last_seen_date,
+        recommendations: recs,
+        instanceOptions,
+        storageOptions,
+      })
+    }
+
+    // Sort services by total spend descending
+    const services = Object.values(serviceMap).sort((a, b) => b.totalSpend - a.totalSpend)
+
+    // ── 5. Provider-level summary ───────────────────────────────────
+    const providerSummary = {}
+    for (const acct of accounts) {
+      const pid = acct.provider_id
+      if (!providerSummary[pid]) {
+        providerSummary[pid] = { providerId: pid, accountCount: 0, totalSpend: 0, resourceCount: 0 }
+      }
+      providerSummary[pid].accountCount += 1
+    }
+    for (const svc of services) {
+      for (const r of svc.resources) {
+        if (providerSummary[r.providerId]) {
+          providerSummary[r.providerId].totalSpend += r.cost
+          providerSummary[r.providerId].resourceCount += 1
+        }
+      }
+    }
+
+    res.json({
+      data: {
+        services,
+        totalSpend,
+        totalResources: resourcesResult.rows.length,
+        providers: Object.values(providerSummary),
+      },
+    })
+  } catch (error) {
+    logger.error('Rightsizing explorer error', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack,
+    })
+    res.status(500).json({ error: 'Failed to fetch rightsizing explorer data' })
+  }
+})
+
+/**
+ * GET /api/insights/resource-utilization/:resourceId
+ * Returns utilization time-series for a specific resource (CPU, Memory, Storage, IOPS).
+ * Uses CloudWatch for AWS, Azure Monitor for Azure, Cloud Monitoring for GCP.
+ * Falls back to service_usage_metrics table data.
+ */
+router.get('/resource-utilization/:resourceId', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const { resourceId } = req.params
+    const { days = 10 } = req.query
+    const lookbackDays = Math.min(parseInt(days, 10) || 10, 90)
+
+    // Fetch available metrics from service_usage_metrics table
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - lookbackDays)
+
+    const metricsResult = await pool.query(`
+      SELECT metric_name, metric_value, metric_unit, recorded_at
+      FROM service_usage_metrics
+      WHERE user_id = $1
+        AND resource_id = $2
+        AND recorded_at >= $3
+      ORDER BY recorded_at ASC
+    `, [userId, resourceId, startDate.toISOString()])
+
+    // Group metrics by type
+    const metricSeries = {}
+    for (const row of metricsResult.rows) {
+      const name = row.metric_name || 'unknown'
+      if (!metricSeries[name]) metricSeries[name] = []
+      metricSeries[name].push({
+        timestamp: row.recorded_at,
+        value: parseFloat(row.metric_value) || 0,
+        unit: row.metric_unit,
+      })
+    }
+
+    // Normalize to standard chart series (cpu, memory, storage, iops)
+    const normalize = (keys) => {
+      for (const k of keys) {
+        const match = Object.keys(metricSeries).find(m => m.toLowerCase().includes(k))
+        if (match) return metricSeries[match]
+      }
+      return []
+    }
+
+    res.json({
+      data: {
+        resourceId,
+        lookbackDays,
+        cpu: normalize(['cpu', 'processor', 'compute']),
+        memory: normalize(['memory', 'mem', 'ram']),
+        storage: normalize(['storage', 'disk', 'volume', 'ebs']),
+        iops: normalize(['iops', 'io', 'operations']),
+        raw: metricSeries,
+      },
+    })
+  } catch (error) {
+    logger.error('Resource utilization error', {
+      userId: req.user?.userId || req.user?.id,
+      resourceId: req.params.resourceId,
+      error: error.message,
+    })
+    res.status(500).json({ error: 'Failed to fetch resource utilization data' })
+  }
+})
+
 export default router

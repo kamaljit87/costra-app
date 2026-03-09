@@ -861,6 +861,24 @@ export const insightsAPI = {
     return response.json()
   },
 
+  getRightsizingExplorer: async (providerId?: string, accountId?: number, service?: string) => {
+    const params = new URLSearchParams()
+    if (providerId) params.append('providerId', providerId)
+    if (accountId) params.append('accountId', accountId.toString())
+    if (service) params.append('service', service)
+
+    const response = await apiRequest(`/insights/rightsizing-explorer?${params.toString()}`)
+    return response.json()
+  },
+
+  getResourceUtilization: async (resourceId: string, days?: number) => {
+    const params = new URLSearchParams()
+    if (days) params.append('days', days.toString())
+
+    const response = await apiRequest(`/insights/resource-utilization/${encodeURIComponent(resourceId)}?${params.toString()}`)
+    return response.json()
+  },
+
   getOptimizationRecommendations: async (filters?: {
     category?: string; provider_id?: string; account_id?: string; priority?: string;
     status?: string; limit?: number; offset?: number; sort_by?: string;
