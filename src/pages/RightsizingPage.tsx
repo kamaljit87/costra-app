@@ -241,6 +241,18 @@ export default function RightsizingPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
           {error}
         </div>
+      ) : services.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <Server className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">No resource data available</h2>
+          <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
+            Rightsizing recommendations require resource-level data from your cloud providers.
+            Make sure you have connected at least one cloud account and synced cost data.
+          </p>
+          <p className="text-xs text-gray-400">
+            Try switching providers above, or check Settings → Cloud Providers to verify your connections.
+          </p>
+        </div>
       ) : (
         <div className="flex gap-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden" style={{ minHeight: 'calc(100vh - 220px)' }}>
           {/* ─── LEFT PANEL: Service Explorer ─────────────────── */}

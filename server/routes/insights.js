@@ -1190,7 +1190,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
 
     // ── 1. Fetch cloud accounts for this user + provider ────────────
     const accountQuery = `
-      SELECT id, provider_id, account_name, credentials->>'accountId' AS aws_account_id
+      SELECT id, provider_id, account_alias, aws_account_id
       FROM cloud_provider_credentials
       WHERE user_id = $1 AND is_active = true
       ${providerId ? "AND provider_id = $2" : ''}
@@ -1206,8 +1206,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
       SELECT
         r.id, r.resource_id, r.resource_name, r.resource_type,
         r.service_name, r.region, r.cost, r.usage_quantity, r.usage_unit,
-        r.usage_type, r.last_seen_date, r.provider_id, r.account_id,
-        r.metadata
+        r.usage_type, r.last_seen_date, r.provider_id, r.account_id
       FROM resources r
       WHERE r.user_id = $1
         AND r.cost > 0
@@ -1273,8 +1272,9 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
       serviceMap[svc].totalSpend += cost
       serviceMap[svc].resourceCount += 1
 
-      const meta = row.metadata || {}
       const recs = recsByResource[row.resource_id] || []
+      // Extract metadata from recommendation evidence if available
+      const firstEvidence = recs.length > 0 ? (recs[0].evidence || {}) : {}
 
       // Build instance recommendation options from evidence
       const instanceOptions = []
@@ -1287,7 +1287,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
             savings: rec.savingsPercent,
             costSavings: rec.savings,
             type: ev.suggested_type || ev.recommended_type || 'gp3',
-            sizeGib: ev.suggested_size || meta.sizeGib || null,
+            sizeGib: ev.suggested_size || ev.size_gb || null,
             iops: ev.suggested_iops || null,
             action: rec.action || 'Rightsize',
             risk: rec.confidence === 'high' ? 1 : rec.confidence === 'medium' ? 3 : 4,
@@ -1320,15 +1320,15 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
         estimatedNewCost: Math.max(0, estimatedNewCost),
         savingsPercent: cost > 0 ? Math.round((totalSavings / cost) * 100) : 0,
         metadata: {
-          instanceType: meta.instanceType || row.resource_type || null,
-          memory: meta.memory || null,
-          vcpus: meta.vcpus || null,
-          storageType: meta.storageType || null,
-          sizeGib: meta.sizeGib || null,
-          iops: meta.iops || null,
-          engine: meta.engine || null,
-          clusterId: meta.clusterId || null,
-          accountName: accounts.find(a => a.id === row.account_id)?.account_name || null,
+          instanceType: firstEvidence.instance_type || row.resource_type || null,
+          memory: firstEvidence.memory_gb ? `${firstEvidence.memory_gb} GiB` : null,
+          vcpus: firstEvidence.vcpus || null,
+          storageType: firstEvidence.storage_type || firstEvidence.volume_type || null,
+          sizeGib: firstEvidence.size_gb || null,
+          iops: firstEvidence.iops || null,
+          engine: firstEvidence.engine || null,
+          clusterId: firstEvidence.cluster_id || null,
+          accountName: accounts.find(a => a.id === row.account_id)?.account_alias || null,
           awsAccountId: accounts.find(a => a.id === row.account_id)?.aws_account_id || null,
         },
         usageQuantity: parseFloat(row.usage_quantity) || 0,
@@ -1382,59 +1382,25 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
 /**
  * GET /api/insights/resource-utilization/:resourceId
  * Returns utilization time-series for a specific resource (CPU, Memory, Storage, IOPS).
- * Uses CloudWatch for AWS, Azure Monitor for Azure, Cloud Monitoring for GCP.
- * Falls back to service_usage_metrics table data.
+ * Currently returns empty series - resource-level metrics collection can be added later
+ * via CloudWatch / Azure Monitor / Cloud Monitoring integration.
  */
 router.get('/resource-utilization/:resourceId', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId || req.user.id
     const { resourceId } = req.params
     const { days = 10 } = req.query
     const lookbackDays = Math.min(parseInt(days, 10) || 10, 90)
 
-    // Fetch available metrics from service_usage_metrics table
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - lookbackDays)
-
-    const metricsResult = await pool.query(`
-      SELECT metric_name, metric_value, metric_unit, recorded_at
-      FROM service_usage_metrics
-      WHERE user_id = $1
-        AND resource_id = $2
-        AND recorded_at >= $3
-      ORDER BY recorded_at ASC
-    `, [userId, resourceId, startDate.toISOString()])
-
-    // Group metrics by type
-    const metricSeries = {}
-    for (const row of metricsResult.rows) {
-      const name = row.metric_name || 'unknown'
-      if (!metricSeries[name]) metricSeries[name] = []
-      metricSeries[name].push({
-        timestamp: row.recorded_at,
-        value: parseFloat(row.metric_value) || 0,
-        unit: row.metric_unit,
-      })
-    }
-
-    // Normalize to standard chart series (cpu, memory, storage, iops)
-    const normalize = (keys) => {
-      for (const k of keys) {
-        const match = Object.keys(metricSeries).find(m => m.toLowerCase().includes(k))
-        if (match) return metricSeries[match]
-      }
-      return []
-    }
-
+    // Resource-level utilization metrics are not yet collected.
+    // Return empty series so the frontend renders "No data" gracefully.
     res.json({
       data: {
         resourceId,
         lookbackDays,
-        cpu: normalize(['cpu', 'processor', 'compute']),
-        memory: normalize(['memory', 'mem', 'ram']),
-        storage: normalize(['storage', 'disk', 'volume', 'ebs']),
-        iops: normalize(['iops', 'io', 'operations']),
-        raw: metricSeries,
+        cpu: [],
+        memory: [],
+        storage: [],
+        iops: [],
       },
     })
   } catch (error) {
