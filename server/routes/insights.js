@@ -408,15 +408,13 @@ router.get('/cost-by-dimension', authenticateToken, async (req, res) => {
     
     res.json({ data })
   } catch (error) {
-    logger.error('Cost by dimension error', { 
-      userId: req.user?.id, 
-      dimension, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Cost by dimension error', {
+      userId: req.user?.userId || req.user?.id,
+      dimensionKey: req.query?.dimensionKey,
+      providerId: req.query?.providerId,
+      accountId: req.query?.accountId,
+      error: error.message,
+      stack: error.stack
     })
     res.status(500).json({ error: 'Failed to fetch cost by dimension' })
   }
@@ -834,16 +832,12 @@ router.get('/cost-by-product', authenticateToken, async (req, res) => {
     
     res.json({ products })
   } catch (error) {
-    logger.error('Cost by product error', { 
-      userId: req.user?.id, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Cost by product error', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack
     })
-    res.json({ products: [] })
+    res.status(500).json({ error: 'Failed to fetch cost by product' })
   }
 })
 
@@ -870,16 +864,12 @@ router.get('/cost-by-team', authenticateToken, async (req, res) => {
     
     res.json({ teams })
   } catch (error) {
-    logger.error('Cost by team error', { 
-      userId: req.user?.id, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Cost by team error', {
+      userId: req.user?.userId || req.user?.id,
+      error: error.message,
+      stack: error.stack
     })
-    res.json({ teams: [] })
+    res.status(500).json({ error: 'Failed to fetch cost by team' })
   }
 })
 
@@ -908,17 +898,13 @@ router.get('/product/:productName/trends', authenticateToken, async (req, res) =
     
     res.json({ trends })
   } catch (error) {
-    logger.error('Product trends error', { 
-      userId: req.user?.id, 
-      productName, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Product trends error', {
+      userId: req.user?.userId || req.user?.id,
+      productName: req.params?.productName,
+      error: error.message,
+      stack: error.stack
     })
-    res.json({ trends: [] })
+    res.status(500).json({ error: 'Failed to fetch product trends' })
   }
 })
 
@@ -947,17 +933,13 @@ router.get('/team/:teamName/trends', authenticateToken, async (req, res) => {
     
     res.json({ trends })
   } catch (error) {
-    logger.error('Team trends error', { 
-      userId: req.user?.id, 
-      teamName, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Team trends error', {
+      userId: req.user?.userId || req.user?.id,
+      teamName: req.params?.teamName,
+      error: error.message,
+      stack: error.stack
     })
-    res.json({ trends: [] })
+    res.status(500).json({ error: 'Failed to fetch team trends' })
   }
 })
 
@@ -986,17 +968,13 @@ router.get('/product/:productName/services', authenticateToken, async (req, res)
     
     res.json({ services })
   } catch (error) {
-    logger.error('Product service breakdown error', { 
-      userId: req.user?.id, 
-      productName, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Product service breakdown error', {
+      userId: req.user?.userId || req.user?.id,
+      productName: req.params?.productName,
+      error: error.message,
+      stack: error.stack
     })
-    res.json({ services: [] })
+    res.status(500).json({ error: 'Failed to fetch product service breakdown' })
   }
 })
 
@@ -1025,17 +1003,13 @@ router.get('/team/:teamName/services', authenticateToken, async (req, res) => {
     
     res.json({ services })
   } catch (error) {
-    logger.error('Team service breakdown error', { 
-      userId: req.user?.id, 
-      teamName, 
-      startDate, 
-      endDate, 
-      providerId, 
-      accountId, 
-      error: error.message, 
-      stack: error.stack 
+    logger.error('Team service breakdown error', {
+      userId: req.user?.userId || req.user?.id,
+      teamName: req.params?.teamName,
+      error: error.message,
+      stack: error.stack
     })
-    res.json({ services: [] })
+    res.status(500).json({ error: 'Failed to fetch team service breakdown' })
   }
 })
 

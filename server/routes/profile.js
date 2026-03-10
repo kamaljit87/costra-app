@@ -21,6 +21,16 @@ const __dirname = path.dirname(__filename)
 
 const router = express.Router()
 
+const serverRoot = path.resolve(__dirname, '..')
+
+/** Resolve an avatar DB path to a safe filesystem path, or null if it escapes the server root */
+function safeAvatarPath(avatarUrl) {
+  const relative = avatarUrl.replace('/api/', '')
+  const resolved = path.resolve(serverRoot, relative)
+  if (!resolved.startsWith(serverRoot + path.sep)) return null
+  return resolved
+}
+
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '..', 'uploads', 'avatars')
 if (!fs.existsSync(uploadsDir)) {
@@ -122,12 +132,12 @@ router.put('/',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        logger.error('Profile: Failed to create notification', { 
-          userId, 
-          error: notifError.message 
+        logger.error('Profile: Failed to create notification', {
+          userId: req.user.userId,
+          error: notifError.message
         })
       }
-      
+
       res.json({
         message: 'Profile updated successfully',
         user: {
@@ -138,10 +148,10 @@ router.put('/',
         },
       })
     } catch (error) {
-      logger.error('Update profile error', { 
-        userId, 
-        error: error.message, 
-        stack: error.stack 
+      logger.error('Update profile error', {
+        userId: req.user?.userId,
+        error: error.message,
+        stack: error.stack
       })
       res.status(500).json({ error: 'Failed to update profile' })
     }
@@ -161,8 +171,8 @@ router.post('/avatar',
       // Get current user to delete old avatar if exists
       const currentUser = await getUserById(req.user.userId)
       if (currentUser && currentUser.avatar_url && currentUser.avatar_url.startsWith('/api/uploads/')) {
-        const oldAvatarPath = path.join(__dirname, '..', currentUser.avatar_url.replace('/api/', ''))
-        if (fs.existsSync(oldAvatarPath)) {
+        const oldAvatarPath = safeAvatarPath(currentUser.avatar_url)
+        if (oldAvatarPath && fs.existsSync(oldAvatarPath)) {
           fs.unlinkSync(oldAvatarPath)
         }
       }
@@ -182,9 +192,9 @@ router.post('/avatar',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        logger.error('Profile: Failed to create notification', { 
-          userId, 
-          error: notifError.message 
+        logger.error('Profile: Failed to create notification', {
+          userId: req.user.userId,
+          error: notifError.message
         })
       }
 
@@ -193,10 +203,10 @@ router.post('/avatar',
         avatarUrl,
       })
     } catch (error) {
-      logger.error('Upload avatar error', { 
-        userId, 
-        error: error.message, 
-        stack: error.stack 
+      logger.error('Upload avatar error', {
+        userId: req.user?.userId,
+        error: error.message,
+        stack: error.stack
       })
       // Clean up uploaded file on error
       if (req.file && fs.existsSync(req.file.path)) {
@@ -214,8 +224,8 @@ router.delete('/avatar', authenticateToken, async (req, res) => {
     
     // Delete the avatar file if it exists
     if (currentUser && currentUser.avatar_url && currentUser.avatar_url.startsWith('/api/uploads/')) {
-      const avatarPath = path.join(__dirname, '..', currentUser.avatar_url.replace('/api/', ''))
-      if (fs.existsSync(avatarPath)) {
+      const avatarPath = safeAvatarPath(currentUser.avatar_url)
+      if (avatarPath && fs.existsSync(avatarPath)) {
         fs.unlinkSync(avatarPath)
       }
     }
@@ -287,18 +297,18 @@ router.put('/password',
           linkText: 'View Settings'
         })
       } catch (notifError) {
-        logger.error('Profile: Failed to create notification', { 
-          userId, 
-          error: notifError.message 
+        logger.error('Profile: Failed to create notification', {
+          userId: req.user.userId,
+          error: notifError.message
         })
       }
 
       res.json({ message: 'Password changed successfully' })
     } catch (error) {
-      logger.error('Change password error', { 
-        userId, 
-        error: error.message, 
-        stack: error.stack 
+      logger.error('Change password error', {
+        userId: req.user?.userId,
+        error: error.message,
+        stack: error.stack
       })
       res.status(500).json({ error: 'Failed to change password' })
     }

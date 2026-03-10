@@ -63,7 +63,7 @@ const apiRequest = async (
   } catch (error: any) {
     // Handle network errors (server not running, CORS, etc.)
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      throw new Error('Unable to connect to server. Please make sure the backend server is running on http://localhost:3001')
+      throw new Error('Unable to connect to server. Please check your connection and try again.')
     }
     // Re-throw other errors
     throw error
@@ -595,7 +595,7 @@ export const profileAPI = {
     const formData = new FormData()
     formData.append('avatar', file)
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:3001/api')}/profile/avatar`, {
+    const response = await fetch(`${API_BASE_URL}/profile/avatar`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

@@ -65,15 +65,21 @@ export const getOrCreateCreditRecord = async (userId) => {
  * Consume credits for an analysis. Throws if insufficient.
  */
 export const consumeCredits = async (userId, amount) => {
-  const record = await getOrCreateCreditRecord(userId)
-  const remaining = record.credits_limit - record.credits_used
-  if (remaining < amount) {
-    throw new Error(`Insufficient credits. Need ${amount}, have ${remaining}.`)
-  }
-  await pool.query(
-    'UPDATE bill_analyzer_credits SET credits_used = credits_used + $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1',
+  // Ensure credit record exists and is current
+  await getOrCreateCreditRecord(userId)
+  // Atomic check-and-update to prevent race conditions
+  const result = await pool.query(
+    `UPDATE bill_analyzer_credits
+     SET credits_used = credits_used + $2, updated_at = CURRENT_TIMESTAMP
+     WHERE user_id = $1 AND (credits_limit - credits_used) >= $2
+     RETURNING *`,
     [userId, amount]
   )
+  if (result.rowCount === 0) {
+    const record = await getOrCreateCreditRecord(userId)
+    const remaining = record.credits_limit - record.credits_used
+    throw new Error(`Insufficient credits. Need ${amount}, have ${remaining}.`)
+  }
 }
 
 /**

@@ -19,7 +19,13 @@ const contactLimiter = rateLimit({
 
 const sanitize = (str) => {
   if (!str) return ''
-  return String(str).replace(/[<>]/g, '').trim()
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .trim()
 }
 
 const ALLOWED_CATEGORIES = ['bug_report', 'help', 'feature_request', 'other']
