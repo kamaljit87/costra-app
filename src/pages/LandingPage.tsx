@@ -154,7 +154,10 @@ export default function LandingPage() {
               )}
             </div>
             {!signupDisabled && (
-              <p className="mt-4 text-sm text-gray-400">No credit card required. 7-day free trial.</p>
+              <p className="mt-4 text-sm text-gray-400">
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-accent-500/10 text-accent-400 font-semibold">7-day free trial</span>
+                <span className="ml-2">Cancel anytime.</span>
+              </p>
             )}
 
             {/* Trust indicators */}
@@ -220,7 +223,7 @@ export default function LandingPage() {
               Simple, Transparent Pricing
             </h2>
             <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-              Start with a 7-day free trial. No credit card required. Cancel anytime.
+              Try everything free for 7 days. No charge until your trial ends.
             </p>
 
             {/* Billing Period Toggle */}
@@ -253,6 +256,11 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             {/* Starter Plan */}
             <div className="bg-white rounded-xl border border-surface-300 p-8 shadow-card">
+              <div className="mb-2">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                  7 DAYS FREE
+                </span>
+              </div>
               <div className="mb-6">
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">{PLANS.starter.name}</h3>
                 <div className="mt-3">
@@ -301,7 +309,7 @@ export default function LandingPage() {
                 {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
               </Link>
               {!signupDisabled && (
-                <p className="text-xs text-gray-400 text-center mt-2">No credit card required</p>
+                <p className="text-xs text-accent-600 font-medium text-center mt-2">7-day free trial included</p>
               )}
             </div>
 
@@ -313,6 +321,11 @@ export default function LandingPage() {
                 </span>
               </div>
 
+              <div className="mb-2">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                  7 DAYS FREE
+                </span>
+              </div>
               <div className="mb-6">
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">{PLANS.pro.name}</h3>
                 <div className="mt-3">
@@ -361,14 +374,14 @@ export default function LandingPage() {
                 {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
               </Link>
               {!signupDisabled && (
-                <p className="text-xs text-white/60 text-center mt-2">No credit card required</p>
+                <p className="text-xs text-accent-600 font-medium text-center mt-2">7-day free trial included</p>
               )}
             </div>
           </div>
 
           <div className="text-center mt-12">
             <p className="text-sm text-gray-500">
-              All plans include a 7-day free trial. No credit card required.
+              All plans include a 7-day free trial. You won't be charged until your trial ends.
             </p>
           </div>
         </div>
@@ -386,7 +399,7 @@ export default function LandingPage() {
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
           {!signupDisabled && (
-            <p className="mt-4 text-sm text-accent-200">No credit card required. Cancel anytime.</p>
+            <p className="mt-4 text-sm text-accent-200">7-day free trial. Cancel anytime.</p>
           )}
         </div>
       </section>

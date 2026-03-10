@@ -53,7 +53,7 @@ export default function UpgradePrompt({ feature, requiredPlan, description }: Up
       </button>
       
       <p className="text-xs text-gray-500 mt-4">
-        Cancel anytime. No credit card required for trial.
+        Cancel anytime. 7-day free trial included.
       </p>
     </div>
   )

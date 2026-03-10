@@ -39,7 +39,7 @@ export default function TermsOfServicePage() {
               <p>Costra offers a 7-day free trial followed by paid subscription plans (Starter and Pro). All payments are processed by <strong>Dodo Payments</strong>, who acts as the Merchant of Record for all transactions.</p>
               <p><strong>Pricing:</strong> Prices are displayed in USD and INR. Applicable taxes (VAT, GST, sales tax) are calculated and collected by Dodo Payments based on your location.</p>
               <p><strong>Billing:</strong> Subscriptions are billed monthly or annually, depending on your chosen plan. Your subscription will automatically renew unless cancelled before the renewal date.</p>
-              <p><strong>Free Trial:</strong> The 7-day free trial provides access to core features. No credit card is required to start a trial.</p>
+              <p><strong>Free Trial:</strong> The 7-day free trial provides full access to all features. You will not be charged during the trial period.</p>
             </div>
           </section>
 
