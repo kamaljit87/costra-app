@@ -8,6 +8,9 @@ metadata:
 spec:
   serviceName: redis
   replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  minReadySeconds: 10
   selector:
     matchLabels:
       app: redis
@@ -16,6 +19,7 @@ spec:
       labels:
         app: redis
     spec:
+      terminationGracePeriodSeconds: 30
       securityContext:
         runAsUser: 999
         runAsGroup: 999
@@ -23,7 +27,16 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
-          command: ["redis-server", "--appendonly", "yes"]
+          command:
+            - redis-server
+            - "--appendonly"
+            - "yes"
+            - "--appendfsync"
+            - "everysec"
+            - "--save"
+            - "300 10"
+            - "--stop-writes-on-bgsave-error"
+            - "no"
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
@@ -53,6 +66,10 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["redis-cli", "bgsave"]
           volumeMounts:
             - name: redis-data
               mountPath: /data

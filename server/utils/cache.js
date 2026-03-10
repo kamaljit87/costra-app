@@ -10,6 +10,17 @@ import { recordCacheOperation } from './metrics.js'
 let redisClient = null
 let isConnected = false
 
+/** Wrap a promise with a timeout so cache operations never block requests */
+const withTimeout = (promise, ms = 2000) => {
+  let timer
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Cache operation timed out')), ms)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
 /**
  * Initialize Redis client
  */
@@ -24,14 +35,16 @@ export const initRedis = async () => {
     redisClient = createClient({
       url: process.env.REDIS_URL,
       socket: {
+        connectTimeout: 5000,
         reconnectStrategy: (retries) => {
-          if (retries > 10) {
-            logger.error('Redis reconnection failed after 10 attempts')
-            return new Error('Redis connection failed')
+          // Never give up reconnecting — Redis may restart but will come back
+          if (retries > 50) {
+            return 10000 // After 50 retries, try every 10s
           }
-          return Math.min(retries * 100, 3000) // Exponential backoff, max 3s
+          return Math.min(retries * 200, 5000) // Exponential backoff, max 5s
         },
       },
+      commandsQueueMaxLength: 128,
     })
 
     redisClient.on('error', (err) => {
@@ -74,7 +87,7 @@ export const get = async (key) => {
 
   try {
     const startTime = Date.now()
-    const value = await redisClient.get(key)
+    const value = await withTimeout(redisClient.get(key))
     const duration = Date.now() - startTime
     
     if (value) {
@@ -107,7 +120,7 @@ export const set = async (key, value, ttl = 3600) => {
   try {
     const startTime = Date.now()
     const serialized = JSON.stringify(value)
-    await redisClient.setEx(key, ttl, serialized)
+    await withTimeout(redisClient.setEx(key, ttl, serialized))
     const duration = Date.now() - startTime
     logger.debug('Cache set', { key, ttl })
     recordCacheOperation('set', 'success', duration)
@@ -130,7 +143,7 @@ export const del = async (key) => {
   }
 
   try {
-    await redisClient.del(key)
+    await withTimeout(redisClient.del(key))
     logger.debug('Cache delete', { key })
     return true
   } catch (error) {
@@ -150,11 +163,11 @@ export const delPattern = async (pattern) => {
   }
 
   try {
-    const keys = await redisClient.keys(pattern)
+    const keys = await withTimeout(redisClient.keys(pattern))
     if (keys.length === 0) {
       return 0
     }
-    const deleted = await redisClient.del(keys)
+    const deleted = await withTimeout(redisClient.del(keys))
     logger.debug('Cache delete pattern', { pattern, deleted })
     return deleted
   } catch (error) {
