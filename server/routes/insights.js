@@ -686,11 +686,27 @@ router.get('/rightsizing-recommendations', authenticateToken, async (req, res) =
             continue
           }
 
-          const awsResult = await fetchAWSRightsizingRecommendations(credentials, {
-            linkedAccountId: account.awsAccountId || undefined,
-          })
-          allRecs.push(...(awsResult.recommendations || []))
-          totalPotentialSavings += awsResult.totalPotentialSavings || 0
+          // Primary: CloudWatch-based rightsizing (no opt-in required)
+          let awsResult = null
+          try {
+            awsResult = await fetchCloudWatchRightsizing(credentials, { lookbackDays: 14 })
+          } catch (cwErr) {
+            logger.warn('CloudWatch rightsizing failed, trying Cost Explorer', { accountId: account.id, error: cwErr.message })
+          }
+          // Fallback: Cost Explorer API (requires opt-in)
+          if (!awsResult?.recommendations?.length) {
+            try {
+              awsResult = await fetchAWSRightsizingRecommendations(credentials, {
+                linkedAccountId: account.awsAccountId || undefined,
+              })
+            } catch (ceErr) {
+              logger.warn('Cost Explorer rightsizing also failed', { accountId: account.id, error: ceErr.message })
+            }
+          }
+          if (awsResult) {
+            allRecs.push(...(awsResult.recommendations || []))
+            totalPotentialSavings += awsResult.totalPotentialSavings || 0
+          }
         }
 
         if (allRecs.length > 0) {

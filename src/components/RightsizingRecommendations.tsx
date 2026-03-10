@@ -19,10 +19,10 @@ interface RightsizingRecommendation {
   region: string | null
   currentCost: number
   utilization: Utilization
-  recommendation: 'downsize' | 'upsize' | 'terminate'
+  recommendation: 'downsize' | 'upsize' | 'terminate' | 'right-sized'
   potentialSavings: number
   savingsPercent: number
-  priority: 'high' | 'medium' | 'low'
+  priority: 'high' | 'medium' | 'low' | 'none'
   reason: string
   findingReasonCodes?: string[]
   suggestedInstanceType?: string | null
@@ -90,7 +90,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
   }
 
   const filteredRecommendations = data?.recommendations.filter(
-    rec => !dismissedIds.has(rec.resourceId)
+    rec => !dismissedIds.has(rec.resourceId) && rec.recommendation !== 'right-sized'
   ) || []
 
   if (isLoading) {
@@ -346,7 +346,7 @@ export default function RightsizingRecommendations({ providerId, accountId }: Ri
                   <span className="capitalize font-medium">{rec.priority}</span>
                   <span>priority</span>
                   <span>•</span>
-                  <span>Recommendation: {rec.recommendation === 'terminate' ? 'Terminate' : rec.recommendation === 'downsize' ? 'Downsize' : 'Upsize'}</span>
+                  <span>Recommendation: {rec.recommendation === 'terminate' ? 'Terminate' : rec.recommendation === 'downsize' ? 'Downsize' : rec.recommendation === 'right-sized' ? 'Right-sized' : 'Upsize'}</span>
                 </div>
               </div>
             </div>
