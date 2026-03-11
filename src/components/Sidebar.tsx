@@ -8,6 +8,7 @@ import {
   FileText,
   ArrowLeftRight,
   MessageCircle,
+  BookMarked,
   X,
   AlertTriangle,
   Shield,
@@ -381,8 +382,22 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
 
         </nav>
 
-        {/* Footer with Contact link */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 py-4 border-t border-surface-300 bg-white">
+        {/* Footer with Docs + Contact link */}
+        <div className="absolute bottom-0 left-0 right-0 px-4 py-3 border-t border-surface-300 bg-white space-y-1">
+          <Link
+            to="/docs"
+            onClick={onClose}
+            className={`
+              flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors duration-150 group w-full
+              ${isActive('/docs')
+                ? 'bg-accent-50 text-accent-600 font-semibold'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-surface-200'
+              }
+            `}
+          >
+            <BookMarked className="h-4 w-4 opacity-70 group-hover:opacity-100" />
+            <span className="text-sm">Docs</span>
+          </Link>
           <button
             onClick={() => { onContactClick?.(); onClose(); }}
             className="flex items-center space-x-3 px-4 py-2.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-surface-200 transition-colors duration-150 group w-full text-left"
