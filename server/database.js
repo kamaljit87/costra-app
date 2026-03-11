@@ -1629,6 +1629,100 @@ export const initDatabase = async () => {
         )
       `)
 
+      // Email verification: add email_verified column to users
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'users' AND column_name = 'email_verified'
+          ) THEN
+            ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false;
+          END IF;
+        END $$;
+      `)
+
+      // Password reset tokens
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token_hash TEXT NOT NULL,
+          used BOOLEAN DEFAULT false,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens(user_id)`)
+
+      // Email verification tokens
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS email_verification_tokens (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token_hash TEXT NOT NULL,
+          email TEXT NOT NULL,
+          used BOOLEAN DEFAULT false,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_email_verify_user ON email_verification_tokens(user_id)`)
+
+      // Email change requests
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS email_change_requests (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          new_email TEXT NOT NULL,
+          token_hash TEXT NOT NULL,
+          cancel_token_hash TEXT,
+          expires_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_email_change_user ON email_change_requests(user_id)`)
+
+      // Deletion confirmation tokens (add token columns to existing deletion requests table)
+      await client.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'data_deletion_requests' AND column_name = 'token_hash'
+          ) THEN
+            ALTER TABLE data_deletion_requests ADD COLUMN token_hash TEXT;
+            ALTER TABLE data_deletion_requests ADD COLUMN cancel_token_hash TEXT;
+          END IF;
+        END $$;
+      `)
+
+      // Email send log (audit trail)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS email_log (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          email_type TEXT NOT NULL,
+          recipient TEXT NOT NULL,
+          ses_message_id TEXT,
+          status TEXT DEFAULT 'sent',
+          error_message TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_email_log_user ON email_log(user_id)`)
+
+      // Email suppression list (bounces/complaints)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS email_suppressions (
+          id SERIAL PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          reason TEXT NOT NULL,
+          ses_notification JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `)
+
       logger.info('Database schema initialized successfully')
     } finally {
       client.release()
@@ -1683,10 +1777,10 @@ export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl,
     let userId
     let isNewUser = false
     if (result.rows.length > 0) {
-      // Update existing user
+      // Update existing user (also mark email as verified — Google verified it)
       userId = result.rows[0].id
       await client.query(
-        'UPDATE users SET name = $1, email = $2, avatar_url = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+        'UPDATE users SET name = $1, email = $2, avatar_url = $3, email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
         [name, email, avatarUrl, userId]
       )
     } else {
@@ -1697,18 +1791,18 @@ export const createOrUpdateGoogleUser = async (googleId, name, email, avatarUrl,
       )
 
       if (result.rows.length > 0) {
-        // Link Google account to existing user
+        // Link Google account to existing user (mark email verified)
         userId = result.rows[0].id
         await client.query(
-          'UPDATE users SET google_id = $1, avatar_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          'UPDATE users SET google_id = $1, avatar_url = $2, email_verified = true, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
           [googleId, avatarUrl, userId]
         )
       } else if (!allowCreate) {
         return { userId: null, isNewUser: true }
       } else {
-        // Create new user
+        // Create new user (Google-verified email)
         result = await client.query(
-          'INSERT INTO users (name, email, google_id, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
+          'INSERT INTO users (name, email, google_id, avatar_url, email_verified) VALUES ($1, $2, $3, $4, true) RETURNING id',
           [name, email, googleId, avatarUrl]
         )
         userId = result.rows[0].id
@@ -1754,7 +1848,7 @@ export const getUserById = async (id) => {
   const client = await pool.connect()
   try {
     const result = await client.query(
-      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at, totp_enabled_at, is_admin FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, password_hash, google_id, created_at, totp_enabled_at, is_admin, email_verified FROM users WHERE id = $1',
       [id]
     )
     return result.rows[0] || null
@@ -8576,6 +8670,229 @@ export const deleteBillAnalysis = async (userId, analysisId) => {
     [analysisId, userId]
   )
   return result.rows[0]
+}
+
+// ==========================================
+// Email Verification Tokens
+// ==========================================
+
+export const createEmailVerificationToken = async (userId, email, tokenHash, expiresAt) => {
+  const client = await pool.connect()
+  try {
+    // Invalidate old tokens for this user
+    await client.query(
+      `UPDATE email_verification_tokens SET used = true WHERE user_id = $1 AND used = false`,
+      [userId]
+    )
+    const result = await client.query(
+      `INSERT INTO email_verification_tokens (user_id, email, token_hash, expires_at)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [userId, email, tokenHash, expiresAt]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+export const verifyEmailToken = async (tokenHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM email_verification_tokens
+       WHERE token_hash = $1 AND used = false AND expires_at > CURRENT_TIMESTAMP`,
+      [tokenHash]
+    )
+    if (result.rows.length === 0) return null
+    const token = result.rows[0]
+    // Mark as used and set email_verified on user
+    await client.query('BEGIN')
+    await client.query(
+      `UPDATE email_verification_tokens SET used = true WHERE id = $1`,
+      [token.id]
+    )
+    await client.query(
+      `UPDATE users SET email_verified = true WHERE id = $1`,
+      [token.user_id]
+    )
+    await client.query('COMMIT')
+    return token
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const setEmailVerified = async (userId) => {
+  const client = await pool.connect()
+  try {
+    await client.query(`UPDATE users SET email_verified = true WHERE id = $1`, [userId])
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// Password Reset Tokens
+// ==========================================
+
+export const createPasswordResetToken = async (userId, tokenHash, expiresAt) => {
+  const client = await pool.connect()
+  try {
+    // Invalidate old tokens
+    await client.query(
+      `UPDATE password_reset_tokens SET used = true WHERE user_id = $1 AND used = false`,
+      [userId]
+    )
+    const result = await client.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [userId, tokenHash, expiresAt]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+export const verifyPasswordResetToken = async (tokenHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM password_reset_tokens
+       WHERE token_hash = $1 AND used = false AND expires_at > CURRENT_TIMESTAMP`,
+      [tokenHash]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+export const markPasswordResetTokenUsed = async (tokenId) => {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `UPDATE password_reset_tokens SET used = true WHERE id = $1`,
+      [tokenId]
+    )
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// Email Change Requests
+// ==========================================
+
+export const createEmailChangeRequest = async (userId, newEmail, tokenHash, cancelTokenHash, expiresAt) => {
+  const client = await pool.connect()
+  try {
+    // Remove any existing pending request
+    await client.query(`DELETE FROM email_change_requests WHERE user_id = $1`, [userId])
+    const result = await client.query(
+      `INSERT INTO email_change_requests (user_id, new_email, token_hash, cancel_token_hash, expires_at)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [userId, newEmail, tokenHash, cancelTokenHash, expiresAt]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+export const verifyEmailChangeToken = async (tokenHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM email_change_requests
+       WHERE token_hash = $1 AND expires_at > CURRENT_TIMESTAMP`,
+      [tokenHash]
+    )
+    if (result.rows.length === 0) return null
+    const req = result.rows[0]
+    // Apply email change and clean up
+    await client.query('BEGIN')
+    await client.query(
+      `UPDATE users SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [req.new_email, req.user_id]
+    )
+    await client.query(`DELETE FROM email_change_requests WHERE id = $1`, [req.id])
+    await client.query('COMMIT')
+    return req
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+export const cancelEmailChangeByToken = async (cancelTokenHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `DELETE FROM email_change_requests WHERE cancel_token_hash = $1 RETURNING *`,
+      [cancelTokenHash]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+// ==========================================
+// Deletion Request Token Helpers
+// ==========================================
+
+export const createDeletionRequestWithToken = async (userId, ipAddress, reason, tokenHash, cancelTokenHash) => {
+  const client = await pool.connect()
+  try {
+    // Check for existing pending request
+    const existing = await client.query(
+      `SELECT id FROM data_deletion_requests WHERE user_id = $1 AND status IN ('pending', 'confirmed')`,
+      [userId]
+    )
+    if (existing.rows.length > 0) {
+      throw new Error('A deletion request is already pending')
+    }
+    const result = await client.query(
+      `INSERT INTO data_deletion_requests (user_id, ip_address, reason, token_hash, cancel_token_hash)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [userId, ipAddress, reason, tokenHash, cancelTokenHash]
+    )
+    return result.rows[0]
+  } finally {
+    client.release()
+  }
+}
+
+export const getDeletionRequestByToken = async (tokenHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM data_deletion_requests WHERE token_hash = $1 AND status = 'pending'`,
+      [tokenHash]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
+}
+
+export const getDeletionRequestByCancelToken = async (cancelTokenHash) => {
+  const client = await pool.connect()
+  try {
+    const result = await client.query(
+      `SELECT * FROM data_deletion_requests WHERE cancel_token_hash = $1 AND status = 'pending'`,
+      [cancelTokenHash]
+    )
+    return result.rows[0] || null
+  } finally {
+    client.release()
+  }
 }
 
 // Close database connection pool

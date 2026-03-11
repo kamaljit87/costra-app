@@ -166,6 +166,33 @@ export const authAPI = {
     localStorage.removeItem('user')
   },
 
+  resetPassword: async (token: string, newPassword: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'Password reset failed')
+    return data
+  },
+
+  verifyEmail: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'Email verification failed')
+    return data
+  },
+
+  resendVerification: async () => {
+    const response = await apiRequest('/auth/resend-verification', { method: 'POST' })
+    return response.json()
+  },
+
   googleLogin: async (credential: string): Promise<{ token?: string; user?: unknown; error?: string; twoFactorRequired?: boolean; temporaryToken?: string }> => {
     const response = await fetch(`${API_BASE_URL}/auth/google/callback`, {
       method: 'POST',
@@ -1315,6 +1342,28 @@ export const complianceAPI = {
       method: 'POST',
     })
     return response.json()
+  },
+
+  confirmDeletionByToken: async (token: string, keepForMarketing?: boolean) => {
+    const response = await fetch(`${API_BASE_URL}/compliance/delete-account/confirm-by-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, keepForMarketing }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'Deletion failed')
+    return data
+  },
+
+  cancelDeletionByToken: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/compliance/delete-account/cancel-by-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || 'Cancellation failed')
+    return data
   },
 
   // Consent management

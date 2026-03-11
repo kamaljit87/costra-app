@@ -1,16 +1,27 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { body, validationResult } from 'express-validator'
 import { authenticateToken } from '../middleware/auth.js'
 import logger from '../utils/logger.js'
-import { 
-  getUserById, 
-  updateUserProfile, 
-  updateUserAvatar, 
+import {
+  getUserById,
+  updateUserProfile,
+  updateUserAvatar,
   updateUserPassword,
   getUserByEmail,
-  createNotification
+  createNotification,
+  createEmailChangeRequest,
+  verifyEmailChangeToken,
+  cancelEmailChangeByToken,
 } from '../database.js'
+import { sendTransactionalEmail } from '../services/emailService.js'
+import {
+  emailChangeVerifyTemplate,
+  emailChangeNotifyTemplate,
+  emailChangedConfirmTemplate,
+  passwordChangedTemplate,
+} from '../services/emailTemplates.js'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
@@ -111,35 +122,82 @@ router.put('/',
       }
 
       const { name, email } = req.body
+      const userId = req.user.userId
 
-      // Check if email is already taken by another user
+      // If email is changing, go through verification flow
       if (email) {
-        const existingUser = await getUserByEmail(email)
-        if (existingUser && existingUser.id !== req.user.userId) {
-          return res.status(400).json({ error: 'Email is already in use' })
+        const currentUser = await getUserById(userId)
+        if (currentUser && email.toLowerCase() !== currentUser.email.toLowerCase()) {
+          const existingUser = await getUserByEmail(email)
+          if (existingUser && existingUser.id !== userId) {
+            return res.status(400).json({ error: 'Email is already in use' })
+          }
+
+          // Generate tokens for verify (new email) and cancel (old email)
+          const verifyToken = crypto.randomBytes(32).toString('hex')
+          const verifyHash = crypto.createHash('sha256').update(verifyToken).digest('hex')
+          const cancelToken = crypto.randomBytes(32).toString('hex')
+          const cancelHash = crypto.createHash('sha256').update(cancelToken).digest('hex')
+          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
+          await createEmailChangeRequest(userId, email, verifyHash, cancelHash, expiresAt)
+
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+          const verifyUrl = `${frontendUrl}/verify-email-change?token=${verifyToken}`
+          const cancelUrl = `${frontendUrl}/cancel-email-change?token=${cancelToken}`
+
+          // Send verification to new email
+          sendTransactionalEmail({
+            to: email,
+            subject: 'Verify Your New Email — Costra',
+            html: emailChangeVerifyTemplate(currentUser.name, email, verifyUrl),
+          }).catch((e) => logger.error('Failed to send email change verification', { error: e.message }))
+
+          // Send notification to old email
+          sendTransactionalEmail({
+            to: currentUser.email,
+            subject: 'Email Change Requested — Costra',
+            html: emailChangeNotifyTemplate(currentUser.name, email, cancelUrl),
+          }).catch((e) => logger.error('Failed to send email change notification', { error: e.message }))
+
+          // If only email is changing (no name change), return early with pending message
+          if (!name || name === currentUser.name) {
+            return res.json({
+              message: 'A verification email has been sent to your new email address. Please verify to complete the change.',
+              emailChangePending: true,
+              user: {
+                id: currentUser.id,
+                name: currentUser.name,
+                email: currentUser.email,
+                avatarUrl: currentUser.avatar_url,
+              },
+            })
+          }
         }
       }
 
-      const updatedUser = await updateUserProfile(req.user.userId, { name, email })
-      
+      // Update name only (email change goes through verification)
+      const updatedUser = await updateUserProfile(userId, { name })
+
       // Create notification for profile update
       try {
-        await createNotification(req.user.userId, {
+        await createNotification(userId, {
           type: 'info',
           title: 'Profile Updated',
-          message: 'Your profile information has been updated successfully',
+          message: email ? 'Name updated. A verification email has been sent for your email change.' : 'Your profile information has been updated successfully',
           link: '/settings',
           linkText: 'View Settings'
         })
       } catch (notifError) {
         logger.error('Profile: Failed to create notification', {
-          userId: req.user.userId,
+          userId,
           error: notifError.message
         })
       }
 
       res.json({
-        message: 'Profile updated successfully',
+        message: email ? 'Name updated. Please check your new email to verify the email change.' : 'Profile updated successfully',
+        emailChangePending: !!email,
         user: {
           id: updatedUser.id,
           name: updatedUser.name,
@@ -303,6 +361,13 @@ router.put('/password',
         })
       }
 
+      // Send password changed email (fire-and-forget)
+      sendTransactionalEmail({
+        to: user.email,
+        subject: 'Password Changed — Costra',
+        html: passwordChangedTemplate(user.name),
+      }).catch((e) => logger.error('Failed to send password changed email', { error: e.message }))
+
       res.json({ message: 'Password changed successfully' })
     } catch (error) {
       logger.error('Change password error', {
@@ -314,5 +379,58 @@ router.put('/password',
     }
   }
 )
+
+// Verify email change (from new email link — no auth required)
+router.post('/verify-email-change', async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const changeReq = await verifyEmailChangeToken(tokenHash)
+    if (!changeReq) {
+      return res.status(400).json({ error: 'Invalid or expired verification link.' })
+    }
+
+    // Send confirmation to both old and new emails
+    const user = await getUserById(changeReq.user_id)
+    if (user) {
+      const html = emailChangedConfirmTemplate(user.name)
+      // Send to new email (now current)
+      sendTransactionalEmail({ to: user.email, subject: 'Email Address Updated — Costra', html })
+        .catch((e) => logger.error('Failed to send email changed confirm', { error: e.message }))
+    }
+
+    logger.info('Email change verified', { userId: changeReq.user_id, newEmail: changeReq.new_email })
+    res.json({ message: 'Email address updated successfully!' })
+  } catch (error) {
+    logger.error('Email change verification error', { error: error.message })
+    res.status(500).json({ error: 'Failed to verify email change' })
+  }
+})
+
+// Cancel email change (from old email link — no auth required)
+router.post('/cancel-email-change', async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const result = await cancelEmailChangeByToken(tokenHash)
+    if (!result) {
+      return res.status(400).json({ error: 'Invalid or expired cancellation link, or no pending change.' })
+    }
+
+    logger.info('Email change cancelled', { userId: result.user_id })
+    res.json({ message: 'Email change cancelled. Your email address remains unchanged.' })
+  } catch (error) {
+    logger.error('Email change cancellation error', { error: error.message })
+    res.status(500).json({ error: 'Failed to cancel email change' })
+  }
+})
 
 export default router

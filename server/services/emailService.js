@@ -1,6 +1,7 @@
 /**
  * Email Service
- * Handles sending emails for alerts and notifications (Pro only)
+ * Handles sending emails for alerts, notifications, and transactional emails.
+ * Supports AWS SES, SendGrid, and SMTP transports.
  */
 
 import nodemailer from 'nodemailer'
@@ -8,11 +9,27 @@ import logger from '../utils/logger.js'
 import { getUserById } from '../database.js'
 import { canAccessFeature } from './subscriptionService.js'
 
-// Create transporter (supports SMTP or SendGrid)
+// Create transporter (supports SES, SendGrid, or SMTP)
 let transporter = null
 
 const initEmailService = () => {
-  // Use SendGrid if API key is provided
+  // Priority 1: AWS SES
+  if (process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY) {
+    const sesRegion = process.env.AWS_SES_REGION || 'us-east-1'
+    transporter = nodemailer.createTransport({
+      host: `email-smtp.${sesRegion}.amazonaws.com`,
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.AWS_SES_ACCESS_KEY_ID,
+        pass: process.env.AWS_SES_SECRET_ACCESS_KEY,
+      },
+    })
+    logger.info('Email service initialized with AWS SES', { region: sesRegion })
+    return
+  }
+
+  // Priority 2: SendGrid
   if (process.env.SENDGRID_API_KEY) {
     transporter = nodemailer.createTransport({
       service: 'SendGrid',
@@ -25,7 +42,7 @@ const initEmailService = () => {
     return
   }
 
-  // Use SMTP if configured
+  // Priority 3: SMTP
   if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -55,6 +72,15 @@ export const isEmailServiceAvailable = () => {
 }
 
 /**
+ * Get the configured "from" address
+ */
+const getFromAddress = () => {
+  const name = process.env.SES_FROM_NAME || 'Costra'
+  const email = process.env.SES_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@costra.dev'
+  return `${name} <${email}>`
+}
+
+/**
  * Get user email preferences
  */
 export const getUserEmailPreferences = async (userId) => {
@@ -67,7 +93,7 @@ export const getUserEmailPreferences = async (userId) => {
        WHERE user_id = $1`,
       [userId]
     )
-    
+
     if (result.rows.length === 0) {
       // Default preferences (all enabled for Pro users)
       return {
@@ -77,7 +103,7 @@ export const getUserEmailPreferences = async (userId) => {
         emailWeeklySummary: false,
       }
     }
-    
+
     const prefs = result.rows[0]
     return {
       emailAlertsEnabled: prefs.email_alerts_enabled ?? true,
@@ -122,7 +148,7 @@ export const updateUserEmailPreferences = async (userId, preferences) => {
         preferences.emailWeeklySummary ?? false,
       ]
     )
-    
+
     logger.info('Email preferences updated', { userId, preferences })
   } catch (error) {
     logger.error('Error updating email preferences', { userId, error: error.message })
@@ -133,7 +159,43 @@ export const updateUserEmailPreferences = async (userId, preferences) => {
 }
 
 /**
- * Send email (Pro only)
+ * Send a transactional email (no subscription check — used for auth, security, compliance emails).
+ * These are always sent regardless of subscription status or email preferences.
+ */
+export const sendTransactionalEmail = async ({ to, subject, html, text }) => {
+  try {
+    if (!isEmailServiceAvailable()) {
+      logger.warn('Email service not available — transactional email not sent', { to, subject })
+      return { success: false, error: 'Email service not configured' }
+    }
+
+    const mailOptions = {
+      from: getFromAddress(),
+      to,
+      subject,
+      html,
+      text: text || html.replace(/<[^>]*>/g, ''),
+    }
+
+    const info = await transporter.sendMail(mailOptions)
+    logger.info('Transactional email sent', { to, subject, messageId: info.messageId })
+
+    // Log to database (fire-and-forget)
+    logEmailSend(null, 'transactional', to, info.messageId).catch(() => {})
+
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    logger.error('Error sending transactional email', { to, subject, error: error.message })
+
+    // Log failure
+    logEmailSend(null, 'transactional', to, null, error.message).catch(() => {})
+
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email (Pro only) — used for alert/notification emails
  */
 export const sendEmail = async (userId, { to, subject, html, text }) => {
   try {
@@ -167,7 +229,7 @@ export const sendEmail = async (userId, { to, subject, html, text }) => {
     }
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'noreply@costra.com',
+      from: getFromAddress(),
       to,
       subject,
       html,
@@ -176,11 +238,36 @@ export const sendEmail = async (userId, { to, subject, html, text }) => {
 
     const info = await transporter.sendMail(mailOptions)
     logger.info('Email sent successfully', { userId, to, subject, messageId: info.messageId })
-    
+
+    logEmailSend(userId, 'alert', to, info.messageId).catch(() => {})
+
     return { success: true, messageId: info.messageId }
   } catch (error) {
     logger.error('Error sending email', { userId, to, error: error.message, stack: error.stack })
+    logEmailSend(userId, 'alert', to, null, error.message).catch(() => {})
     return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Log email send to database for audit trail
+ */
+async function logEmailSend(userId, emailType, recipient, messageId, errorMessage = null) {
+  try {
+    const { pool } = await import('../database.js')
+    const client = await pool.connect()
+    try {
+      await client.query(
+        `INSERT INTO email_log (user_id, email_type, recipient, ses_message_id, status, error_message)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, emailType, recipient, messageId, errorMessage ? 'failed' : 'sent', errorMessage]
+      )
+    } finally {
+      client.release()
+    }
+  } catch (err) {
+    // Non-critical — don't let logging failure break email sending
+    logger.debug('Failed to log email send', { error: err.message })
   }
 }
 
@@ -218,10 +305,10 @@ export const sendAnomalyAlert = async (userId, anomalyData) => {
         </div>
         <div class="content">
           <div class="alert">
-            <strong>${serviceName}</strong> costs have ${isIncrease ? 'increased' : 'decreased'} by 
+            <strong>${serviceName}</strong> costs have ${isIncrease ? 'increased' : 'decreased'} by
             <strong>${Math.abs(variancePercent).toFixed(1)}%</strong> compared to the 30-day baseline.
           </div>
-          
+
           <div class="metric">
             <span class="metric-label">Current Cost:</span>
             <span>$${currentCost.toFixed(2)}</span>
@@ -235,7 +322,7 @@ export const sendAnomalyAlert = async (userId, anomalyData) => {
             <span>${isIncrease ? '+' : ''}${variancePercent.toFixed(1)}%</span>
           </div>
           ${date ? `<div class="metric"><span class="metric-label">Date:</span><span>${new Date(date).toLocaleDateString()}</span></div>` : ''}
-          
+
           <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/provider/${anomalyData.providerId || ''}?tab=analytics" class="button">
             View Anomalies
           </a>
@@ -259,10 +346,10 @@ export const sendBudgetAlert = async (userId, budgetData) => {
 
   const { budgetName, currentSpend, budgetAmount, percentage, isExceeded } = budgetData
 
-  const subject = isExceeded 
+  const subject = isExceeded
     ? `Budget Exceeded: ${budgetName}`
     : `Budget Alert: ${budgetName}`
-  
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -288,7 +375,7 @@ export const sendBudgetAlert = async (userId, budgetData) => {
             <strong>${budgetName}</strong> is at <strong>${percentage.toFixed(1)}%</strong> of the budget limit.
             ${isExceeded ? 'The budget has been exceeded!' : ''}
           </div>
-          
+
           <div class="metric">
             <span class="metric-label">Current Spend:</span>
             <span>$${currentSpend.toFixed(2)}</span>
@@ -301,7 +388,7 @@ export const sendBudgetAlert = async (userId, budgetData) => {
             <span class="metric-label">Remaining:</span>
             <span>$${(budgetAmount - currentSpend).toFixed(2)}</span>
           </div>
-          
+
           <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/budgets" class="button">
             View Budgets
           </a>
@@ -356,7 +443,7 @@ export const sendWeeklySummary = async (userId, summaryData) => {
             <span>${costChange > 0 ? '+' : ''}${costChange.toFixed(2)}%</span>
           </div>
           ` : ''}
-          
+
           ${topServices && topServices.length > 0 ? `
           <h3>Top Services</h3>
           ${topServices.map(service => `
@@ -366,7 +453,7 @@ export const sendWeeklySummary = async (userId, summaryData) => {
             </div>
           `).join('')}
           ` : ''}
-          
+
           <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" class="button">
             View Dashboard
           </a>

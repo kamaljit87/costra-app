@@ -1,6 +1,7 @@
 import express from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 import speakeasy from 'speakeasy'
 import {
   createUser,
@@ -13,17 +14,53 @@ import {
   confirmTOTPAndEnable,
   disableTOTP,
   recordMultipleConsents,
+  createEmailVerificationToken,
+  verifyEmailToken,
+  createPasswordResetToken,
+  verifyPasswordResetToken,
+  markPasswordResetTokenUsed,
+  updateUserPassword,
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
 import { createTrialSubscription } from '../services/subscriptionService.js'
 import { addMarketingLead } from '../database.js'
+import { sendTransactionalEmail } from '../services/emailService.js'
+import {
+  verifyEmailTemplate,
+  passwordResetTemplate,
+  welcomeTemplate,
+  passwordChangedTemplate,
+  twoFactorEnabledTemplate,
+  twoFactorDisabledTemplate,
+} from '../services/emailTemplates.js'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
 
 const TOTP_ISSUER = 'Costra'
 const TEMP_TOKEN_EXPIRY = '10m'
+const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
+
+/** Generate a secure random token and its SHA-256 hash */
+function generateTokenPair() {
+  const token = crypto.randomBytes(32).toString('hex')
+  const hash = crypto.createHash('sha256').update(token).digest('hex')
+  return { token, hash }
+}
+
+/** Send email verification to user */
+async function sendVerificationEmail(userId, email, name) {
+  const { token, hash } = generateTokenPair()
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+  await createEmailVerificationToken(userId, email, hash, expiresAt)
+  const verifyUrl = `${FRONTEND_URL()}/verify-email?token=${token}`
+  await sendTransactionalEmail({
+    to: email,
+    subject: 'Verify Your Email — Costra',
+    html: verifyEmailTemplate(name, verifyUrl),
+  })
+}
 
 /** Issue a short-lived token only valid for POST /auth/2fa/verify */
 function signTemporary2FAToken(userId, email) {
@@ -48,6 +85,7 @@ function toUserResponse(user) {
     email: user.email,
     avatarUrl: user.avatar_url ?? null,
     isAdmin: user.is_admin || false,
+    emailVerified: user.email_verified ?? false,
   }
 }
 
@@ -107,14 +145,117 @@ router.get('/config', (_req, res) => {
   res.json({ signupDisabled })
 })
 
-/** Forgot password: accept email and return generic success (no email sent unless configured). Prevents user enumeration. */
-router.post('/forgot-password', (req, res) => {
+/** Forgot password: sends reset email if user exists. Always returns generic success to prevent user enumeration. */
+router.post('/forgot-password', async (req, res) => {
   const email = req.body?.email
   if (!email || typeof email !== 'string' || !email.trim()) {
     return res.status(400).json({ error: 'Email is required' })
   }
-  // Always return success to avoid revealing whether the account exists
+
+  // Always return success immediately to prevent timing-based enumeration
   res.json({ message: 'If an account exists for this email, you will receive reset instructions.' })
+
+  // Send reset email in background (after response)
+  try {
+    const user = await getUserByEmail(email.trim().toLowerCase())
+    if (user && user.password_hash) {
+      const { token, hash } = generateTokenPair()
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+      await createPasswordResetToken(user.id, hash, expiresAt)
+      const resetUrl = `${FRONTEND_URL()}/reset-password?token=${token}`
+      await sendTransactionalEmail({
+        to: user.email,
+        subject: 'Reset Your Password — Costra',
+        html: passwordResetTemplate(user.name, resetUrl),
+      })
+      logger.info('Password reset email sent', { email: user.email })
+    }
+  } catch (err) {
+    logger.error('Error sending password reset email', { email: email.trim(), error: err.message })
+  }
+})
+
+/** Reset password: verify token and set new password */
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required' })
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const resetToken = await verifyPasswordResetToken(tokenHash)
+    if (!resetToken) {
+      return res.status(400).json({ error: 'Invalid or expired reset link. Please request a new one.' })
+    }
+
+    // Update password
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    await updateUserPassword(resetToken.user_id, passwordHash)
+    await markPasswordResetTokenUsed(resetToken.id)
+
+    // Send confirmation email
+    const user = await getUserById(resetToken.user_id)
+    if (user) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: 'Password Changed — Costra',
+        html: passwordChangedTemplate(user.name),
+      }).catch((e) => logger.error('Failed to send password changed email', { error: e.message }))
+    }
+
+    logger.info('Password reset completed', { userId: resetToken.user_id })
+    res.json({ message: 'Password reset successfully. You can now sign in with your new password.' })
+  } catch (error) {
+    logger.error('Password reset error', { error: error.message })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/** Verify email: validate token and mark email as verified */
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) {
+      return res.status(400).json({ error: 'Verification token is required' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const verified = await verifyEmailToken(tokenHash)
+    if (!verified) {
+      return res.status(400).json({ error: 'Invalid or expired verification link. Please request a new one.' })
+    }
+
+    logger.info('Email verified', { userId: verified.user_id, email: verified.email })
+    res.json({ message: 'Email verified successfully!' })
+  } catch (error) {
+    logger.error('Email verification error', { error: error.message })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/** Resend verification email */
+router.post('/resend-verification', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id
+    const user = await getUserById(userId)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+    if (user.email_verified) {
+      return res.json({ message: 'Email is already verified' })
+    }
+
+    await sendVerificationEmail(userId, user.email, user.name)
+    logger.info('Verification email resent', { userId })
+    res.json({ message: 'Verification email sent. Please check your inbox.' })
+  } catch (error) {
+    logger.error('Resend verification error', { userId: req.user?.userId, error: error.message })
+    res.status(500).json({ error: 'Failed to resend verification email' })
+  }
 })
 
 /** Waitlist: store lead details securely (no auth required) */
@@ -205,6 +346,18 @@ router.post('/signup',
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
       )
+
+      // Send verification and welcome emails (non-blocking)
+      try {
+        await sendVerificationEmail(userId, email, name)
+      } catch (emailErr) {
+        logger.error('Failed to send verification email', { userId, error: emailErr.message })
+      }
+      sendTransactionalEmail({
+        to: email,
+        subject: 'Welcome to Costra!',
+        html: welcomeTemplate(name),
+      }).catch((e) => logger.error('Failed to send welcome email', { userId, error: e.message }))
 
       // Get the created user to return full user object
       const user = await getUserByEmail(email)
@@ -405,6 +558,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         email: user.email,
         avatarUrl: user.avatar_url || null,
         isAdmin: user.is_admin || false,
+        emailVerified: user.email_verified ?? false,
       },
     })
   } catch (error) {
@@ -562,6 +716,15 @@ router.post('/2fa/confirm', authenticateToken, async (req, res) => {
     if (!ok) {
       return res.status(400).json({ error: 'Could not enable 2FA. Please try again.' })
     }
+    // Send notification email
+    const user2fa = await getUserById(userId)
+    if (user2fa) {
+      sendTransactionalEmail({
+        to: user2fa.email,
+        subject: 'Two-Factor Authentication Enabled — Costra',
+        html: twoFactorEnabledTemplate(user2fa.name),
+      }).catch((e) => logger.error('Failed to send 2FA enabled email', { error: e.message }))
+    }
     res.json({ message: 'Two-factor authentication enabled.' })
   } catch (error) {
     logger.error('2FA confirm error', { requestId: req.requestId, error: error.message })
@@ -590,6 +753,15 @@ router.post('/2fa/disable', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Invalid verification code.' })
     }
     await disableTOTP(userId)
+    // Send notification email
+    const userDis = await getUserById(userId)
+    if (userDis) {
+      sendTransactionalEmail({
+        to: userDis.email,
+        subject: 'Two-Factor Authentication Disabled — Costra',
+        html: twoFactorDisabledTemplate(userDis.name),
+      }).catch((e) => logger.error('Failed to send 2FA disabled email', { error: e.message }))
+    }
     res.json({ message: 'Two-factor authentication disabled.' })
   } catch (error) {
     logger.error('2FA disable error', { requestId: req.requestId, error: error.message })

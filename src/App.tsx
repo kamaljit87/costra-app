@@ -51,6 +51,12 @@ const SaaSPage = lazy(() => import('./pages/SaaSPage'))
 const CustomDashboardPage = lazy(() => import('./pages/CustomDashboardPage'))
 const BillAnalyzerPage = lazy(() => import('./pages/BillAnalyzerPage'))
 const RightsizingPage = lazy(() => import('./pages/RightsizingPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'))
+const ConfirmDeletePage = lazy(() => import('./pages/ConfirmDeletePage'))
+const CancelDeletePage = lazy(() => import('./pages/CancelDeletePage'))
+const VerifyEmailChangePage = lazy(() => import('./pages/VerifyEmailChangePage'))
+const CancelEmailChangePage = lazy(() => import('./pages/CancelEmailChangePage'))
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -127,6 +133,12 @@ function App() {
                   <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
                   <Route path="/waitlist" element={<WaitlistRoute />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
+                  <Route path="/confirm-delete" element={<ConfirmDeletePage />} />
+                  <Route path="/cancel-delete" element={<CancelDeletePage />} />
+                  <Route path="/verify-email-change" element={<VerifyEmailChangePage />} />
+                  <Route path="/cancel-email-change" element={<CancelEmailChangePage />} />
                 <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
                 <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />
                 <Route path="/auth/suggest-2fa" element={<ProtectedRoute><Suggest2FAPage /></ProtectedRoute>} />
@@ -135,7 +147,7 @@ function App() {
                 <Route path="/contact" element={<ContactPage />} />
                 <Route path="/blog" element={<BlogListPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
-                <Route path="/docs" element={<DocsPage />} />
+                <Route path="/docs" element={<ProtectedRoute><DocsPage /></ProtectedRoute>} />
             <Route
               path="/dashboard"
               element={

@@ -4,12 +4,15 @@
  */
 
 import express from 'express'
+import crypto from 'crypto'
 import { authenticateToken } from '../middleware/auth.js'
 import {
   exportUserData,
-  createDeletionRequest,
+  createDeletionRequestWithToken,
   confirmDeletionRequest,
   cancelDeletionRequest,
+  getDeletionRequestByToken,
+  getDeletionRequestByCancelToken,
   getUserConsents,
   withdrawConsent,
   submitGrievance,
@@ -17,7 +20,15 @@ import {
   getUserById,
   addMarketingLead,
 } from '../database.js'
+import { sendTransactionalEmail } from '../services/emailService.js'
+import {
+  deletionConfirmTemplate,
+  accountDeletedTemplate,
+  deletionCancelledTemplate,
+} from '../services/emailTemplates.js'
 import logger from '../utils/logger.js'
+
+const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
 
 const router = express.Router()
 
@@ -55,7 +66,7 @@ router.get('/export', authenticateToken, async (req, res) => {
 
 /**
  * POST /api/compliance/delete-account
- * Request account deletion
+ * Request account deletion — sends confirmation email with approve/cancel links
  */
 router.post('/delete-account', authenticateToken, async (req, res) => {
   try {
@@ -63,12 +74,30 @@ router.post('/delete-account', authenticateToken, async (req, res) => {
     const { reason } = req.body
     const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress
 
-    const request = await createDeletionRequest(userId, ipAddress, reason)
+    const user = await getUserById(userId)
+    if (!user) return res.status(404).json({ error: 'User not found' })
 
-    logger.info('Account deletion requested', { userId, requestId: request.id })
+    // Generate confirm and cancel tokens
+    const confirmToken = crypto.randomBytes(32).toString('hex')
+    const confirmHash = crypto.createHash('sha256').update(confirmToken).digest('hex')
+    const cancelToken = crypto.randomBytes(32).toString('hex')
+    const cancelHash = crypto.createHash('sha256').update(cancelToken).digest('hex')
+
+    const request = await createDeletionRequestWithToken(userId, ipAddress, reason, confirmHash, cancelHash)
+
+    // Send confirmation email
+    const confirmUrl = `${FRONTEND_URL()}/confirm-delete?token=${confirmToken}`
+    const cancelUrl = `${FRONTEND_URL()}/cancel-delete?token=${cancelToken}`
+    await sendTransactionalEmail({
+      to: user.email,
+      subject: 'Confirm Account Deletion — Costra',
+      html: deletionConfirmTemplate(user.name, confirmUrl, cancelUrl),
+    })
+
+    logger.info('Account deletion requested — confirmation email sent', { userId, requestId: request.id })
 
     res.json({
-      message: 'Deletion request created. Please confirm to permanently delete your account and all associated data.',
+      message: 'A confirmation email has been sent to your email address. Please check your inbox to confirm account deletion.',
       request: {
         id: request.id,
         status: request.status,
@@ -90,7 +119,7 @@ router.post('/delete-account', authenticateToken, async (req, res) => {
 
 /**
  * POST /api/compliance/delete-account/:requestId/confirm
- * Confirm and execute account deletion
+ * Confirm and execute account deletion (authenticated — from UI)
  */
 router.post('/delete-account/:requestId/confirm', authenticateToken, async (req, res) => {
   try {
@@ -102,20 +131,29 @@ router.post('/delete-account/:requestId/confirm', authenticateToken, async (req,
       return res.status(400).json({ error: 'Invalid request ID' })
     }
 
+    const user = await getUserById(userId)
+
     // If user opted in to marketing emails, save their email before deletion
-    if (keepForMarketing) {
+    if (keepForMarketing && user) {
       try {
-        const user = await getUserById(userId)
         const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress
         await addMarketingLead(user.email, user.name, 'account_deletion', ipAddress)
         logger.info('User opted in to marketing emails before deletion', { userId, email: user.email })
       } catch (marketingError) {
-        // Non-critical — proceed with deletion even if marketing save fails
         logger.warn('Failed to save marketing lead before deletion', { userId, error: marketingError.message })
       }
     }
 
     await confirmDeletionRequest(userId, requestId)
+
+    // Send "account deleted" email (fire-and-forget, user no longer exists in DB)
+    if (user) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: 'Account Deleted — Costra',
+        html: accountDeletedTemplate(user.name),
+      }).catch((e) => logger.error('Failed to send account deleted email', { error: e.message }))
+    }
 
     logger.info('Account deletion confirmed and executed', { userId, requestId, keepForMarketing: !!keepForMarketing })
 
@@ -130,6 +168,89 @@ router.post('/delete-account/:requestId/confirm', authenticateToken, async (req,
       stack: error.stack,
     })
     res.status(500).json({ error: error.message || 'Failed to delete account' })
+  }
+})
+
+/**
+ * POST /api/compliance/delete-account/confirm-by-token
+ * Confirm account deletion via email token link (no auth required)
+ */
+router.post('/delete-account/confirm-by-token', async (req, res) => {
+  try {
+    const { token, keepForMarketing } = req.body
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const request = await getDeletionRequestByToken(tokenHash)
+    if (!request) {
+      return res.status(400).json({ error: 'Invalid or expired deletion link.' })
+    }
+
+    const user = await getUserById(request.user_id)
+
+    if (keepForMarketing && user) {
+      try {
+        await addMarketingLead(user.email, user.name, 'account_deletion', request.ip_address)
+      } catch (marketingError) {
+        logger.warn('Failed to save marketing lead', { error: marketingError.message })
+      }
+    }
+
+    await confirmDeletionRequest(request.user_id, request.id)
+
+    if (user) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: 'Account Deleted — Costra',
+        html: accountDeletedTemplate(user.name),
+      }).catch((e) => logger.error('Failed to send account deleted email', { error: e.message }))
+    }
+
+    logger.info('Account deletion confirmed via email token', { userId: request.user_id, requestId: request.id })
+
+    res.json({ message: 'Your account and all associated data have been permanently deleted.' })
+  } catch (error) {
+    logger.error('Error confirming deletion by token', { error: error.message })
+    res.status(500).json({ error: error.message || 'Failed to delete account' })
+  }
+})
+
+/**
+ * POST /api/compliance/delete-account/cancel-by-token
+ * Cancel account deletion via email token link (no auth required)
+ */
+router.post('/delete-account/cancel-by-token', async (req, res) => {
+  try {
+    const { token } = req.body
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' })
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const request = await getDeletionRequestByCancelToken(tokenHash)
+    if (!request) {
+      return res.status(400).json({ error: 'Invalid or expired cancellation link.' })
+    }
+
+    await cancelDeletionRequest(request.user_id, request.id)
+
+    const user = await getUserById(request.user_id)
+    if (user) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: 'Account Deletion Cancelled — Costra',
+        html: deletionCancelledTemplate(user.name),
+      }).catch((e) => logger.error('Failed to send deletion cancelled email', { error: e.message }))
+    }
+
+    logger.info('Account deletion cancelled via email token', { userId: request.user_id, requestId: request.id })
+
+    res.json({ message: 'Account deletion cancelled. Your account is safe.' })
+  } catch (error) {
+    logger.error('Error cancelling deletion by token', { error: error.message })
+    res.status(500).json({ error: 'Failed to cancel deletion request' })
   }
 })
 
@@ -150,6 +271,16 @@ router.post('/delete-account/:requestId/cancel', authenticateToken, async (req, 
 
     if (!result) {
       return res.status(404).json({ error: 'Deletion request not found or already processed' })
+    }
+
+    // Send cancellation email
+    const user = await getUserById(userId)
+    if (user) {
+      sendTransactionalEmail({
+        to: user.email,
+        subject: 'Account Deletion Cancelled — Costra',
+        html: deletionCancelledTemplate(user.name),
+      }).catch((e) => logger.error('Failed to send deletion cancelled email', { error: e.message }))
     }
 
     logger.info('Account deletion cancelled', { userId, requestId })
