@@ -202,7 +202,10 @@ const Sidebar = ({
   }, {} as Record<string, CloudAccount[]>)
 
   const closeOnNav = () => {
-    if (isControlled) onToggle!()
+    // On mobile, close the overlay sidebar
+    if (isControlled && isOpen) onToggle!()
+    // On desktop, collapse back to icon-only rail
+    setIsCollapsed(true)
   }
 
   const isActive = (path: string) => location.pathname === path
