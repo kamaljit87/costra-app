@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
-import { MessageCircle, Plus, Lightbulb, ChevronDown } from 'lucide-react'
+import { MessageCircle, Plus, Lightbulb, ChevronDown, BookMarked } from 'lucide-react'
 import { cloudProvidersAPI } from '../../services/api'
 import { ProviderIcon } from '../CloudProviderIcons'
 
@@ -322,6 +322,15 @@ const Sidebar = ({
 
   const renderFooter = (collapsed: boolean) => (
     <div className={`p-2 border-t border-surface-200 dark:border-gray-700 space-y-1 ${collapsed ? 'flex flex-col items-center' : ''}`}>
+      <Link
+        to="/docs"
+        onClick={closeOnNav}
+        className={`flex items-center ${collapsed ? 'justify-center w-10 h-10' : 'gap-2 w-full py-2 px-4'} font-medium text-sm rounded-xl ${isActive('/docs') ? 'bg-accent-50 dark:bg-accent-900/50 text-accent-700 dark:text-accent-200' : 'text-gray-600 dark:text-gray-300 hover:bg-surface-200 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-gray-100'} transition-colors`}
+        title={collapsed ? 'Docs' : undefined}
+      >
+        <BookMarked className="h-4 w-4 flex-shrink-0" />
+        {!collapsed && 'Docs'}
+      </Link>
       {onContactClick && (
         <button
           type="button"
