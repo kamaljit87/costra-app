@@ -206,7 +206,7 @@ export default function Dashboard() {
 
         {/* Demo Mode Banner */}
         {/* Header with Sync and Add Provider - Compact */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-0.5 flex items-center gap-2">
               Dashboard
@@ -216,7 +216,7 @@ export default function Dashboard() {
               Multi-cloud cost overview across all your providers
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+          <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
             <button
                 onClick={() => navigate('/settings?tab=providers')}
                 className="btn-secondary"
