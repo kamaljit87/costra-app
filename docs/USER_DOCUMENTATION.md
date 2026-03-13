@@ -1,8 +1,8 @@
-# Costra — User Documentation
+# Costdoq — User Documentation
 
 ## Introduction
 
-**Costra** is a cloud cost dashboard that helps you see and manage spending across all your cloud providers in one place. Connect AWS, Azure, Google Cloud, and other supported providers to view current and historical costs, set budgets, compare months, and get recommendations to reduce waste. It’s built for founders, small teams, and anyone who wants clarity on cloud spend without heavy setup.
+**Costdoq** is a cloud cost dashboard that helps you see and manage spending across all your cloud providers in one place. Connect AWS, Azure, Google Cloud, and other supported providers to view current and historical costs, set budgets, compare months, and get recommendations to reduce waste. It’s built for founders, small teams, and anyone who wants clarity on cloud spend without heavy setup.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### Creating an account
 
-1. Open the Costra website and click **Sign up** (or go to the signup page if your organization uses a direct link).
+1. Open the Costdoq website and click **Sign up** (or go to the signup page if your organization uses a direct link).
 2. Enter your **name**, **email**, and **password**, and accept the terms if required.
 3. Click **Sign up**. You’ll be signed in and can go to the **Dashboard**.
 
@@ -86,7 +86,7 @@ If you don’t receive an email, confirm the address is correct and try again, o
 
 ### Cloud provider integrations
 
-**What it does:** Costra pulls cost and usage data from your cloud accounts (e.g. AWS, Azure, Google Cloud, DigitalOcean, and others). You add and manage these connections in Settings. For AWS, you can use access keys or an automated (role-based) connection.
+**What it does:** Costdoq pulls cost and usage data from your cloud accounts (e.g. AWS, Azure, Google Cloud, DigitalOcean, and others). You add and manage these connections in Settings. For AWS, you can use access keys or an automated (role-based) connection.
 
 **Who it’s for:** Anyone who needs to track real spend; you must connect at least one provider to see real data.
 
@@ -97,8 +97,8 @@ If you don’t receive an email, confirm the address is correct and try again, o
 3. Click **Add provider** (or equivalent).
 4. Choose a provider (e.g. **Amazon Web Services**, **Microsoft Azure**, **Google Cloud Platform**).
 5. Follow the on-screen steps:
-   - **AWS (simple):** Enter an account alias (e.g. “Production”), Access Key ID, and Secret Access Key. Costra will verify and then start syncing.
-   - **AWS (automated):** Use the “automated” flow: get a link/URL to create a stack in your AWS account, then authorize the role. Costra will detect when the connection is ready (you may need to click **Verify connection** if auto-detection times out).
+   - **AWS (simple):** Enter an account alias (e.g. “Production”), Access Key ID, and Secret Access Key. Costdoq will verify and then start syncing.
+   - **AWS (automated):** Use the “automated” flow: get a link/URL to create a stack in your AWS account, then authorize the role. Costdoq will detect when the connection is ready (you may need to click **Verify connection** if auto-detection times out).
    - **Other providers:** Enter the credentials or details shown for that provider (e.g. subscription/tenant IDs for Azure, project/key for GCP).
 6. After a successful connection, the provider appears in the list and in the sidebar. Cost data will appear after the first sync (triggered automatically or via **Sync Data** on the Dashboard).
 
@@ -110,7 +110,7 @@ If you don’t receive an email, confirm the address is correct and try again, o
 - **Starter plan:** Up to 3 cloud provider accounts; **Pro:** unlimited.
 - If **Sync** says “No Providers Connected”, add at least one provider in Settings.
 - AWS automated connection: if auto-detection times out, the UI may say something like “Auto-detection timed out. If your stack is still creating, click Verify Connection below.” Click **Verify connection** once your AWS stack is ready.
-- Removing a provider removes its data from Costra; historical data for that account may no longer be available.
+- Removing a provider removes its data from Costdoq; historical data for that account may no longer be available.
 
 <!-- Screenshot: Settings — Cloud Providers list -->
 
@@ -120,7 +120,7 @@ If you don’t receive an email, confirm the address is correct and try again, o
 
 ### Budgets
 
-**What it does:** Budgets let you set a spending cap (e.g. $500/month) per provider or account and get alerts when you approach or exceed it. You can create budgets in Costra only, or (for supported clouds) also create them in the cloud provider.
+**What it does:** Budgets let you set a spending cap (e.g. $500/month) per provider or account and get alerts when you approach or exceed it. You can create budgets in Costdoq only, or (for supported clouds) also create them in the cloud provider.
 
 **Who it’s for:** Teams and individuals who want to avoid overspend and get early warnings.
 
@@ -355,7 +355,7 @@ If you don’t receive an email, confirm the address is correct and try again, o
 - **Savings plans (Dashboard):** View committed savings from AWS (or other) savings plans.
 - **Anomaly detection (Provider detail):** Highlights unusual cost changes; availability may be Pro or provider-specific.
 - **Unit economics (Provider detail):** Cost per unit of usage; may be Pro-only.
-- **API keys (Settings → API):** For integrating Costra with your own tools or scripts.
+- **API keys (Settings → API):** For integrating Costdoq with your own tools or scripts.
 - **Admin / Debug:** If you have an admin or debug route (e.g. **/admin/tickets**, **/debug**), these are for internal or support use; normal users typically don’t need them.
 
 ---
@@ -458,4 +458,4 @@ Uploaded files are processed in memory and never stored on disk. Only the extrac
 
 ---
 
-*This documentation is based on the current Costra application. If something doesn’t match what you see in the app, the product may have changed; we recommend checking in-app help or contacting support. Items marked “TODO” are for the team to verify (e.g. plan limits, provider support, and feature availability).*
+*This documentation is based on the current Costdoq application. If something doesn’t match what you see in the app, the product may have changed; we recommend checking in-app help or contacting support. Items marked “TODO” are for the team to verify (e.g. plan limits, provider support, and feature availability).*

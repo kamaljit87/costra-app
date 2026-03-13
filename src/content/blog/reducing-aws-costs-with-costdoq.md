@@ -1,9 +1,9 @@
 ---
 title: "5 Ways to Reduce Your AWS Bill with Multi-Cloud Visibility"
-slug: "reducing-aws-costs-with-costra"
+slug: "reducing-aws-costs-with-costdoq"
 date: "2026-02-15"
 description: "Discover how multi-cloud cost visibility helps teams identify savings opportunities and reduce AWS spending by up to 30%."
-author: "Costra Team"
+author: "Costdoq Team"
 tags: ["aws", "cost-optimization", "finops", "multi-cloud"]
 ---
 
@@ -15,7 +15,7 @@ Here are five proven strategies that help engineering and finance teams cut thei
 
 When your AWS, Azure, and GCP spend live in separate consoles, it is nearly impossible to get a complete picture of your cloud investment. A unified dashboard surfaces the full picture across all providers, accounts, and services in a single view.
 
-With Costra, you can see all your cloud costs side by side, making it easy to spot which provider or service is driving your bill up.
+With Costdoq, you can see all your cloud costs side by side, making it easy to spot which provider or service is driving your bill up.
 
 ## 2. Credit-Aware Cost Tracking
 

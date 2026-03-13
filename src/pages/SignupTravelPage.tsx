@@ -32,7 +32,7 @@ export default function SignupTravelPage() {
         <SignUpCard
         onSubmit={handleSubmit}
         googleButton={<GoogleSignInButton mode="signup" />}
-        title="Costra"
+        title="Costdoq"
         tagline="Create your account and connect all your cloud providers in one place"
       />
       </div>

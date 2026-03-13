@@ -204,7 +204,7 @@ router.get('/export', requireFeature('csv_export'), async (req, res) => {
         .filter(s => (s.service_name || '').toLowerCase() !== 'tax' && !(s.service_name || '').toLowerCase().includes('tax -'))
         .map(s => ({ name: s.service_name, cost: parseFloat(s.cost) || 0, change: parseFloat(s.change_percent) || 0 })),
     }))
-    const filename = `costra-cost-${year}-${String(month).padStart(2, '0')}`
+    const filename = `costdoq-cost-${year}-${String(month).padStart(2, '0')}`
     if (format === 'csv') {
       const rows = []
       rows.push(['Provider', 'Current Month ($)', 'Last Month ($)', 'Service', 'Cost ($)', 'Change (%)'])
@@ -1942,7 +1942,7 @@ router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (
       }
       if (accountData.connectionType?.startsWith('automated') && accountData.roleArn && accountData.externalId) {
         const { getAssumedRoleCredentials } = await import('../services/awsAuth.js')
-        credentials = await getAssumedRoleCredentials(accountData.roleArn, accountData.externalId, `costra-monthly-total-${accountId}-${Date.now()}`)
+        credentials = await getAssumedRoleCredentials(accountData.roleArn, accountData.externalId, `costdoq-monthly-total-${accountId}-${Date.now()}`)
       } else {
         credentials = accountData.credentials
       }
@@ -1960,7 +1960,7 @@ router.get('/:providerId/monthly-total/:year/:month', authenticateToken, async (
       }
       if (accountData.connectionType?.startsWith('automated') && accountData.roleArn && accountData.externalId) {
         const { getAssumedRoleCredentials } = await import('../services/awsAuth.js')
-        credentials = await getAssumedRoleCredentials(accountData.roleArn, accountData.externalId, `costra-monthly-total-${first.id}-${Date.now()}`)
+        credentials = await getAssumedRoleCredentials(accountData.roleArn, accountData.externalId, `costdoq-monthly-total-${first.id}-${Date.now()}`)
       } else {
         credentials = accountData.credentials
       }

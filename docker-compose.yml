@@ -1,12 +1,12 @@
-# Costra Docker Compose - Fault tolerant
+# Costdoq Docker Compose - Fault tolerant
 # Use: docker compose up -d
 # Access: http://localhost (via nginx)
 # Set DATABASE_URL, JWT_SECRET, etc. in .env
 
 services:
-  costra-redis:
+  costdoq-redis:
     image: redis:7-alpine
-    container_name: costra-redis
+    container_name: costdoq-redis
     command: redis-server --appendonly yes
     volumes:
       - redis-data:/data
@@ -18,19 +18,19 @@ services:
       start_period: 5s
     restart: unless-stopped
     networks:
-      - costra-network
+      - costdoq-network
 
-  costra-backend:
+  costdoq-backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    image: costra-backend:latest
-    container_name: costra-backend
+    image: costdoq-backend:latest
+    container_name: costdoq-backend
     env_file: .env
     expose:
       - "3002"
     depends_on:
-      costra-redis:
+      costdoq-redis:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -40,17 +40,17 @@ services:
       retries: 3
       start_period: 60s
     networks:
-      - costra-network
+      - costdoq-network
 
-  costra-frontend:
+  costdoq-frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
-    image: costra-frontend:latest
-    container_name: costra-frontend
+    image: costdoq-frontend:latest
+    container_name: costdoq-frontend
     expose:
       - "8080"
     restart: unless-stopped
@@ -61,11 +61,11 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - costra-network
+      - costdoq-network
 
-  costra-nginx:
+  costdoq-nginx:
     image: nginx:1.27-alpine
-    container_name: costra-nginx
+    container_name: costdoq-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -74,9 +74,9 @@ services:
       - certbot-webroot:/var/www/certbot:ro
       - certbot-certs:/etc/letsencrypt:ro
     depends_on:
-      costra-backend:
+      costdoq-backend:
         condition: service_healthy
-      costra-frontend:
+      costdoq-frontend:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
@@ -86,22 +86,22 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - costra-network
+      - costdoq-network
 
-  costra-certbot:
+  costdoq-certbot:
     image: certbot/certbot:latest
-    container_name: costra-certbot
+    container_name: costdoq-certbot
     entrypoint: ["/bin/sh", "-c"]
     command: ["trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $$!; done;"]
     volumes:
       - certbot-certs:/etc/letsencrypt
       - certbot-webroot:/var/www/certbot
     depends_on:
-      costra-nginx:
+      costdoq-nginx:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - costra-network
+      - costdoq-network
 
 volumes:
   redis-data:
@@ -109,5 +109,5 @@ volumes:
   certbot-webroot:
 
 networks:
-  costra-network:
+  costdoq-network:
     driver: bridge

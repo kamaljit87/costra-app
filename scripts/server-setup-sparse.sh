@@ -7,15 +7,15 @@
 #   bash server-setup-sparse.sh [REPO_URL] [TARGET_DIR]
 #
 # Defaults:
-#   REPO_URL  = git@github.com:kamaljit87/costra-app.git
-#   TARGET_DIR = /var/servers/costra-app
+#   REPO_URL  = git@github.com:kamaljit87/costdoq-app.git
+#   TARGET_DIR = /var/servers/costdoq-app
 #
 set -euo pipefail
 
-REPO_URL="${1:-git@github.com:kamaljit87/costra-app.git}"
-TARGET_DIR="${2:-/var/servers/costra-app}"
+REPO_URL="${1:-git@github.com:kamaljit87/costdoq-app.git}"
+TARGET_DIR="${2:-/var/servers/costdoq-app}"
 
-echo "=== Costra sparse checkout setup ==="
+echo "=== Costdoq sparse checkout setup ==="
 echo "Repo:   $REPO_URL"
 echo "Target: $TARGET_DIR"
 echo ""

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
-const STORAGE_KEY = 'costra-theme'
+const STORAGE_KEY = 'costdoq-theme'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 

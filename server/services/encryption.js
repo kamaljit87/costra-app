@@ -26,7 +26,7 @@ const getEncryptionKey = () => {
     process.exit(1)
   } else {
     logger.warn('Using default encryption key — NOT SAFE FOR PRODUCTION. Set ENCRYPTION_KEY environment variable.')
-    _encryptionKey = crypto.scryptSync('costra-default-key-change-in-production', 'costra-dev-salt-not-for-production', 32)
+    _encryptionKey = crypto.scryptSync('costdoq-default-key-change-in-production', 'costdoq-dev-salt-not-for-production', 32)
   }
 
   return _encryptionKey
@@ -73,7 +73,7 @@ const decryptWithKey = (encryptedData, key) => {
 }
 
 // Legacy default key used when ENCRYPTION_KEY env var was not loaded at import time
-const LEGACY_KEY = crypto.scryptSync('costra-default-key-change-in-production', 'costra-dev-salt-not-for-production', 32)
+const LEGACY_KEY = crypto.scryptSync('costdoq-default-key-change-in-production', 'costdoq-dev-salt-not-for-production', 32)
 
 /**
  * Decrypt sensitive data

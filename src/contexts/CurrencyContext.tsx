@@ -27,14 +27,14 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
         const token = localStorage.getItem('authToken')
         if (token) {
           // Use cached preference immediately, then refresh in background
-          const cachedCurrency = localStorage.getItem('costra_currency')
+          const cachedCurrency = localStorage.getItem('costdoq_currency')
           if (cachedCurrency) {
             setSelectedCurrency(cachedCurrency as Currency)
           }
           const prefs = await costDataAPI.getPreferences()
           if (prefs.preferences?.currency) {
             setSelectedCurrency(prefs.preferences.currency as Currency)
-            localStorage.setItem('costra_currency', prefs.preferences.currency)
+            localStorage.setItem('costdoq_currency', prefs.preferences.currency)
           }
         }
       } catch (error) {
@@ -66,7 +66,7 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const handleCurrencyChange = useCallback(async (currency: Currency) => {
     setSelectedCurrency(currency)
-    localStorage.setItem('costra_currency', currency)
+    localStorage.setItem('costdoq_currency', currency)
     // Save to database if user is authenticated
     const token = localStorage.getItem('authToken')
     if (token) {

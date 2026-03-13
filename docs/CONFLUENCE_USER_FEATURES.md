@@ -1,4 +1,4 @@
-# Costra – User Features Documentation
+# Costdoq – User Features Documentation
 
 *For Confluence: copy sections into Confluence pages or paste into a Confluence page (Markdown supported).*
 
@@ -6,7 +6,7 @@
 
 ## 1. Product overview
 
-**Costra** is a multi-cloud cost management application.
+**Costdoq** is a multi-cloud cost management application.
 
 | Capability | Description |
 |------------|-------------|
@@ -110,7 +110,7 @@
 ## 14. Settings (`/settings`)
 
 ### General
-- **Appearance:** Light / Dark / System; also theme toggle (sun/moon) in header. Stored in `costra-theme` (localStorage).
+- **Appearance:** Light / Dark / System; also theme toggle (sun/moon) in header. Stored in `costdoq-theme` (localStorage).
 - **Currency:** Display currency (USD, EUR, INR, etc.).
 - **Email reports and alerts:** Pro only – weekly summary, budget alerts, anomaly alerts.
 
@@ -181,7 +181,7 @@
 
 ---
 
-*End of Costra user features documentation.*
+*End of Costdoq user features documentation.*
 or search.
 
 ---
@@ -240,7 +240,7 @@ Used for showback/chargeback and reporting.
 - **Export CSV** – Downloads cost data for the **current month** as CSV (all providers/services).
 - **Export PDF** – Downloads cost data for the **current month** as PDF.
 - Exports are **Pro**-gated when the feature flag `csv_export` is enforced.
-- File names: e.g. `costra-cost-YYYY-MM.csv` / `.pdf`.
+- File names: e.g. `costdoq-cost-YYYY-MM.csv` / `.pdf`.
 
 ### 12.2 Reports (Reports page)
 
@@ -276,7 +276,7 @@ Used for showback/chargeback and reporting.
 
 - **Appearance (theme)**  
   - **Light**, **Dark**, or **System** (follow OS preference).  
-  - Stored in browser (`costra-theme`).  
+  - Stored in browser (`costdoq-theme`).  
   - A **theme toggle** (sun/moon) in the header also switches between light and dark.
 
 - **Currency**  
@@ -307,7 +307,7 @@ Used for showback/chargeback and reporting.
 - **List keys** – Shows key prefix, optional name, created date (full key never shown again).
 - **Revoke** – Delete a key; it stops working immediately.
 - **Usage:** Send `Authorization: Bearer <your-api-key>` on API requests. Keys are **read-only** and cannot manage account or create/delete other keys.
-- Key format: `costra_` followed by a long hex string.
+- Key format: `costdoq_` followed by a long hex string.
 
 ---
 
@@ -336,7 +336,7 @@ Used for showback/chargeback and reporting.
 
 - **Settings → General → Appearance:** Light / Dark / System.
 - **Header:** Sun/moon icon toggles between light and dark (overrides system until changed again).
-- **Persistence:** Stored in `localStorage` as `costra-theme`.
+- **Persistence:** Stored in `localStorage` as `costdoq-theme`.
 - **Tailwind:** Uses `dark` class on `<html>`; components use `dark:` variants where needed.
 
 ### 16.2 Saved views (filters)
@@ -401,4 +401,4 @@ Used for showback/chargeback and reporting.
 
 ---
 
-*End of Costra user features documentation. For technical implementation details, see the codebase and server README.*
+*End of Costdoq user features documentation. For technical implementation details, see the codebase and server README.*

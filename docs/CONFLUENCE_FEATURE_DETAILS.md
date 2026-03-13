@@ -1,4 +1,4 @@
-# Costra – Feature Details (Confluence)
+# Costdoq – Feature Details (Confluence)
 
 *Supplementary detail for Confluence. Use with CONFLUENCE_USER_FEATURES.md.*
 
@@ -78,7 +78,7 @@
 
 ## API keys – Details
 
-- **Format:** `costra_` + 64 hex characters. Stored as hash; only prefix shown in UI after creation.
+- **Format:** `costdoq_` + 64 hex characters. Stored as hash; only prefix shown in UI after creation.
 - **Create:** One-time display of full key; user must copy and store it. Key cannot be retrieved again.
 - **Use:** Send `Authorization: Bearer <full-key>` on requests. Same auth middleware as JWT; API keys get `req.user` with userId.
 - **Scopes:** Read-only; they can access cost/insights endpoints that use `authenticateToken`. They cannot call key-management endpoints (list/create/delete keys); those require JWT (`requireJwt`).

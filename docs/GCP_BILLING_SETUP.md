@@ -1,12 +1,12 @@
-# GCP Billing Setup for Costra
+# GCP Billing Setup for Costdoq
 
 ## Important: BigQuery Required for Cost Data
 
-**Without BigQuery billing export, Costra will show $0 for GCP costs.**
+**Without BigQuery billing export, Costdoq will show $0 for GCP costs.**
 
 GCP's Cloud Billing API does not provide detailed cost breakdown. The only way to get programmatic access to cost data is via:
 
-1. **BigQuery Billing Export** (recommended for Costra)
+1. **BigQuery Billing Export** (recommended for Costdoq)
 2. Budget API (for alerts only, not actual costs)
 
 ## Setup Steps
@@ -16,7 +16,7 @@ GCP's Cloud Billing API does not provide detailed cost breakdown. The only way t
    - Create a BigQuery dataset for billing data
    - Enable "Detailed usage cost" export
 
-2. **Add credentials in Costra**
+2. **Add credentials in Costdoq**
    - Include `bigQueryDataset` in your GCP credentials (e.g. `my-project.billing_export`)
    - Include `billingAccountId` for the billing account
 

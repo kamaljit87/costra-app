@@ -110,7 +110,7 @@ export default function Sidebar({ isOpen, onClose, isPermanent = false, onContac
             <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
               <img
                 src="/logo.png"
-                alt="Costra"
+                alt="Costdoq"
                 className="h-16 w-auto transition-all duration-200 group-hover:scale-105"
               />
             </span>

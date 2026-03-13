@@ -661,7 +661,7 @@ router.get('/rightsizing-recommendations', authenticateToken, async (req, res) =
               const stsClient = new STSClient({ region: 'us-east-1' })
               const assumeRes = await stsClient.send(new AssumeRoleCommand({
                 RoleArn: account.roleArn,
-                RoleSessionName: `costra-rightsizing-${account.id}-${Date.now()}`,
+                RoleSessionName: `costdoq-rightsizing-${account.id}-${Date.now()}`,
                 ExternalId: account.externalId,
                 DurationSeconds: 3600,
               }))
@@ -1353,7 +1353,7 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
                 const stsClient = new STSClient({ region: 'us-east-1' })
                 const assumeRes = await stsClient.send(new AssumeRoleCommand({
                   RoleArn: accountData.roleArn,
-                  RoleSessionName: `costra-explorer-${account.id}-${Date.now()}`,
+                  RoleSessionName: `costdoq-explorer-${account.id}-${Date.now()}`,
                   ExternalId: accountData.externalId,
                   DurationSeconds: 3600,
                 }))
@@ -1389,8 +1389,8 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
                     message: 'The CloudFormation stack needs updating to include EC2 read permissions for rightsizing analysis.',
                     steps: [
                       'Go to AWS CloudFormation in your AWS Console',
-                      'Find the Costra stack and click Update',
-                      'Choose "Replace current template" and re-enter the Costra template URL',
+                      'Find the Costdoq stack and click Update',
+                      'Choose "Replace current template" and re-enter the Costdoq template URL',
                       'Complete the update wizard to add the new ec2:DescribeInstances permission',
                     ],
                   })

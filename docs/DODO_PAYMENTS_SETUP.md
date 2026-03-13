@@ -1,6 +1,6 @@
 # Dodo Payments Setup
 
-Costra uses [Dodo Payments](https://dodopayments.com) as its payment provider for subscriptions.
+Costdoq uses [Dodo Payments](https://dodopayments.com) as its payment provider for subscriptions.
 
 ## Prerequisites
 

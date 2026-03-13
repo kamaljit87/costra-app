@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Costra AWS Billing Connection - Grants Costra read-only access to AWS billing and cost data with CUR support'
+Description: 'Costdoq AWS Billing Connection - Grants Costdoq read-only access to AWS billing and cost data with CUR support'
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -8,7 +8,7 @@ Metadata:
         default: Connection Information
       Parameters:
       - ConnectionName
-      - CostraAccountId
+      - CostdoqAccountId
     - Label:
         default: Security
       Parameters:
@@ -20,32 +20,32 @@ Metadata:
     ParameterLabels:
       ConnectionName:
         default: 'Connection Name (descriptive alias for this AWS account)'
-      CostraAccountId:
-        default: 'Costra AWS Account ID'
+      CostdoqAccountId:
+        default: 'Costdoq AWS Account ID'
       ExternalId:
         default: 'External ID (for secure cross-account access)'
       CallbackUrl:
-        default: 'Costra Callback URL (do not modify)'
+        default: 'Costdoq Callback URL (do not modify)'
 
 Parameters:
   ConnectionName:
     Type: String
-    Description: 'Descriptive name for this connection (used to identify your account in Costra)'
-    Default: 'costra-billing-connection'
+    Description: 'Descriptive name for this connection (used to identify your account in Costdoq)'
+    Default: 'costdoq-billing-connection'
     AllowedPattern: '^[a-z0-9-]+$'
     ConstraintDescription: 'Must be lowercase alphanumeric with hyphens only (3-39 characters). Kept short to fit S3 bucket naming limits.'
     MinLength: 3
     MaxLength: 39
 
-  CostraAccountId:
+  CostdoqAccountId:
     Type: String
-    Description: 'Costra AWS Account ID (provided by Costra)'
+    Description: 'Costdoq AWS Account ID (provided by Costdoq)'
     AllowedPattern: '^[0-9]{12}$'
     ConstraintDescription: 'Must be a valid 12-digit AWS account ID'
 
   ExternalId:
     Type: String
-    Description: 'External ID for secure cross-account access (provided by Costra)'
+    Description: 'External ID for secure cross-account access (provided by Costdoq)'
     MinLength: 16
     MaxLength: 1224
     NoEcho: true
@@ -54,25 +54,25 @@ Parameters:
 
   CallbackUrl:
     Type: String
-    Description: 'Costra API callback URL (auto-filled, do not modify)'
+    Description: 'Costdoq API callback URL (auto-filled, do not modify)'
     Default: ''
 
 Conditions:
   HasCallbackUrl: !Not [!Equals [!Ref CallbackUrl, '']]
 
 Resources:
-  CostraAccessRole:
+  CostdoqAccessRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'CostraAccessRole-${ConnectionName}'
-      Description: !Sub 'Role for Costra to access AWS billing and cost data for ${ConnectionName}'
+      RoleName: !Sub 'CostdoqAccessRole-${ConnectionName}'
+      Description: !Sub 'Role for Costdoq to access AWS billing and cost data for ${ConnectionName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Sid: AllowCostraAssumeRole
+          - Sid: AllowCostdoqAssumeRole
             Effect: Allow
             Principal:
-              AWS: !Sub 'arn:aws:iam::${CostraAccountId}:root'
+              AWS: !Sub 'arn:aws:iam::${CostdoqAccountId}:root'
             Action: 'sts:AssumeRole'
             Condition:
               StringEquals:
@@ -80,7 +80,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/job-function/Billing
       Policies:
-        - PolicyName: CostraCostExplorerAccess
+        - PolicyName: CostdoqCostExplorerAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -125,7 +125,7 @@ Resources:
                   - 'bcm-data-exports:UpdateExport'
                   - 'bcm-data-exports:DeleteExport'
                 Resource: '*'
-        - PolicyName: CostraCURBucketAccess
+        - PolicyName: CostdoqCURBucketAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -141,7 +141,7 @@ Resources:
                   - 's3:GetBucketLocation'
                   - 's3:GetBucketPolicy'
                 Resource:
-                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}'
+                  - !Sub 'arn:aws:s3:::costdoq-cur-${AWS::AccountId}-${ConnectionName}'
               - Sid: CURBucketReadWrite
                 Effect: Allow
                 Action:
@@ -150,9 +150,9 @@ Resources:
                   - 's3:GetBucketLocation'
                   - 's3:DeleteObject'
                 Resource:
-                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}'
-                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}/*'
-        - PolicyName: CostraStackSelfCleanup
+                  - !Sub 'arn:aws:s3:::costdoq-cur-${AWS::AccountId}-${ConnectionName}'
+                  - !Sub 'arn:aws:s3:::costdoq-cur-${AWS::AccountId}-${ConnectionName}/*'
+        - PolicyName: CostdoqStackSelfCleanup
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -170,8 +170,8 @@ Resources:
                   - 'iam:DetachRolePolicy'
                   - 'iam:ListRolePolicies'
                   - 'iam:ListAttachedRolePolicies'
-                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CostraAccessRole-${ConnectionName}'
-        - PolicyName: CostraOrganizationsAndMonitoring
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/CostdoqAccessRole-${ConnectionName}'
+        - PolicyName: CostdoqOrganizationsAndMonitoring
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -210,23 +210,23 @@ Resources:
       MaxSessionDuration: 3600
       Tags:
         - Key: ManagedBy
-          Value: Costra
+          Value: Costdoq
         - Key: Purpose
           Value: BillingDataAccess
         - Key: ConnectionName
           Value: !Ref ConnectionName
         - Key: CreatedBy
           Value: CloudFormation
-        - Key: CostraAccountId
-          Value: !Ref CostraAccountId
+        - Key: CostdoqAccountId
+          Value: !Ref CostdoqAccountId
 
   # S3 bucket for CUR 2.0 Data Exports — created via Lambda to avoid failure
   # when the bucket already exists (e.g. stack re-creation after deletion with
   # DeletionPolicy: Retain).
-  CostraCURBucketCreatorRole:
+  CostdoqCURBucketCreatorRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'CostraCURBucketRole-${ConnectionName}'
+      RoleName: !Sub 'CostdoqCURBucketRole-${ConnectionName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -251,23 +251,23 @@ Resources:
                   - 's3:PutLifecycleConfiguration'
                   - 's3:PutBucketPublicAccessBlock'
                 Resource:
-                  - !Sub 'arn:aws:s3:::costra-cur-${AWS::AccountId}-${ConnectionName}'
+                  - !Sub 'arn:aws:s3:::costdoq-cur-${AWS::AccountId}-${ConnectionName}'
       Tags:
         - Key: ManagedBy
-          Value: Costra
+          Value: Costdoq
 
-  CostraCURBucketCreator:
+  CostdoqCURBucketCreator:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub 'costra-bucket-${ConnectionName}'
+      FunctionName: !Sub 'costdoq-bucket-${ConnectionName}'
       Runtime: python3.12
       Handler: index.handler
       Timeout: 30
       MemorySize: 128
-      Role: !GetAtt CostraCURBucketCreatorRole.Arn
+      Role: !GetAtt CostdoqCURBucketCreatorRole.Arn
       Tags:
         - Key: ManagedBy
-          Value: Costra
+          Value: Costdoq
       Code:
         ZipFile: |
           import json
@@ -332,7 +332,7 @@ Resources:
                                  "Expiration": {"Days": 400}, "Filter": {"Prefix": ""}}]
                   })
                   s3.put_bucket_tagging(Bucket=bucket_name, Tagging={"TagSet": [
-                      {"Key": "ManagedBy", "Value": "Costra"},
+                      {"Key": "ManagedBy", "Value": "Costdoq"},
                       {"Key": "Purpose", "Value": "CostAndUsageReports"},
                       {"Key": "ConnectionName", "Value": props.get("ConnectionName", "")},
                   ]})
@@ -342,7 +342,7 @@ Resources:
               # Apply bucket policy (idempotent PUT)
               try:
                   account_id = props.get("AccountId", "")
-                  costra_account_id = props.get("CostraAccountId", "")
+                  costdoq_account_id = props.get("CostdoqAccountId", "")
                   bucket_arn = f"arn:aws:s3:::{bucket_name}"
                   policy = {
                       "Version": "2012-10-17",
@@ -359,9 +359,9 @@ Resources:
                               },
                           },
                           {
-                              "Sid": "AllowCostraCrossAccountRead",
+                              "Sid": "AllowCostdoqCrossAccountRead",
                               "Effect": "Allow",
-                              "Principal": {"AWS": f"arn:aws:iam::{costra_account_id}:root"},
+                              "Principal": {"AWS": f"arn:aws:iam::{costdoq_account_id}:root"},
                               "Action": ["s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"],
                               "Resource": [bucket_arn, f"{bucket_arn}/*"],
                           },
@@ -374,24 +374,24 @@ Resources:
 
               send_cfn_response(event, context, "SUCCESS", "Bucket ready", {"BucketName": bucket_name})
 
-  CostraCURBucket:
+  CostdoqCURBucket:
     Type: Custom::S3Bucket
     Properties:
-      ServiceToken: !GetAtt CostraCURBucketCreator.Arn
-      BucketName: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
+      ServiceToken: !GetAtt CostdoqCURBucketCreator.Arn
+      BucketName: !Sub 'costdoq-cur-${AWS::AccountId}-${ConnectionName}'
       ConnectionName: !Ref ConnectionName
       AccountId: !Ref AWS::AccountId
-      CostraAccountId: !Ref CostraAccountId
+      CostdoqAccountId: !Ref CostdoqAccountId
 
-  # CUR 2.0 Data Export is created via the Costra API after the stack is deployed.
+  # CUR 2.0 Data Export is created via the Costdoq API after the stack is deployed.
   # This avoids rollback of the entire stack if the BCM export creation fails.
 
-  # Lambda function that notifies Costra API when the stack is created
-  CostraCallbackRole:
+  # Lambda function that notifies Costdoq API when the stack is created
+  CostdoqCallbackRole:
     Type: AWS::IAM::Role
     Condition: HasCallbackUrl
     Properties:
-      RoleName: !Sub 'CostraCallbackRole-${ConnectionName}'
+      RoleName: !Sub 'CostdoqCallbackRole-${ConnectionName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -403,21 +403,21 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Tags:
         - Key: ManagedBy
-          Value: Costra
+          Value: Costdoq
 
-  CostraCallbackFunction:
+  CostdoqCallbackFunction:
     Type: AWS::Lambda::Function
     Condition: HasCallbackUrl
     Properties:
-      FunctionName: !Sub 'costra-callback-${ConnectionName}'
+      FunctionName: !Sub 'costdoq-callback-${ConnectionName}'
       Runtime: python3.12
       Handler: index.handler
       Timeout: 30
       MemorySize: 128
-      Role: !GetAtt CostraCallbackRole.Arn
+      Role: !GetAtt CostdoqCallbackRole.Arn
       Tags:
         - Key: ManagedBy
-          Value: Costra
+          Value: Costdoq
       Code:
         ZipFile: |
           import json
@@ -480,24 +480,24 @@ Resources:
               # Always succeed — callback failure should not roll back the stack
               send_cfn_response(event, context, "SUCCESS", "Callback sent")
 
-  NotifyCostra:
-    Type: Custom::CostraCallback
+  NotifyCostdoq:
+    Type: Custom::CostdoqCallback
     Condition: HasCallbackUrl
-    DependsOn: CostraAccessRole
+    DependsOn: CostdoqAccessRole
     Properties:
-      ServiceToken: !GetAtt CostraCallbackFunction.Arn
+      ServiceToken: !GetAtt CostdoqCallbackFunction.Arn
       CallbackUrl: !Ref CallbackUrl
       AccountId: !Ref AWS::AccountId
       ExternalId: !Ref ExternalId
-      RoleArn: !GetAtt CostraAccessRole.Arn
+      RoleArn: !GetAtt CostdoqAccessRole.Arn
       ConnectionName: !Ref ConnectionName
       Region: !Ref AWS::Region
       StackName: !Ref AWS::StackName
 
 Outputs:
   RoleArn:
-    Description: 'ARN of the IAM role that Costra will use to access your AWS account'
-    Value: !GetAtt CostraAccessRole.Arn
+    Description: 'ARN of the IAM role that Costdoq will use to access your AWS account'
+    Value: !GetAtt CostdoqAccessRole.Arn
     Export:
       Name: !Sub '${AWS::StackName}-RoleArn'
 
@@ -527,7 +527,7 @@ Outputs:
 
   CURBucketName:
     Description: 'S3 bucket for CUR 2.0 Data Exports'
-    Value: !Sub 'costra-cur-${AWS::AccountId}-${ConnectionName}'
+    Value: !Sub 'costdoq-cur-${AWS::AccountId}-${ConnectionName}'
     Export:
       Name: !Sub '${AWS::StackName}-CURBucket'
 

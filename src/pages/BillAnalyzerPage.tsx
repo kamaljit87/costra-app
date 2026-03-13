@@ -281,7 +281,7 @@ export default function BillAnalyzerPage() {
 
   return (
     <Layout>
-      <Helmet><title>Bill Analyzer - Costra</title></Helmet>
+      <Helmet><title>Bill Analyzer - Costdoq</title></Helmet>
 
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}

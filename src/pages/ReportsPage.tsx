@@ -249,7 +249,7 @@ export default function ReportsPage() {
 
   return (
     <Layout>
-      <Helmet><title>Reports | Costra</title></Helmet>
+      <Helmet><title>Reports | Costdoq</title></Helmet>
 
       <div className="max-w-6xl mx-auto">
         {/* Header */}

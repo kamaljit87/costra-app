@@ -1,4 +1,4 @@
-# Costra Kubernetes Operations Guide
+# Costdoq Kubernetes Operations Guide
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@
 
 ## Architecture Overview
 
-Costra runs on a **single-node k3s** cluster (lightweight Kubernetes) on an OVH VPS (6 CPU, 12GB RAM). Traffic flows through **Cloudflare CDN** → **Traefik ingress** → **Services** → **Pods**.
+Costdoq runs on a **single-node k3s** cluster (lightweight Kubernetes) on an OVH VPS (6 CPU, 12GB RAM). Traffic flows through **Cloudflare CDN** → **Traefik ingress** → **Services** → **Pods**.
 
 ### Key Components
 
@@ -25,8 +25,8 @@ Costra runs on a **single-node k3s** cluster (lightweight Kubernetes) on an OVH 
 | Kubernetes | k3s (lightweight) | — |
 | Ingress Controller | Traefik (k3s built-in) | kube-system |
 | TLS Certificates | cert-manager + Let's Encrypt | cert-manager |
-| Frontend | React/Vite + nginx | costra |
-| Backend | Node.js (ESM) | costra |
+| Frontend | React/Vite + nginx | costdoq |
+| Backend | Node.js (ESM) | costdoq |
 | Cache | Redis 7 (StatefulSet) | infra |
 | Database | PostgreSQL (external managed) | — |
 | Container Registry | AWS ECR | — |
@@ -44,7 +44,7 @@ Costra runs on a **single-node k3s** cluster (lightweight Kubernetes) on an OVH 
                            ▼
                 ┌─────────────────────┐
                 │   Cloudflare CDN    │
-                │   (costra.app)      │
+                │   (costdoq.com)      │
                 │                     │
                 │  • SSL termination  │
                 │  • DDoS protection  │
@@ -65,12 +65,12 @@ Costra runs on a **single-node k3s** cluster (lightweight Kubernetes) on an OVH 
 │  │  │  └────────┬─────────┘                                    │  │  │
 │  │  └───────────┼──────────────────────────────────────────────┘  │  │
 │  │              │                                                  │  │
-│  │              │  Ingress rules (costra.app):                     │  │
-│  │              │    /api/*  → costra-backend:3002                 │  │
-│  │              │    /*      → costra-frontend:8080                │  │
+│  │              │  Ingress rules (costdoq.com):                     │  │
+│  │              │    /api/*  → costdoq-backend:3002                 │  │
+│  │              │    /*      → costdoq-frontend:8080                │  │
 │  │              │                                                  │  │
 │  │  ┌──────────┼───────────────────────────────────────────────┐  │  │
-│  │  │  costra namespace                                        │  │  │
+│  │  │  costdoq namespace                                        │  │  │
 │  │  │          │                                                │  │  │
 │  │  │          ├──────────────────┐                             │  │  │
 │  │  │          ▼                  ▼                             │  │  │
@@ -90,8 +90,8 @@ Costra runs on a **single-node k3s** cluster (lightweight Kubernetes) on an OVH 
 │  │  │  │  port 3002   │  │  port 8080   │                     │  │  │
 │  │  │  └──────┬───────┘  └──────────────┘                     │  │  │
 │  │  │         │                                                │  │  │
-│  │  │         │  ConfigMap: costra-config (non-secret env)     │  │  │
-│  │  │         │  Secret: costra-secrets (from .env)            │  │  │
+│  │  │         │  ConfigMap: costdoq-config (non-secret env)     │  │  │
+│  │  │         │  Secret: costdoq-secrets (from .env)            │  │  │
 │  │  └─────────┼────────────────────────────────────────────────┘  │  │
 │  │            │                                                    │  │
 │  │  ┌─────────┼────────────────────────────────────────────────┐  │  │
@@ -130,12 +130,12 @@ User Browser
 │   Ingress    │
 └──────┬──────┘
        │
-       ├── /api/*  ──► costra-backend Service ──► Backend Pod (Node.js)
+       ├── /api/*  ──► costdoq-backend Service ──► Backend Pod (Node.js)
        │                                              │
        │                                              ├── PostgreSQL (external)
        │                                              └── Redis (infra namespace)
        │
-       └── /*      ──► costra-frontend Service ──► Frontend Pod (nginx)
+       └── /*      ──► costdoq-frontend Service ──► Frontend Pod (nginx)
                                                        │
                                                        └── Serves React SPA
                                                            (index.html + /assets/*)
@@ -210,16 +210,16 @@ k3s Cluster
 ├── infra                (shared infrastructure)
 │   └── redis            (StatefulSet, 1 replica, 2Gi PVC)
 │
-└── costra               (application)
-    ├── costra-secrets   (Secret - generated from .env)
-    ├── costra-config    (ConfigMap - non-secret env vars)
-    ├── costra-backend   (Deployment: 2-4 replicas)
-    ├── costra-frontend  (Deployment: 2-3 replicas)
-    ├── costra-backend   (Service: ClusterIP:3002)
-    ├── costra-frontend  (Service: ClusterIP:8080)
-    ├── costra-backend   (HPA: 70% CPU target)
-    ├── costra-frontend  (HPA: 70% CPU target)
-    └── costra-ingress   (Ingress: Traefik, TLS via cert-manager)
+└── costdoq               (application)
+    ├── costdoq-secrets   (Secret - generated from .env)
+    ├── costdoq-config    (ConfigMap - non-secret env vars)
+    ├── costdoq-backend   (Deployment: 2-4 replicas)
+    ├── costdoq-frontend  (Deployment: 2-3 replicas)
+    ├── costdoq-backend   (Service: ClusterIP:3002)
+    ├── costdoq-frontend  (Service: ClusterIP:8080)
+    ├── costdoq-backend   (HPA: 70% CPU target)
+    ├── costdoq-frontend  (HPA: 70% CPU target)
+    └── costdoq-ingress   (Ingress: Traefik, TLS via cert-manager)
 ```
 
 ---
@@ -234,7 +234,7 @@ Secrets are stored in `.env` (gitignored) and **never committed** to git.
 .env (on server, gitignored)
   │
   ├──► scripts/gen-k8s-secrets.sh
-  │    Generates k8s/costra/secret.yaml (also gitignored)
+  │    Generates k8s/costdoq/secret.yaml (also gitignored)
   │    with base64-encoded values from .env
   │
   └──► scripts/create-secret-from-env.sh
@@ -244,15 +244,15 @@ Secrets are stored in `.env` (gitignored) and **never committed** to git.
 **To update secrets:**
 1. Edit `.env` on the server
 2. Run `./scripts/gen-k8s-secrets.sh`
-3. Run `sudo kubectl apply -f k8s/costra/secret.yaml`
-4. Restart backend pods: `sudo kubectl rollout restart deployment/costra-backend -n costra`
+3. Run `sudo kubectl apply -f k8s/costdoq/secret.yaml`
+4. Restart backend pods: `sudo kubectl rollout restart deployment/costdoq-backend -n costdoq`
 
 ### ConfigMap vs Secret
 
 | Resource | File | Contents |
 |----------|------|----------|
-| `costra-config` (ConfigMap) | `k8s/costra/configmap.yaml` | `NODE_ENV`, `PORT`, `REDIS_URL`, `FRONTEND_URL`, `VITE_API_URL` |
-| `costra-secrets` (Secret) | `k8s/costra/secret.yaml` | Everything from `.env` (DATABASE_URL, JWT_SECRET, API keys, etc.) |
+| `costdoq-config` (ConfigMap) | `k8s/costdoq/configmap.yaml` | `NODE_ENV`, `PORT`, `REDIS_URL`, `FRONTEND_URL`, `VITE_API_URL` |
+| `costdoq-secrets` (Secret) | `k8s/costdoq/secret.yaml` | Everything from `.env` (DATABASE_URL, JWT_SECRET, API keys, etc.) |
 
 Both are mounted into backend pods via `envFrom`.
 
@@ -262,40 +262,40 @@ Both are mounted into backend pods via `envFrom`.
 
 ### View pod status
 ```bash
-sudo kubectl get pods -n costra
+sudo kubectl get pods -n costdoq
 ```
 
 ### View pod logs
 ```bash
 # Backend logs (follow)
-sudo kubectl logs -l component=backend -n costra -f --tail=100
+sudo kubectl logs -l component=backend -n costdoq -f --tail=100
 
 # Frontend logs
-sudo kubectl logs -l component=frontend -n costra -f --tail=100
+sudo kubectl logs -l component=frontend -n costdoq -f --tail=100
 
 # Specific pod
-sudo kubectl logs costra-backend-665d77dbf6-6nqqr -n costra
+sudo kubectl logs costdoq-backend-665d77dbf6-6nqqr -n costdoq
 ```
 
 ### Restart a deployment
 ```bash
 # Rolling restart (zero downtime)
-sudo kubectl rollout restart deployment/costra-backend -n costra
+sudo kubectl rollout restart deployment/costdoq-backend -n costdoq
 ```
 
 ### Scale manually
 ```bash
-sudo kubectl scale deployment/costra-backend --replicas=3 -n costra
+sudo kubectl scale deployment/costdoq-backend --replicas=3 -n costdoq
 ```
 
 ### Shell into a pod
 ```bash
-sudo kubectl exec -it deploy/costra-backend -n costra -- sh
+sudo kubectl exec -it deploy/costdoq-backend -n costdoq -- sh
 ```
 
 ### Check resource usage
 ```bash
-sudo kubectl top pods -n costra
+sudo kubectl top pods -n costdoq
 sudo kubectl top nodes
 ```
 
@@ -303,29 +303,29 @@ sudo kubectl top nodes
 ```bash
 # Edit .env, then:
 ./scripts/gen-k8s-secrets.sh
-sudo kubectl apply -f k8s/costra/secret.yaml
-sudo kubectl rollout restart deployment/costra-backend -n costra
+sudo kubectl apply -f k8s/costdoq/secret.yaml
+sudo kubectl rollout restart deployment/costdoq-backend -n costdoq
 ```
 
 ### Manual deploy (without CI/CD)
 ```bash
 # Build locally
-docker build -t costra-backend:v1 -f Dockerfile.backend .
-docker build -t costra-frontend:v1 -f Dockerfile.frontend \
+docker build -t costdoq-backend:v1 -f Dockerfile.backend .
+docker build -t costdoq-frontend:v1 -f Dockerfile.frontend \
   --build-arg VITE_GOOGLE_CLIENT_ID=<your-id> .
 
 # Import into k3s
-docker save costra-backend:v1 | sudo k3s ctr images import -
-docker save costra-frontend:v1 | sudo k3s ctr images import -
+docker save costdoq-backend:v1 | sudo k3s ctr images import -
+docker save costdoq-frontend:v1 | sudo k3s ctr images import -
 
 # Update deployment
-sudo kubectl set image deployment/costra-backend backend=costra-backend:v1 -n costra
-sudo kubectl set image deployment/costra-frontend frontend=costra-frontend:v1 -n costra
+sudo kubectl set image deployment/costdoq-backend backend=costdoq-backend:v1 -n costdoq
+sudo kubectl set image deployment/costdoq-frontend frontend=costdoq-frontend:v1 -n costdoq
 ```
 
 ### Check all resources in namespace
 ```bash
-sudo kubectl get all -n costra
+sudo kubectl get all -n costdoq
 ```
 
 ---
@@ -337,7 +337,7 @@ sudo kubectl get all -n costra
 ```
 Site not working?
 │
-├── Can't reach costra.app at all?
+├── Can't reach costdoq.com at all?
 │   ├── Check Cloudflare DNS → A record points to server IP?
 │   ├── Check server is reachable: ping <server-ip>
 │   └── Check Traefik is running:
@@ -345,38 +345,38 @@ Site not working?
 │
 ├── Getting 404 "page not found"?
 │   ├── Check ingress has an ADDRESS:
-│   │   sudo kubectl get ingress -n costra
+│   │   sudo kubectl get ingress -n costdoq
 │   │   └── No address? → ingressClassName wrong (must be "traefik")
 │   ├── Check ingress rules:
-│   │   sudo kubectl describe ingress costra-ingress -n costra
+│   │   sudo kubectl describe ingress costdoq-ingress -n costdoq
 │   └── Check services exist:
-│       sudo kubectl get svc -n costra
+│       sudo kubectl get svc -n costdoq
 │
 ├── Getting 502 Bad Gateway?
 │   ├── Pods crashing → check logs:
-│   │   sudo kubectl logs -l component=backend -n costra --tail=50
+│   │   sudo kubectl logs -l component=backend -n costdoq --tail=50
 │   ├── Check pod status:
-│   │   sudo kubectl get pods -n costra
+│   │   sudo kubectl get pods -n costdoq
 │   │   └── CrashLoopBackOff? → App error (check logs)
 │   │   └── ImagePullBackOff? → Image not imported (see below)
 │   └── Check service endpoints:
-│       sudo kubectl get endpoints -n costra
+│       sudo kubectl get endpoints -n costdoq
 │       └── No endpoints? → Labels don't match between Service and Pod
 │
 ├── ImagePullBackOff?
 │   ├── Images must be imported via: docker save <img> | sudo k3s ctr images import -
-│   ├── Check imported images: sudo k3s ctr images list | grep costra
+│   ├── Check imported images: sudo k3s ctr images list | grep costdoq
 │   ├── imagePullPolicy MUST be "Never" (we don't pull from ECR on server)
 │   └── Re-import:
-│       docker save <ecr-url>/costra-backend:<tag> | sudo k3s ctr images import -
+│       docker save <ecr-url>/costdoq-backend:<tag> | sudo k3s ctr images import -
 │
 ├── API returns errors?
 │   ├── Check backend logs:
-│   │   sudo kubectl logs -l component=backend -n costra --tail=100
+│   │   sudo kubectl logs -l component=backend -n costdoq --tail=100
 │   ├── Check secrets are loaded:
-│   │   sudo kubectl exec deploy/costra-backend -n costra -- env | grep DATABASE
+│   │   sudo kubectl exec deploy/costdoq-backend -n costdoq -- env | grep DATABASE
 │   ├── Check DB connectivity:
-│   │   sudo kubectl exec deploy/costra-backend -n costra -- \
+│   │   sudo kubectl exec deploy/costdoq-backend -n costdoq -- \
 │   │     node -e "require('./database.js').then(()=>console.log('OK'))"
 │   └── Check Redis:
 │       sudo kubectl exec -it redis-0 -n infra -- redis-cli ping
@@ -387,14 +387,14 @@ Site not working?
 │   │   transferred via SCP from CI, not pulled on server
 │   ├── SSH connection refused → Check SSH_HOST, SSH_PRIVATE_KEY secrets
 │   ├── "timed out waiting for rollout" → Pods crashing after deploy
-│   │   └── Check: sudo kubectl describe pod <pod-name> -n costra
+│   │   └── Check: sudo kubectl describe pod <pod-name> -n costdoq
 │   └── SCP failed → Disk space? Check: df -h
 │
 └── Pods running but site slow?
     ├── Check HPA status:
-    │   sudo kubectl get hpa -n costra
+    │   sudo kubectl get hpa -n costdoq
     ├── Check resource usage:
-    │   sudo kubectl top pods -n costra
+    │   sudo kubectl top pods -n costdoq
     ├── Check node resources:
     │   sudo kubectl top nodes
     └── Purge Cloudflare cache:
@@ -417,10 +417,10 @@ Site not working?
 
 ```bash
 # Namespace events (sorted by time)
-sudo kubectl get events -n costra --sort-by=.lastTimestamp
+sudo kubectl get events -n costdoq --sort-by=.lastTimestamp
 
 # Specific pod events
-sudo kubectl describe pod <pod-name> -n costra
+sudo kubectl describe pod <pod-name> -n costdoq
 ```
 
 ---
@@ -465,8 +465,8 @@ k8s/
 │       ├── statefulset.yaml         # Redis 7 with AOF persistence
 │       └── service.yaml             # ClusterIP on port 6379
 │
-├── costra/                          # Application manifests
-│   ├── namespace.yaml               # "costra" namespace
+├── costdoq/                          # Application manifests
+│   ├── namespace.yaml               # "costdoq" namespace
 │   ├── configmap.yaml               # Non-secret environment variables
 │   ├── secret.yaml                  # Generated from .env (GITIGNORED)
 │   ├── secret.yaml.example          # Template showing required keys

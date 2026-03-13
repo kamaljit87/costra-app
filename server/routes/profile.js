@@ -149,14 +149,14 @@ router.put('/',
           // Send verification to new email
           sendTransactionalEmail({
             to: email,
-            subject: 'Verify Your New Email — Costra',
+            subject: 'Verify Your New Email — Costdoq',
             html: emailChangeVerifyTemplate(currentUser.name, email, verifyUrl),
           }).catch((e) => logger.error('Failed to send email change verification', { error: e.message }))
 
           // Send notification to old email
           sendTransactionalEmail({
             to: currentUser.email,
-            subject: 'Email Change Requested — Costra',
+            subject: 'Email Change Requested — Costdoq',
             html: emailChangeNotifyTemplate(currentUser.name, email, cancelUrl),
           }).catch((e) => logger.error('Failed to send email change notification', { error: e.message }))
 
@@ -364,7 +364,7 @@ router.put('/password',
       // Send password changed email (fire-and-forget)
       sendTransactionalEmail({
         to: user.email,
-        subject: 'Password Changed — Costra',
+        subject: 'Password Changed — Costdoq',
         html: passwordChangedTemplate(user.name),
       }).catch((e) => logger.error('Failed to send password changed email', { error: e.message }))
 
@@ -399,7 +399,7 @@ router.post('/verify-email-change', async (req, res) => {
     if (user) {
       const html = emailChangedConfirmTemplate(user.name)
       // Send to new email (now current)
-      sendTransactionalEmail({ to: user.email, subject: 'Email Address Updated — Costra', html })
+      sendTransactionalEmail({ to: user.email, subject: 'Email Address Updated — Costdoq', html })
         .catch((e) => logger.error('Failed to send email changed confirm', { error: e.message }))
     }
 

@@ -1,5 +1,5 @@
 /**
- * Costra backend server
+ * Costdoq backend server
  * Entry point - loads config, initializes services, starts HTTP server
  */
 

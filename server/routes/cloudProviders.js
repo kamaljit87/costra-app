@@ -538,7 +538,7 @@ router.post('/aws/automated',
         })
       }
       
-      const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID || '061190967865' // Example, replace with your account ID
+      const costdoqAccountId = process.env.COSTDOQ_AWS_ACCOUNT_ID || '061190967865' // Example, replace with your account ID
       
       // Store pending connection in Redis so the callback can look it up
       const pendingData = {
@@ -552,13 +552,13 @@ router.post('/aws/automated',
       await cache.set(`pending-aws-connection:${externalId}`, pendingData, 1800) // 30 min TTL
 
       // Build callback URL for the CloudFormation Lambda
-      const callbackBaseUrl = process.env.COSTRA_API_URL || process.env.API_BASE_URL || ''
+      const callbackBaseUrl = process.env.COSTDOQ_API_URL || process.env.API_BASE_URL || ''
 
       // Use sanitized connection name for CloudFormation (already sanitized above)
       const quickCreateUrl = generateCloudFormationQuickCreateUrl(
         templateUrl,
         sanitizedConnectionName,
-        costraAccountId,
+        costdoqAccountId,
         externalId,
         callbackBaseUrl ? `${callbackBaseUrl}/api/aws-callback` : '',
       )

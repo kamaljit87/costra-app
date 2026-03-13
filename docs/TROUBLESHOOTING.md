@@ -28,7 +28,7 @@ sudo systemctl status postgresql  # Linux
 brew services list  # macOS
 
 # Test database connection
-psql postgresql://postgres:postgres@localhost:5432/costra
+psql postgresql://postgres:postgres@localhost:5432/costdoq
 ```
 
 ### 3. Verify Environment Variables
@@ -45,7 +45,7 @@ Should contain:
 PORT=3001
 JWT_SECRET=your-secret-key
 NODE_ENV=development
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costdoq
 ```
 
 ### 4. Check CORS Configuration
@@ -81,12 +81,12 @@ brew services start postgresql  # macOS
 
 #### Database Does Not Exist
 ```
-error: database "costra" does not exist
+error: database "costdoq" does not exist
 ```
 **Solution**: Create the database
 ```bash
-createdb costra
-# Or: psql -c "CREATE DATABASE costra;"
+createdb costdoq
+# Or: psql -c "CREATE DATABASE costdoq;"
 ```
 
 #### Port Already in Use
@@ -117,7 +117,7 @@ Test if the backend is responding:
 # Health check
 curl http://localhost:3001/api/health
 
-# Should return: {"status":"ok","message":"Costra API is running"}
+# Should return: {"status":"ok","message":"Costdoq API is running"}
 ```
 
 ### 8. Check Frontend API URL
@@ -161,7 +161,7 @@ DATABASE_URL=postgresql://username:password@host:port/database
 
 ### Permission Denied
 ```sql
-GRANT ALL PRIVILEGES ON DATABASE costra TO your_username;
+GRANT ALL PRIVILEGES ON DATABASE costdoq TO your_username;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO your_username;
 ```
 

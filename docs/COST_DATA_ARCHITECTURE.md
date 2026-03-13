@@ -1,6 +1,6 @@
-# Costra — Cost Data Architecture & Fetching Documentation
+# Costdoq — Cost Data Architecture & Fetching Documentation
 
-> A comprehensive technical document explaining how Costra fetches, calculates, stores, and displays cost data for all supported cloud providers.
+> A comprehensive technical document explaining how Costdoq fetches, calculates, stores, and displays cost data for all supported cloud providers.
 
 ---
 
@@ -34,7 +34,7 @@
 
 ## 1. System Overview
 
-Costra is a multi-cloud FinOps (Financial Operations) platform that aggregates cost data from **7 cloud providers** into a single dashboard. The system:
+Costdoq is a multi-cloud FinOps (Financial Operations) platform that aggregates cost data from **7 cloud providers** into a single dashboard. The system:
 
 - Fetches real cost data using each provider's official billing APIs
 - Stores daily granular data (365 days of history) in PostgreSQL
@@ -203,16 +203,16 @@ When a user drills into a service (e.g., "EC2"):
 
 #### AWS Role-Based Access (Automated Connections)
 
-For users who don't want to share long-lived credentials, Costra supports **IAM Role Assumption**:
+For users who don't want to share long-lived credentials, Costdoq supports **IAM Role Assumption**:
 
 ```
-User's AWS Account                    Costra's AWS Account
+User's AWS Account                    Costdoq's AWS Account
 ┌────────────────────┐               ┌────────────────────┐
-│  IAM Role:         │  AssumeRole   │  Costra Server     │
-│  CostraAccessRole  │ ◄──────────── │  (ECS Task)        │
+│  IAM Role:         │  AssumeRole   │  Costdoq Server     │
+│  CostdoqAccessRole  │ ◄──────────── │  (ECS Task)        │
 │                    │               │                    │
 │  Trust Policy:     │               │  Uses default      │
-│  - Costra account  │               │  credential chain  │
+│  - Costdoq account  │               │  credential chain  │
 │  - ExternalId req  │               │  (instance profile)│
 │                    │               │                    │
 │  Permissions:      │               │  Gets temporary:   │
@@ -227,7 +227,7 @@ The flow in `sync.js` (lines 113-148):
 const stsClient = new STSClient({ region: 'us-east-1' })
 const assumeRoleCommand = new AssumeRoleCommand({
   RoleArn: accountData.roleArn,
-  RoleSessionName: `costra-sync-${accountId}-${Date.now()}`,
+  RoleSessionName: `costdoq-sync-${accountId}-${Date.now()}`,
   ExternalId: accountData.externalId,  // Random UUID generated at setup
   DurationSeconds: 3600,               // 1 hour
 })
@@ -337,7 +337,7 @@ This gives granular daily data with full service breakdown.
 - **Cannot provide detailed cost breakdown** without BigQuery export
 - Returns zeros and empty arrays — logs a warning to configure BigQuery export
 
-**Important**: GCP detailed cost data **requires** the user to set up billing export to BigQuery in their GCP Console. Without it, Costra cannot get granular costs.
+**Important**: GCP detailed cost data **requires** the user to set up billing export to BigQuery in their GCP Console. Without it, Costdoq cannot get granular costs.
 
 ---
 
@@ -706,7 +706,7 @@ When the frontend requests service breakdown for a specific date range (not just
 5. Scale to period: periodServiceCost = totalPeriodCost × servicePercent
 ```
 
-**Why proportional scaling?** Costra doesn't store service-level daily data (only total daily costs). Service breakdown is stored monthly. To estimate service costs for arbitrary date ranges, it applies the latest month's service proportions to the period's total.
+**Why proportional scaling?** Costdoq doesn't store service-level daily data (only total daily costs). Service breakdown is stored monthly. To estimate service costs for arbitrary date ranges, it applies the latest month's service proportions to the period's total.
 
 ---
 
@@ -905,7 +905,7 @@ CREATE INDEX idx_daily_cost_data_user_provider_date ON daily_cost_data(user_id, 
 
 ## 9. Caching Strategy
 
-Costra uses a **three-layer caching** approach:
+Costdoq uses a **three-layer caching** approach:
 
 ### Layer 1: API Response Cache (Database)
 
@@ -1149,7 +1149,7 @@ const convertAmount = (amount: number, fromCurrency: Currency = 'USD'): number =
 
 ## 12. Demo Mode (No Credentials Required)
 
-Demo mode allows users to explore Costra's features without connecting real cloud accounts.
+Demo mode allows users to explore Costdoq's features without connecting real cloud accounts.
 
 ### How It's Activated
 
@@ -1414,7 +1414,7 @@ CREATE TABLE anomaly_baselines (
 
 ## Summary: How Values Are Fetched Without Credits
 
-The term "credits" in Costra refers to cloud provider credits/discounts (like AWS promotional credits), NOT to Costra subscription credits.
+The term "credits" in Costdoq refers to cloud provider credits/discounts (like AWS promotional credits), NOT to Costdoq subscription credits.
 
 **How cost data works without entering cloud credentials (demo mode)**:
 1. No API calls are made to any cloud provider
@@ -1434,4 +1434,4 @@ The cost data fetching system is entirely independent of any credit or billing s
 1. Authenticating with the cloud provider's API using stored credentials
 2. Querying their billing/cost management API endpoints
 3. Receiving the raw cost data that the provider reports
-4. Transforming, calculating, and storing it in Costra's database
+4. Transforming, calculating, and storing it in Costdoq's database

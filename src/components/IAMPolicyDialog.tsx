@@ -42,14 +42,14 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
           steps: [
             'Log in to Azure Portal and navigate to Azure Active Directory',
             'Go to App registrations → New registration',
-            'Name your app (e.g., "Costra") and click Register',
+            'Name your app (e.g., "Costdoq") and click Register',
             'Note the Application (client) ID and Directory (tenant) ID',
             'Go to Certificates & secrets → New client secret',
             'Create a secret and copy the value (you\'ll only see it once)',
             'Go to Subscriptions → Your subscription → Access control (IAM)',
             'Click "Add" → "Add role assignment"',
             'Select role "Cost Management Reader" and assign to your app',
-            'Use the Application ID, Tenant ID, Client Secret, and Subscription ID in Costra'
+            'Use the Application ID, Tenant ID, Client Secret, and Subscription ID in Costdoq'
           ],
           roles: [
             'Cost Management Reader (required for cost data)',
@@ -76,7 +76,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Log in to Google Cloud Console',
             'Navigate to IAM & Admin → Service Accounts',
             'Click "Create Service Account"',
-            'Enter a name (e.g., "costra-reader") and description',
+            'Enter a name (e.g., "costdoq-reader") and description',
             'Click "Create and Continue"',
             'In "Grant this service account access to project", skip for now',
             'Click "Done" to create the service account',
@@ -86,7 +86,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Go to Billing → Account Management → Select your billing account',
             'Click "Manage permissions" → "Add principal"',
             'Add your service account email and grant "Billing Account Costs Viewer" role',
-            'Paste the entire JSON key content into Costra\'s Service Account Key field'
+            'Paste the entire JSON key content into Costdoq\'s Service Account Key field'
           ],
           roles: [
             'Billing Account Costs Viewer (billing.accounts.getCosts)',
@@ -112,11 +112,11 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Log in to DigitalOcean Control Panel',
             'Navigate to API → Tokens/Keys',
             'Click "Generate New Token"',
-            'Enter a name (e.g., "Costra")',
+            'Enter a name (e.g., "Costdoq")',
             'Select "Read" scope (or "Read/Write" if you need more features)',
             'Click "Generate Token"',
             'Copy the token immediately (you won\'t see it again)',
-            'Paste the token into Costra\'s API Token field'
+            'Paste the token into Costdoq\'s API Token field'
           ],
           links: [
             { label: 'DigitalOcean API Tokens', url: 'https://cloud.digitalocean.com/account/api/tokens' }
@@ -133,12 +133,12 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Log in to Linode Cloud Manager',
             'Navigate to Profile → API Tokens',
             'Click "Create a Personal Access Token"',
-            'Enter a label (e.g., "Costra")',
+            'Enter a label (e.g., "Costdoq")',
             'Set expiration (optional, recommended: 1 year)',
             'Select scopes: "Account:Read Only" and "Billing:Read Only"',
             'Click "Create Token"',
             'Copy the token immediately (you won\'t see it again)',
-            'Paste the token into Costra\'s API Token field'
+            'Paste the token into Costdoq\'s API Token field'
           ],
           links: [
             { label: 'Linode API Tokens', url: 'https://cloud.linode.com/profile/tokens' }
@@ -156,11 +156,11 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Navigate to Settings → API',
             'Click "Enable API" if not already enabled',
             'Click "Add API Key"',
-            'Enter a description (e.g., "Costra")',
+            'Enter a description (e.g., "Costdoq")',
             'Select permissions: "Read" (minimum required)',
             'Click "Add API Key"',
             'Copy the API key immediately',
-            'Paste the API key into Costra\'s API Key field'
+            'Paste the API key into Costdoq\'s API Key field'
           ],
           links: [
             { label: 'Vultr API Settings', url: 'https://my.vultr.com/settings/#settingsapi' }
@@ -177,7 +177,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Log in to IBM Cloud Console',
             'Navigate to Manage → Access (IAM) → Service IDs',
             'Click "Create" to create a new Service ID',
-            'Enter a name (e.g., "costra-reader") and description',
+            'Enter a name (e.g., "costdoq-reader") and description',
             'Click "Create"',
             'Go to the Service ID → API Keys tab',
             'Click "Create" to generate an API key',
@@ -185,7 +185,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Go to Access Groups → Create or select a group',
             'Add the Service ID to the group',
             'Assign "Billing Viewer" role to the access group',
-            'Use the API Key and Account ID in Costra'
+            'Use the API Key and Account ID in Costdoq'
           ],
           roles: [
             'Billing Viewer (required for cost data)',
@@ -209,13 +209,13 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             'Note your Organization ID (shown in the URL or Settings page)',
             'Go to "Access Manager" in the left sidebar, then click "API Keys"',
             'Click "Create API Key"',
-            'Enter a description (e.g., "Costra Billing Reader")',
+            'Enter a description (e.g., "Costdoq Billing Reader")',
             'Select the "Organization Billing Viewer" role',
             'Click "Next"',
             'Copy the Public Key and Private Key — the private key is shown only once',
             'Add your server\'s IP address to the API key\'s Access List (or use 0.0.0.0/0 for any IP)',
             'Click "Done"',
-            'Enter the Public Key, Private Key, and Organization ID in Costra'
+            'Enter the Public Key, Private Key, and Organization ID in Costdoq'
           ],
           roles: [
             'Organization Billing Viewer (required for invoice and cost data)',
@@ -320,13 +320,13 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             </h4>
             <ol className="space-y-2 list-decimal list-inside">
               <li className="text-sm text-gray-500 pl-2">Log in to AWS Console and navigate to <strong>IAM → Users</strong></li>
-              <li className="text-sm text-gray-500 pl-2">Click <strong>"Add users"</strong> and create a new user (e.g., "costra-readonly")</li>
+              <li className="text-sm text-gray-500 pl-2">Click <strong>"Add users"</strong> and create a new user (e.g., "costdoq-readonly")</li>
               <li className="text-sm text-gray-500 pl-2">Select <strong>"Attach policies directly"</strong> and click <strong>"Create policy"</strong></li>
               <li className="text-sm text-gray-500 pl-2">Switch to the <strong>JSON tab</strong> and paste the policy below</li>
-              <li className="text-sm text-gray-500 pl-2">Name the policy (e.g., "CostraReadOnlyAccess") and create it</li>
+              <li className="text-sm text-gray-500 pl-2">Name the policy (e.g., "CostdoqReadOnlyAccess") and create it</li>
               <li className="text-sm text-gray-500 pl-2">Attach the policy to your IAM user</li>
               <li className="text-sm text-gray-500 pl-2">Go to <strong>Security credentials</strong> tab and create an <strong>Access Key</strong></li>
-              <li className="text-sm text-gray-500 pl-2">Copy the <strong>Access Key ID</strong> and <strong>Secret Access Key</strong> to use in Costra</li>
+              <li className="text-sm text-gray-500 pl-2">Copy the <strong>Access Key ID</strong> and <strong>Secret Access Key</strong> to use in Costdoq</li>
             </ol>
           </div>
 
@@ -362,7 +362,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             <h4 className="text-lg font-semibold text-green-800 mb-2">Rightsizing Recommendations</h4>
             <p className="text-sm text-green-700">
               The policy above includes <code className="bg-white/60 px-1 rounded">ce:GetRightsizingRecommendation</code> for VM rightsizing.
-              Costra uses CPU/RAM utilization from CloudWatch to suggest downsizing or terminating underutilized EC2 instances.
+              Costdoq uses CPU/RAM utilization from CloudWatch to suggest downsizing or terminating underutilized EC2 instances.
             </p>
           </div>
 
@@ -412,19 +412,19 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
             <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
               <ol className="space-y-3 list-decimal list-inside text-sm text-gray-600">
                 <li className="pl-2">You provide a <strong>connection name</strong> and your <strong>12-digit AWS Account ID</strong></li>
-                <li className="pl-2">Costra generates a <strong>CloudFormation Quick Create URL</strong> with pre-filled parameters</li>
+                <li className="pl-2">Costdoq generates a <strong>CloudFormation Quick Create URL</strong> with pre-filled parameters</li>
                 <li className="pl-2">You click the link to open the AWS CloudFormation Console and create the stack</li>
                 <li className="pl-2">CloudFormation automatically provisions:
                   <ul className="list-disc list-inside ml-4 mt-1 space-y-1 text-gray-500">
                     <li>A cross-account <strong>IAM role</strong> with read-only billing permissions</li>
                     <li>An <strong>S3 bucket</strong> for Cost & Usage Report delivery (encrypted, private)</li>
-                    <li>A <strong>bucket policy</strong> allowing AWS to write CUR data and Costra to read it</li>
+                    <li>A <strong>bucket policy</strong> allowing AWS to write CUR data and Costdoq to read it</li>
                   </ul>
                 </li>
-                <li className="pl-2">You return to Costra and click <strong>"Verify Connection"</strong></li>
-                <li className="pl-2">Costra automatically creates a <strong>CUR Data Export</strong> via the BCM Data Exports API</li>
+                <li className="pl-2">You return to Costdoq and click <strong>"Verify Connection"</strong></li>
+                <li className="pl-2">Costdoq automatically creates a <strong>CUR Data Export</strong> via the BCM Data Exports API</li>
                 <li className="pl-2">AWS delivers the first CUR data within <strong>~24 hours</strong> as Parquet files to S3</li>
-                <li className="pl-2">Costra polls every 6 hours, ingests new CUR data, and replaces approximate Cost Explorer data with penny-perfect totals</li>
+                <li className="pl-2">Costdoq polls every 6 hours, ingests new CUR data, and replaces approximate Cost Explorer data with penny-perfect totals</li>
               </ol>
             </div>
           </div>
@@ -438,7 +438,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
               <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
                 <p className="text-sm font-medium text-gray-900 mb-2">IAM Role</p>
                 <p className="text-sm text-gray-500 mb-2">
-                  Read-only cross-account role that Costra assumes via STS. Permissions include:
+                  Read-only cross-account role that Costdoq assumes via STS. Permissions include:
                 </p>
                 <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside ml-2">
                   <li>Cost Explorer read access (<code className="bg-white px-1 rounded">ce:GetCostAndUsage</code>, <code className="bg-white px-1 rounded">ce:GetRightsizingRecommendation</code>, etc.)</li>
@@ -453,7 +453,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                 <h4 className="text-sm font-semibold text-green-800 mb-2">Rightsizing Recommendations</h4>
                 <p className="text-sm text-green-700">
                   The CloudFormation role includes <code className="bg-white/60 px-1 rounded">ce:GetRightsizingRecommendation</code> and CloudWatch read access.
-                  Costra uses CPU/RAM utilization to suggest downsizing or terminating underutilized EC2 instances.
+                  Costdoq uses CPU/RAM utilization to suggest downsizing or terminating underutilized EC2 instances.
                 </p>
               </div>
               <div className="bg-surface-50 border border-surface-200 rounded-xl p-4">
@@ -462,7 +462,7 @@ export default function IAMPolicyDialog({ isOpen, onClose, providerId, providerN
                   Private, encrypted bucket for CUR delivery:
                 </p>
                 <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside ml-2">
-                  <li>Name format: <code className="bg-white px-1 rounded">costra-cur-{'<account-id>'}-{'<connection-name>'}</code></li>
+                  <li>Name format: <code className="bg-white px-1 rounded">costdoq-cur-{'<account-id>'}-{'<connection-name>'}</code></li>
                   <li>AES-256 server-side encryption</li>
                   <li>All public access blocked</li>
                   <li>400-day lifecycle policy (old reports auto-expire)</li>

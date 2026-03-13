@@ -31,7 +31,7 @@ export default function LoginTravelPage() {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-4xl">
           <SignInCard
-            title="Costra"
+            title="Costdoq"
             tagline="Sign in to your cost dashboard and connect all your cloud providers"
             forgotPasswordHref="/forgot-password"
             onSubmit={handleSubmit}

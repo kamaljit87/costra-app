@@ -18,7 +18,7 @@ async function setup() {
     logger.error('Make sure:')
     logger.error('1. PostgreSQL is installed and running')
     logger.error('2. DATABASE_URL is set correctly in .env file')
-    logger.error('3. The database exists (CREATE DATABASE costra;)')
+    logger.error('3. The database exists (CREATE DATABASE costdoq;)')
     process.exit(1)
   }
 }

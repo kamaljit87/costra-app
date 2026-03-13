@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# Generate k8s/costra/secret.yaml from .env
+# Generate k8s/costdoq/secret.yaml from .env
 # Usage: ./scripts/gen-k8s-secrets.sh [.env]
 #
 # Reads ALL key=value pairs from the .env file and writes
-# k8s/costra/secret.yaml with base64-encoded values.
+# k8s/costdoq/secret.yaml with base64-encoded values.
 # The generated file is gitignored — never commit real secrets.
 #
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="${1:-$REPO_ROOT/.env}"
-OUTPUT="$REPO_ROOT/k8s/costra/secret.yaml"
+OUTPUT="$REPO_ROOT/k8s/costdoq/secret.yaml"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Error: $ENV_FILE not found" >&2
@@ -23,10 +23,10 @@ cat > "$OUTPUT" <<'HEADER'
 apiVersion: v1
 kind: Secret
 metadata:
-  name: costra-secrets
-  namespace: costra
+  name: costdoq-secrets
+  namespace: costdoq
   labels:
-    app: costra
+    app: costdoq
 type: Opaque
 data:
 HEADER

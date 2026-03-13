@@ -1,36 +1,36 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: costra-ingress
-  namespace: costra
+  name: costdoq-ingress
+  namespace: costdoq
   labels:
-    app: costra
+    app: costdoq
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.middlewares: costra-compress@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: costdoq-compress@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - costra.app
-      secretName: costra-tls
+        - costdoq.com
+      secretName: costdoq-tls
   rules:
-    - host: costra.app
+    - host: costdoq.com
       http:
         paths:
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: costra-backend
+                name: costdoq-backend
                 port:
                   number: 3002
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: costra-frontend
+                name: costdoq-frontend
                 port:
                   number: 8080

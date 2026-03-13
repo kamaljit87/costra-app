@@ -4,8 +4,8 @@ This doc describes how to check whether AWS CUR integration was successful for a
 
 ## Success criteria
 
-- **Setup succeeded** if the CUR export and S3 bucket exist in the customer’s AWS account and Costra has a config row.
-- **Integration is “active”** when Costra has ingested at least one billing period from the CUR (status moves from `provisioning` to `active`).
+- **Setup succeeded** if the CUR export and S3 bucket exist in the customer’s AWS account and Costdoq has a config row.
+- **Integration is “active”** when Costdoq has ingested at least one billing period from the CUR (status moves from `provisioning` to `active`).
 
 ## 1. In the UI (Settings → Cloud Providers)
 
@@ -66,7 +66,7 @@ ORDER BY cil.billing_period DESC;
 
 - **Billing data exports not successful / "Insufficient permission" (unhealthy export)**: The S3 bucket policy must allow the Data Exports service (`bcm-data-exports.amazonaws.com`) to deliver reports. AWS requires both **`aws:SourceAccount`** and **`aws:SourceArn`** condition keys; see [Setting up an S3 bucket for data exports](https://docs.aws.amazon.com/cur/latest/userguide/dataexports-s3-bucket.html). Re-run "Set up CUR" so the app applies the correct policy. The IAM role must include `cur:PutReportDefinition` and `bcm-data-exports:CreateExport`; see [IAM for Data Exports](https://docs.aws.amazon.com/cur/latest/userguide/bcm-data-exports-access.html).
 - **Stays `provisioning`**: AWS BCM hasn’t delivered data yet (can take up to 24h); or S3 prefix/format doesn’t match what we expect. Check that the CUR 2.0 export in the customer account is enabled and writing to the expected bucket/prefix.
-- **`error`**: Often S3 access (bucket policy or role permissions). Check `status_message`; ensure Costra’s role can read the CUR bucket and that `COSTRA_AWS_ACCOUNT_ID` is set if we read from our side.
+- **`error`**: Often S3 access (bucket policy or role permissions). Check `status_message`; ensure Costdoq’s role can read the CUR bucket and that `COSTDOQ_AWS_ACCOUNT_ID` is set if we read from our side.
 - **No CUR badge / `curEnabled: false`**: CUR was never set up or was disabled after an access error. Use “Set up CUR” from Settings (or POST `/api/cloud-providers/aws/:accountId/cur-setup`) for automated (IAM role) connections.
 
 ## 5. Background polling
@@ -75,4 +75,4 @@ CUR data is polled every 6 hours (see `server/services/syncScheduler.js` → `in
 
 ## 6. S3 path structure (CUR 2.0)
 
-Data Exports delivers to: `s3://bucket/prefix/export-name/data/BILLING_PERIOD=YYYY-MM/` (see [Understanding export delivery](https://docs.aws.amazon.com/cur/latest/userguide/dataexports-export-delivery.html)). Costra uses prefix `costra-cur` and export name `costra-export-<connectionName>`. The first delivery can take up to **24 hours** after the export is created; if the bucket is empty, confirm the export is **Healthy** in AWS Console (Billing → Data Exports) and that the bucket policy includes both `aws:SourceAccount` and `aws:SourceArn` for `bcm-data-exports.amazonaws.com`.
+Data Exports delivers to: `s3://bucket/prefix/export-name/data/BILLING_PERIOD=YYYY-MM/` (see [Understanding export delivery](https://docs.aws.amazon.com/cur/latest/userguide/dataexports-export-delivery.html)). Costdoq uses prefix `costdoq-cur` and export name `costdoq-export-<connectionName>`. The first delivery can take up to **24 hours** after the export is created; if the bucket is empty, confirm the export is **Healthy** in AWS Console (Billing → Data Exports) and that the bucket policy includes both `aws:SourceAccount` and `aws:SourceArn` for `bcm-data-exports.amazonaws.com`.

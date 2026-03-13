@@ -99,12 +99,12 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Costra - Multi-Cloud Cost Management | Simplify Cloud Spending</title>
-        <meta name="description" content="Costra helps teams manage and optimize cloud costs across AWS, Azure, GCP, and more. Get unified visibility, anomaly detection, and actionable insights." />
-        <meta property="og:title" content="Costra - Multi-Cloud Cost Management" />
+        <title>Costdoq - Multi-Cloud Cost Management | Simplify Cloud Spending</title>
+        <meta name="description" content="Costdoq helps teams manage and optimize cloud costs across AWS, Azure, GCP, and more. Get unified visibility, anomaly detection, and actionable insights." />
+        <meta property="og:title" content="Costdoq - Multi-Cloud Cost Management" />
         <meta property="og:description" content="Simplify cloud spending across AWS, Azure, GCP, and more with unified cost visibility and optimization." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://costra.app" />
+        <meta property="og:url" content="https://costdoq.com" />
       </Helmet>
 
       <LandingNav />
@@ -392,7 +392,7 @@ export default function LandingPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Optimize Your Cloud Costs?</h2>
           <p className="text-xl text-accent-100 mb-10 max-w-2xl mx-auto">
-            Join teams worldwide managing their multi-cloud infrastructure with Costra.
+            Join teams worldwide managing their multi-cloud infrastructure with Costdoq.
           </p>
           <Link to={signupDisabled ? '/waitlist' : '/signup'} className="inline-flex items-center px-10 py-4 bg-white text-accent-700 rounded-lg font-semibold text-lg hover:bg-accent-50 transition-all duration-150 shadow-lg hover:shadow-xl">
             {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
@@ -408,7 +408,7 @@ export default function LandingPage() {
       <footer className="bg-surface-100 border-t border-surface-300 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500 space-y-2 sm:space-y-0">
-            <p>&copy; {new Date().getFullYear()} Costra. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Costdoq. All rights reserved.</p>
             <div className="flex space-x-6">
               <Link to="/privacy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gray-900 transition-colors">Terms of Service</Link>

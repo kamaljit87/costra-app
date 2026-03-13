@@ -1,6 +1,6 @@
-# Costra Backend Server
+# Costdoq Backend Server
 
-Backend API server for Costra multi-cloud cost management platform.
+Backend API server for Costdoq multi-cloud cost management platform.
 
 ## Prerequisites
 
@@ -20,11 +20,11 @@ Backend API server for Costra multi-cloud cost management platform.
 sudo -u postgres psql
 
 # Create database
-CREATE DATABASE costra;
+CREATE DATABASE costdoq;
 
 # Create user (optional, or use existing postgres user)
-CREATE USER costra_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE costra TO costra_user;
+CREATE USER costdoq_user WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE costdoq TO costdoq_user;
 
 # Exit psql
 \q
@@ -32,12 +32,12 @@ GRANT ALL PRIVILEGES ON DATABASE costra TO costra_user;
 
 3. **Set up connection string** in `.env`:
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costdoq
 ```
 
 Or if using a custom user:
 ```
-DATABASE_URL=postgresql://costra_user:your_password@localhost:5432/costra
+DATABASE_URL=postgresql://costdoq_user:your_password@localhost:5432/costdoq
 ```
 
 ## Setup
@@ -58,7 +58,7 @@ cp .env.example .env
 PORT=3001
 JWT_SECRET=your-secret-key-change-this-in-production
 NODE_ENV=development
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costdoq
 ```
 
 ## Running
@@ -129,14 +129,14 @@ The application uses PostgreSQL with the following schema:
 If you get connection errors:
 1. Verify PostgreSQL is running: `sudo systemctl status postgresql` (Linux) or `brew services list` (macOS)
 2. Check your DATABASE_URL format: `postgresql://username:password@host:port/database`
-3. Verify database exists: `psql -l` should show `costra` database
+3. Verify database exists: `psql -l` should show `costdoq` database
 4. Check PostgreSQL logs for errors
 
 ### Permission Issues
 
 If you get permission errors:
 ```sql
-GRANT ALL PRIVILEGES ON DATABASE costra TO your_username;
+GRANT ALL PRIVILEGES ON DATABASE costdoq TO your_username;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO your_username;
 ```
 

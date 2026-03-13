@@ -53,7 +53,7 @@ export default function WaitlistPage() {
               <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
               <h1 className="text-2xl font-bold text-gray-900 mb-2">You're on the list!</h1>
               <p className="text-gray-500 mb-6">
-                Thanks for your interest in Costra. We'll reach out when your spot is ready.
+                Thanks for your interest in Costdoq. We'll reach out when your spot is ready.
               </p>
               <Link
                 to="/"

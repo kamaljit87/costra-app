@@ -22,7 +22,7 @@ const pool = new Pool({
   ...(process.env.DATABASE_URL ? {} : {
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'costra',
+    database: process.env.DB_NAME || 'costdoq',
     user: process.env.DB_USER || 'postgres',
     password: String(process.env.DB_PASSWORD || 'postgres'),
   }),
@@ -1045,7 +1045,7 @@ export const initDatabase = async () => {
           export_name TEXT NOT NULL,
           export_arn TEXT,
           s3_bucket TEXT NOT NULL,
-          s3_prefix TEXT DEFAULT 'costra-cur',
+          s3_prefix TEXT DEFAULT 'costdoq-cur',
           cur_status TEXT DEFAULT 'pending',
           status_message TEXT,
           last_manifest_key TEXT,
@@ -2712,7 +2712,7 @@ export const addAutomatedAWSConnection = async (
     // Import sanitization function to ensure consistency
     const { sanitizeConnectionNameForRole } = await import('./services/awsConnectionService.js')
     const sanitizedConnectionName = sanitizeConnectionNameForRole(connectionName)
-    const roleName = `CostraAccessRole-${sanitizedConnectionName}`
+    const roleName = `CostdoqAccessRole-${sanitizedConnectionName}`
     const roleArn = `arn:aws:iam::${awsAccountId}:role/${roleName}`
 
     // Encrypt empty credentials object for automated connections

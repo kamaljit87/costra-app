@@ -1,6 +1,6 @@
 # Kubernetes Deployment
 
-Multi-app Kubernetes setup for Costra and future apps. Shared infrastructure (ingress, cert-manager, Redis) is installed once; each app gets its own namespace.
+Multi-app Kubernetes setup for Costdoq and future apps. Shared infrastructure (ingress, cert-manager, Redis) is installed once; each app gets its own namespace.
 
 **Server**: 6 CPU, 12GB RAM — fits 6-8 apps comfortably.
 
@@ -50,11 +50,11 @@ kubectl apply -R -f k8s/cluster/
 kubectl get pods -n infra
 ```
 
-## Deploy Costra
+## Deploy Costdoq
 
 ### 1. Configure secrets
 
-Generate `k8s/costra/secret.yaml` from your `.env` file (the generated file is gitignored):
+Generate `k8s/costdoq/secret.yaml` from your `.env` file (the generated file is gitignored):
 
 ```bash
 ./scripts/gen-k8s-secrets.sh
@@ -69,8 +69,8 @@ Alternatively, create the secret directly via kubectl:
 ### 2. Build and tag container images
 
 ```bash
-docker build -t costra-backend:latest -f Dockerfile.backend .
-docker build -t costra-frontend:latest \
+docker build -t costdoq-backend:latest -f Dockerfile.backend .
+docker build -t costdoq-frontend:latest \
   --build-arg VITE_API_URL=/api \
   --build-arg VITE_GOOGLE_CLIENT_ID=your-client-id \
   -f Dockerfile.frontend .
@@ -81,42 +81,42 @@ docker build -t costra-frontend:latest \
 ### 3. Apply manifests
 
 ```bash
-kubectl apply -R -f k8s/costra/
+kubectl apply -R -f k8s/costdoq/
 ```
 
 ### 4. Verify
 
 ```bash
-kubectl get pods -n costra                    # All Running
-kubectl get svc -n costra                     # Services created
-kubectl get ingress -n costra                 # Ingress with IP
-kubectl get certificate -n costra             # TLS cert issued
-kubectl get hpa -n costra                     # Autoscaler targets
-curl -k https://costra.app/api/health         # Health check
+kubectl get pods -n costdoq                    # All Running
+kubectl get svc -n costdoq                     # Services created
+kubectl get ingress -n costdoq                 # Ingress with IP
+kubectl get certificate -n costdoq             # TLS cert issued
+kubectl get hpa -n costdoq                     # Autoscaler targets
+curl -k https://costdoq.com/api/health         # Health check
 ```
 
 ## Updating an App
 
 ```bash
 # Rebuild image
-docker build -t costra-backend:v1.2 -f Dockerfile.backend .
+docker build -t costdoq-backend:v1.2 -f Dockerfile.backend .
 
 # Rolling update
-kubectl set image deployment/costra-backend backend=costra-backend:v1.2 -n costra
+kubectl set image deployment/costdoq-backend backend=costdoq-backend:v1.2 -n costdoq
 
 # Watch rollout
-kubectl rollout status deployment/costra-backend -n costra
+kubectl rollout status deployment/costdoq-backend -n costdoq
 ```
 
 ## Adding a New App
 
 ```bash
 # 1. Copy template
-cp -r k8s/costra k8s/newapp
+cp -r k8s/costdoq k8s/newapp
 
 # 2. Find/replace
-#    - costra → newapp (namespace, resource names)
-#    - costra.app → newapp.com (domain in ingress)
+#    - costdoq → newapp (namespace, resource names)
+#    - costdoq.com → newapp.com (domain in ingress)
 #    - Update image names
 
 # 3. Fill in secret.yaml with new app's secrets
@@ -138,20 +138,20 @@ Max per app at full scale: ~1.2GB RAM, ~1.6 CPU cores.
 
 ```bash
 # Logs
-kubectl logs -l component=backend -n costra --tail=100
-kubectl logs -l component=frontend -n costra --tail=100
+kubectl logs -l component=backend -n costdoq --tail=100
+kubectl logs -l component=frontend -n costdoq --tail=100
 
 # Shell into a pod
-kubectl exec -it deploy/costra-backend -n costra -- sh
+kubectl exec -it deploy/costdoq-backend -n costdoq -- sh
 
 # Scale manually
-kubectl scale deployment/costra-backend --replicas=3 -n costra
+kubectl scale deployment/costdoq-backend --replicas=3 -n costdoq
 
 # Check events (troubleshooting)
-kubectl get events -n costra --sort-by=.lastTimestamp
+kubectl get events -n costdoq --sort-by=.lastTimestamp
 
 # Restart a deployment (triggers rolling restart)
-kubectl rollout restart deployment/costra-backend -n costra
+kubectl rollout restart deployment/costdoq-backend -n costdoq
 ```
 
 ## Directory Structure
@@ -164,7 +164,7 @@ k8s/
 │       ├── namespace.yaml      # infra namespace
 │       ├── statefulset.yaml    # Redis with AOF persistence
 │       └── service.yaml        # ClusterIP on port 6379
-├── costra/                     # Per-app (template for new apps)
+├── costdoq/                     # Per-app (template for new apps)
 │   ├── namespace.yaml
 │   ├── configmap.yaml          # Non-secret env vars
 │   ├── secret.yaml             # Generated from .env (gitignored)

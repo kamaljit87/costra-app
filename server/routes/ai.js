@@ -345,7 +345,7 @@ async function gatherCostContext(userId) {
 
 // Helper function to build system prompt
 function buildSystemPrompt(costContext) {
-  return `You are an intelligent cloud cost management assistant for Costra, a multi-cloud cost tracking platform. You help users understand and optimize their cloud spending across AWS, Azure, GCP, DigitalOcean, IBM Cloud, Linode, and Vultr.
+  return `You are an intelligent cloud cost management assistant for Costdoq, a multi-cloud cost tracking platform. You help users understand and optimize their cloud spending across AWS, Azure, GCP, DigitalOcean, IBM Cloud, Linode, and Vultr.
 
 Your capabilities:
 - Analyze cloud spending patterns and trends

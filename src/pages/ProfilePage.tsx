@@ -204,7 +204,7 @@ export default function ProfilePage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `costra-data-export-${new Date().toISOString().split('T')[0]}.json`
+      a.download = `costdoq-data-export-${new Date().toISOString().split('T')[0]}.json`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)

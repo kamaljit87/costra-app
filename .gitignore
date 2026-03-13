@@ -18,4 +18,4 @@ logs/
 server/uploads/
 
 # Generated k8s secrets (contains real values from .env)
-k8s/costra/secret.yaml
+k8s/costdoq/secret.yaml

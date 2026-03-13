@@ -48,7 +48,7 @@ export default {
         const stsClient = new STSClient({ region: 'us-east-1' })
         const assumeRoleCommand = new AssumeRoleCommand({
           RoleArn: accountData.roleArn,
-          RoleSessionName: `costra-sync-${account.id}-${Date.now()}`,
+          RoleSessionName: `costdoq-sync-${account.id}-${Date.now()}`,
           ExternalId: accountData.externalId,
           DurationSeconds: 3600,
         })
@@ -79,7 +79,7 @@ export default {
         if (assumeError.message?.includes('Could not load credentials') || assumeError.code === 'CredentialsError') {
           errorMessage = 'Server AWS credentials not configured. The server needs AWS credentials (from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY environment variables or IAM instance profile) to assume the role in your AWS account. Please configure server-side AWS credentials.'
         } else if (assumeError.code === 'AccessDenied') {
-          errorMessage = 'Access denied when assuming role. Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costra\'s AWS account has permission to assume the role.'
+          errorMessage = 'Access denied when assuming role. Please verify: 1) The CloudFormation stack was created successfully, 2) The role ARN is correct, 3) The external ID matches, 4) Costdoq\'s AWS account has permission to assume the role.'
         } else if (assumeError.code === 'InvalidClientTokenId') {
           errorMessage = 'Invalid AWS credentials. Please check that the server\'s AWS credentials are valid and have permission to assume roles.'
         }

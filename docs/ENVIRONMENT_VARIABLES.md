@@ -1,6 +1,6 @@
 # Environment Variables Reference
 
-This document lists all environment variables needed for the Costra ECS deployment.
+This document lists all environment variables needed for the Costdoq ECS deployment.
 
 ## Frontend Container
 
@@ -8,7 +8,7 @@ This document lists all environment variables needed for the Costra ECS deployme
 
 | Variable | Description | Example | Set In |
 |----------|-------------|---------|--------|
-| `VITE_API_URL` | Backend API URL (must include `/api` path) | `http://costra-backend-alb-005878674861.us-east-1.elb.amazonaws.com/api` | Task Definition (Environment) |
+| `VITE_API_URL` | Backend API URL (must include `/api` path) | `http://costdoq-backend-alb-005878674861.us-east-1.elb.amazonaws.com/api` | Task Definition (Environment) |
 
 **Note**: Vite requires the `VITE_` prefix for environment variables to be accessible in the frontend code.
 
@@ -34,9 +34,9 @@ These must be stored in AWS Secrets Manager and referenced in the task definitio
 
 | Secret Name | Description | Example ARN | Required |
 |-------------|-------------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/database-url` | ✅ Yes |
-| `JWT_SECRET` | Secret key for JWT token signing (min 32 chars) | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/jwt-secret` | ✅ Yes |
-| `FRONTEND_URL` | Frontend ALB URL for CORS | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/frontend-url` | ✅ Yes |
+| `DATABASE_URL` | PostgreSQL connection string | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costdoq/database-url` | ✅ Yes |
+| `JWT_SECRET` | Secret key for JWT token signing (min 32 chars) | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costdoq/jwt-secret` | ✅ Yes |
+| `FRONTEND_URL` | Frontend ALB URL for CORS | `arn:aws:secretsmanager:us-east-1:005878674861:secret:costdoq/frontend-url` | ✅ Yes |
 
 ### Optional Environment Variables
 
@@ -57,24 +57,24 @@ These can be set as environment variables or secrets if needed:
 ```bash
 # Database URL
 aws secretsmanager create-secret \
-  --name costra/database-url \
-  --secret-string "postgresql://username:password@host:5432/costra" \
+  --name costdoq/database-url \
+  --secret-string "postgresql://username:password@host:5432/costdoq" \
   --region us-east-1
 
 # JWT Secret (generate a strong secret)
 aws secretsmanager create-secret \
-  --name costra/jwt-secret \
+  --name costdoq/jwt-secret \
   --secret-string "$(openssl rand -base64 32)" \
   --region us-east-1
 
 # Frontend URL (get from CloudFormation output)
 FRONTEND_ALB_DNS=$(aws cloudformation describe-stacks \
-  --stack-name costra-infrastructure \
+  --stack-name costdoq-infrastructure \
   --query "Stacks[0].Outputs[?OutputKey=='FrontendApplicationLoadBalancerDNS'].OutputValue" \
   --output text)
 
 aws secretsmanager create-secret \
-  --name costra/frontend-url \
+  --name costdoq/frontend-url \
   --secret-string "http://$FRONTEND_ALB_DNS" \
   --region us-east-1
 ```
@@ -102,7 +102,7 @@ The ECS task execution role needs permission to read secrets:
         "secretsmanager:DescribeSecret"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:us-east-1:005878674861:secret:costra/*"
+        "arn:aws:secretsmanager:us-east-1:005878674861:secret:costdoq/*"
       ]
     }
   ]
@@ -128,7 +128,7 @@ Create `server/.env`:
 ```bash
 NODE_ENV=development
 PORT=3002
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costdoq
 JWT_SECRET=your-secret-key-change-this-min-32-chars-long
 FRONTEND_URL=http://localhost:5173
 ```

@@ -22,7 +22,7 @@ export const generateExternalId = () => {
  * @returns {string} Sanitized connection name
  */
 export const sanitizeConnectionName = (connectionName) => {
-  if (!connectionName) return 'costra-connection'
+  if (!connectionName) return 'costdoq-connection'
   
   // Convert to lowercase and replace invalid chars with hyphens
   let sanitized = connectionName
@@ -32,18 +32,18 @@ export const sanitizeConnectionName = (connectionName) => {
     .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
   
   // Ensure it starts with a letter (CloudFormation requirement)
-  // If it starts with a number, prefix with 'costra-'
+  // If it starts with a number, prefix with 'costdoq-'
   if (sanitized && /^[0-9]/.test(sanitized)) {
-    sanitized = `costra-${sanitized}`
+    sanitized = `costdoq-${sanitized}`
   }
   
   // Limit to 39 chars so S3 bucket name stays under 63 chars
-  // (costra-cur- = 11 + 12-digit account + - + name = 24 + name)
-  sanitized = sanitized.substring(0, 39) || 'costra-connection'
+  // (costdoq-cur- = 11 + 12-digit account + - + name = 24 + name)
+  sanitized = sanitized.substring(0, 39) || 'costdoq-connection'
   
   // Final check: ensure it starts with a letter
   if (!/^[a-z]/.test(sanitized)) {
-    sanitized = `costra-${sanitized}`
+    sanitized = `costdoq-${sanitized}`
   }
   
   return sanitized
@@ -53,14 +53,14 @@ export const sanitizeConnectionName = (connectionName) => {
  * Generate CloudFormation Quick Create URL for automated AWS connection
  * @param {string} templateUrl - URL to the CloudFormation template
  * @param {string} connectionName - Name for the connection (will be sanitized)
- * @param {string} costraAccountId - Costra's AWS account ID
+ * @param {string} costdoqAccountId - Costdoq's AWS account ID
  * @param {string} externalId - External ID for secure access
  * @param {string} awsAccountId - User's AWS account ID (optional, can be entered in console)
  */
 export const generateCloudFormationQuickCreateUrl = (
   templateUrl,
   connectionName,
-  costraAccountId,
+  costdoqAccountId,
   externalId,
   callbackUrl = '',
 ) => {
@@ -74,12 +74,12 @@ export const generateCloudFormationQuickCreateUrl = (
   const params = new URLSearchParams({
     templateURL: templateUrl,
     stackName: sanitizedStackName,
-    param_CostraAccountId: costraAccountId,
+    param_CostdoqAccountId: costdoqAccountId,
     param_ExternalId: externalId,
     param_ConnectionName: sanitizedConnectionName,
   })
 
-  // Pass callback URL so the Lambda can notify Costra when stack is ready
+  // Pass callback URL so the Lambda can notify Costdoq when stack is ready
   if (callbackUrl) {
     params.set('param_CallbackUrl', callbackUrl)
   }
@@ -95,7 +95,7 @@ export const generateCloudFormationQuickCreateUrl = (
  */
 export const computeRoleArn = (awsAccountId, connectionName) => {
   const sanitized = sanitizeConnectionNameForRole(connectionName)
-  const roleName = `CostraAccessRole-${sanitized}`
+  const roleName = `CostdoqAccessRole-${sanitized}`
   return `arn:aws:iam::${awsAccountId}:role/${roleName}`
 }
 
@@ -163,7 +163,7 @@ export const verifyAWSConnection = async (roleArn, externalId, region = 'us-east
       // Attempt to assume the role
       const assumeRoleCommand = new AssumeRoleCommand({
         RoleArn: roleArn,
-        RoleSessionName: `costra-connection-verify-${Date.now()}`,
+        RoleSessionName: `costdoq-connection-verify-${Date.now()}`,
         ExternalId: externalId,
         DurationSeconds: 900, // 15 minutes
       })
@@ -276,14 +276,14 @@ export const extractAccountIdFromRoleArn = (roleArn) => {
  * @returns {string} Sanitized connection name
  */
 export const sanitizeConnectionNameForRole = (connectionName) => {
-  if (!connectionName) return 'costra-connection'
+  if (!connectionName) return 'costdoq-connection'
   
   return connectionName
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '-') // Replace invalid chars with hyphens
     .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
     .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-    .substring(0, 39) || 'costra-connection' // Limit to 39 chars for S3 bucket name limits
+    .substring(0, 39) || 'costdoq-connection' // Limit to 39 chars for S3 bucket name limits
 }
 
 /**

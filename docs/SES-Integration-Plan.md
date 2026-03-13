@@ -1,8 +1,8 @@
-# Amazon SES Integration Plan for Costra
+# Amazon SES Integration Plan for Costdoq
 
 ## Overview
 
-This document outlines how to integrate Amazon SES (Simple Email Service) into the Costra app, what emails will be sent, and the verification/approval flows for account deletion and other sensitive actions.
+This document outlines how to integrate Amazon SES (Simple Email Service) into the Costdoq app, what emails will be sent, and the verification/approval flows for account deletion and other sensitive actions.
 
 ---
 
@@ -14,7 +14,7 @@ This document outlines how to integrate Amazon SES (Simple Email Service) into t
 2. **Request production access** — new SES accounts start in sandbox mode (can only send to verified addresses). Submit a request to move out of sandbox.
 3. **Create IAM credentials** — an IAM user or role with `ses:SendEmail` and `ses:SendRawEmail` permissions.
 4. **Set up a MAIL FROM domain** (optional but recommended for deliverability).
-5. **Configure SPF, DKIM, and DMARC** DNS records for the sending domain (e.g., `costra.dev`).
+5. **Configure SPF, DKIM, and DMARC** DNS records for the sending domain (e.g., `costdoq.dev`).
 
 ### 1.2 Environment Variables
 
@@ -25,8 +25,8 @@ Add to the backend `.env` / Docker environment:
 AWS_SES_REGION=us-east-1
 AWS_SES_ACCESS_KEY_ID=AKIA...
 AWS_SES_SECRET_ACCESS_KEY=...
-SES_FROM_EMAIL=noreply@costra.dev
-SES_FROM_NAME=Costra
+SES_FROM_EMAIL=noreply@costdoq.dev
+SES_FROM_NAME=Costdoq
 ```
 
 ### 1.3 Integration into emailService.js
@@ -127,7 +127,7 @@ Set `email_verified = true`, redirect to app with success message
 ### Implementation Details
 
 - **Token**: JWT with `{ userId, email, purpose: 'email_verification' }`, 24-hour expiry.
-- **Link format**: `https://costra.dev/verify-email?token=<jwt>`
+- **Link format**: `https://costdoq.dev/verify-email?token=<jwt>`
 - **Database change**: Add `email_verified BOOLEAN DEFAULT false` column to `users` table.
 - **Access restriction**: Unverified users can log in but see a banner prompting verification. They cannot access cloud provider connections or billing features until verified.
 - **Resend**: Add `POST /api/auth/resend-verification` endpoint, rate-limited to 1 per minute.
@@ -149,7 +149,7 @@ If email exists → generate reset token, send SES email
 If email doesn't exist → return same generic success (prevent enumeration)
     │
     ▼
-User clicks link: https://costra.dev/reset-password?token=xxx
+User clicks link: https://costdoq.dev/reset-password?token=xxx
     │
     ▼
 Frontend shows "Set New Password" form
@@ -200,7 +200,7 @@ Backend:
     ▼
 User receives email with:
   ┌─────────────────────────────────────────────┐
-  │  Subject: Confirm Account Deletion - Costra │
+  │  Subject: Confirm Account Deletion - Costdoq │
   │                                             │
   │  You requested to delete your account.      │
   │                                             │
@@ -328,9 +328,9 @@ Include "Revoke this key" link if unauthorized
 
 All emails should follow a consistent template:
 
-- **From**: `Costra <noreply@costra.dev>`
-- **Reply-To**: `support@costra.dev`
-- **Design**: Clean, minimal HTML with the Costra logo. Plain-text fallback for all emails.
+- **From**: `Costdoq <noreply@costdoq.dev>`
+- **Reply-To**: `support@costdoq.dev`
+- **Design**: Clean, minimal HTML with the Costdoq logo. Plain-text fallback for all emails.
 - **Footer**: Unsubscribe link (for non-transactional), company address (CAN-SPAM compliance).
 - **Categories**:
   - **Transactional** (always sent): verification, password reset, deletion confirmation, security alerts

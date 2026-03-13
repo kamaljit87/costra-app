@@ -1,6 +1,6 @@
-# Costra Regulatory Compliance Audit Report
+# Costdoq Regulatory Compliance Audit Report
 
-**Application:** Costra — Multi-Cloud Cost Management SaaS Platform
+**Application:** Costdoq — Multi-Cloud Cost Management SaaS Platform
 **Audit Date:** 2026-02-07
 **Payment Provider:** Dodo Payments (Merchant of Record)
 **Frameworks Audited:** EU GDPR, India DPDPA (2023), EU VAT Regulations, ePrivacy Directive
@@ -9,11 +9,11 @@
 
 ## Executive Summary
 
-Costra has **significant compliance gaps** across GDPR, DPDPA, and ePrivacy requirements. While the application has solid security engineering (AES-256-GCM encryption, parameterized queries, JWT auth, Helmet headers), it is **missing nearly all legal/regulatory infrastructure** required for a commercial SaaS serving EU and Indian users.
+Costdoq has **significant compliance gaps** across GDPR, DPDPA, and ePrivacy requirements. While the application has solid security engineering (AES-256-GCM encryption, parameterized queries, JWT auth, Helmet headers), it is **missing nearly all legal/regulatory infrastructure** required for a commercial SaaS serving EU and Indian users.
 
 The pricing page shows INR and USD pricing and targets global users, making compliance mandatory.
 
-**Payment/VAT Note:** Costra uses **Dodo Payments as a Merchant of Record (MoR)**, which handles VAT/GST calculation, collection, invoicing, and remittance. This significantly reduces the EU VAT compliance burden on Costra directly, but does not eliminate obligations around pricing transparency and record-keeping.
+**Payment/VAT Note:** Costdoq uses **Dodo Payments as a Merchant of Record (MoR)**, which handles VAT/GST calculation, collection, invoicing, and remittance. This significantly reduces the EU VAT compliance burden on Costdoq directly, but does not eliminate obligations around pricing transparency and record-keeping.
 
 **Overall Risk Level: HIGH**
 
@@ -204,7 +204,7 @@ The pricing page shows INR and USD pricing and targets global users, making comp
 - Tax filing and remittance across jurisdictions
 - EU One-Stop Shop (OSS) compliance
 
-**Remaining Obligations for Costra:**
+**Remaining Obligations for Costdoq:**
 - Ensure pricing pages clearly indicate whether prices include or exclude tax
 - Maintain records of transactions for audit purposes
 - Cooperate with Dodo Payments for any tax authority inquiries
@@ -259,7 +259,7 @@ The pricing page shows INR and USD pricing and targets global users, making comp
 
 **Finding:** No published refund or cancellation policy. EU consumers have a 14-day cooling-off period under the Consumer Rights Directive.
 
-**Note:** Dodo Payments as MoR may handle refund processing, but Costra should still publish a clear policy.
+**Note:** Dodo Payments as MoR may handle refund processing, but Costdoq should still publish a clear policy.
 
 **Remediation:** Publish a clear refund and cancellation policy.
 
@@ -277,7 +277,7 @@ The pricing page shows INR and USD pricing and targets global users, making comp
 
 ### 6.1 HIGH — Weak Default Encryption Key
 
-**Finding:** `server/services/encryption.js:5` uses a hardcoded fallback: `'costra-default-key-change-in-production'`. If `ENCRYPTION_KEY` is not set in production, all cloud provider credentials are encrypted with a publicly known key.
+**Finding:** `server/services/encryption.js:5` uses a hardcoded fallback: `'costdoq-default-key-change-in-production'`. If `ENCRYPTION_KEY` is not set in production, all cloud provider credentials are encrypted with a publicly known key.
 
 **Remediation:** Remove the fallback; fail startup if `ENCRYPTION_KEY` is not configured in production.
 

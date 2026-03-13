@@ -1,6 +1,6 @@
 # Cloud Provider Cost Accuracy Plan
 
-This document outlines potential mismatches between provider billing dashboards and Costra's displayed costs, and the planned fixes for each provider. The Linode fix (accrued/uninvoiced balance) serves as the template.
+This document outlines potential mismatches between provider billing dashboards and Costdoq's displayed costs, and the planned fixes for each provider. The Linode fix (accrued/uninvoiced balance) serves as the template.
 
 ---
 
@@ -130,4 +130,4 @@ For each provider after changes:
 - [ ] New account with usage but no invoice yet
 - [ ] Mid-cycle sync (accrued charges visible on provider dashboard)
 - [ ] After invoice generated (historical data)
-- [ ] Compare Costra total vs provider billing page for same period
+- [ ] Compare Costdoq total vs provider billing page for same period

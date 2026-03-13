@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { X } from 'lucide-react'
 
-const COOKIE_CONSENT_KEY = 'costra_cookie_consent'
+const COOKIE_CONSENT_KEY = 'costdoq_cookie_consent'
 
 interface ConsentState {
   essential: boolean

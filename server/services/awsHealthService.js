@@ -10,9 +10,9 @@ import { createNotification, getUserIdsWithProvider, saveProviderHealthEvent } f
 
 const AWS_PROVIDER_ID = 'aws'
 
-/** RSS URL; set COSTRA_AWS_HEALTH_RSS_URL to override. Tries billing feed first, then general. */
+/** RSS URL; set COSTDOQ_AWS_HEALTH_RSS_URL to override. Tries billing feed first, then general. */
 const RSS_URLS = [
-  process.env.COSTRA_AWS_HEALTH_RSS_URL,
+  process.env.COSTDOQ_AWS_HEALTH_RSS_URL,
   'https://status.aws.amazon.com/rss/billing.rss',
   'https://status.aws.amazon.com/rss/health.rss',
 ].filter(Boolean)

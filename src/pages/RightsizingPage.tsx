@@ -524,9 +524,9 @@ export default function RightsizingPage() {
                 <div className="text-sm text-blue-800">
                   <p className="font-medium mb-1">How rightsizing works</p>
                   <p className="text-blue-600">
-                    Costra analyzes your EC2 instance CPU, network, and disk utilization via CloudWatch metrics
+                    Costdoq analyzes your EC2 instance CPU, network, and disk utilization via CloudWatch metrics
                     over the past 14 days to identify over-provisioned or idle instances. No manual opt-in is needed
-                    for the CloudWatch approach — just ensure the Costra IAM role has the required permissions.
+                    for the CloudWatch approach — just ensure the Costdoq IAM role has the required permissions.
                   </p>
                 </div>
               </div>

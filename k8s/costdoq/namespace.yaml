@@ -1,6 +1,6 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: costra
+  name: costdoq
   labels:
-    app: costra
+    app: costdoq

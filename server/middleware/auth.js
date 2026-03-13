@@ -11,8 +11,8 @@ export const authenticateToken = async (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' })
   }
 
-  // API key (read-only): costra_<hex>
-  if (token.startsWith('costra_') && token.length > 20) {
+  // API key (read-only): costdoq_<hex>
+  if (token.startsWith('costdoq_') && token.length > 20) {
     try {
       const keyHash = crypto.createHash('sha256').update(token).digest('hex')
       const userId = await cached(
@@ -55,7 +55,7 @@ export const requireJwt = (req, res, next) => {
   const authHeader = req.headers['authorization']
   const token = authHeader && authHeader.split(' ')[1]
   if (!token) return res.status(401).json({ error: 'Access token required' })
-  if (token.startsWith('costra_')) return res.status(403).json({ error: 'API keys cannot manage keys; use your session token' })
+  if (token.startsWith('costdoq_')) return res.status(403).json({ error: 'API keys cannot manage keys; use your session token' })
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Invalid or expired token' })
     req.user = user

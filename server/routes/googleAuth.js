@@ -51,7 +51,7 @@ router.post('/callback', async (req, res) => {
         // Google often returns redirect_uri_mismatch or invalid_grant - surface a clear message
         if (msg.includes('redirect_uri_mismatch') || msg.includes('redirect_uri')) {
           return res.status(400).json({
-            error: 'Redirect URI mismatch. Set FRONTEND_URL to the exact site URL (e.g. https://costra.app) with no trailing slash, and add that callback URL in Google Cloud Console.',
+            error: 'Redirect URI mismatch. Set FRONTEND_URL to the exact site URL (e.g. https://costdoq.com) with no trailing slash, and add that callback URL in Google Cloud Console.',
           })
         }
         if (msg.includes('invalid_grant') || msg.includes('Token has been expired')) {

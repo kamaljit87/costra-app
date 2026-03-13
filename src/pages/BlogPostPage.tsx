@@ -21,21 +21,21 @@ export default function BlogPostPage() {
     description: post.description,
     datePublished: post.date,
     author: { '@type': 'Organization', name: post.author },
-    publisher: { '@type': 'Organization', name: 'Costra' },
-    url: `https://costra.app/blog/${post.slug}`,
-    ...(post.image && { image: `https://costra.app${post.image}` }),
+    publisher: { '@type': 'Organization', name: 'Costdoq' },
+    url: `https://costdoq.com/blog/${post.slug}`,
+    ...(post.image && { image: `https://costdoq.com${post.image}` }),
   }
 
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>{post.title} - Costra Blog</title>
+        <title>{post.title} - Costdoq Blog</title>
         <meta name="description" content={post.description} />
         <meta property="og:title" content={post.title} />
         <meta property="og:description" content={post.description} />
         <meta property="og:type" content="article" />
-        <meta property="og:url" content={`https://costra.app/blog/${post.slug}`} />
-        {post.image && <meta property="og:image" content={`https://costra.app${post.image}`} />}
+        <meta property="og:url" content={`https://costdoq.com/blog/${post.slug}`} />
+        {post.image && <meta property="og:image" content={`https://costdoq.com${post.image}`} />}
         <meta name="twitter:card" content="summary_large_image" />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>
@@ -69,7 +69,7 @@ export default function BlogPostPage() {
       <footer className="bg-surface-100 border-t border-surface-300 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500 space-y-2 sm:space-y-0">
-            <p>&copy; {new Date().getFullYear()} Costra. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Costdoq. All rights reserved.</p>
             <div className="flex space-x-6">
               <Link to="/privacy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gray-900 transition-colors">Terms of Service</Link>

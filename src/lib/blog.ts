@@ -44,7 +44,7 @@ export function getPostBySlug(slug: string): BlogPost | null {
         slug: fileSlug!,
         date: data.date || '',
         description: data.description || '',
-        author: data.author || 'Costra Team',
+        author: data.author || 'Costdoq Team',
         tags: Array.isArray(data.tags) ? data.tags : [],
         image: data.image,
         content,

@@ -1,6 +1,6 @@
-# Costra — Multi-Cloud Cost Management
+# Costdoq — Multi-Cloud Cost Management
 
-Costra is a FinOps platform that gives engineering and finance teams a single dashboard for all their cloud spending. Connect AWS, Azure, and GCP accounts, track costs in real time, catch anomalies before they hit your bill, and right-size resources — all from one place.
+Costdoq is a FinOps platform that gives engineering and finance teams a single dashboard for all their cloud spending. Connect AWS, Azure, and GCP accounts, track costs in real time, catch anomalies before they hit your bill, and right-size resources — all from one place.
 
 ## What it does
 
@@ -52,7 +52,7 @@ The app will be available at `http://localhost:5173` (frontend) and `http://loca
 Copy `.env.example` and fill in at minimum:
 
 ```bash
-DATABASE_URL=postgresql://postgres:postgres@costra-db:5432/costra
+DATABASE_URL=postgresql://postgres:postgres@costdoq-db:5432/costdoq
 JWT_SECRET=your-secret-key-min-32-chars
 FRONTEND_URL=http://localhost:5173
 VITE_API_URL=http://localhost:3002/api
@@ -63,7 +63,7 @@ See [docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) for the full 
 ## Project structure
 
 ```
-costra-app/
+costdoq-app/
 ├── src/                     # React frontend
 │   ├── components/          # Reusable UI components
 │   ├── contexts/            # Auth, Theme, Currency contexts

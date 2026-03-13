@@ -15,14 +15,14 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Introduction</h2>
             <p className="text-gray-700 leading-relaxed">
-              Costra ("we", "our", "us") is a multi-cloud cost management platform. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our services. We are committed to compliance with the EU General Data Protection Regulation (GDPR), India's Digital Personal Data Protection Act (DPDPA) 2023, and other applicable data protection laws.
+              Costdoq ("we", "our", "us") is a multi-cloud cost management platform. This Privacy Policy explains how we collect, use, store, and protect your personal data when you use our services. We are committed to compliance with the EU General Data Protection Regulation (GDPR), India's Digital Personal Data Protection Act (DPDPA) 2023, and other applicable data protection laws.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Data Controller</h2>
             <p className="text-gray-700 leading-relaxed">
-              Costra acts as the Data Controller (GDPR) / Data Fiduciary (DPDPA) for personal data processed through our platform. For any privacy-related inquiries, you may contact our Grievance Officer at: <strong>privacy@costra.dev</strong>
+              Costdoq acts as the Data Controller (GDPR) / Data Fiduciary (DPDPA) for personal data processed through our platform. For any privacy-related inquiries, you may contact our Grievance Officer at: <strong>privacy@costdoq.dev</strong>
             </p>
           </section>
 
@@ -199,7 +199,7 @@ export default function PrivacyPolicyPage() {
               </li>
               <li className="flex items-start space-x-2">
                 <span className="font-semibold text-gray-900 min-w-[180px]">Right to Lodge a Complaint:</span>
-                <span>Submit a grievance via our in-app grievance form or contact privacy@costra.dev.</span>
+                <span>Submit a grievance via our in-app grievance form or contact privacy@costdoq.dev.</span>
               </li>
             </ul>
           </section>
@@ -221,14 +221,14 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">11. Children's Data</h2>
             <p className="text-gray-700 leading-relaxed">
-              Costra is not intended for use by individuals under the age of 18. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us at privacy@costra.dev.
+              Costdoq is not intended for use by individuals under the age of 18. We do not knowingly collect personal data from children. If you believe a child has provided us with personal data, please contact us at privacy@costdoq.dev.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Grievance Redressal (DPDPA)</h2>
             <p className="text-gray-700 leading-relaxed">
-              In accordance with DPDPA Section 13, you may submit grievances regarding the processing of your personal data. Our Grievance Officer will acknowledge your grievance within 48 hours and provide a resolution within 30 days. Contact: <strong>privacy@costra.dev</strong>
+              In accordance with DPDPA Section 13, you may submit grievances regarding the processing of your personal data. Our Grievance Officer will acknowledge your grievance within 48 hours and provide a resolution within 30 days. Contact: <strong>privacy@costdoq.dev</strong>
             </p>
           </section>
 
@@ -241,7 +241,7 @@ export default function PrivacyPolicyPage() {
 
           <section className="border-t border-gray-200 pt-8">
             <p className="text-gray-600">
-              For any questions about this Privacy Policy, please contact us at <strong>privacy@costra.dev</strong>.
+              For any questions about this Privacy Policy, please contact us at <strong>privacy@costdoq.dev</strong>.
             </p>
           </section>
         </div>
@@ -251,7 +251,7 @@ export default function PrivacyPolicyPage() {
       <footer className="bg-white border-t border-gray-200 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600 space-y-2 sm:space-y-0">
-            <p>&copy; {new Date().getFullYear()} Costra. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Costdoq. All rights reserved.</p>
             <div className="flex space-x-6">
               <Link to="/privacy" className="hover:text-gray-900">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gray-900">Terms of Service</Link>

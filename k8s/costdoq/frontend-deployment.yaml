@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: costra-backend
-  namespace: costra
+  name: costdoq-frontend
+  namespace: costdoq
   labels:
-    app: costra
-    component: backend
+    app: costdoq
+    component: frontend
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: costra
-      component: backend
+      app: costdoq
+      component: frontend
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,49 +20,44 @@ spec:
   template:
     metadata:
       labels:
-        app: costra
-        component: backend
+        app: costdoq
+        component: frontend
     spec:
       containers:
-        - name: backend
-          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-backend:latest
+        - name: frontend
+          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-frontend:latest
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           ports:
-            - containerPort: 3002
+            - containerPort: 8080
               name: http
-          envFrom:
-            - configMapRef:
-                name: costra-config
-            - secretRef:
-                name: costra-secrets
           resources:
             requests:
-              memory: "192Mi"
-              cpu: "150m"
+              memory: "32Mi"
+              cpu: "50m"
             limits:
-              memory: "384Mi"
-              cpu: "500m"
+              memory: "64Mi"
+              cpu: "200m"
           readinessProbe:
             httpGet:
-              path: /api/health
-              port: 3002
-            initialDelaySeconds: 10
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /api/health
-              port: 3002
-            initialDelaySeconds: 30
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
             periodSeconds: 30
-            timeoutSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
       affinity:
         podAntiAffinity:
@@ -71,6 +66,6 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchLabels:
-                    app: costra
-                    component: backend
+                    app: costdoq
+                    component: frontend
                 topologyKey: kubernetes.io/hostname

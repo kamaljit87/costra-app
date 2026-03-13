@@ -2,14 +2,14 @@
 
 ## Overview
 
-For **automated AWS connections** (CloudFormation-based), the Costra server needs AWS credentials to assume the IAM role in your AWS account. These credentials are for **Costra's AWS account**, not your account.
+For **automated AWS connections** (CloudFormation-based), the Costdoq server needs AWS credentials to assume the IAM role in your AWS account. These credentials are for **Costdoq's AWS account**, not your account.
 
 ## Why Server Credentials Are Needed
 
 When you create an automated AWS connection:
 1. A CloudFormation stack creates an IAM role in **your AWS account**
-2. This role allows **Costra's AWS account** to assume it
-3. The Costra server needs credentials for **Costra's AWS account** to assume the role
+2. This role allows **Costdoq's AWS account** to assume it
+3. The Costdoq server needs credentials for **Costdoq's AWS account** to assume the role
 4. Once assumed, the server gets temporary credentials to access your billing data
 
 ## Configuration Options
@@ -19,13 +19,13 @@ When you create an automated AWS connection:
 Add to `server/.env`:
 
 ```bash
-# Costra's AWS Account Credentials (for assuming roles in customer accounts)
-AWS_ACCESS_KEY_ID=your-costra-aws-access-key-id
-AWS_SECRET_ACCESS_KEY=your-costra-aws-secret-access-key
+# Costdoq's AWS Account Credentials (for assuming roles in customer accounts)
+AWS_ACCESS_KEY_ID=your-costdoq-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=your-costdoq-aws-secret-access-key
 AWS_REGION=us-east-1
 ```
 
-**Note**: These are credentials for Costra's AWS account, not customer accounts.
+**Note**: These are credentials for Costdoq's AWS account, not customer accounts.
 
 ### Option 2: IAM Instance Profile (AWS EC2 Only)
 
@@ -43,7 +43,7 @@ The IAM role should have a policy like:
     {
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::*:role/CostraAccessRole-*"
+      "Resource": "arn:aws:iam::*:role/CostdoqAccessRole-*"
     }
   ]
 }
@@ -57,15 +57,15 @@ Create `~/.aws/credentials`:
 
 ```ini
 [default]
-aws_access_key_id = your-costra-aws-access-key-id
-aws_secret_access_key = your-costra-aws-secret-access-key
+aws_access_key_id = your-costdoq-aws-access-key-id
+aws_secret_access_key = your-costdoq-aws-secret-access-key
 region = us-east-1
 ```
 
 ## Verification
 
 After configuring credentials, test by running a sync. The server will:
-1. Use Costra's AWS credentials to assume the role in your account
+1. Use Costdoq's AWS credentials to assume the role in your account
 2. Get temporary credentials
 3. Use those credentials to fetch cost data
 
@@ -82,13 +82,13 @@ After configuring credentials, test by running a sync. The server will:
 
 ### Error: "Access denied when assuming role"
 
-**Cause**: Costra's AWS account doesn't have permission to assume the role.
+**Cause**: Costdoq's AWS account doesn't have permission to assume the role.
 
 **Solution**:
 - Verify the CloudFormation stack was created successfully
 - Check that the role ARN in the database matches the role created by CloudFormation
 - Verify the external ID matches
-- Ensure Costra's AWS account ID is correctly set in the CloudFormation template
+- Ensure Costdoq's AWS account ID is correctly set in the CloudFormation template
 
 ### Error: "Invalid AWS credentials"
 

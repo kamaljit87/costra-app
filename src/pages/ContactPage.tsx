@@ -240,7 +240,7 @@ export default function ContactPage() {
       <footer className="bg-surface-100 border-t border-surface-300 py-10 mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-500 space-y-2 sm:space-y-0">
-            <p>&copy; {new Date().getFullYear()} Costra. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Costdoq. All rights reserved.</p>
             <div className="flex space-x-6">
               <Link to="/privacy" className="hover:text-gray-900 transition-colors">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gray-900 transition-colors">Terms of Service</Link>

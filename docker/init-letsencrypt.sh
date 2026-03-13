@@ -3,8 +3,8 @@
 # Prereqs: DNS for your domain must point to this server; ports 80 and 443 open.
 #
 # Usage:
-#   LETSENCRYPT_DOMAIN=costra.app LETSENCRYPT_EMAIL=admin@costra.app ./docker/init-letsencrypt.sh
-#   Or: ./docker/init-letsencrypt.sh costra.app admin@costra.app
+#   LETSENCRYPT_DOMAIN=costdoq.com LETSENCRYPT_EMAIL=admin@costdoq.com ./docker/init-letsencrypt.sh
+#   Or: ./docker/init-letsencrypt.sh costdoq.com admin@costdoq.com
 
 set -e
 cd "$(dirname "$0")/.."
@@ -24,11 +24,11 @@ read -p "Continue? [y/N] " -n 1 -r; echo
 
 # nginx-reverse-proxy.conf is HTTP-only + ACME; nginx can start without certs
 echo "Starting nginx (HTTP only)..."
-docker compose up -d costra-nginx
+docker compose up -d costdoq-nginx
 sleep 3
 
 echo "Requesting certificate from Let's Encrypt..."
-docker compose run --rm costra-certbot certonly \
+docker compose run --rm costdoq-certbot certonly \
   --webroot -w /var/www/certbot \
   -d "$DOMAIN" \
   --email "$EMAIL" \
@@ -38,9 +38,9 @@ docker compose run --rm costra-certbot certonly \
 
 # Switch to full config (HTTP redirect + HTTPS) with this domain's cert path
 echo "Enabling HTTPS in nginx..."
-sed "s/costra\.app/$DOMAIN/g" docker/nginx-reverse-proxy-full.conf > docker/nginx-reverse-proxy.conf
+sed "s/costdoq\.app/$DOMAIN/g" docker/nginx-reverse-proxy-full.conf > docker/nginx-reverse-proxy.conf
 
-docker compose exec costra-nginx nginx -t
-docker compose exec costra-nginx nginx -s reload
+docker compose exec costdoq-nginx nginx -t
+docker compose exec costdoq-nginx nginx -s reload
 echo "Done. HTTPS is active for https://$DOMAIN"
-echo "Start the certbot renewal service: docker compose up -d costra-certbot"
+echo "Start the certbot renewal service: docker compose up -d costdoq-certbot"

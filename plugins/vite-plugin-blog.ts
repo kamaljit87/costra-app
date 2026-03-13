@@ -4,7 +4,7 @@ import matter from 'gray-matter'
 import type { Plugin } from 'vite'
 
 const BLOG_DIR = path.resolve(__dirname, '../src/content/blog')
-const SITE_URL = 'https://costra.app'
+const SITE_URL = 'https://costdoq.com'
 
 const STATIC_ROUTES: { path: string; changefreq: string; priority: string }[] = [
   { path: '/', changefreq: 'weekly', priority: '1.0' },
@@ -26,7 +26,7 @@ function getBlogPosts() {
       slug: data.slug || file.replace(/\.md$/, ''),
       date: data.date || '',
       description: data.description || '',
-      author: data.author || 'Costra Team',
+      author: data.author || 'Costdoq Team',
       tags: data.tags || [],
       image: data.image || null,
     }

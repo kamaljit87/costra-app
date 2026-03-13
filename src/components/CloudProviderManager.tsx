@@ -379,14 +379,14 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
         
         // Ensure it starts with a letter (CloudFormation requirement)
         if (sanitized && /^[0-9]/.test(sanitized)) {
-          sanitized = `costra-${sanitized}`
+          sanitized = `costdoq-${sanitized}`
         }
         
-        sanitized = sanitized.substring(0, 50) || 'costra-connection' // Limit length
+        sanitized = sanitized.substring(0, 50) || 'costdoq-connection' // Limit length
         
         // Final check: ensure it starts with a letter
         if (!/^[a-z]/.test(sanitized)) {
-          sanitized = `costra-${sanitized}`
+          sanitized = `costdoq-${sanitized}`
         }
         
         return sanitized
@@ -1265,7 +1265,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
                         const placeholders: Record<string, string> = {
                           accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
                           secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-                          roleArn: 'arn:aws:iam::123456789012:role/CostraReadOnlyRole',
+                          roleArn: 'arn:aws:iam::123456789012:role/CostdoqReadOnlyRole',
                           s3BucketName: 'your-company-billing',
                           curReportName: 'cloud-billing',
                           region: 'us-east-1',
@@ -1466,7 +1466,7 @@ export default function CloudProviderManager({ onProviderChange, modalMode = fal
               </div>
 
               <p className="text-sm text-gray-600 mb-4">
-                This will permanently delete all cost data, credentials, and historical records from Costra.
+                This will permanently delete all cost data, credentials, and historical records from Costdoq.
               </p>
 
               {deleteModal.isAutomated && (

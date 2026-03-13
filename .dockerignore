@@ -59,7 +59,7 @@ ecosystem.config.js
 # Database
 *.db
 *.db-journal
-server/costra.db
+server/costdoq.db
 
 # Reports
 reports

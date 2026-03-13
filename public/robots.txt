@@ -1,4 +1,4 @@
-# robots.txt — https://costra.app
+# robots.txt — https://costdoq.com
 # Only public marketing/informational pages should be crawled.
 # All authenticated, API, and internal routes are disallowed.
 
@@ -52,4 +52,4 @@ Disallow: /internal/
 Disallow: /api/
 
 # Sitemap
-Sitemap: https://costra.app/sitemap.xml
+Sitemap: https://costdoq.com/sitemap.xml

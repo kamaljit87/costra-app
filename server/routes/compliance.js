@@ -48,7 +48,7 @@ router.get('/export', authenticateToken, async (req, res) => {
     logger.info('User data export requested', { userId })
 
     res.setHeader('Content-Type', 'application/json')
-    res.setHeader('Content-Disposition', `attachment; filename="costra-data-export-${userId}-${new Date().toISOString().split('T')[0]}.json"`)
+    res.setHeader('Content-Disposition', `attachment; filename="costdoq-data-export-${userId}-${new Date().toISOString().split('T')[0]}.json"`)
     res.json(data)
   } catch (error) {
     logger.error('Error exporting user data', {
@@ -90,7 +90,7 @@ router.post('/delete-account', authenticateToken, async (req, res) => {
     const cancelUrl = `${FRONTEND_URL()}/cancel-delete?token=${cancelToken}`
     await sendTransactionalEmail({
       to: user.email,
-      subject: 'Confirm Account Deletion — Costra',
+      subject: 'Confirm Account Deletion — Costdoq',
       html: deletionConfirmTemplate(user.name, confirmUrl, cancelUrl),
     })
 
@@ -150,7 +150,7 @@ router.post('/delete-account/:requestId/confirm', authenticateToken, async (req,
     if (user) {
       sendTransactionalEmail({
         to: user.email,
-        subject: 'Account Deleted — Costra',
+        subject: 'Account Deleted — Costdoq',
         html: accountDeletedTemplate(user.name),
       }).catch((e) => logger.error('Failed to send account deleted email', { error: e.message }))
     }
@@ -203,7 +203,7 @@ router.post('/delete-account/confirm-by-token', async (req, res) => {
     if (user) {
       sendTransactionalEmail({
         to: user.email,
-        subject: 'Account Deleted — Costra',
+        subject: 'Account Deleted — Costdoq',
         html: accountDeletedTemplate(user.name),
       }).catch((e) => logger.error('Failed to send account deleted email', { error: e.message }))
     }
@@ -240,7 +240,7 @@ router.post('/delete-account/cancel-by-token', async (req, res) => {
     if (user) {
       sendTransactionalEmail({
         to: user.email,
-        subject: 'Account Deletion Cancelled — Costra',
+        subject: 'Account Deletion Cancelled — Costdoq',
         html: deletionCancelledTemplate(user.name),
       }).catch((e) => logger.error('Failed to send deletion cancelled email', { error: e.message }))
     }
@@ -278,7 +278,7 @@ router.post('/delete-account/:requestId/cancel', authenticateToken, async (req, 
     if (user) {
       sendTransactionalEmail({
         to: user.email,
-        subject: 'Account Deletion Cancelled — Costra',
+        subject: 'Account Deletion Cancelled — Costdoq',
         html: deletionCancelledTemplate(user.name),
       }).catch((e) => logger.error('Failed to send deletion cancelled email', { error: e.message }))
     }

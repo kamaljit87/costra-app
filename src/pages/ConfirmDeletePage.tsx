@@ -86,7 +86,7 @@ export default function ConfirmDeletePage() {
         <div className="w-full max-w-md rounded-2xl bg-white border border-surface-200 shadow-xl p-8">
           <h1 className="text-xl font-semibold text-red-600 mb-2">Confirm Account Deletion</h1>
           <p className="text-sm text-gray-600 mb-4">
-            You are about to permanently delete your Costra account and all associated data. This action cannot be undone.
+            You are about to permanently delete your Costdoq account and all associated data. This action cannot be undone.
           </p>
 
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">

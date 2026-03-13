@@ -1,4 +1,4 @@
-# Costra FinOps — Competitive Edge Strategy
+# Costdoq FinOps — Competitive Edge Strategy
 
 **Audience:** Founders, product and engineering leads
 **Date:** February 2026
@@ -8,9 +8,9 @@
 
 ## Executive Summary
 
-Costra is a multi-cloud cost management platform with a solid foundation: 8 cloud provider integrations (AWS with CUR 2.0, Azure, GCP, DigitalOcean, IBM, Linode, Vultr, MongoDB Atlas), AI-powered cost explanations via Claude, anomaly detection, budgets, showback/chargeback reports, unit economics, and a 3-tier subscription model (Trial/Starter/Pro). The product covers the core FinOps "crawl" phase well.
+Costdoq is a multi-cloud cost management platform with a solid foundation: 8 cloud provider integrations (AWS with CUR 2.0, Azure, GCP, DigitalOcean, IBM, Linode, Vultr, MongoDB Atlas), AI-powered cost explanations via Claude, anomaly detection, budgets, showback/chargeback reports, unit economics, and a 3-tier subscription model (Trial/Starter/Pro). The product covers the core FinOps "crawl" phase well.
 
-However, the FinOps market has shifted. Competitors like CloudZero, Kubecost, Harness, and Vantage are winning on **real-time granularity**, **container-native cost allocation**, **automated policy enforcement**, and **developer-facing workflows**. Costra's current gaps are primarily in the "run" and "optimize" phases of FinOps maturity.
+However, the FinOps market has shifted. Competitors like CloudZero, Kubecost, Harness, and Vantage are winning on **real-time granularity**, **container-native cost allocation**, **automated policy enforcement**, and **developer-facing workflows**. Costdoq's current gaps are primarily in the "run" and "optimize" phases of FinOps maturity.
 
 This document identifies 16 high-impact features across 6 categories, prioritized into a 90-day sprint plan and 6–12 month vision.
 
@@ -103,7 +103,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 
 ## 2. Market & Competitor Feature Map
 
-| Capability | Costra | CloudZero | Vantage | Kubecost | Harness CCM | CloudHealth |
+| Capability | Costdoq | CloudZero | Vantage | Kubecost | Harness CCM | CloudHealth |
 |------------|--------|-----------|---------|----------|-------------|-------------|
 | Multi-cloud visibility | ✓ (8) | ✓ (3) | ✓ (6+) | K8s only | ✓ (3) | ✓ (3) |
 | Kubernetes cost allocation | — | ✓ | ✓ | **Core** | ✓✓ | ✓ |
@@ -122,7 +122,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 | Natural language queries | — | — | — | — | — | — |
 | Open API | Partial | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-**Key insight**: Costra's Claude AI integration and broad provider coverage (8 providers) are genuine differentiators. The biggest gaps are Kubernetes, policy enforcement, advanced anomaly detection, RBAC, and team workflows.
+**Key insight**: Costdoq's Claude AI integration and broad provider coverage (8 providers) are genuine differentiators. The biggest gaps are Kubernetes, policy enforcement, advanced anomaly detection, RBAC, and team workflows.
 
 ---
 
@@ -130,21 +130,21 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 
 ### Critical Gaps (blocking enterprise/team adoption)
 
-1. **No team/org RBAC hierarchy** — Only user/admin roles. Engineering managers can't see only their team's costs. Finance can't get org-wide rollups without full admin. This blocks any company with >5 engineers from adopting Costra seriously.
+1. **No team/org RBAC hierarchy** — Only user/admin roles. Engineering managers can't see only their team's costs. Finance can't get org-wide rollups without full admin. This blocks any company with >5 engineers from adopting Costdoq seriously.
 
-2. **No Kubernetes / container cost allocation** — K8s is where most cloud spend growth happens. Without namespace/pod/label cost attribution, Costra is invisible to platform engineering teams. This is a deal-breaker in evaluations against Kubecost or Harness.
+2. **No Kubernetes / container cost allocation** — K8s is where most cloud spend growth happens. Without namespace/pod/label cost attribution, Costdoq is invisible to platform engineering teams. This is a deal-breaker in evaluations against Kubecost or Harness.
 
 3. **No cost policies or automated guardrails** — Budgets exist but are passive (alert-only). No way to enforce spend limits, require approval for provisioning, or flag policy violations. Competitors like Harness and CloudHealth offer this.
 
 ### High-Impact Gaps (competitive disadvantage)
 
-4. **Anomaly detection is primitive** — Static threshold on 30-day rolling average. No seasonality adjustment, no ML scoring, no root-cause analysis. Competitors flag the *why* alongside the spike. Costra's Claude integration could make root-cause analysis a unique strength.
+4. **Anomaly detection is primitive** — Static threshold on 30-day rolling average. No seasonality adjustment, no ML scoring, no root-cause analysis. Competitors flag the *why* alongside the spike. Costdoq's Claude integration could make root-cause analysis a unique strength.
 
 5. **Forecasting is single-month linear** — No scenario modeling ("what if we add 3 instances?"), no multi-month projection, no confidence intervals. This limits planning use cases.
 
 6. **RI/SP utilization tracking is absent** — `savings_plans` table stores plans but doesn't track utilization rates, coverage gaps, or expiration risk. This is low-hanging fruit with high value.
 
-7. **Unit economics requires manual entry** — CloudZero auto-correlates costs to business telemetry. Costra requires users to manually type in customer counts monthly. High friction.
+7. **Unit economics requires manual entry** — CloudZero auto-correlates costs to business telemetry. Costdoq requires users to manually type in customer counts monthly. High friction.
 
 ### Moderate Gaps (differentiation opportunities)
 
@@ -165,7 +165,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.1 Team/Org Hierarchy & Scoped RBAC [P0]
 - **Problem**: Only user/admin roles. Can't give an engineering manager visibility into only their team's spend, or let finance see org-wide without admin powers.
 - **Persona**: Engineering managers, finance, FinOps practitioners, any company >5 people.
-- **Competitive advantage**: Essential for multi-user adoption. Without this, Costra is limited to single-user setups. Every competitor has this.
+- **Competitive advantage**: Essential for multi-user adoption. Without this, Costdoq is limited to single-user setups. Every competitor has this.
 - **Implementation**:
   - New tables: `organizations` (id, name, slug), `teams` (id, org_id, name), `team_members` (team_id, user_id, role: viewer/editor/admin)
   - Scope all cost queries by org → team membership
@@ -177,7 +177,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.2 Cost Policies & Guardrails [P0]
 - **Problem**: Budgets alert after overspend. No way to prevent waste proactively or enforce tagging/spend rules.
 - **Persona**: FinOps practitioners, engineering managers, finance.
-- **Competitive advantage**: Policy-as-code is emerging but most tools (except Harness) don't do it simply. Costra can make it accessible.
+- **Competitive advantage**: Policy-as-code is emerging but most tools (except Harness) don't do it simply. Costdoq can make it accessible.
 - **Implementation**:
   - New `cost_policies` table: condition (service/tag/amount threshold), action (alert/block/require-approval), scope (account/team/org)
   - Policy engine evaluates on each sync: flag violations, create notifications
@@ -188,7 +188,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.3 FinOps Review Workflows [P1]
 - **Problem**: No structured process for reviewing cost changes, approving optimizations, or tracking who acknowledged an anomaly.
 - **Persona**: FinOps practitioners, engineering managers in teams.
-- **Competitive advantage**: Turns Costra from a dashboard into a workflow tool — increases stickiness and daily usage.
+- **Competitive advantage**: Turns Costdoq from a dashboard into a workflow tool — increases stickiness and daily usage.
 - **Implementation**:
   - New `workflow_items` table: type (anomaly_review/optimization_approval/budget_review), status (open/in_review/approved/rejected), assignee, comments
   - When anomaly detected → create review item assigned to account owner
@@ -203,7 +203,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.4 ML Anomaly Detection with Claude Root-Cause Analysis [P0]
 - **Problem**: Current anomaly detection uses a flat 30-day average. It misses seasonal patterns, flags expected spikes (month-end batch jobs), and doesn't explain *why* costs spiked.
 - **Persona**: FinOps practitioners, engineering managers, SREs.
-- **Competitive advantage**: Claude integration gives Costra a unique ability to generate natural-language root cause analysis that no competitor can match. This is Costra's strongest differentiator.
+- **Competitive advantage**: Claude integration gives Costdoq a unique ability to generate natural-language root cause analysis that no competitor can match. This is Costdoq's strongest differentiator.
 - **Implementation**:
   - Replace static baseline with time-series decomposition (Holt-Winters or STL in JS — no heavy ML library needed) to handle seasonality and trends
   - When anomaly detected: query service-level breakdown for that day, identify which services/resources drove the spike
@@ -237,7 +237,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.7 Automated Unit Economics via Integrations [P1]
 - **Problem**: Manual metric entry is high friction. Nobody remembers to update customer counts monthly.
 - **Persona**: Founders, product managers, finance.
-- **Competitive advantage**: CloudZero requires complex instrumentation. Costra can offer simple webhook/API integrations.
+- **Competitive advantage**: CloudZero requires complex instrumentation. Costdoq can offer simple webhook/API integrations.
 - **Implementation**:
   - Webhook endpoint: `POST /api/business-metrics/ingest` (accepts metric_type, value, date)
   - Pre-built integrations: Dodo Payments (customer count, MRR via API), custom metric polling
@@ -252,11 +252,11 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.8 Kubernetes Cost Allocation [P0]
 - **Problem**: Platform teams can't attribute K8s cluster costs to namespaces, deployments, or labels. Shared clusters make cost accountability impossible.
 - **Persona**: Platform engineers, FinOps practitioners, engineering managers.
-- **Competitive advantage**: Combines Costra's multi-cloud breadth with K8s depth — most tools do one or the other.
+- **Competitive advantage**: Combines Costdoq's multi-cloud breadth with K8s depth — most tools do one or the other.
 - **Implementation**:
   - Lightweight agent (DaemonSet) that reads Prometheus metrics (CPU/memory requests vs actual usage per pod/namespace)
   - New tables: `k8s_clusters`, `k8s_namespace_costs`, `k8s_workload_costs`
-  - Agent pushes metrics to Costra API via existing API key auth
+  - Agent pushes metrics to Costdoq API via existing API key auth
   - Backend correlates K8s node costs (from cloud bill) with pod-level resource consumption
   - Frontend: `/kubernetes` page with namespace breakdown, idle pod detection, right-sizing at pod level
   - Alternative v1: integrate with Kubecost API for orgs that already run it
@@ -280,7 +280,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 - **Competitive advantage**: Interactive bot (not just webhooks) with slash commands and action buttons.
 - **Implementation**:
   - Slack app with OAuth installation flow
-  - Commands: `/costra summary` (today's spend), `/costra anomalies` (open anomalies), `/costra budget [name]`
+  - Commands: `/costdoq summary` (today's spend), `/costdoq anomalies` (open anomalies), `/costdoq budget [name]`
   - Interactive messages: "Cost spike on EC2 (+$340/day). [Investigate] [Acknowledge] [Mute]"
   - Daily/weekly digest to configured channel
   - Store Slack tokens in `slack_integrations` table
@@ -326,7 +326,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.14 Enhanced AI Cost Advisor [P1]
 - **Problem**: AI chat answers questions but doesn't proactively surface insights or connect patterns.
 - **Persona**: All users.
-- **Competitive advantage**: Costra already has Claude — no competitor has this depth of AI. Push it further.
+- **Competitive advantage**: Costdoq already has Claude — no competitor has this depth of AI. Push it further.
 - **Implementation**:
   - Weekly AI-generated "Cost Intelligence Brief": top 3 insights, risks, opportunities
   - Proactive alerts: "Your EC2 pattern suggests a Compute Savings Plan would save $2,400/year"
@@ -337,7 +337,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 #### 4.15 Natural Language Cost Queries [P1]
 - **Problem**: Users navigate multiple pages to answer "How much did Team Alpha spend on RDS last quarter?"
 - **Persona**: Engineering managers, finance, non-technical stakeholders.
-- **Competitive advantage**: Nobody else offers natural language querying of cost data. Claude makes this uniquely feasible for Costra.
+- **Competitive advantage**: Nobody else offers natural language querying of cost data. Claude makes this uniquely feasible for Costdoq.
 - **Implementation**:
   - Extend `/api/ai/chat` to translate natural language → database queries
   - Claude generates query plan, executes against cost data, returns formatted answer
@@ -376,7 +376,7 @@ This document identifies 16 high-impact features across 6 categories, prioritize
 | 11 | Slack bot MVP (daily digest + anomaly alerts with action buttons) | Increases engagement and daily active usage |
 | 12 | Scheduled report delivery + review workflows v1 | Enterprise readiness signal |
 
-**Exit criteria**: After 90 days, Costra supports multi-team organizations, catches anomalies intelligently with root-cause narratives, forecasts with scenarios, and has basic K8s cost allocation. This moves the product from FinOps "crawl" to "walk/run" maturity.
+**Exit criteria**: After 90 days, Costdoq supports multi-team organizations, catches anomalies intelligently with root-cause narratives, forecasts with scenarios, and has basic K8s cost allocation. This moves the product from FinOps "crawl" to "walk/run" maturity.
 
 ---
 

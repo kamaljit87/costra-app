@@ -81,10 +81,10 @@ export default function DocsPage() {
   return (
     <Layout>
       <Helmet>
-        <title>User Documentation - Costra</title>
-        <meta name="description" content="Costra user guide: get started, connect cloud providers, budgets, reports, and more." />
-        <meta property="og:title" content="User Documentation - Costra" />
-        <meta property="og:description" content="Learn how to use Costra to manage and optimize your cloud costs." />
+        <title>User Documentation - Costdoq</title>
+        <meta name="description" content="Costdoq user guide: get started, connect cloud providers, budgets, reports, and more." />
+        <meta property="og:title" content="User Documentation - Costdoq" />
+        <meta property="og:description" content="Learn how to use Costdoq to manage and optimize your cloud costs." />
         <meta property="og:type" content="website" />
       </Helmet>
 

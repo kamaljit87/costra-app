@@ -4,7 +4,7 @@
 
 The automated AWS connection feature requires the CloudFormation template to be hosted at a publicly accessible HTTPS URL. This guide explains how to set this up.
 
-**Note**: Our CloudFormation template follows CloudZero's pattern but is simplified for Costra's needs. It creates a single IAM role with read-only access to billing and cost data.
+**Note**: Our CloudFormation template follows CloudZero's pattern but is simplified for Costdoq's needs. It creates a single IAM role with read-only access to billing and cost data.
 
 ## Quick Setup Options
 
@@ -12,31 +12,31 @@ The automated AWS connection feature requires the CloudFormation template to be 
 
 1. **Create an S3 bucket** (or use an existing one)
    ```bash
-   aws s3 mb s3://costra-cloudformation-templates
+   aws s3 mb s3://costdoq-cloudformation-templates
    ```
 
 2. **Upload the template**
    ```bash
-   aws s3 cp cloudformation/aws-billing-connection.yml s3://costra-cloudformation-templates/
+   aws s3 cp cloudformation/aws-billing-connection.yml s3://costdoq-cloudformation-templates/
    ```
 
 3. **Make the template publicly readable**
    ```bash
    aws s3api put-object-acl \
-     --bucket costra-cloudformation-templates \
+     --bucket costdoq-cloudformation-templates \
      --key aws-billing-connection.yml \
      --acl public-read
    ```
 
 4. **Get the public URL**
    ```
-   https://costra-cloudformation-templates.s3.amazonaws.com/aws-billing-connection.yml
+   https://costdoq-cloudformation-templates.s3.amazonaws.com/aws-billing-connection.yml
    ```
 
 5. **Set environment variable**
    ```bash
    # In server/.env
-   CLOUDFORMATION_TEMPLATE_URL=https://costra-cloudformation-templates.s3.amazonaws.com/aws-billing-connection.yml
+   CLOUDFORMATION_TEMPLATE_URL=https://costdoq-cloudformation-templates.s3.amazonaws.com/aws-billing-connection.yml
    ```
 
 ### Option 2: Host on GitHub (Good for Development)
@@ -45,13 +45,13 @@ The automated AWS connection feature requires the CloudFormation template to be 
 
 2. **Get the raw content URL**
    ```
-   https://raw.githubusercontent.com/your-org/costra/main/cloudformation/aws-billing-connection.yml
+   https://raw.githubusercontent.com/your-org/costdoq/main/cloudformation/aws-billing-connection.yml
    ```
 
 3. **Set environment variable**
    ```bash
    # In server/.env
-   CLOUDFORMATION_TEMPLATE_URL=https://raw.githubusercontent.com/your-org/costra/main/cloudformation/aws-billing-connection.yml
+   CLOUDFORMATION_TEMPLATE_URL=https://raw.githubusercontent.com/your-org/costdoq/main/cloudformation/aws-billing-connection.yml
    ```
 
 ### Option 3: Host on Your Own Web Server

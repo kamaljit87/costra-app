@@ -38,7 +38,7 @@ import logger from '../utils/logger.js'
 
 const router = express.Router()
 
-const TOTP_ISSUER = 'Costra'
+const TOTP_ISSUER = 'Costdoq'
 const TEMP_TOKEN_EXPIRY = '10m'
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
 
@@ -57,7 +57,7 @@ async function sendVerificationEmail(userId, email, name) {
   const verifyUrl = `${FRONTEND_URL()}/verify-email?token=${token}`
   await sendTransactionalEmail({
     to: email,
-    subject: 'Verify Your Email — Costra',
+    subject: 'Verify Your Email — Costdoq',
     html: verifyEmailTemplate(name, verifyUrl),
   })
 }
@@ -165,7 +165,7 @@ router.post('/forgot-password', async (req, res) => {
       const resetUrl = `${FRONTEND_URL()}/reset-password?token=${token}`
       await sendTransactionalEmail({
         to: user.email,
-        subject: 'Reset Your Password — Costra',
+        subject: 'Reset Your Password — Costdoq',
         html: passwordResetTemplate(user.name, resetUrl),
       })
       logger.info('Password reset email sent', { email: user.email })
@@ -202,7 +202,7 @@ router.post('/reset-password', async (req, res) => {
     if (user) {
       sendTransactionalEmail({
         to: user.email,
-        subject: 'Password Changed — Costra',
+        subject: 'Password Changed — Costdoq',
         html: passwordChangedTemplate(user.name),
       }).catch((e) => logger.error('Failed to send password changed email', { error: e.message }))
     }
@@ -355,7 +355,7 @@ router.post('/signup',
       }
       sendTransactionalEmail({
         to: email,
-        subject: 'Welcome to Costra!',
+        subject: 'Welcome to Costdoq!',
         html: welcomeTemplate(name),
       }).catch((e) => logger.error('Failed to send welcome email', { userId, error: e.message }))
 
@@ -721,7 +721,7 @@ router.post('/2fa/confirm', authenticateToken, async (req, res) => {
     if (user2fa) {
       sendTransactionalEmail({
         to: user2fa.email,
-        subject: 'Two-Factor Authentication Enabled — Costra',
+        subject: 'Two-Factor Authentication Enabled — Costdoq',
         html: twoFactorEnabledTemplate(user2fa.name),
       }).catch((e) => logger.error('Failed to send 2FA enabled email', { error: e.message }))
     }
@@ -758,7 +758,7 @@ router.post('/2fa/disable', authenticateToken, async (req, res) => {
     if (userDis) {
       sendTransactionalEmail({
         to: userDis.email,
-        subject: 'Two-Factor Authentication Disabled — Costra',
+        subject: 'Two-Factor Authentication Disabled — Costdoq',
         html: twoFactorDisabledTemplate(userDis.name),
       }).catch((e) => logger.error('Failed to send 2FA disabled email', { error: e.message }))
     }

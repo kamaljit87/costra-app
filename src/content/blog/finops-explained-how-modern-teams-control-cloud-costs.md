@@ -3,7 +3,7 @@ title: "FinOps Explained: How Modern Teams Control Cloud Costs Without Slowing I
 slug: "finops-explained-how-modern-teams-control-cloud-costs"
 date: "2026-03-08"
 description: "A practical guide to FinOps for developers and startup founders. Learn how engineering teams can take control of cloud spending without sacrificing speed or innovation."
-author: "Costra Team"
+author: "Costdoq Team"
 tags: ["finops", "cloud-costs", "cost-optimization", "devops", "startup"]
 ---
 
@@ -95,7 +95,7 @@ You do not need to build all of this from scratch. There are solid tools availab
 
 **Cloud-native options** like AWS Cost Explorer, Azure Cost Management, and GCP Billing Reports give you basic visibility within a single provider. They are free and a good starting point, but they only show you one piece of the puzzle.
 
-**Multi-cloud platforms** like Costra, CloudHealth, and Cloudability aggregate costs across providers, giving you a unified view when your infrastructure spans AWS, Azure, GCP, or other clouds. This is where you get real cross-provider insights and the ability to compare unit costs.
+**Multi-cloud platforms** like Costdoq, CloudHealth, and Cloudability aggregate costs across providers, giving you a unified view when your infrastructure spans AWS, Azure, GCP, or other clouds. This is where you get real cross-provider insights and the ability to compare unit costs.
 
 **Kubernetes-specific tools** like Kubecost and OpenCost help you understand container-level spending, which is notoriously difficult to track with cloud-provider billing alone. If you are running Kubernetes at any real scale, you need something like this.
 

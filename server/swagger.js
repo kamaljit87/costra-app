@@ -10,12 +10,12 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Costra API',
+      title: 'Costdoq API',
       version: '1.0.0',
       description: 'Multi-cloud cost management platform API',
       contact: {
-        name: 'Costra Support',
-        email: 'support@costra.com',
+        name: 'Costdoq Support',
+        email: 'support@costdoq.com',
       },
       license: {
         name: 'MIT',
@@ -28,7 +28,7 @@ const options = {
         description: 'Development server',
       },
       {
-        url: process.env.PRODUCTION_URL || 'https://api.costra.com',
+        url: process.env.PRODUCTION_URL || 'https://api.costdoq.com',
         description: 'Production server',
       },
     ],
@@ -160,7 +160,7 @@ export const swaggerSpec = swaggerJsdoc(options)
 
 export const swaggerUiOptions = {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'Costra API Documentation',
+  customSiteTitle: 'Costdoq API Documentation',
 }
 
 export const setupSwagger = (app) => {

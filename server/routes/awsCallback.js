@@ -2,7 +2,7 @@
  * AWS CloudFormation Callback Route (Public — no auth)
  *
  * Called by the Lambda Custom Resource in the CloudFormation template
- * when the stack finishes creating. This lets Costra automatically
+ * when the stack finishes creating. This lets Costdoq automatically
  * verify and activate the connection without frontend polling.
  *
  * Security: The externalId acts as a shared secret. Only requests

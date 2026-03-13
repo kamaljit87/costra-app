@@ -141,7 +141,7 @@ export default function AdminTicketsPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Admin - Support Tickets | Costra</title>
+        <title>Admin - Support Tickets | Costdoq</title>
       </Helmet>
 
       <div className="max-w-6xl mx-auto">

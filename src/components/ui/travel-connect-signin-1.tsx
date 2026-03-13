@@ -185,7 +185,7 @@ export const SignInCard = ({
   onGoogleClick,
   googleButton,
   forgotPasswordHref = '#',
-  title = 'Costra',
+  title = 'Costdoq',
   tagline = 'Sign in to your cost dashboard and connect all your cloud providers',
 }: SignInCardProps) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
@@ -441,7 +441,7 @@ const SignUpLeftPanel = ({ title, tagline }: { title: string; tagline: string })
 export const SignUpCard = ({
   onSubmit,
   googleButton,
-  title = 'Costra',
+  title = 'Costdoq',
   tagline = 'Create your account and connect all your cloud providers in one place',
 }: SignUpCardProps) => {
   const [name, setName] = useState('')

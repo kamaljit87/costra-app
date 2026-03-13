@@ -93,9 +93,9 @@ async function processScheduledReport(schedule) {
       const transporter = getEmailTransporter()
       if (transporter) {
         await transporter.sendMail({
-          from: process.env.EMAIL_FROM || 'noreply@costra.io',
+          from: process.env.EMAIL_FROM || 'noreply@costdoq.io',
           to: parsedRecipients.join(', '),
-          subject: `Costra Report: ${reportName}`,
+          subject: `Costdoq Report: ${reportName}`,
           text: `Your scheduled report "${reportName}" is attached.\n\nPeriod: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`,
           attachments: [{ filename: path.basename(filePath), path: filePath }],
         })

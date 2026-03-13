@@ -780,7 +780,7 @@ export default function RecommendationsPage() {
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs font-medium text-gray-700 mb-1">2. Sync Data</div>
-                      <div className="text-xs text-gray-500">Let Costra fetch your cost and usage data</div>
+                      <div className="text-xs text-gray-500">Let Costdoq fetch your cost and usage data</div>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs font-medium text-gray-700 mb-1">3. Run Analysis</div>

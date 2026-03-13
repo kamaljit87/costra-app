@@ -25,7 +25,7 @@ export const sendSlackMessage = async (webhookUrl, payload) => {
 
 export const sendSlackTestMessage = async (webhookUrl) => {
   return sendSlackMessage(webhookUrl, {
-    text: ':white_check_mark: *Costra Connected!*\nSlack integration is working. You will receive cost alerts and digests here.',
+    text: ':white_check_mark: *Costdoq Connected!*\nSlack integration is working. You will receive cost alerts and digests here.',
   })
 }
 
@@ -49,7 +49,7 @@ export const sendDailyDigest = async (integration) => {
 
     await sendSlackMessage(integration.webhook_url, {
       blocks: [
-        { type: 'header', text: { type: 'plain_text', text: ':bar_chart: Costra Daily Cost Digest' } },
+        { type: 'header', text: { type: 'plain_text', text: ':bar_chart: Costdoq Daily Cost Digest' } },
         { type: 'section', fields: [
           { type: 'mrkdwn', text: `*Today's Spend:*\n$${todayCost.toFixed(2)}` },
           { type: 'mrkdwn', text: `*Yesterday:*\n$${yesterdayCost.toFixed(2)}` },

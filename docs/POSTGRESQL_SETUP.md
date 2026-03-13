@@ -1,6 +1,6 @@
 # PostgreSQL Setup Guide
 
-This guide will help you set up PostgreSQL for the Costra application.
+This guide will help you set up PostgreSQL for the Costdoq application.
 
 ## Installation
 
@@ -34,13 +34,13 @@ sudo -u postgres psql
 
 2. **Create database:**
 ```sql
-CREATE DATABASE costra;
+CREATE DATABASE costdoq;
 ```
 
 3. **Create user (optional - you can use the default postgres user):**
 ```sql
-CREATE USER costra_user WITH PASSWORD 'your_secure_password';
-GRANT ALL PRIVILEGES ON DATABASE costra TO costra_user;
+CREATE USER costdoq_user WITH PASSWORD 'your_secure_password';
+GRANT ALL PRIVILEGES ON DATABASE costdoq TO costdoq_user;
 ```
 
 4. **Exit psql:**
@@ -58,19 +58,19 @@ cp .env.example .env
 
 2. **Edit `.env` and set DATABASE_URL:**
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costdoq
 ```
 
 Or if using a custom user:
 ```
-DATABASE_URL=postgresql://costra_user:your_secure_password@localhost:5432/costra
+DATABASE_URL=postgresql://costdoq_user:your_secure_password@localhost:5432/costdoq
 ```
 
 ## Verify Connection
 
 Test the connection:
 ```bash
-psql postgresql://postgres:postgres@localhost:5432/costra
+psql postgresql://postgres:postgres@localhost:5432/costdoq
 ```
 
 If successful, you should see the PostgreSQL prompt.
@@ -96,14 +96,14 @@ You should see: "Connected to PostgreSQL database" and "Database schema initiali
 ### Authentication Failed
 - Verify username and password in DATABASE_URL
 - Check `pg_hba.conf` for authentication settings
-- Try connecting with: `psql -U postgres -d costra`
+- Try connecting with: `psql -U postgres -d costdoq`
 
 ### Database Does Not Exist
-- Create it: `createdb costra` or `psql -c "CREATE DATABASE costra;"`
+- Create it: `createdb costdoq` or `psql -c "CREATE DATABASE costdoq;"`
 
 ### Permission Denied
 ```sql
-GRANT ALL PRIVILEGES ON DATABASE costra TO your_username;
+GRANT ALL PRIVILEGES ON DATABASE costdoq TO your_username;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO your_username;
 ```
 

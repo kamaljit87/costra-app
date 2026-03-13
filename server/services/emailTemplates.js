@@ -44,8 +44,8 @@ function baseLayout(title, bodyHtml) {
       ${bodyHtml}
     </div>
     <div class="footer">
-      <p style="margin:0">&copy; ${new Date().getFullYear()} Costra. All rights reserved.</p>
-      <p style="margin:4px 0 0">This is a transactional email from Costra.</p>
+      <p style="margin:0">&copy; ${new Date().getFullYear()} Costdoq. All rights reserved.</p>
+      <p style="margin:4px 0 0">This is a transactional email from Costdoq.</p>
     </div>
   </div>
 </body>
@@ -58,11 +58,11 @@ function baseLayout(title, bodyHtml) {
 export function verifyEmailTemplate(name, verifyUrl) {
   return baseLayout('Verify Your Email', `
     <p>Hi ${name},</p>
-    <p>Welcome to Costra! Please verify your email address to get started.</p>
+    <p>Welcome to Costdoq! Please verify your email address to get started.</p>
     <p style="text-align:center; margin: 28px 0;">
       <a href="${verifyUrl}" class="btn">Verify Email Address</a>
     </p>
-    <p class="muted">This link expires in 24 hours. If you didn't create a Costra account, you can safely ignore this email.</p>
+    <p class="muted">This link expires in 24 hours. If you didn't create a Costdoq account, you can safely ignore this email.</p>
     <p class="muted" style="word-break:break-all;">Or copy and paste this URL into your browser:<br>${verifyUrl}</p>
   `)
 }
@@ -105,7 +105,7 @@ export function passwordChangedTemplate(name) {
 export function deletionConfirmTemplate(name, confirmUrl, cancelUrl) {
   return baseLayout('Confirm Account Deletion', `
     <p>Hi ${name},</p>
-    <p>You requested to delete your Costra account. This action is <strong>permanent and irreversible</strong>.</p>
+    <p>You requested to delete your Costdoq account. This action is <strong>permanent and irreversible</strong>.</p>
     <div class="alert alert-danger">
       <strong>This will permanently delete:</strong>
       <ul style="margin: 8px 0 0; padding-left: 20px;">
@@ -132,7 +132,7 @@ export function deletionConfirmTemplate(name, confirmUrl, cancelUrl) {
 export function accountDeletedTemplate(name) {
   return baseLayout('Account Deleted', `
     <p>Hi ${name},</p>
-    <p>Your Costra account and all associated data have been permanently deleted.</p>
+    <p>Your Costdoq account and all associated data have been permanently deleted.</p>
     <p>We're sorry to see you go. If you ever want to come back, you're welcome to create a new account at <a href="${FRONTEND_URL()}">${FRONTEND_URL()}</a>.</p>
   `)
 }
@@ -159,7 +159,7 @@ export function deletionCancelledTemplate(name) {
 export function emailChangeVerifyTemplate(name, newEmail, verifyUrl) {
   return baseLayout('Verify Your New Email', `
     <p>Hi ${name},</p>
-    <p>You requested to change your Costra email to <strong>${newEmail}</strong>.</p>
+    <p>You requested to change your Costdoq email to <strong>${newEmail}</strong>.</p>
     <p>Click below to verify this new email address:</p>
     <p style="text-align:center; margin: 28px 0;">
       <a href="${verifyUrl}" class="btn">Verify New Email</a>
@@ -209,7 +209,7 @@ export function twoFactorEnabledTemplate(name) {
   return baseLayout('Two-Factor Authentication Enabled', `
     <p>Hi ${name},</p>
     <div class="alert alert-info">
-      <strong>Two-factor authentication has been enabled</strong> on your Costra account.
+      <strong>Two-factor authentication has been enabled</strong> on your Costdoq account.
     </div>
     <p>You'll now need your authenticator app to sign in. Make sure you've saved your recovery codes in a safe place.</p>
     <p>If you didn't enable 2FA, your account may be compromised. Change your password immediately:</p>
@@ -226,7 +226,7 @@ export function twoFactorDisabledTemplate(name) {
   return baseLayout('Two-Factor Authentication Disabled', `
     <p>Hi ${name},</p>
     <div class="alert alert-warning">
-      <strong>Two-factor authentication has been disabled</strong> on your Costra account.
+      <strong>Two-factor authentication has been disabled</strong> on your Costdoq account.
     </div>
     <p>Your account is now only protected by your password. We recommend keeping 2FA enabled for better security.</p>
     <p>If you didn't disable 2FA, your account may be compromised:</p>
@@ -240,9 +240,9 @@ export function twoFactorDisabledTemplate(name) {
  * Welcome email with trial info
  */
 export function welcomeTemplate(name) {
-  return baseLayout('Welcome to Costra!', `
+  return baseLayout('Welcome to Costdoq!', `
     <p>Hi ${name},</p>
-    <p>Thanks for joining Costra! Your <strong>7-day free trial</strong> has started.</p>
+    <p>Thanks for joining Costdoq! Your <strong>7-day free trial</strong> has started.</p>
     <p>Here's how to get started:</p>
     <ol style="padding-left: 20px;">
       <li><strong>Connect your cloud provider</strong> — AWS, Azure, GCP, or others</li>

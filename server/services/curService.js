@@ -19,7 +19,7 @@ import { clearUserCache, clearCostExplanationsCache, createNotification, saveSer
 import logger from '../utils/logger.js'
 
 const MAX_PARQUET_FILE_SIZE = 200 * 1024 * 1024 // 200MB
-const CUR_S3_PREFIX = 'costra-cur'
+const CUR_S3_PREFIX = 'costdoq-cur'
 
 // ─── Database helpers ────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ const getCurConfig = async (userId, accountId) => {
   return result.rows[0] || null
 }
 
-const upsertCurConfig = async (userId, accountId, exportName, exportArn, s3Bucket, status, statusMessage = null, s3Prefix = 'costra-cur') => {
+const upsertCurConfig = async (userId, accountId, exportName, exportArn, s3Bucket, status, statusMessage = null, s3Prefix = 'costdoq-cur') => {
   await pool.query(
     `INSERT INTO cur_export_config (user_id, account_id, export_name, export_arn, s3_bucket, s3_prefix, cur_status, status_message, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
@@ -108,11 +108,11 @@ export const registerCURExport = async (userId, accountId, exportName, exportArn
  * Used as fallback for stacks that don't include the BCM export resource.
  */
 export const setupCURExport = async (userId, accountId, roleArn, externalId, awsAccountId, connectionName) => {
-  const creds = await getAssumedRoleCredentials(roleArn, externalId, `costra-cur-setup-${accountId}-${Date.now()}`)
+  const creds = await getAssumedRoleCredentials(roleArn, externalId, `costdoq-cur-setup-${accountId}-${Date.now()}`)
 
-  const s3Bucket = `costra-cur-${awsAccountId}-${connectionName}`
-  const exportName = `costra-export-${connectionName}`
-  const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID
+  const s3Bucket = `costdoq-cur-${awsAccountId}-${connectionName}`
+  const exportName = `costdoq-export-${connectionName}`
+  const costdoqAccountId = process.env.COSTDOQ_AWS_ACCOUNT_ID
 
   const credentialConfig = {
     accessKeyId: creds.accessKeyId,
@@ -172,7 +172,7 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
 
   // Tags — merge with existing tags so we don't remove CloudFormation system tags
   const desiredTags = [
-    { Key: 'ManagedBy', Value: 'Costra' },
+    { Key: 'ManagedBy', Value: 'Costdoq' },
     { Key: 'Purpose', Value: 'CostAndUsageReports' },
   ]
   try {
@@ -196,7 +196,7 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
     logger.warn('Could not update bucket tags, continuing', { s3Bucket, error: tagErr.message })
   }
 
-  // 3. Set bucket policy: allow BCM Data Exports to write + Costra cross-account read
+  // 3. Set bucket policy: allow BCM Data Exports to write + Costdoq cross-account read
   // Per https://docs.aws.amazon.com/cur/latest/userguide/dataexports-s3-bucket.html both
   // aws:SourceAccount and aws:SourceArn are required for Data Exports to deliver successfully.
   const bucketPolicy = {
@@ -213,10 +213,10 @@ export const setupCURExport = async (userId, accountId, roleArn, externalId, aws
           ArnLike: { 'aws:SourceArn': `arn:aws:bcm-data-exports:us-east-1:${awsAccountId}:export/*` },
         },
       },
-      ...(costraAccountId ? [{
-        Sid: 'AllowCostraCrossAccountRead',
+      ...(costdoqAccountId ? [{
+        Sid: 'AllowCostdoqCrossAccountRead',
         Effect: 'Allow',
-        Principal: { AWS: `arn:aws:iam::${costraAccountId}:root` },
+        Principal: { AWS: `arn:aws:iam::${costdoqAccountId}:root` },
         Action: ['s3:GetObject', 's3:ListBucket', 's3:GetBucketLocation'],
         Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
       }] : []),
@@ -370,10 +370,10 @@ export const applyCURBucketPolicy = async (userId, accountId) => {
     throw new Error('Account credentials missing')
   }
 
-  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costra-cur-fix-policy-${accountId}-${Date.now()}`)
+  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costdoq-cur-fix-policy-${accountId}-${Date.now()}`)
   const s3Bucket = config.s3_bucket
   const awsAccountId = account.aws_account_id
-  const costraAccountId = process.env.COSTRA_AWS_ACCOUNT_ID
+  const costdoqAccountId = process.env.COSTDOQ_AWS_ACCOUNT_ID
 
   const s3Client = new S3Client({
     region: 'us-east-1',
@@ -398,10 +398,10 @@ export const applyCURBucketPolicy = async (userId, accountId) => {
           ArnLike: { 'aws:SourceArn': `arn:aws:bcm-data-exports:us-east-1:${awsAccountId}:export/*` },
         },
       },
-      ...(costraAccountId ? [{
-        Sid: 'AllowCostraCrossAccountRead',
+      ...(costdoqAccountId ? [{
+        Sid: 'AllowCostdoqCrossAccountRead',
         Effect: 'Allow',
-        Principal: { AWS: `arn:aws:iam::${costraAccountId}:root` },
+        Principal: { AWS: `arn:aws:iam::${costdoqAccountId}:root` },
         Action: ['s3:GetObject', 's3:ListBucket', 's3:GetBucketLocation'],
         Resource: [`arn:aws:s3:::${s3Bucket}`, `arn:aws:s3:::${s3Bucket}/*`],
       }] : []),
@@ -436,7 +436,7 @@ async function getExportStatusFromAWS(userId, accountId) {
   if (!account?.role_arn || !account.external_id) return null
 
   try {
-    const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costra-cur-status-${accountId}-${Date.now()}`)
+    const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costdoq-cur-status-${accountId}-${Date.now()}`)
     const bcmClient = new BCMDataExportsClient({
       region: 'us-east-1',
       credentials: {
@@ -476,7 +476,7 @@ export const checkCURDataAvailability = async (userId, accountId) => {
     return { available: false, billingPeriods: [] }
   }
 
-  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costra-cur-check-${accountId}-${Date.now()}`)
+  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costdoq-cur-check-${accountId}-${Date.now()}`)
   const s3Client = new S3Client({
     region: 'us-east-1',
     credentials: {
@@ -536,7 +536,7 @@ export const ingestCURData = async (userId, accountId, billingPeriod) => {
     throw new Error('Account credentials missing for CUR ingestion')
   }
 
-  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costra-cur-ingest-${accountId}-${Date.now()}`)
+  const creds = await getAssumedRoleCredentials(account.role_arn, account.external_id, `costdoq-cur-ingest-${accountId}-${Date.now()}`)
   const s3Client = new S3Client({
     region: 'us-east-1',
     credentials: {
@@ -1145,7 +1145,7 @@ export const getCURStatus = async (userId, accountId) => {
 // ─── AWS Resource Cleanup ────────────────────────────────────────────
 
 /**
- * Clean up AWS resources created by Costra for a connection.
+ * Clean up AWS resources created by Costdoq for a connection.
  * Deletes: BCM Data Export and CloudFormation stack (which includes the IAM role).
  * Preserves the S3 bucket and its data — it may contain valuable CUR data
  * and will be reused if the customer reconnects.
@@ -1162,7 +1162,7 @@ export const cleanupAWSResources = async (roleArn, externalId, awsAccountId, con
 
   let creds
   try {
-    creds = await getAssumedRoleCredentials(roleArn, externalId, `costra-cleanup-${Date.now()}`)
+    creds = await getAssumedRoleCredentials(roleArn, externalId, `costdoq-cleanup-${Date.now()}`)
   } catch (err) {
     logger.error('Cleanup: Failed to assume role', { roleArn, error: err.message })
     return {
@@ -1178,7 +1178,7 @@ export const cleanupAWSResources = async (roleArn, externalId, awsAccountId, con
   }
 
   // 1. Delete BCM Data Export
-  const exportName = `costra-export-${connectionName}`
+  const exportName = `costdoq-export-${connectionName}`
   try {
     const bcmClient = new BCMDataExportsClient({ region: 'us-east-1', credentials: credentialConfig })
     const listResp = await bcmClient.send(new ListExportsCommand({}))
@@ -1196,7 +1196,7 @@ export const cleanupAWSResources = async (roleArn, externalId, awsAccountId, con
   }
 
   // 2. S3 bucket is preserved (may contain valuable CUR data, will be reused on reconnect)
-  const bucketName = `costra-cur-${awsAccountId}-${connectionName}`
+  const bucketName = `costdoq-cur-${awsAccountId}-${connectionName}`
   results.push({ step: 'preserveBucket', bucketName, status: 'preserved' })
   logger.info('Cleanup: S3 bucket preserved', { bucketName })
 

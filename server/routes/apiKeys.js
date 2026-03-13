@@ -26,7 +26,7 @@ router.post('/', async (req, res) => {
   const userId = req.user?.userId || req.user?.id
   if (!userId) return res.status(401).json({ error: 'Unauthorized' })
   const name = (req.body && req.body.name) ? String(req.body.name).trim() || null : null
-  const rawKey = 'costra_' + crypto.randomBytes(32).toString('hex')
+  const rawKey = 'costdoq_' + crypto.randomBytes(32).toString('hex')
   const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex')
   const keyPrefix = rawKey.slice(0, 15) + '...'
   try {

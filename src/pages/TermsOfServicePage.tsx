@@ -15,14 +15,14 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Acceptance of Terms</h2>
             <p className="text-gray-700 leading-relaxed">
-              By creating an account or using Costra ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service. These Terms constitute a legally binding agreement between you and Costra.
+              By creating an account or using Costdoq ("the Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service. These Terms constitute a legally binding agreement between you and Costdoq.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Description of Service</h2>
             <p className="text-gray-700 leading-relaxed">
-              Costra is a multi-cloud cost management platform that allows you to connect cloud provider accounts (AWS, Azure, GCP, and others), view and analyze cloud spending data, set budgets, receive alerts, and generate cost reports. The Service includes AI-powered cost analysis features and multi-currency support.
+              Costdoq is a multi-cloud cost management platform that allows you to connect cloud provider accounts (AWS, Azure, GCP, and others), view and analyze cloud spending data, set budgets, receive alerts, and generate cost reports. The Service includes AI-powered cost analysis features and multi-currency support.
             </p>
           </section>
 
@@ -36,7 +36,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Subscription Plans and Payment</h2>
             <div className="text-gray-700 leading-relaxed space-y-3">
-              <p>Costra offers a 7-day free trial followed by paid subscription plans (Starter and Pro). All payments are processed by <strong>Dodo Payments</strong>, who acts as the Merchant of Record for all transactions.</p>
+              <p>Costdoq offers a 7-day free trial followed by paid subscription plans (Starter and Pro). All payments are processed by <strong>Dodo Payments</strong>, who acts as the Merchant of Record for all transactions.</p>
               <p><strong>Pricing:</strong> Prices are displayed in USD and INR. Applicable taxes (VAT, GST, sales tax) are calculated and collected by Dodo Payments based on your location.</p>
               <p><strong>Billing:</strong> Subscriptions are billed monthly or annually, depending on your chosen plan. Your subscription will automatically renew unless cancelled before the renewal date.</p>
               <p><strong>Free Trial:</strong> The 7-day free trial provides full access to all features. You will not be charged during the trial period.</p>
@@ -47,8 +47,8 @@ export default function TermsOfServicePage() {
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Cancellation and Refund Policy</h2>
             <div className="text-gray-700 leading-relaxed space-y-3">
               <p><strong>Cancellation:</strong> You may cancel your subscription at any time through the billing settings. Your access will continue until the end of the current billing period.</p>
-              <p><strong>EU Right of Withdrawal:</strong> If you are an EU consumer, you have the right to withdraw from a purchase within 14 days without giving any reason. To exercise this right, contact us at support@costra.dev. Refunds under the right of withdrawal will be processed through Dodo Payments.</p>
-              <p><strong>Refunds:</strong> Refund requests outside the EU withdrawal period will be evaluated on a case-by-case basis. Contact support@costra.dev for assistance.</p>
+              <p><strong>EU Right of Withdrawal:</strong> If you are an EU consumer, you have the right to withdraw from a purchase within 14 days without giving any reason. To exercise this right, contact us at support@costdoq.dev. Refunds under the right of withdrawal will be processed through Dodo Payments.</p>
+              <p><strong>Refunds:</strong> Refund requests outside the EU withdrawal period will be evaluated on a case-by-case basis. Contact support@costdoq.dev for assistance.</p>
             </div>
           </section>
 
@@ -68,14 +68,14 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Cloud Provider Credentials</h2>
             <p className="text-gray-700 leading-relaxed">
-              You are responsible for the cloud provider credentials you connect to Costra. We recommend using read-only, least-privilege IAM roles. We encrypt all credentials using AES-256-GCM and do not access your cloud resources beyond what is necessary to retrieve cost and usage data. You may disconnect your cloud providers and revoke credentials at any time.
+              You are responsible for the cloud provider credentials you connect to Costdoq. We recommend using read-only, least-privilege IAM roles. We encrypt all credentials using AES-256-GCM and do not access your cloud resources beyond what is necessary to retrieve cost and usage data. You may disconnect your cloud providers and revoke credentials at any time.
             </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. AI Features</h2>
             <p className="text-gray-700 leading-relaxed">
-              Costra offers AI-powered cost analysis features. When you use these features, aggregated cost data (not personal information) may be sent to our AI provider (Anthropic) for analysis. AI-generated insights are provided for informational purposes only and should not be considered financial advice.
+              Costdoq offers AI-powered cost analysis features. When you use these features, aggregated cost data (not personal information) may be sent to our AI provider (Anthropic) for analysis. AI-generated insights are provided for informational purposes only and should not be considered financial advice.
             </p>
           </section>
 
@@ -89,7 +89,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Limitation of Liability</h2>
             <p className="text-gray-700 leading-relaxed">
-              To the maximum extent permitted by law, Costra shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or business opportunities arising from your use of the Service. Our total liability for any claims related to the Service shall not exceed the amount you have paid us in the 12 months preceding the claim.
+              To the maximum extent permitted by law, Costdoq shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or business opportunities arising from your use of the Service. Our total liability for any claims related to the Service shall not exceed the amount you have paid us in the 12 months preceding the claim.
             </p>
           </section>
 
@@ -103,7 +103,7 @@ export default function TermsOfServicePage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">12. Intellectual Property</h2>
             <p className="text-gray-700 leading-relaxed">
-              The Service, including its design, features, and content, is owned by Costra and protected by intellectual property laws. Your subscription grants you a limited, non-exclusive, non-transferable license to use the Service for its intended purpose.
+              The Service, including its design, features, and content, is owned by Costdoq and protected by intellectual property laws. Your subscription grants you a limited, non-exclusive, non-transferable license to use the Service for its intended purpose.
             </p>
           </section>
 
@@ -130,7 +130,7 @@ export default function TermsOfServicePage() {
 
           <section className="border-t border-gray-200 pt-8">
             <p className="text-gray-600">
-              For any questions about these Terms, please contact us at <strong>support@costra.dev</strong>.
+              For any questions about these Terms, please contact us at <strong>support@costdoq.dev</strong>.
             </p>
           </section>
         </div>
@@ -140,7 +140,7 @@ export default function TermsOfServicePage() {
       <footer className="bg-white border-t border-gray-200 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600 space-y-2 sm:space-y-0">
-            <p>&copy; {new Date().getFullYear()} Costra. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Costdoq. All rights reserved.</p>
             <div className="flex space-x-6">
               <Link to="/privacy" className="hover:text-gray-900">Privacy Policy</Link>
               <Link to="/terms" className="hover:text-gray-900">Terms of Service</Link>

@@ -4,20 +4,20 @@
 # Usage: ./scripts/create-secret-from-env.sh [OPTIONS] [ENV_FILE]
 #
 # Options:
-#   -n, --namespace NAME   Kubernetes namespace (default: costra)
-#   -s, --secret-name NAME Secret name (default: costra-env)
+#   -n, --namespace NAME   Kubernetes namespace (default: costdoq)
+#   -s, --secret-name NAME Secret name (default: costdoq-env)
 #   -h, --help             Show this help
 #
 # Example:
 #   ./scripts/create-secret-from-env.sh
-#   ./scripts/create-secret-from-env.sh -n costra -s costra-env .env
+#   ./scripts/create-secret-from-env.sh -n costdoq -s costdoq-env .env
 #   ./scripts/create-secret-from-env.sh .env.production
 #
 
 set -e
 
-NAMESPACE="${K8S_NAMESPACE:-costra}"
-SECRET_NAME="costra-secrets"
+NAMESPACE="${K8S_NAMESPACE:-costdoq}"
+SECRET_NAME="costdoq-secrets"
 ENV_FILE=".env"
 
 usage() {

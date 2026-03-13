@@ -1,6 +1,6 @@
 # Sentry Setup Guide
 
-Sentry is already integrated into the Costra application. You just need to configure it with your DSN (Data Source Name).
+Sentry is already integrated into the Costdoq application. You just need to configure it with your DSN (Data Source Name).
 
 ## 📋 Prerequisites
 
@@ -19,7 +19,7 @@ Sentry is already integrated into the Costra application. You just need to confi
 
 1. After signing up, you'll be prompted to create a project
 2. Select **Node.js** as your platform
-3. Give your project a name (e.g., "Costra" or "Costra Production")
+3. Give your project a name (e.g., "Costdoq" or "Costdoq Production")
 4. Click **Create Project**
 
 ### Step 3: Get Your DSN
@@ -52,7 +52,7 @@ Sentry is already integrated into the Costra application. You just need to confi
    ```env
    # Required
    JWT_SECRET=your-secret-key-change-this-in-production
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costra
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/costdoq
    
    # Optional - Server defaults
    PORT=3001
@@ -76,7 +76,7 @@ Restart your server to load the new environment variable:
 
 ```bash
 # If using PM2
-pm2 restart costra-backend
+pm2 restart costdoq-backend
 
 # If running directly
 # Stop the server (Ctrl+C) and restart:

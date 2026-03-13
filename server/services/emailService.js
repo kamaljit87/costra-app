@@ -75,8 +75,8 @@ export const isEmailServiceAvailable = () => {
  * Get the configured "from" address
  */
 const getFromAddress = () => {
-  const name = process.env.SES_FROM_NAME || 'Costra'
-  const email = process.env.SES_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@costra.dev'
+  const name = process.env.SES_FROM_NAME || 'Costdoq'
+  const email = process.env.SES_FROM_EMAIL || process.env.EMAIL_FROM || 'noreply@costdoq.dev'
   return `${name} <${email}>`
 }
 

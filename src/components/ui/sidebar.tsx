@@ -479,7 +479,7 @@ const Sidebar = ({
               <div className="flex items-center justify-center h-16 px-4 border-b border-surface-200 dark:border-gray-800 shrink-0 relative">
                 <Link to="/dashboard" onClick={closeOnNav} className="w-full flex justify-center items-center">
                   <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
-                    <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
+                    <img src="/logo.png" alt="Costdoq" className="h-9 w-auto block" />
                   </span>
                 </Link>
                 <button
@@ -510,11 +510,11 @@ const Sidebar = ({
           <Link to="/dashboard" className="flex items-center justify-center shrink-0">
             {isCollapsed ? (
               <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:p-1">
-                <img src="/favicon-192.png" alt="Costra" className="h-8 w-8 block object-contain" />
+                <img src="/favicon-192.png" alt="Costdoq" className="h-8 w-8 block object-contain" />
               </span>
             ) : (
               <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
-                <img src="/logo.png" alt="Costra" className="h-9 w-auto block" />
+                <img src="/logo.png" alt="Costdoq" className="h-9 w-auto block" />
               </span>
             )}
           </Link>

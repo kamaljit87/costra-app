@@ -1,4 +1,4 @@
-# Costra documentation for Confluence
+# Costdoq documentation for Confluence
 
 This folder contains user-facing feature documentation formatted for **Atlassian Confluence**.
 
@@ -35,7 +35,7 @@ This folder contains user-facing feature documentation formatted for **Atlassian
 
 ## Suggested Confluence structure
 
-- **Costra User Guide** (parent)
+- **Costdoq User Guide** (parent)
   - **Overview & getting started** (from §1–2)
   - **Dashboard** (§3)
   - **Budgets** (§4)

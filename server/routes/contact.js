@@ -86,7 +86,7 @@ router.post('/', contactLimiter, async (req, res) => {
       if (supportEmail && sendEmail) {
         await sendEmail(null, {
           to: supportEmail,
-          subject: `[Costra Contact] ${sanitizedData.category}: ${sanitizedData.subject}`,
+          subject: `[Costdoq Contact] ${sanitizedData.category}: ${sanitizedData.subject}`,
           html: `
             <h3>New Contact Form Submission</h3>
             <p><strong>From:</strong> ${sanitizedData.name} (${sanitizedData.email})</p>

@@ -26,7 +26,7 @@ export default function LandingNav() {
     <header className="sticky top-0 z-[100] border-b border-gray-200/60 bg-white/80 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto px-4 sm:px-5 lg:px-6">
         <div className="flex justify-between items-center h-14 sm:h-16 gap-4">
-          <Link to="/" className="flex items-center shrink-0" aria-label="Costra Home">
+          <Link to="/" className="flex items-center shrink-0" aria-label="Costdoq Home">
             <Logo height={40} />
           </Link>
 

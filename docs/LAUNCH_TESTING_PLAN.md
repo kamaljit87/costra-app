@@ -1,4 +1,4 @@
-# Costra App — Launch Testing Plan
+# Costdoq App — Launch Testing Plan
 
 **Target Launch: March 8, 2026**
 **Testing Window: March 4–7 (4 days)**
@@ -130,7 +130,7 @@ cd server && npm test -- --coverage
 - [ ] All tests green
 - [ ] No critical security vulnerabilities in direct dependencies
 - [ ] TypeScript build succeeds: `docker run --rm -v "$(pwd)":/app -w /app node:20-slim npx tsc --noEmit --skipLibCheck`
-- [ ] Frontend build succeeds: `docker compose build --no-cache costra-frontend`
+- [ ] Frontend build succeeds: `docker compose build --no-cache costdoq-frontend`
 - [ ] Production environment variables all set (JWT_SECRET, DATABASE_URL, payment keys, OAuth, Sentry)
 - [ ] Backup strategy tested (PostgreSQL backup + restore)
 - [ ] Purge Cloudflare cache after final deploy

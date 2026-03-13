@@ -1,4 +1,4 @@
-# Costra Future Roadmap
+# Costdoq Future Roadmap
 
 This document captures planned enhancements and future work. **Current implementation stays as-is** until these items are prioritized and scheduled.
 
@@ -34,7 +34,7 @@ This document captures planned enhancements and future work. **Current implement
 
 Infracost estimates costs from Terraform/Pulumi **before** deployment using a pricing catalog and no cloud credentials.
 
-**If Costra adds this in future:**
+**If Costdoq adds this in future:**
 
 - Parse IaC for cost-relevant parameters (instance types, disk sizes, regions).
 - Use a pricing catalog (build own or integrate Infracost Cloud Pricing API).

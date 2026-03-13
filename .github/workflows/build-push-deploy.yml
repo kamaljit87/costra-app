@@ -22,12 +22,12 @@ concurrency:
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: 005878674861.dkr.ecr.us-east-1.amazonaws.com
-  ECR_BACKEND: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-backend
-  ECR_FRONTEND: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costra-frontend
-  REMOTE_DIR: /var/servers/costra-app
+  ECR_BACKEND: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-backend
+  ECR_FRONTEND: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-frontend
+  REMOTE_DIR: /var/servers/costdoq-app
   REMOTE_USER: ubuntu
   REMOTE_PORT: "44823"
-  K8S_NAMESPACE: costra
+  K8S_NAMESPACE: costdoq
 
 jobs:
   build-and-push:
@@ -63,7 +63,7 @@ jobs:
 
       - name: Create ECR repositories if missing
         run: |
-          for repo in costra-backend costra-frontend; do
+          for repo in costdoq-backend costdoq-frontend; do
             aws ecr describe-repositories --repository-names "$repo" --region ${{ env.AWS_REGION }} 2>/dev/null || \
               aws ecr create-repository --repository-name "$repo" --region ${{ env.AWS_REGION }}
           done

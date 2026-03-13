@@ -1,5 +1,5 @@
 /**
- * Costra Logo Component
+ * Costdoq Logo Component
  * Uses the brand logo PNG image
  */
 
@@ -13,7 +13,7 @@ export default function Logo({ className = '', height = 40 }: LogoProps) {
     <span className="dark:inline-block dark:rounded-lg dark:bg-gray-100 dark:px-2 dark:py-1.5">
       <img
         src="/logo.png"
-        alt="Costra"
+        alt="Costdoq"
         className={`w-auto ${className}`}
         style={{ height: `${height}px` }}
       />
