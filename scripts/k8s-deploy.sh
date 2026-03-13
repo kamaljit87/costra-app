@@ -16,10 +16,9 @@ echo "Deploying $REGISTRY/costdoq-{backend,frontend}:$TAG to namespace $NS"
 # Pull latest k8s manifests (works with both full clone and sparse checkout)
 cd "$DIR" && [ -d .git ] && git pull --ff-only || true
 
-# Apply k8s manifests (infra + app configs)
+# Ensure namespace and core resources exist
+sudo kubectl apply -R -f "$DIR/k8s/costdoq/" 2>/dev/null || true
 [ -d "$DIR/k8s/cluster/redis" ] && sudo kubectl apply -f "$DIR/k8s/cluster/redis/" 2>/dev/null || true
-[ -f "$DIR/k8s/costdoq/middleware.yaml" ] && sudo kubectl apply -f "$DIR/k8s/costdoq/middleware.yaml" 2>/dev/null || true
-[ -f "$DIR/k8s/costdoq/ingress.yaml" ] && sudo kubectl apply -f "$DIR/k8s/costdoq/ingress.yaml" 2>/dev/null || true
 
 # Update deployments
 sudo kubectl set image deployment/costdoq-backend backend="$REGISTRY/costdoq-backend:$TAG" -n "$NS"

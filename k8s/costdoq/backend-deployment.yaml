@@ -25,10 +25,11 @@ spec:
     spec:
       containers:
         - name: backend
-          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-backend:latest
+          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-backend:92e1fc8
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
+            runAsUser: 1001
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
             capabilities:

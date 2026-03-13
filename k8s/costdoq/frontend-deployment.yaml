@@ -25,14 +25,11 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-frontend:latest
+          image: 005878674861.dkr.ecr.us-east-1.amazonaws.com/costdoq-frontend:92e1fc8
           imagePullPolicy: IfNotPresent
           securityContext:
-            runAsNonRoot: true
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ["ALL"]
+            readOnlyRootFilesystem: false
           ports:
             - containerPort: 8080
               name: http
