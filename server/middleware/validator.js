@@ -30,11 +30,10 @@ export const sanitizeString = (str) => {
   if (typeof str !== 'string') return str
   return str
     .trim()
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
+    .replace(/<[^>]*>/g, '')       // Strip HTML tags
+    .replace(/javascript\s*:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+\s*=/gi, '')    // Remove inline event handlers
+    .replace(/data\s*:/gi, '')     // Remove data: URIs
 }
 
 /**

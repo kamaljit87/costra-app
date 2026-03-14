@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { CurrencyProvider } from './contexts/CurrencyContext'
 import { FilterProvider } from './contexts/FilterContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -75,13 +75,13 @@ const PageLoader = () => (
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authReady, isAuthenticated } = useAuth()
+  // On marketing domain, always redirect to app subdomain
+  if (!isAppDomain) {
+    window.location.href = `${APP_ORIGIN}${window.location.pathname}${window.location.search}`
+    return <PageLoader />
+  }
   if (!authReady) return <PageLoader />
   if (!isAuthenticated) {
-    // On marketing domain, redirect to app subdomain login
-    if (!isAppDomain) {
-      window.location.href = `${APP_ORIGIN}/login`
-      return <PageLoader />
-    }
     return <Navigate to="/login" replace />
   }
   return <>{children}</>
@@ -107,6 +107,12 @@ function WaitlistRoute() {
   return <WaitlistPage />
 }
 
+/** ErrorBoundary that resets when the route changes */
+function RouteErrorBoundary({ children }: { children: React.ReactNode }) {
+  const location = useLocation()
+  return <ErrorBoundary key={location.pathname}>{children}</ErrorBoundary>
+}
+
 /** On the marketing site, redirect auth routes to app subdomain */
 function RedirectToApp({ path }: { path: string }) {
   window.location.href = `${APP_ORIGIN}${path}${window.location.search}`
@@ -121,7 +127,7 @@ function App() {
           <CurrencyProvider>
             <FilterProvider>
               <NotificationProvider>
-                <ErrorBoundary>
+                <RouteErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Landing — on app subdomain, redirect to dashboard */}
@@ -200,7 +206,7 @@ function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>
-                </ErrorBoundary>
+                </RouteErrorBoundary>
               <CookieConsent />
             </NotificationProvider>
           </FilterProvider>
