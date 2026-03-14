@@ -1054,14 +1054,20 @@ router.post('/:providerId/report', async (req, res) => {
     // Get team and product breakdowns
     const teamBreakdowns = await Promise.all(
       teams.map(async (team) => {
-        const breakdown = await getTeamServiceBreakdown(userId, team.teamName, startDate, endDate, providerId, accountId).catch(() => [])
+        const breakdown = await getTeamServiceBreakdown(userId, team.teamName, startDate, endDate, providerId, accountId).catch((err) => {
+          logger.warn('Failed to get team service breakdown', { teamName: team.teamName, error: err.message })
+          return []
+        })
         return { ...team, services: breakdown }
       })
     )
 
     const productBreakdowns = await Promise.all(
       products.map(async (product) => {
-        const breakdown = await getProductServiceBreakdown(userId, product.productName, startDate, endDate, providerId, accountId).catch(() => [])
+        const breakdown = await getProductServiceBreakdown(userId, product.productName, startDate, endDate, providerId, accountId).catch((err) => {
+          logger.warn('Failed to get product service breakdown', { productName: product.productName, error: err.message })
+          return []
+        })
         return { ...product, services: breakdown }
       })
     )

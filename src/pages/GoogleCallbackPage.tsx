@@ -18,6 +18,15 @@ export default function GoogleCallbackPage() {
       setStatus('error')
       return
     }
+    // Validate OAuth state parameter (CSRF protection)
+    const returnedState = searchParams.get('state')
+    const savedState = sessionStorage.getItem('oauth_state')
+    sessionStorage.removeItem('oauth_state')
+    if (!returnedState || returnedState !== savedState) {
+      setErrorMessage('Invalid OAuth state. Please try signing in again.')
+      setStatus('error')
+      return
+    }
     if (!codeParam) {
       setErrorMessage('No authorization code received')
       setStatus('error')

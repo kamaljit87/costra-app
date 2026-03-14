@@ -28,7 +28,7 @@ export const authenticateToken = async (req, res, next) => {
     return res.status(403).json({ error: 'Invalid API key' })
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }, (err, user) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token' })
     }
@@ -56,7 +56,7 @@ export const requireJwt = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]
   if (!token) return res.status(401).json({ error: 'Access token required' })
   if (token.startsWith('costdoq_')) return res.status(403).json({ error: 'API keys cannot manage keys; use your session token' })
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] }, (err, user) => {
     if (err) return res.status(403).json({ error: 'Invalid or expired token' })
     req.user = user
     next()

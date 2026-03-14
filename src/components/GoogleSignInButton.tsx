@@ -18,9 +18,12 @@ export default function GoogleSignInButton({ mode: _mode }: GoogleSignInButtonPr
     }
     setError('')
     setIsLoading(true)
+    // Generate random state for CSRF protection
+    const state = crypto.randomUUID()
+    sessionStorage.setItem('oauth_state', state)
     const redirectUri = encodeURIComponent(window.location.origin + '/auth/google/callback')
     const scope = encodeURIComponent('email profile')
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent&state=${encodeURIComponent(state)}`
   }
 
   return (

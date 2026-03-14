@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PublicConfigProvider, usePublicConfig } from './contexts/PublicConfigContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import CookieConsent from './components/CookieConsent'
+import ErrorBoundary from './components/ErrorBoundary'
 
 import LandingPage from './pages/LandingPage'
 
@@ -120,6 +121,7 @@ function App() {
           <CurrencyProvider>
             <FilterProvider>
               <NotificationProvider>
+                <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Landing — on app subdomain, redirect to dashboard */}
@@ -198,6 +200,7 @@ function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>
+                </ErrorBoundary>
               <CookieConsent />
             </NotificationProvider>
           </FilterProvider>

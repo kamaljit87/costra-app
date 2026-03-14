@@ -178,14 +178,23 @@ export const checkCacheHealth = async (errorCount) => {
 /**
  * Initialize alerting checks (run periodically)
  */
+let alertingInterval = null
+
 export const initAlerting = () => {
   // Run health checks every minute
-  setInterval(async () => {
+  alertingInterval = setInterval(async () => {
     await checkErrorRate()
     await checkLatency()
   }, 60000) // 1 minute
 
   logger.info('Alerting system initialized')
+}
+
+export const stopAlerting = () => {
+  if (alertingInterval) {
+    clearInterval(alertingInterval)
+    alertingInterval = null
+  }
 }
 
 /**

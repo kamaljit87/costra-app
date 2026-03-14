@@ -23,6 +23,7 @@ import {
 } from '../database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { validateSignup, validateLogin } from '../middleware/validator.js'
+import { authLimiter } from '../middleware/rateLimiter.js'
 import { createTrialSubscription } from '../services/subscriptionService.js'
 import { addMarketingLead } from '../database.js'
 import { sendTransactionalEmail } from '../services/emailService.js'
@@ -147,7 +148,7 @@ router.get('/config', (_req, res) => {
 })
 
 /** Forgot password: sends reset email if user exists. Always returns generic success to prevent user enumeration. */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authLimiter, async (req, res) => {
   const email = req.body?.email
   if (!email || typeof email !== 'string' || !email.trim()) {
     return res.status(400).json({ error: 'Email is required' })
@@ -291,6 +292,7 @@ router.post('/waitlist', async (req, res) => {
 })
 
 router.post('/signup',
+  authLimiter,
   validateSignup,
   async (req, res) => {
     try {
@@ -430,6 +432,7 @@ router.post('/signup',
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/login',
+  authLimiter,
   validateLogin,
   async (req, res) => {
     try {
@@ -610,7 +613,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 })
 
 // --- 2FA verify (no auth middleware; uses temporary token) ---
-router.post('/2fa/verify', async (req, res) => {
+router.post('/2fa/verify', authLimiter, async (req, res) => {
   try {
     const { temporaryToken, code } = req.body
     if (!temporaryToken || typeof code !== 'string' || !code.trim()) {

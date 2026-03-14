@@ -9,6 +9,22 @@ import logger from '../utils/logger.js'
 import { getUserById } from '../database.js'
 import { canAccessFeature } from './subscriptionService.js'
 
+/** Escape user-supplied strings before interpolation into HTML */
+function esc(str) {
+  if (typeof str !== 'string') return String(str ?? '')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
+/** Strip newlines/carriage returns from email subjects to prevent header injection */
+function safeSubject(str) {
+  return String(str ?? '').replace(/[\r\n]/g, '')
+}
+
 // Create transporter (supports SES, SendGrid, or SMTP)
 let transporter = null
 
@@ -282,7 +298,7 @@ export const sendAnomalyAlert = async (userId, anomalyData) => {
 
   const { serviceName, variancePercent, currentCost, baselineCost, isIncrease, date } = anomalyData
 
-  const subject = `Cost Anomaly Detected: ${serviceName}`
+  const subject = safeSubject(`Cost Anomaly Detected: ${serviceName}`)
   const html = `
     <!DOCTYPE html>
     <html>
@@ -305,7 +321,7 @@ export const sendAnomalyAlert = async (userId, anomalyData) => {
         </div>
         <div class="content">
           <div class="alert">
-            <strong>${serviceName}</strong> costs have ${isIncrease ? 'increased' : 'decreased'} by
+            <strong>${esc(serviceName)}</strong> costs have ${isIncrease ? 'increased' : 'decreased'} by
             <strong>${Math.abs(variancePercent).toFixed(1)}%</strong> compared to the 30-day baseline.
           </div>
 
@@ -346,9 +362,9 @@ export const sendBudgetAlert = async (userId, budgetData) => {
 
   const { budgetName, currentSpend, budgetAmount, percentage, isExceeded } = budgetData
 
-  const subject = isExceeded
+  const subject = safeSubject(isExceeded
     ? `Budget Exceeded: ${budgetName}`
-    : `Budget Alert: ${budgetName}`
+    : `Budget Alert: ${budgetName}`)
 
   const html = `
     <!DOCTYPE html>
@@ -372,7 +388,7 @@ export const sendBudgetAlert = async (userId, budgetData) => {
         </div>
         <div class="content">
           <div class="alert">
-            <strong>${budgetName}</strong> is at <strong>${percentage.toFixed(1)}%</strong> of the budget limit.
+            <strong>${esc(budgetName)}</strong> is at <strong>${percentage.toFixed(1)}%</strong> of the budget limit.
             ${isExceeded ? 'The budget has been exceeded!' : ''}
           </div>
 
@@ -448,7 +464,7 @@ export const sendWeeklySummary = async (userId, summaryData) => {
           <h3>Top Services</h3>
           ${topServices.map(service => `
             <div class="metric">
-              <span>${service.name}</span>
+              <span>${esc(service.name)}</span>
               <span>$${service.cost.toFixed(2)}</span>
             </div>
           `).join('')}

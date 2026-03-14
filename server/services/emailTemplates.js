@@ -7,6 +7,17 @@ const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
 const APP_URL = () => process.env.APP_URL || FRONTEND_URL()
 const BRAND_COLOR = '#3F4ABF'
 
+/** Escape user-supplied strings before interpolation into HTML */
+function esc(str) {
+  if (typeof str !== 'string') return String(str ?? '')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
 /**
  * Base email layout wrapper
  */
@@ -58,7 +69,7 @@ function baseLayout(title, bodyHtml) {
  */
 export function verifyEmailTemplate(name, verifyUrl) {
   return baseLayout('Verify Your Email', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <p>Welcome to Costdoq! Please verify your email address to get started.</p>
     <p style="text-align:center; margin: 28px 0;">
       <a href="${verifyUrl}" class="btn">Verify Email Address</a>
@@ -73,7 +84,7 @@ export function verifyEmailTemplate(name, verifyUrl) {
  */
 export function passwordResetTemplate(name, resetUrl) {
   return baseLayout('Reset Your Password', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <p>We received a request to reset your password. Click the button below to choose a new password.</p>
     <p style="text-align:center; margin: 28px 0;">
       <a href="${resetUrl}" class="btn">Reset Password</a>
@@ -88,7 +99,7 @@ export function passwordResetTemplate(name, resetUrl) {
  */
 export function passwordChangedTemplate(name) {
   return baseLayout('Password Changed', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <div class="alert alert-warning">
       <strong>Your password was just changed.</strong>
     </div>
@@ -105,7 +116,7 @@ export function passwordChangedTemplate(name) {
  */
 export function deletionConfirmTemplate(name, confirmUrl, cancelUrl) {
   return baseLayout('Confirm Account Deletion', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <p>You requested to delete your Costdoq account. This action is <strong>permanent and irreversible</strong>.</p>
     <div class="alert alert-danger">
       <strong>This will permanently delete:</strong>
@@ -132,7 +143,7 @@ export function deletionConfirmTemplate(name, confirmUrl, cancelUrl) {
  */
 export function accountDeletedTemplate(name) {
   return baseLayout('Account Deleted', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <p>Your Costdoq account and all associated data have been permanently deleted.</p>
     <p>We're sorry to see you go. If you ever want to come back, you're welcome to create a new account at <a href="${FRONTEND_URL()}">${FRONTEND_URL()}</a>.</p>
   `)
@@ -143,7 +154,7 @@ export function accountDeletedTemplate(name) {
  */
 export function deletionCancelledTemplate(name) {
   return baseLayout('Account Deletion Cancelled', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <div class="alert alert-info">
       <strong>Your account deletion request has been cancelled.</strong> Your account is safe and no data was deleted.
     </div>
@@ -159,8 +170,8 @@ export function deletionCancelledTemplate(name) {
  */
 export function emailChangeVerifyTemplate(name, newEmail, verifyUrl) {
   return baseLayout('Verify Your New Email', `
-    <p>Hi ${name},</p>
-    <p>You requested to change your Costdoq email to <strong>${newEmail}</strong>.</p>
+    <p>Hi ${esc(name)},</p>
+    <p>You requested to change your Costdoq email to <strong>${esc(newEmail)}</strong>.</p>
     <p>Click below to verify this new email address:</p>
     <p style="text-align:center; margin: 28px 0;">
       <a href="${verifyUrl}" class="btn">Verify New Email</a>
@@ -175,9 +186,9 @@ export function emailChangeVerifyTemplate(name, newEmail, verifyUrl) {
  */
 export function emailChangeNotifyTemplate(name, newEmail, cancelUrl) {
   return baseLayout('Email Change Requested', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <div class="alert alert-warning">
-      <strong>Someone requested to change your email address</strong> to <strong>${newEmail}</strong>.
+      <strong>Someone requested to change your email address</strong> to <strong>${esc(newEmail)}</strong>.
     </div>
     <p>If this was you, no action is needed — verify the change from your new email inbox.</p>
     <p>If you did <strong>not</strong> request this change, click below to cancel it and secure your account:</p>
@@ -192,7 +203,7 @@ export function emailChangeNotifyTemplate(name, newEmail, cancelUrl) {
  */
 export function emailChangedConfirmTemplate(name) {
   return baseLayout('Email Address Updated', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <div class="alert alert-info">
       <strong>Your email address has been successfully updated.</strong>
     </div>
@@ -208,7 +219,7 @@ export function emailChangedConfirmTemplate(name) {
  */
 export function twoFactorEnabledTemplate(name) {
   return baseLayout('Two-Factor Authentication Enabled', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <div class="alert alert-info">
       <strong>Two-factor authentication has been enabled</strong> on your Costdoq account.
     </div>
@@ -225,7 +236,7 @@ export function twoFactorEnabledTemplate(name) {
  */
 export function twoFactorDisabledTemplate(name) {
   return baseLayout('Two-Factor Authentication Disabled', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <div class="alert alert-warning">
       <strong>Two-factor authentication has been disabled</strong> on your Costdoq account.
     </div>
@@ -242,7 +253,7 @@ export function twoFactorDisabledTemplate(name) {
  */
 export function welcomeTemplate(name) {
   return baseLayout('Welcome to Costdoq!', `
-    <p>Hi ${name},</p>
+    <p>Hi ${esc(name)},</p>
     <p>Thanks for joining Costdoq! Your <strong>7-day free trial</strong> has started.</p>
     <p>Here's how to get started:</p>
     <ol style="padding-left: 20px;">

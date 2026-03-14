@@ -150,6 +150,14 @@ const shutdown = async (signal) => {
     logger.warn('Error closing Redis', { error: err.message })
   }
 
+  try {
+    const { stopAlerting } = await import('./utils/alerting.js')
+    stopAlerting()
+    logger.info('Alerting interval cleared')
+  } catch (err) {
+    logger.warn('Error stopping alerting', { error: err.message })
+  }
+
   process.exit(0)
 }
 

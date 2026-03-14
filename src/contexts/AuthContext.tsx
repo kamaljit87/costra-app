@@ -73,7 +73,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userData = JSON.parse(savedUser)
         setUser(userData)
         setIsAuthenticated(true)
-        verifyAndRefreshToken()
+        verifyAndRefreshToken().catch((err) => {
+          console.error('Token verification failed:', err)
+          logout()
+        })
       } catch (error) {
         console.error('Error parsing user data:', error)
         logout()
