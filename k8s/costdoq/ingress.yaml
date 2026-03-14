@@ -16,8 +16,30 @@ spec:
     - hosts:
         - costdoq.com
       secretName: costdoq-tls
+    - hosts:
+        - app.costdoq.com
+      secretName: costdoq-app-tls
   rules:
+    # Marketing site + contact API
     - host: costdoq.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: costdoq-backend
+                port:
+                  number: 3002
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: costdoq-frontend
+                port:
+                  number: 8080
+    # App dashboard + full API
+    - host: app.costdoq.com
       http:
         paths:
           - path: /api

@@ -29,6 +29,7 @@ import {
 import logger from '../utils/logger.js'
 
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
+const APP_URL = () => process.env.APP_URL || FRONTEND_URL()
 
 const router = express.Router()
 
@@ -86,8 +87,8 @@ router.post('/delete-account', authenticateToken, async (req, res) => {
     const request = await createDeletionRequestWithToken(userId, ipAddress, reason, confirmHash, cancelHash)
 
     // Send confirmation email
-    const confirmUrl = `${FRONTEND_URL()}/confirm-delete?token=${confirmToken}`
-    const cancelUrl = `${FRONTEND_URL()}/cancel-delete?token=${cancelToken}`
+    const confirmUrl = `${APP_URL()}/confirm-delete?token=${confirmToken}`
+    const cancelUrl = `${APP_URL()}/cancel-delete?token=${cancelToken}`
     await sendTransactionalEmail({
       to: user.email,
       subject: 'Confirm Account Deletion — Costdoq',

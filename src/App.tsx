@@ -58,6 +58,14 @@ const CancelDeletePage = lazy(() => import('./pages/CancelDeletePage'))
 const VerifyEmailChangePage = lazy(() => import('./pages/VerifyEmailChangePage'))
 const CancelEmailChangePage = lazy(() => import('./pages/CancelEmailChangePage'))
 
+/** True when running on the app subdomain (app.costdoq.com) */
+export const isAppDomain = window.location.hostname.startsWith('app.')
+
+/** Base URL for the app subdomain — used for cross-domain links from the marketing site */
+export const APP_ORIGIN = isAppDomain
+  ? ''
+  : `https://app.${window.location.hostname}`
+
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50">
     <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
@@ -66,56 +74,42 @@ const PageLoader = () => (
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authReady, isAuthenticated } = useAuth()
-  if (!authReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
-      </div>
-    )
+  if (!authReady) return <PageLoader />
+  if (!isAuthenticated) {
+    // On marketing domain, redirect to app subdomain login
+    if (!isAppDomain) {
+      window.location.href = `${APP_ORIGIN}/login`
+      return <PageLoader />
+    }
+    return <Navigate to="/login" replace />
   }
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
+  return <>{children}</>
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { authReady, isAuthenticated } = useAuth()
-  if (!authReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
-      </div>
-    )
-  }
+  if (!authReady) return <PageLoader />
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>
 }
 
 function SignupRoute() {
   const { signupDisabled, configReady } = usePublicConfig()
-  if (!configReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
-      </div>
-    )
-  }
-  if (signupDisabled) {
-    return <Navigate to="/waitlist" replace />
-  }
+  if (!configReady) return <PageLoader />
+  if (signupDisabled) return <Navigate to="/waitlist" replace />
   return <SignupTravelPage />
 }
 
 function WaitlistRoute() {
   const { signupDisabled, configReady } = usePublicConfig()
-  if (!configReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
-      </div>
-    )
-  }
-  if (!signupDisabled) {
-    return <Navigate to="/signup" replace />
-  }
+  if (!configReady) return <PageLoader />
+  if (!signupDisabled) return <Navigate to="/signup" replace />
   return <WaitlistPage />
+}
+
+/** On the marketing site, redirect auth routes to app subdomain */
+function RedirectToApp({ path }: { path: string }) {
+  window.location.href = `${APP_ORIGIN}${path}${window.location.search}`
+  return <PageLoader />
 }
 
 function App() {
@@ -128,244 +122,81 @@ function App() {
               <NotificationProvider>
                 <Suspense fallback={<PageLoader />}>
                 <Routes>
-                  <Route path="/" element={<LandingPage />} />
-                  <Route path="/login" element={<PublicRoute><LoginTravelPage /></PublicRoute>} />
-                  <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
-                  <Route path="/waitlist" element={<WaitlistRoute />} />
-                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  <Route path="/verify-email" element={<VerifyEmailPage />} />
-                  <Route path="/confirm-delete" element={<ConfirmDeletePage />} />
-                  <Route path="/cancel-delete" element={<CancelDeletePage />} />
-                  <Route path="/verify-email-change" element={<VerifyEmailChangePage />} />
-                  <Route path="/cancel-email-change" element={<CancelEmailChangePage />} />
-                <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
-                <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />
-                <Route path="/auth/suggest-2fa" element={<ProtectedRoute><Suggest2FAPage /></ProtectedRoute>} />
-                <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                <Route path="/terms" element={<TermsOfServicePage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/blog" element={<BlogListPage />} />
-                <Route path="/blog/:slug" element={<BlogPostPage />} />
-                <Route path="/docs" element={<ProtectedRoute><DocsPage /></ProtectedRoute>} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings/billing"
-              element={
-                <ProtectedRoute>
-                  <BillingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/provider/:providerId"
-              element={
-                <ProtectedRoute>
-                  <ProviderDetailPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/budgets"
-              element={
-                <ProtectedRoute>
-                  <BudgetsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/products"
-              element={
-                <ProtectedRoute>
-                  <ProductCostView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/teams"
-              element={
-                <ProtectedRoute>
-                  <TeamCostView />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/compare"
-              element={
-                <ProtectedRoute>
-                  <CostComparePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/recommendations"
-              element={
-                <ProtectedRoute>
-                  <RecommendationsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/rightsizing"
-              element={
-                <ProtectedRoute>
-                  <RightsizingPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute>
-                  <ReportsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/organization"
-              element={
-                <ProtectedRoute>
-                  <OrganizationPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/anomalies"
-              element={
-                <ProtectedRoute>
-                  <AnomaliesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/policies"
-              element={
-                <ProtectedRoute>
-                  <PoliciesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/forecasts"
-              element={
-                <ProtectedRoute>
-                  <ForecastPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/kubernetes"
-              element={
-                <ProtectedRoute>
-                  <KubernetesPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/workflows"
-              element={
-                <ProtectedRoute>
-                  <WorkflowsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/savings-plans"
-              element={
-                <ProtectedRoute>
-                  <SavingsPlansPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/allocations"
-              element={
-                <ProtectedRoute>
-                  <AllocationsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/terraform"
-              element={
-                <ProtectedRoute>
-                  <TerraformPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/saas"
-              element={
-                <ProtectedRoute>
-                  <SaaSPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/custom-dashboard"
-              element={
-                <ProtectedRoute>
-                  <CustomDashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/custom-dashboard/:id"
-              element={
-                <ProtectedRoute>
-                  <CustomDashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bill-analyzer"
-              element={
-                <ProtectedRoute>
-                  <BillAnalyzerPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/debug"
-              element={
-                <ProtectedRoute>
-                  <DebugPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/tickets"
-              element={
-                <ProtectedRoute>
-                  <AdminTicketsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-              </Routes>
+                  {/* Landing — on app subdomain, redirect to dashboard */}
+                  <Route path="/" element={isAppDomain ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+
+                  {/* Auth pages — on marketing domain, redirect to app subdomain */}
+                  {isAppDomain ? (
+                    <>
+                      <Route path="/login" element={<PublicRoute><LoginTravelPage /></PublicRoute>} />
+                      <Route path="/signup" element={<PublicRoute><SignupRoute /></PublicRoute>} />
+                      <Route path="/waitlist" element={<WaitlistRoute />} />
+                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      <Route path="/verify-email" element={<VerifyEmailPage />} />
+                      <Route path="/confirm-delete" element={<ConfirmDeletePage />} />
+                      <Route path="/cancel-delete" element={<CancelDeletePage />} />
+                      <Route path="/verify-email-change" element={<VerifyEmailChangePage />} />
+                      <Route path="/cancel-email-change" element={<CancelEmailChangePage />} />
+                      <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
+                      <Route path="/auth/verify-2fa" element={<Verify2FAPage />} />
+                      <Route path="/auth/suggest-2fa" element={<ProtectedRoute><Suggest2FAPage /></ProtectedRoute>} />
+                    </>
+                  ) : (
+                    <>
+                      <Route path="/login" element={<RedirectToApp path="/login" />} />
+                      <Route path="/signup" element={<RedirectToApp path="/signup" />} />
+                      <Route path="/waitlist" element={<RedirectToApp path="/waitlist" />} />
+                      <Route path="/forgot-password" element={<RedirectToApp path="/forgot-password" />} />
+                      <Route path="/reset-password" element={<RedirectToApp path="/reset-password" />} />
+                      <Route path="/verify-email" element={<RedirectToApp path="/verify-email" />} />
+                      <Route path="/confirm-delete" element={<RedirectToApp path="/confirm-delete" />} />
+                      <Route path="/cancel-delete" element={<RedirectToApp path="/cancel-delete" />} />
+                      <Route path="/verify-email-change" element={<RedirectToApp path="/verify-email-change" />} />
+                      <Route path="/cancel-email-change" element={<RedirectToApp path="/cancel-email-change" />} />
+                      <Route path="/auth/google/callback" element={<RedirectToApp path="/auth/google/callback" />} />
+                      <Route path="/auth/verify-2fa" element={<RedirectToApp path="/auth/verify-2fa" />} />
+                    </>
+                  )}
+
+                  {/* Public pages — served on both domains */}
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsOfServicePage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/blog" element={<BlogListPage />} />
+                  <Route path="/blog/:slug" element={<BlogPostPage />} />
+
+                  {/* Protected app pages */}
+                  <Route path="/docs" element={<ProtectedRoute><DocsPage /></ProtectedRoute>} />
+                  <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                  <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+                  <Route path="/settings/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                  <Route path="/provider/:providerId" element={<ProtectedRoute><ProviderDetailPage /></ProtectedRoute>} />
+                  <Route path="/budgets" element={<ProtectedRoute><BudgetsPage /></ProtectedRoute>} />
+                  <Route path="/products" element={<ProtectedRoute><ProductCostView /></ProtectedRoute>} />
+                  <Route path="/teams" element={<ProtectedRoute><TeamCostView /></ProtectedRoute>} />
+                  <Route path="/compare" element={<ProtectedRoute><CostComparePage /></ProtectedRoute>} />
+                  <Route path="/recommendations" element={<ProtectedRoute><RecommendationsPage /></ProtectedRoute>} />
+                  <Route path="/rightsizing" element={<ProtectedRoute><RightsizingPage /></ProtectedRoute>} />
+                  <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+                  <Route path="/organization" element={<ProtectedRoute><OrganizationPage /></ProtectedRoute>} />
+                  <Route path="/anomalies" element={<ProtectedRoute><AnomaliesPage /></ProtectedRoute>} />
+                  <Route path="/policies" element={<ProtectedRoute><PoliciesPage /></ProtectedRoute>} />
+                  <Route path="/forecasts" element={<ProtectedRoute><ForecastPage /></ProtectedRoute>} />
+                  <Route path="/kubernetes" element={<ProtectedRoute><KubernetesPage /></ProtectedRoute>} />
+                  <Route path="/workflows" element={<ProtectedRoute><WorkflowsPage /></ProtectedRoute>} />
+                  <Route path="/savings-plans" element={<ProtectedRoute><SavingsPlansPage /></ProtectedRoute>} />
+                  <Route path="/allocations" element={<ProtectedRoute><AllocationsPage /></ProtectedRoute>} />
+                  <Route path="/terraform" element={<ProtectedRoute><TerraformPage /></ProtectedRoute>} />
+                  <Route path="/saas" element={<ProtectedRoute><SaaSPage /></ProtectedRoute>} />
+                  <Route path="/custom-dashboard" element={<ProtectedRoute><CustomDashboardPage /></ProtectedRoute>} />
+                  <Route path="/custom-dashboard/:id" element={<ProtectedRoute><CustomDashboardPage /></ProtectedRoute>} />
+                  <Route path="/bill-analyzer" element={<ProtectedRoute><BillAnalyzerPage /></ProtectedRoute>} />
+                  <Route path="/debug" element={<ProtectedRoute><DebugPage /></ProtectedRoute>} />
+                  <Route path="/admin/tickets" element={<ProtectedRoute><AdminTicketsPage /></ProtectedRoute>} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
                 </Suspense>
               <CookieConsent />
             </NotificationProvider>
@@ -378,4 +209,3 @@ function App() {
 }
 
 export default App
-

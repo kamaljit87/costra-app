@@ -43,7 +43,7 @@ export async function createApp() {
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:5173'],
+        connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:5173', process.env.APP_URL].filter(Boolean),
         fontSrc: ["'self'", 'data:', 'https:'],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
@@ -59,11 +59,15 @@ export async function createApp() {
 
   app.use(compression())
 
-  // CORS
+  // CORS — allow both marketing site (FRONTEND_URL) and app subdomain (APP_URL)
+  const allowedOrigins = isProduction
+    ? [process.env.FRONTEND_URL, process.env.APP_URL].filter(Boolean)
+    : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://192.168.122.4:5173', 'http://192.168.18.29:5173']
   app.use(cors({
-    origin: isProduction
-      ? process.env.FRONTEND_URL
-      : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://192.168.122.4:5173', 'http://192.168.18.29:5173'],
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true)
+      cb(null, false)
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],

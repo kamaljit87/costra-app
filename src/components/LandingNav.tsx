@@ -5,6 +5,7 @@ import Logo from './Logo'
 import { cn } from '@/lib/utils'
 import { useAuth } from '../contexts/AuthContext'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
+import { APP_ORIGIN } from '../App'
 
 const NAV_ITEMS = [
   { name: 'Home', url: '/', icon: Home },
@@ -88,8 +89,8 @@ export default function LandingNav() {
 
             {isAuthenticated ? (
               <>
-                <Link
-                  to="/dashboard"
+                <a
+                  href={`${APP_ORIGIN}/dashboard`}
                   className={cn(
                     'flex items-center gap-1.5 text-sm font-semibold px-3 sm:px-4 py-2 rounded-full transition-colors',
                     'bg-primary-600 text-white hover:bg-primary-700',
@@ -97,9 +98,9 @@ export default function LandingNav() {
                 >
                   <LayoutDashboard size={16} strokeWidth={2.5} />
                   <span className="hidden sm:inline">Dashboard</span>
-                </Link>
-                <Link
-                  to="/dashboard"
+                </a>
+                <a
+                  href={`${APP_ORIGIN}/dashboard`}
                   className="flex items-center justify-center w-8 h-8 rounded-full bg-accent-100 text-accent-700 text-xs font-bold overflow-hidden shrink-0"
                   title={user?.name || 'Profile'}
                 >
@@ -108,38 +109,38 @@ export default function LandingNav() {
                   ) : (
                     initials
                   )}
-                </Link>
+                </a>
               </>
             ) : signupDisabled ? (
-              <Link
-                to="/waitlist"
+              <a
+                href={`${APP_ORIGIN}/waitlist`}
                 className={cn(
                   'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
                   'bg-primary-600 text-white hover:bg-primary-700',
                 )}
               >
                 Join Waitlist
-              </Link>
+              </a>
             ) : (
               <>
-                <Link
-                  to="/login"
+                <a
+                  href={`${APP_ORIGIN}/login`}
                   className={cn(
                     'text-sm font-semibold px-3 sm:px-4 py-2 rounded-full transition-colors',
                     'text-gray-700 hover:text-primary-600 hover:bg-gray-50',
                   )}
                 >
                   Sign In
-                </Link>
-                <Link
-                  to="/signup"
+                </a>
+                <a
+                  href={`${APP_ORIGIN}/signup`}
                   className={cn(
                     'text-sm font-semibold px-4 py-2 rounded-full transition-colors shrink-0',
                     'bg-primary-600 text-white hover:bg-primary-700',
                   )}
                 >
                   Try Free
-                </Link>
+                </a>
               </>
             )}
           </nav>

@@ -4,6 +4,7 @@
  */
 
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
+const APP_URL = () => process.env.APP_URL || FRONTEND_URL()
 const BRAND_COLOR = '#3F4ABF'
 
 /**
@@ -94,7 +95,7 @@ export function passwordChangedTemplate(name) {
     <p>If you made this change, no further action is needed.</p>
     <p>If you did <strong>not</strong> change your password, your account may be compromised. Please reset your password immediately:</p>
     <p style="text-align:center; margin: 28px 0;">
-      <a href="${FRONTEND_URL()}/forgot-password" class="btn btn-danger">Secure My Account</a>
+      <a href="${APP_URL()}/forgot-password" class="btn btn-danger">Secure My Account</a>
     </p>
   `)
 }
@@ -115,7 +116,7 @@ export function deletionConfirmTemplate(name, confirmUrl, cancelUrl) {
         <li>Your account and profile</li>
       </ul>
     </div>
-    <p>Before deleting, you can <a href="${FRONTEND_URL()}/settings">export your data</a> from Settings.</p>
+    <p>Before deleting, you can <a href="${APP_URL()}/settings">export your data</a> from Settings.</p>
     <p style="text-align:center; margin: 28px 0;">
       <a href="${confirmUrl}" class="btn btn-danger">Confirm Deletion</a>
     </p>
@@ -148,7 +149,7 @@ export function deletionCancelledTemplate(name) {
     </div>
     <p>If you didn't request the deletion, we recommend changing your password as a precaution:</p>
     <p style="text-align:center; margin: 28px 0;">
-      <a href="${FRONTEND_URL()}/settings" class="btn">Go to Settings</a>
+      <a href="${APP_URL()}/settings" class="btn">Go to Settings</a>
     </p>
   `)
 }
@@ -197,7 +198,7 @@ export function emailChangedConfirmTemplate(name) {
     </div>
     <p>You can now sign in with your new email. If you didn't make this change, please contact support immediately.</p>
     <p style="text-align:center; margin: 28px 0;">
-      <a href="${FRONTEND_URL()}/settings" class="btn">Go to Settings</a>
+      <a href="${APP_URL()}/settings" class="btn">Go to Settings</a>
     </p>
   `)
 }
@@ -214,7 +215,7 @@ export function twoFactorEnabledTemplate(name) {
     <p>You'll now need your authenticator app to sign in. Make sure you've saved your recovery codes in a safe place.</p>
     <p>If you didn't enable 2FA, your account may be compromised. Change your password immediately:</p>
     <p style="text-align:center; margin: 28px 0;">
-      <a href="${FRONTEND_URL()}/forgot-password" class="btn btn-danger">Secure My Account</a>
+      <a href="${APP_URL()}/forgot-password" class="btn btn-danger">Secure My Account</a>
     </p>
   `)
 }
@@ -231,7 +232,7 @@ export function twoFactorDisabledTemplate(name) {
     <p>Your account is now only protected by your password. We recommend keeping 2FA enabled for better security.</p>
     <p>If you didn't disable 2FA, your account may be compromised:</p>
     <p style="text-align:center; margin: 28px 0;">
-      <a href="${FRONTEND_URL()}/forgot-password" class="btn btn-danger">Secure My Account</a>
+      <a href="${APP_URL()}/forgot-password" class="btn btn-danger">Secure My Account</a>
     </p>
   `)
 }
@@ -250,8 +251,8 @@ export function welcomeTemplate(name) {
       <li><strong>Set up budgets</strong> — get alerted before you overspend</li>
     </ol>
     <p style="text-align:center; margin: 28px 0;">
-      <a href="${FRONTEND_URL()}/dashboard" class="btn">Go to Dashboard</a>
+      <a href="${APP_URL()}/dashboard" class="btn">Go to Dashboard</a>
     </p>
-    <p class="muted">Need help? Reply to this email or visit our <a href="${FRONTEND_URL()}/docs">documentation</a>.</p>
+    <p class="muted">Need help? Reply to this email or visit our <a href="${APP_URL()}/docs">documentation</a>.</p>
   `)
 }

@@ -10,4 +10,5 @@ data:
   PORT: "3002"
   REDIS_URL: "redis://redis.infra.svc.cluster.local:6379"
   FRONTEND_URL: "https://costdoq.com"
+  APP_URL: "https://app.costdoq.com"
   VITE_API_URL: "/api"

@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import { Globe, TrendingDown, Shield, Zap, ArrowRight, Check, BarChart3, Brain, ScanLine } from 'lucide-react'
 import LandingNav from '../components/LandingNav'
 import { usePublicConfig } from '../contexts/PublicConfigContext'
+import { APP_ORIGIN } from '../App'
 
 const FlickeringGrid = lazy(() => import('@/components/ui/flickering-grid').then(m => ({ default: m.FlickeringGrid })))
 
@@ -137,19 +138,19 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
               {signupDisabled ? (
-                <Link to="/waitlist" className="btn-primary text-base px-8 py-3 flex items-center">
+                <a href={`${APP_ORIGIN}/waitlist`} className="btn-primary text-base px-8 py-3 flex items-center">
                   Join Waitlist
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
+                </a>
               ) : (
                 <>
-                  <Link to="/signup" className="btn-primary text-lg px-10 py-4 flex items-center shadow-lg hover:shadow-xl transition-shadow">
+                  <a href={`${APP_ORIGIN}/signup`} className="btn-primary text-lg px-10 py-4 flex items-center shadow-lg hover:shadow-xl transition-shadow">
                     Start Free Trial
                     <ArrowRight className="ml-2 h-5 w-5" />
-                  </Link>
-                  <Link to="/login" className="btn-secondary text-base px-8 py-3">
+                  </a>
+                  <a href={`${APP_ORIGIN}/login`} className="btn-secondary text-base px-8 py-3">
                     Sign In
-                  </Link>
+                  </a>
                 </>
               )}
             </div>
@@ -302,12 +303,12 @@ export default function LandingPage() {
                 <p className="text-sm text-gray-600 italic">{PLANS.starter.priceWorksBecause}</p>
               </div>
 
-              <Link
-                to={signupDisabled ? '/waitlist' : '/signup'}
+              <a
+                href={`${APP_ORIGIN}${signupDisabled ? '/waitlist' : '/signup'}`}
                 className="w-full btn-secondary text-center block py-3 rounded-lg font-semibold"
               >
                 {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
-              </Link>
+              </a>
               {!signupDisabled && (
                 <p className="text-xs text-accent-600 font-medium text-center mt-2">7-day free trial included</p>
               )}
@@ -367,12 +368,12 @@ export default function LandingPage() {
                 <p className="text-sm text-gray-600 italic">{PLANS.pro.priceWorksBecause}</p>
               </div>
 
-              <Link
-                to={signupDisabled ? '/waitlist' : '/signup'}
+              <a
+                href={`${APP_ORIGIN}${signupDisabled ? '/waitlist' : '/signup'}`}
                 className="w-full btn-primary text-center block py-3 rounded-lg font-semibold"
               >
                 {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
-              </Link>
+              </a>
               {!signupDisabled && (
                 <p className="text-xs text-accent-600 font-medium text-center mt-2">7-day free trial included</p>
               )}
@@ -394,10 +395,10 @@ export default function LandingPage() {
           <p className="text-xl text-accent-100 mb-10 max-w-2xl mx-auto">
             Join teams worldwide managing their multi-cloud infrastructure with Costdoq.
           </p>
-          <Link to={signupDisabled ? '/waitlist' : '/signup'} className="inline-flex items-center px-10 py-4 bg-white text-accent-700 rounded-lg font-semibold text-lg hover:bg-accent-50 transition-all duration-150 shadow-lg hover:shadow-xl">
+          <a href={`${APP_ORIGIN}${signupDisabled ? '/waitlist' : '/signup'}`} className="inline-flex items-center px-10 py-4 bg-white text-accent-700 rounded-lg font-semibold text-lg hover:bg-accent-50 transition-all duration-150 shadow-lg hover:shadow-xl">
             {signupDisabled ? 'Join Waitlist' : 'Start Free Trial'}
             <ArrowRight className="ml-2 h-5 w-5" />
-          </Link>
+          </a>
           {!signupDisabled && (
             <p className="mt-4 text-sm text-accent-200">7-day free trial. Cancel anytime.</p>
           )}

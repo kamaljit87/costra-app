@@ -41,6 +41,7 @@ const router = express.Router()
 const TOTP_ISSUER = 'Costdoq'
 const TEMP_TOKEN_EXPIRY = '10m'
 const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:5173'
+const APP_URL = () => process.env.APP_URL || FRONTEND_URL()
 
 /** Generate a secure random token and its SHA-256 hash */
 function generateTokenPair() {
@@ -54,7 +55,7 @@ async function sendVerificationEmail(userId, email, name) {
   const { token, hash } = generateTokenPair()
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
   await createEmailVerificationToken(userId, email, hash, expiresAt)
-  const verifyUrl = `${FRONTEND_URL()}/verify-email?token=${token}`
+  const verifyUrl = `${APP_URL()}/verify-email?token=${token}`
   await sendTransactionalEmail({
     to: email,
     subject: 'Verify Your Email — Costdoq',
@@ -162,7 +163,7 @@ router.post('/forgot-password', async (req, res) => {
       const { token, hash } = generateTokenPair()
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
       await createPasswordResetToken(user.id, hash, expiresAt)
-      const resetUrl = `${FRONTEND_URL()}/reset-password?token=${token}`
+      const resetUrl = `${APP_URL()}/reset-password?token=${token}`
       await sendTransactionalEmail({
         to: user.email,
         subject: 'Reset Your Password — Costdoq',

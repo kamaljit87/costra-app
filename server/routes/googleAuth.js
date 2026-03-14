@@ -11,6 +11,7 @@ const router = express.Router()
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').replace(/\/$/, '')
+const APP_URL = (process.env.APP_URL || FRONTEND_URL).replace(/\/$/, '')
 
 async function verifyGoogleIdToken(idToken) {
   if (!GOOGLE_CLIENT_ID) {
@@ -39,7 +40,7 @@ router.post('/callback', async (req, res) => {
       if (!FRONTEND_URL) {
         return res.status(500).json({ error: 'FRONTEND_URL is required for Google redirect flow' })
       }
-      const redirectUri = `${FRONTEND_URL}/auth/google/callback`
+      const redirectUri = `${APP_URL}/auth/google/callback`
       const client = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, redirectUri)
       let tokens
       try {

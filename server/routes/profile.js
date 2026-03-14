@@ -142,9 +142,9 @@ router.put('/',
 
           await createEmailChangeRequest(userId, email, verifyHash, cancelHash, expiresAt)
 
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-          const verifyUrl = `${frontendUrl}/verify-email-change?token=${verifyToken}`
-          const cancelUrl = `${frontendUrl}/cancel-email-change?token=${cancelToken}`
+          const appUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173'
+          const verifyUrl = `${appUrl}/verify-email-change?token=${verifyToken}`
+          const cancelUrl = `${appUrl}/cancel-email-change?token=${cancelToken}`
 
           // Send verification to new email
           sendTransactionalEmail({
