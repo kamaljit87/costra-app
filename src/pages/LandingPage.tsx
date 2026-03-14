@@ -102,10 +102,23 @@ export default function LandingPage() {
       <Helmet>
         <title>Costdoq - Multi-Cloud Cost Management | Simplify Cloud Spending</title>
         <meta name="description" content="Costdoq helps teams manage and optimize cloud costs across AWS, Azure, GCP, and more. Get unified visibility, anomaly detection, and actionable insights." />
+        <link rel="canonical" href="https://costdoq.com/" />
         <meta property="og:title" content="Costdoq - Multi-Cloud Cost Management" />
         <meta property="og:description" content="Simplify cloud spending across AWS, Azure, GCP, and more with unified cost visibility and optimization." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://costdoq.com" />
+        <meta property="og:url" content="https://costdoq.com/" />
+        <meta property="og:image" content="https://costdoq.com/logo.png" />
+        <script type="application/ld+json">{JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareApplication',
+          name: 'Costdoq',
+          applicationCategory: 'BusinessApplication',
+          operatingSystem: 'Web',
+          description: 'Multi-cloud cost management platform. Unify AWS, Azure, GCP, and more.',
+          url: 'https://costdoq.com',
+          offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', description: 'Free tier available' },
+          publisher: { '@type': 'Organization', name: 'Indraops Technologies', url: 'https://indraopstech.com' },
+        })}</script>
       </Helmet>
 
       <LandingNav />

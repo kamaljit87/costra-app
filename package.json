@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "generate:seo": "node scripts/generate-seo.js",
+    "generate:seo:ping": "node scripts/generate-seo.js --ping",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 200",
     "server:start": "cd server && npm run pm2:start",

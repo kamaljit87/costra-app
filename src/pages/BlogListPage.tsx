@@ -39,6 +39,7 @@ export default function BlogListPage() {
       <Helmet>
         <title>Blog - Costdoq | Multi-Cloud Cost Management Insights</title>
         <meta name="description" content="Insights on cloud cost optimization, FinOps best practices, and multi-cloud management from the Costdoq team." />
+        <link rel="canonical" href="https://costdoq.com/blog" />
         <meta property="og:title" content="Costdoq Blog - Cloud Cost Optimization Insights" />
         <meta property="og:description" content="Cloud cost optimization insights and FinOps best practices." />
         <meta property="og:type" content="website" />
