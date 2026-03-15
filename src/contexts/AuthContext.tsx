@@ -75,7 +75,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsAuthenticated(true)
         verifyAndRefreshToken().catch((err) => {
           console.error('Token verification failed:', err)
-          logout()
+          // Don't logout here — verifyAndRefreshToken handles logout internally
+          // for specific error cases. An unhandled rejection here is likely a
+          // transient network error that shouldn't force logout.
         })
       } catch (error) {
         console.error('Error parsing user data:', error)
