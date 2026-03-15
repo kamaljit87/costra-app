@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { } from '../contexts/AuthContext'
 import { useNotification } from '../contexts/NotificationContext'
@@ -6,7 +6,17 @@ import { saasAPI } from '../services/api'
 import Layout from '../components/Layout'
 import Breadcrumbs from '../components/Breadcrumbs'
 import FeatureInfoButton from '../components/FeatureInfoButton'
-import { Cloud, Plus, Trash2, Upload, TrendingUp, TrendingDown } from 'lucide-react'
+import { Cloud, Plus, Trash2, Upload, TrendingUp, TrendingDown, RefreshCw, CheckCircle, AlertCircle, Clock, Loader2, Link2 } from 'lucide-react'
+
+interface CredentialField {
+  key: string
+  label: string
+  type: 'text' | 'password' | 'select'
+  required: boolean
+  placeholder?: string
+  defaultValue?: string
+  options?: { value: string; label: string }[]
+}
 
 interface SaaSProvider {
   id: number
@@ -15,6 +25,9 @@ interface SaaSProvider {
   is_active: boolean
   current_month_cost: string
   created_at: string
+  last_sync_at: string | null
+  sync_status: 'never' | 'syncing' | 'success' | 'error'
+  sync_error: string | null
 }
 
 interface SaaSTotals {
@@ -29,8 +42,52 @@ const PROVIDER_TYPES = [
   { value: 'datadog', label: 'Datadog' },
   { value: 'snowflake', label: 'Snowflake' },
   { value: 'github', label: 'GitHub' },
-  { value: 'custom', label: 'Custom' },
+  { value: 'custom', label: 'Custom (Manual / CSV)' },
 ]
+
+function SyncStatusBadge({ status, error, lastSync }: { status: string; error: string | null; lastSync: string | null }) {
+  const formatTime = (iso: string) => {
+    const d = new Date(iso)
+    const now = new Date()
+    const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000)
+    if (diffMin < 1) return 'just now'
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHr = Math.floor(diffMin / 60)
+    if (diffHr < 24) return `${diffHr}h ago`
+    return `${Math.floor(diffHr / 24)}d ago`
+  }
+
+  switch (status) {
+    case 'success':
+      return (
+        <span className="flex items-center gap-1 text-xs text-green-600" title={lastSync ? `Last synced: ${new Date(lastSync).toLocaleString()}` : ''}>
+          <CheckCircle className="h-3.5 w-3.5" />
+          Synced {lastSync ? formatTime(lastSync) : ''}
+        </span>
+      )
+    case 'syncing':
+      return (
+        <span className="flex items-center gap-1 text-xs text-blue-600">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Syncing...
+        </span>
+      )
+    case 'error':
+      return (
+        <span className="flex items-center gap-1 text-xs text-red-600" title={error || 'Sync failed'}>
+          <AlertCircle className="h-3.5 w-3.5" />
+          Error
+        </span>
+      )
+    default:
+      return (
+        <span className="flex items-center gap-1 text-xs text-gray-400">
+          <Clock className="h-3.5 w-3.5" />
+          Never synced
+        </span>
+      )
+  }
+}
 
 export default function SaaSPage() {
   const { showSuccess, showError } = useNotification()
@@ -41,15 +98,16 @@ export default function SaaSPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [formName, setFormName] = useState('')
-  const [formType, setFormType] = useState('custom')
+  const [formType, setFormType] = useState('datadog')
+  const [credentialFields, setCredentialFields] = useState<CredentialField[]>([])
+  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({})
+  const [isAdding, setIsAdding] = useState(false)
+  const [syncingIds, setSyncingIds] = useState<Set<number>>(new Set())
+  const [expandedError, setExpandedError] = useState<number | null>(null)
   const [uploadProviderId, setUploadProviderId] = useState('')
   const [uploadCsv, setUploadCsv] = useState('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true)
       const [providersRes, totalsRes] = await Promise.all([
@@ -63,18 +121,67 @@ export default function SaaSPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [showError])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Load credential fields when provider type changes
+  useEffect(() => {
+    if (formType === 'custom') {
+      setCredentialFields([])
+      setCredentialValues({})
+      return
+    }
+    saasAPI.getCredentialFields(formType).then(res => {
+      const fields = res.fields || []
+      setCredentialFields(fields)
+      const defaults: Record<string, string> = {}
+      for (const f of fields) {
+        if (f.defaultValue) defaults[f.key] = f.defaultValue
+      }
+      setCredentialValues(defaults)
+    }).catch(() => setCredentialFields([]))
+  }, [formType])
 
   const handleAddProvider = async () => {
     if (!formName.trim()) return
+    setIsAdding(true)
     try {
-      await saasAPI.addProvider({ providerName: formName.trim(), providerType: formType })
+      const hasCredentials = credentialFields.length > 0 && Object.values(credentialValues).some(v => v)
+      await saasAPI.addProvider({
+        providerName: formName.trim(),
+        providerType: formType,
+        credentials: hasCredentials ? credentialValues : undefined,
+      })
       showSuccess('SaaS provider added')
       setShowAddForm(false)
       setFormName('')
+      setCredentialValues({})
       await loadData()
-    } catch {
-      showError('Failed to add provider')
+    } catch (err: any) {
+      showError(err?.message || 'Failed to add provider')
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
+  const handleSync = async (id: number) => {
+    setSyncingIds(prev => new Set(prev).add(id))
+    try {
+      const res = await saasAPI.syncProvider(id)
+      showSuccess(res.message || 'Sync completed')
+      await loadData()
+    } catch (err: any) {
+      showError(err?.message || 'Sync failed')
+      await loadData()
+    } finally {
+      setSyncingIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -96,7 +203,6 @@ export default function SaaSPage() {
   const handleUpload = async () => {
     if (!uploadProviderId || !uploadCsv.trim()) return
     try {
-      // Parse simple CSV: date,service,cost
       const lines = uploadCsv.trim().split('\n')
       const costs = lines.slice(1).map(line => {
         const [date, service, cost] = line.split(',').map(s => s.trim())
@@ -113,10 +219,11 @@ export default function SaaSPage() {
     }
   }
 
-
   const totalCurrentMonth = totals.reduce((s, t) => s + parseFloat(t.current_month || '0'), 0)
   const totalLastMonth = totals.reduce((s, t) => s + parseFloat(t.last_month || '0'), 0)
   const change = totalLastMonth > 0 ? ((totalCurrentMonth - totalLastMonth) / totalLastMonth * 100) : 0
+
+  const getProviderDetails = (id: number) => providers.find(p => p.id === id)
 
   return (
     <Layout>
@@ -162,9 +269,12 @@ export default function SaaSPage() {
           </div>
         </div>
 
+        {/* Add Provider Form */}
         {showAddForm && (
           <div className="mb-6 p-5 bg-white rounded-xl border shadow-sm">
-            <h3 className="font-semibold mb-4">Add SaaS Provider</h3>
+            <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <Link2 className="h-4 w-4" /> Add SaaS Provider
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Provider Name</label>
@@ -179,13 +289,66 @@ export default function SaaSPage() {
                 </select>
               </div>
             </div>
+
+            {/* Dynamic credential fields */}
+            {credentialFields.length > 0 && (
+              <div className="border-t pt-4 mt-2 mb-4">
+                <p className="text-xs font-medium text-gray-600 mb-3 uppercase tracking-wide">
+                  Connection Credentials
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {credentialFields.map(field => (
+                    <div key={field.key}>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        {field.label} {field.required && <span className="text-red-400">*</span>}
+                      </label>
+                      {field.type === 'select' ? (
+                        <select
+                          value={credentialValues[field.key] || field.defaultValue || ''}
+                          onChange={e => setCredentialValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white"
+                        >
+                          {field.options?.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type={field.type}
+                          value={credentialValues[field.key] || ''}
+                          onChange={e => setCredentialValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                          placeholder={field.placeholder}
+                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Credentials are encrypted at rest (AES-256-GCM). Connection will be tested before saving.
+                </p>
+              </div>
+            )}
+
+            {formType === 'custom' && (
+              <p className="text-xs text-gray-400 mb-4">
+                Custom providers use manual CSV upload for cost data. No API credentials needed.
+              </p>
+            )}
+
             <div className="flex gap-2">
-              <button onClick={handleAddProvider} className="px-4 py-2 bg-accent-600 text-white rounded-lg text-sm">Add</button>
-              <button onClick={() => setShowAddForm(false)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm">Cancel</button>
+              <button onClick={handleAddProvider} disabled={isAdding || !formName.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-accent-600 text-white rounded-lg text-sm disabled:opacity-50">
+                {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {isAdding ? 'Connecting...' : 'Add Provider'}
+              </button>
+              <button onClick={() => { setShowAddForm(false); setCredentialValues({}) }}
+                className="px-4 py-2 bg-gray-100 rounded-lg text-sm">Cancel</button>
             </div>
           </div>
         )}
 
+        {/* Upload CSV Form */}
         {showUploadForm && (
           <div className="mb-6 p-5 bg-white rounded-xl border shadow-sm">
             <h3 className="font-semibold mb-4">Upload Cost CSV</h3>
@@ -210,6 +373,7 @@ export default function SaaSPage() {
           </div>
         )}
 
+        {/* Provider List */}
         {isLoading ? (
           <div className="flex justify-center py-12">
             <div className="h-8 w-8 rounded-full border-2 border-gray-200 border-t-gray-600 animate-spin" />
@@ -218,7 +382,7 @@ export default function SaaSPage() {
           <div className="text-center py-16 bg-white rounded-xl border">
             <Cloud className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-lg font-medium text-gray-700">No SaaS providers</p>
-            <p className="text-sm text-gray-500 mt-1">Add Datadog, Snowflake, or other SaaS providers to track their costs.</p>
+            <p className="text-sm text-gray-500 mt-1">Add Datadog, Snowflake, GitHub, or other SaaS providers to track their costs.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -226,22 +390,62 @@ export default function SaaSPage() {
               const current = parseFloat(t.current_month || '0')
               const last = parseFloat(t.last_month || '0')
               const pctChange = last > 0 ? ((current - last) / last * 100) : 0
+              const details = getProviderDetails(t.id)
+              const isSyncing = syncingIds.has(t.id) || details?.sync_status === 'syncing'
+              const hasCredentials = details?.provider_type !== 'custom'
+              const isErrorExpanded = expandedError === t.id
+
               return (
                 <div key={t.id} className="bg-white rounded-xl border p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold">{t.provider_name}</span>
                         <span className="px-2 py-0.5 bg-gray-100 rounded-full text-xs">{t.provider_type}</span>
+                        {details && (
+                          <SyncStatusBadge
+                            status={details.sync_status}
+                            error={details.sync_error}
+                            lastSync={details.last_sync_at}
+                          />
+                        )}
                       </div>
                       <p className="text-xs text-gray-400 mt-1">
                         This month: ${current.toFixed(2)} &middot; Last month: ${last.toFixed(2)}
                       </p>
+                      {isErrorExpanded && details?.sync_error && (
+                        <p className="text-xs text-red-500 mt-1 bg-red-50 rounded px-2 py-1">
+                          {details.sync_error}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 ml-3">
                       <span className={`text-sm font-medium ${pctChange >= 0 ? 'text-red-600' : 'text-green-600'}`}>
                         {pctChange >= 0 ? '+' : ''}{pctChange.toFixed(1)}%
                       </span>
+                      {hasCredentials && (
+                        <button
+                          onClick={() => handleSync(t.id)}
+                          disabled={isSyncing}
+                          title="Sync now"
+                          className="p-1.5 text-gray-400 hover:text-indigo-600 disabled:opacity-50"
+                        >
+                          {isSyncing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
+                      {details?.sync_status === 'error' && (
+                        <button
+                          onClick={() => setExpandedError(isErrorExpanded ? null : t.id)}
+                          title="Show error"
+                          className="p-1.5 text-red-400 hover:text-red-600"
+                        >
+                          <AlertCircle className="h-4 w-4" />
+                        </button>
+                      )}
                       <button onClick={() => handleDelete(t.id)} className="p-1.5 text-gray-400 hover:text-red-500">
                         <Trash2 className="h-4 w-4" />
                       </button>

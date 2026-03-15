@@ -1765,12 +1765,24 @@ export const saasAPI = {
     const response = await apiRequest('/saas/providers')
     return response.json()
   },
-  addProvider: async (data: { providerName: string; providerType: string; apiKey?: string; apiEndpoint?: string }) => {
+  addProvider: async (data: { providerName: string; providerType: string; credentials?: Record<string, string> }) => {
     const response = await apiRequest('/saas/providers', { method: 'POST', body: JSON.stringify(data) })
     return response.json()
   },
   deleteProvider: async (id: number) => {
     const response = await apiRequest(`/saas/providers/${id}`, { method: 'DELETE' })
+    return response.json()
+  },
+  getCredentialFields: async (type: string) => {
+    const response = await apiRequest(`/saas/credential-fields/${type}`)
+    return response.json()
+  },
+  syncProvider: async (id: number) => {
+    const response = await apiRequest(`/saas/providers/${id}/sync`, { method: 'POST' })
+    return response.json()
+  },
+  testConnection: async (id: number) => {
+    const response = await apiRequest(`/saas/providers/${id}/test`, { method: 'POST' })
     return response.json()
   },
   getCosts: async (params?: { startDate?: string; endDate?: string; providerId?: number }) => {

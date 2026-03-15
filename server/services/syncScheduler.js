@@ -166,3 +166,58 @@ export const initAwsHealthPolling = () => {
 
   logger.info('AWS health polling cron initialized (runs every 2 hours)')
 }
+
+// SaaS provider sync — runs every 6 hours
+export const initSaaSSyncSchedule = () => {
+  cron.schedule('15 */6 * * *', async () => {
+    try {
+      logger.info('Starting SaaS provider sync cycle')
+      const { getSaaSProvidersForSync, getSaaSProviderById, updateSaaSProviderSyncStatus, upsertSaaSCost } = await import('../database.js')
+      const { decrypt } = await import('./encryption.js')
+      const { getSaaSAdapter } = await import('./saas-providers/index.js')
+
+      const providers = await getSaaSProvidersForSync()
+      logger.info('SaaS providers due for sync', { count: providers.length })
+
+      for (const provider of providers) {
+        try {
+          const adapter = getSaaSAdapter(provider.provider_type)
+          if (!adapter) continue
+
+          await updateSaaSProviderSyncStatus(provider.id, 'syncing')
+
+          const credentials = JSON.parse(decrypt(provider.credentials_encrypted))
+          const endDate = new Date()
+          const startDate = new Date()
+          startDate.setDate(startDate.getDate() - 30)
+
+          const costs = await adapter.fetchCosts(credentials, startDate, endDate)
+
+          for (const entry of costs) {
+            await upsertSaaSCost(provider.user_id, provider.org_id, {
+              saasProviderId: provider.id,
+              serviceName: entry.serviceName,
+              date: entry.date,
+              cost: entry.cost,
+              usageQuantity: entry.usageQuantity || null,
+              usageUnit: entry.usageUnit || null,
+              metadata: entry.metadata || {},
+            })
+          }
+
+          await updateSaaSProviderSyncStatus(provider.id, 'success')
+          logger.info('SaaS provider synced', { providerId: provider.id, entries: costs.length })
+        } catch (error) {
+          await updateSaaSProviderSyncStatus(provider.id, 'error', error.message)
+          logger.error('SaaS provider sync failed', { providerId: provider.id, error: error.message })
+        }
+      }
+
+      logger.info('SaaS sync cycle completed')
+    } catch (error) {
+      logger.error('SaaS sync cycle error', { error: error.message, stack: error.stack })
+    }
+  })
+
+  logger.info('SaaS sync cron initialized (runs every 6 hours at :15)')
+}

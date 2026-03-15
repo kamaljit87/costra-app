@@ -65,11 +65,12 @@ initRedis().catch((error) => {
 // Start background services (production only)
 if (isProduction) {
   import('./utils/alerting.js').then(({ initAlerting }) => initAlerting()).catch((e) => logger.warn('Alerting init failed', { error: e.message }))
-  import('./services/syncScheduler.js').then(({ initScheduledSyncs, initCURPolling, initOptimizationSchedule, initAwsHealthPolling }) => {
+  import('./services/syncScheduler.js').then(({ initScheduledSyncs, initCURPolling, initOptimizationSchedule, initAwsHealthPolling, initSaaSSyncSchedule }) => {
     initScheduledSyncs()
     initCURPolling()
     initOptimizationSchedule()
     initAwsHealthPolling()
+    initSaaSSyncSchedule()
   }).catch((e) => logger.warn('Sync scheduler init failed', { error: e.message }))
   import('./services/weeklySummaryScheduler.js').then(({ initWeeklySummarySchedule }) => {
     initWeeklySummarySchedule()

@@ -1532,7 +1532,12 @@ export const initDatabase = async () => {
           provider_type TEXT NOT NULL CHECK (provider_type IN ('datadog', 'snowflake', 'github', 'custom')),
           api_key_encrypted TEXT,
           api_endpoint TEXT,
+          credentials_encrypted TEXT,
           is_active BOOLEAN DEFAULT true,
+          last_sync_at TIMESTAMP,
+          sync_status TEXT DEFAULT 'never' CHECK (sync_status IN ('never', 'syncing', 'success', 'error')),
+          sync_error TEXT,
+          sync_interval_hours INTEGER DEFAULT 24,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `)
@@ -1548,10 +1553,17 @@ export const initDatabase = async () => {
           usage_quantity DECIMAL(15, 2),
           usage_unit TEXT,
           metadata JSONB DEFAULT '{}',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(saas_provider_id, service_name, date)
         )
       `)
       await client.query(`CREATE INDEX IF NOT EXISTS idx_saas_costs_provider ON saas_costs(saas_provider_id, date DESC)`)
+      // Add new columns if upgrading from older schema
+      await client.query(`ALTER TABLE saas_providers ADD COLUMN IF NOT EXISTS credentials_encrypted TEXT`)
+      await client.query(`ALTER TABLE saas_providers ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMP`)
+      await client.query(`ALTER TABLE saas_providers ADD COLUMN IF NOT EXISTS sync_status TEXT DEFAULT 'never'`)
+      await client.query(`ALTER TABLE saas_providers ADD COLUMN IF NOT EXISTS sync_error TEXT`)
+      await client.query(`ALTER TABLE saas_providers ADD COLUMN IF NOT EXISTS sync_interval_hours INTEGER DEFAULT 24`)
 
       // ── Custom Dashboards ──
       await client.query(`
@@ -8472,20 +8484,23 @@ export const deleteTerraformEstimate = async (estimateId, userId) => {
 // SaaS Providers & Costs
 // ═══════════════════════════════════════════════════
 
-export const createSaaSProvider = async (userId, orgId, { providerName, providerType, apiKeyEncrypted, apiEndpoint }) => {
+export const createSaaSProvider = async (userId, orgId, { providerName, providerType, apiKeyEncrypted, apiEndpoint, credentialsEncrypted }) => {
   const result = await pool.query(
-    `INSERT INTO saas_providers (user_id, org_id, provider_name, provider_type, api_key_encrypted, api_endpoint)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [userId, orgId, providerName, providerType, apiKeyEncrypted || null, apiEndpoint || null]
+    `INSERT INTO saas_providers (user_id, org_id, provider_name, provider_type, api_key_encrypted, api_endpoint, credentials_encrypted)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [userId, orgId, providerName, providerType, apiKeyEncrypted || null, apiEndpoint || null, credentialsEncrypted || null]
   )
   return result.rows[0]
 }
 
 export const getSaaSProviders = async (userId, orgId) => {
   const result = await pool.query(
-    `SELECT sp.*, COALESCE(
-       (SELECT SUM(sc.cost) FROM saas_costs sc WHERE sc.saas_provider_id = sp.id AND sc.date >= DATE_TRUNC('month', CURRENT_DATE)), 0
-     ) AS current_month_cost
+    `SELECT sp.id, sp.user_id, sp.org_id, sp.provider_name, sp.provider_type,
+       sp.api_endpoint, sp.is_active, sp.last_sync_at, sp.sync_status, sp.sync_error,
+       sp.sync_interval_hours, sp.created_at,
+       COALESCE(
+         (SELECT SUM(sc.cost) FROM saas_costs sc WHERE sc.saas_provider_id = sp.id AND sc.date >= DATE_TRUNC('month', CURRENT_DATE)), 0
+       ) AS current_month_cost
      FROM saas_providers sp
      WHERE sp.user_id = $1 AND (sp.org_id = $2 OR sp.org_id IS NULL)
      ORDER BY sp.created_at DESC`,
@@ -8535,6 +8550,48 @@ export const getSaaSTotalsByProvider = async (userId, orgId) => {
     [userId, orgId]
   )
   return result.rows
+}
+
+export const getSaaSProviderById = async (providerId, userId) => {
+  const result = await pool.query(
+    `SELECT * FROM saas_providers WHERE id = $1 AND user_id = $2`,
+    [providerId, userId]
+  )
+  return result.rows[0]
+}
+
+export const getSaaSProvidersForSync = async () => {
+  const result = await pool.query(
+    `SELECT * FROM saas_providers
+     WHERE is_active = true
+       AND provider_type != 'custom'
+       AND credentials_encrypted IS NOT NULL
+       AND (last_sync_at IS NULL OR last_sync_at < NOW() - (sync_interval_hours || ' hours')::INTERVAL)`
+  )
+  return result.rows
+}
+
+export const updateSaaSProviderSyncStatus = async (providerId, status, error = null) => {
+  const result = await pool.query(
+    `UPDATE saas_providers SET sync_status = $2, sync_error = $3,
+       last_sync_at = CASE WHEN $2 IN ('success', 'error') THEN NOW() ELSE last_sync_at END
+     WHERE id = $1 RETURNING *`,
+    [providerId, status, error]
+  )
+  return result.rows[0]
+}
+
+export const upsertSaaSCost = async (userId, orgId, { saasProviderId, serviceName, date, cost, usageQuantity, usageUnit, metadata }) => {
+  const result = await pool.query(
+    `INSERT INTO saas_costs (user_id, org_id, saas_provider_id, service_name, date, cost, usage_quantity, usage_unit, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (saas_provider_id, service_name, date) DO UPDATE SET
+       cost = EXCLUDED.cost, usage_quantity = EXCLUDED.usage_quantity,
+       usage_unit = EXCLUDED.usage_unit, metadata = EXCLUDED.metadata
+     RETURNING *`,
+    [userId, orgId, saasProviderId, serviceName || 'default', date, cost, usageQuantity || null, usageUnit || null, JSON.stringify(metadata || {})]
+  )
+  return result.rows[0]
 }
 
 // ═══════════════════════════════════════════════════
