@@ -224,7 +224,7 @@ export default function RightsizingPage() {
     const fetch = async () => {
       setUtilLoading(true)
       try {
-        const result = await insightsAPI.getResourceUtilization(selectedResource.resourceId, 10)
+        const result = await insightsAPI.getResourceUtilization(selectedResource.resourceId, 10, selectedProvider || undefined)
         if (!cancelled) setUtilData(result.data || null)
       } catch {
         if (!cancelled) setUtilData(null)
@@ -234,7 +234,7 @@ export default function RightsizingPage() {
     }
     fetch()
     return () => { cancelled = true }
-  }, [selectedResource?.resourceId])
+  }, [selectedResource?.resourceId, selectedProvider])
 
   // ── Derived data ──────────────────────────────────────────────────
   const activeService = useMemo(

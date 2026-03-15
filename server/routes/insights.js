@@ -1587,25 +1587,155 @@ router.get('/rightsizing-explorer', authenticateToken, async (req, res) => {
 /**
  * GET /api/insights/resource-utilization/:resourceId
  * Returns utilization time-series for a specific resource (CPU, Memory, Storage, IOPS).
- * Currently returns empty series - resource-level metrics collection can be added later
- * via CloudWatch / Azure Monitor / Cloud Monitoring integration.
+ * Fetches live CloudWatch metrics for AWS EC2 instances.
  */
 router.get('/resource-utilization/:resourceId', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user?.userId || req.user?.id
     const { resourceId } = req.params
-    const { days = 10 } = req.query
+    const { days = 10, providerId } = req.query
     const lookbackDays = Math.min(parseInt(days, 10) || 10, 90)
 
-    // Resource-level utilization metrics are not yet collected.
-    // Return empty series so the frontend renders "No data" gracefully.
+    const emptyResult = { data: { resourceId, lookbackDays, cpu: [], memory: [], storage: [], iops: [] } }
+
+    // Find the cloud provider credentials for this user
+    let credentials = null
+    let providerType = null
+
+    if (providerId) {
+      // Look up by specific provider credential ID
+      const accountData = await getCloudProviderCredentialsByAccountId(userId, providerId)
+      if (accountData) {
+        providerType = accountData.providerType || accountData.provider_type || 'aws'
+        credentials = accountData.credentials || {}
+
+        // Handle automated role assumption
+        if (accountData.connectionType?.startsWith('automated') && accountData.roleArn && accountData.externalId) {
+          try {
+            const { STSClient, AssumeRoleCommand } = await import('@aws-sdk/client-sts')
+            const stsClient = new STSClient({ region: credentials.region || 'us-east-1' })
+            const assumeRes = await stsClient.send(new AssumeRoleCommand({
+              RoleArn: accountData.roleArn,
+              RoleSessionName: `costdoq-util-${Date.now()}`,
+              ExternalId: accountData.externalId,
+              DurationSeconds: 3600,
+            }))
+            if (assumeRes.Credentials) {
+              credentials = {
+                accessKeyId: assumeRes.Credentials.AccessKeyId,
+                secretAccessKey: assumeRes.Credentials.SecretAccessKey,
+                sessionToken: assumeRes.Credentials.SessionToken,
+                region: credentials.region || 'us-east-1',
+              }
+            }
+          } catch (assumeErr) {
+            logger.warn('Failed to assume role for utilization', { error: assumeErr.message })
+            return res.json(emptyResult)
+          }
+        }
+      }
+    } else {
+      // Try to find any active AWS credentials for this user
+      const result = await pool.query(
+        `SELECT id FROM cloud_provider_credentials WHERE user_id = $1 AND provider_id = 'aws' AND is_active = true ORDER BY created_at ASC LIMIT 1`,
+        [userId]
+      )
+      if (result.rows[0]) {
+        const accountData = await getCloudProviderCredentialsByAccountId(userId, result.rows[0].id)
+        if (accountData) {
+          providerType = 'aws'
+          credentials = accountData.credentials || {}
+        }
+      }
+    }
+
+    if (!credentials?.accessKeyId || !credentials?.secretAccessKey) {
+      return res.json(emptyResult)
+    }
+
+    // Currently only AWS CloudWatch is supported
+    if (providerType !== 'aws') {
+      return res.json(emptyResult)
+    }
+
+    // Fetch CloudWatch metrics for this instance
+    const { CloudWatchClient, GetMetricDataCommand } = await import('@aws-sdk/client-cloudwatch')
+    const cwClient = new CloudWatchClient({
+      region: credentials.region || 'us-east-1',
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        ...(credentials.sessionToken && { sessionToken: credentials.sessionToken }),
+      },
+    })
+
+    const endTime = new Date()
+    const startTime = new Date()
+    startTime.setDate(startTime.getDate() - lookbackDays)
+
+    // Use 1-hour period for <=14 days, 6-hour for longer
+    const period = lookbackDays <= 14 ? 3600 : 21600
+
+    const queries = [
+      { Id: 'cpu_avg', MetricStat: { Metric: { Namespace: 'AWS/EC2', MetricName: 'CPUUtilization', Dimensions: [{ Name: 'InstanceId', Value: resourceId }] }, Period: period, Stat: 'Average' }, ReturnData: true },
+      { Id: 'mem_avg', MetricStat: { Metric: { Namespace: 'CWAgent', MetricName: 'mem_used_percent', Dimensions: [{ Name: 'InstanceId', Value: resourceId }] }, Period: period, Stat: 'Average' }, ReturnData: true },
+      { Id: 'disk_used', MetricStat: { Metric: { Namespace: 'CWAgent', MetricName: 'disk_used_percent', Dimensions: [{ Name: 'InstanceId', Value: resourceId }] }, Period: period, Stat: 'Average' }, ReturnData: true },
+      { Id: 'ebs_read', MetricStat: { Metric: { Namespace: 'AWS/EC2', MetricName: 'EBSReadOps', Dimensions: [{ Name: 'InstanceId', Value: resourceId }] }, Period: period, Stat: 'Sum' }, ReturnData: true },
+      { Id: 'ebs_write', MetricStat: { Metric: { Namespace: 'AWS/EC2', MetricName: 'EBSWriteOps', Dimensions: [{ Name: 'InstanceId', Value: resourceId }] }, Period: period, Stat: 'Sum' }, ReturnData: true },
+    ]
+
+    let allResults = {}
+    let cwNextToken = undefined
+
+    do {
+      const resp = await cwClient.send(new GetMetricDataCommand({
+        MetricDataQueries: queries,
+        StartTime: startTime,
+        EndTime: endTime,
+        NextToken: cwNextToken,
+      }))
+
+      for (const result of (resp.MetricDataResults || [])) {
+        if (!allResults[result.Id]) allResults[result.Id] = { timestamps: [], values: [] }
+        allResults[result.Id].timestamps.push(...(result.Timestamps || []))
+        allResults[result.Id].values.push(...(result.Values || []))
+      }
+      cwNextToken = resp.NextToken
+    } while (cwNextToken)
+
+    // Build time-series arrays sorted by timestamp
+    const buildSeries = (id, unit) => {
+      const data = allResults[id]
+      if (!data || data.timestamps.length === 0) return []
+      const points = data.timestamps.map((ts, i) => ({ timestamp: ts.toISOString(), value: parseFloat(data.values[i]?.toFixed(2) || 0), unit }))
+      points.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+      return points
+    }
+
+    // Combine EBS read + write ops into total IOPS
+    const ebsRead = allResults['ebs_read'] || { timestamps: [], values: [] }
+    const ebsWrite = allResults['ebs_write'] || { timestamps: [], values: [] }
+    const iopsMap = new Map()
+    ebsRead.timestamps.forEach((ts, i) => {
+      const key = ts.toISOString()
+      iopsMap.set(key, (iopsMap.get(key) || 0) + (ebsRead.values[i] / period)) // ops/sec
+    })
+    ebsWrite.timestamps.forEach((ts, i) => {
+      const key = ts.toISOString()
+      iopsMap.set(key, (iopsMap.get(key) || 0) + (ebsWrite.values[i] / period))
+    })
+    const iopsSeries = Array.from(iopsMap.entries())
+      .map(([timestamp, value]) => ({ timestamp, value: parseFloat(value.toFixed(1)), unit: 'ops/sec' }))
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+
     res.json({
       data: {
         resourceId,
         lookbackDays,
-        cpu: [],
-        memory: [],
-        storage: [],
-        iops: [],
+        cpu: buildSeries('cpu_avg', '%'),
+        memory: buildSeries('mem_avg', '%'),
+        storage: buildSeries('disk_used', '%'),
+        iops: iopsSeries,
       },
     })
   } catch (error) {

@@ -898,9 +898,10 @@ export const insightsAPI = {
     return response.json()
   },
 
-  getResourceUtilization: async (resourceId: string, days?: number) => {
+  getResourceUtilization: async (resourceId: string, days?: number, providerId?: string) => {
     const params = new URLSearchParams()
     if (days) params.append('days', days.toString())
+    if (providerId) params.append('providerId', providerId)
 
     const response = await apiRequest(`/insights/resource-utilization/${encodeURIComponent(resourceId)}?${params.toString()}`)
     return response.json()
